@@ -11,16 +11,15 @@ mutable struct StochasticProgramData{S <: AbstractScenarioData}
     num_scenarios::Int
     generator::Function
     subproblems::Vector{JuMP.Model}
-    evp::JuMP.Model
 
     function (::Type{StochasticProgramData})(::Type{S}) where S <: AbstractScenarioData
-        return new{S}(scenariodata,0,Void,Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
+        return new{S}(scenariodata,0,(sdata)->nothing,Vector{JuMP.Model}())
     end
 
     function (::Type{StochasticProgramData})(scenariodata::Vector{<:AbstractScenarioData})
         S = eltype(scenariodata)
         num_scenarios = length(scenariodata)
-        return new{S}(scenariodata,num_scenarios,Void,Vector{JuMP.Model}(num_scenarios),Model(solver=JuMP.UnsetSolver()))
+        return new{S}(scenariodata,num_scenarios,(sdata)->nothing,Vector{JuMP.Model}(num_scenarios))
     end
 end
 
@@ -35,17 +34,15 @@ function StochasticProgram(scenariodata::Vector{<:AbstractScenarioData})
     return model
 end
 
-function _solve(model::Model; variant = :dep, kwargs...)
-    if variant == :dep
-        solve_dep(model,kwargs...)
-    elseif variant == :evp
-        solve_evp(model,kwargs...)
-    elseif variant == :struct
-        solve_struct(model,kwargs...)
-    else
-        error("Invalid variant option")
-    end
-end
+_solve(model::Model) = nothing
+
+# function _solve(model::Model; solver::MathProgBase.AbstractMathProgBaseSolver, kwargs...)
+# Solve dep
+# end
+
+# function _solve(model::Model; solver, kwargs...)
+# Solve struct
+# end
 
 function _printhook(io::IO, model::Model)
     print(io, model, ignore_print_hook=true)
@@ -65,19 +62,19 @@ getsubproblem(m::JuMP.Model,i)  = subproblems(m)[i]
 getprobability(m::JuMP.Model,i) = probability(m.ext[:SP].scenariodata[i])
 num_scenarios(m::JuMP.Model)    = m.ext[:SP].num_scenarios
 
-function Base.push!(sp::StochasticProgram{S},sdata::S) where S <: AbstractScenarioData
+function Base.push!(sp::StochasticProgramData{S},sdata::S) where S <: AbstractScenarioData
     push!(sp.scenariodata,sdata)
     sp.num_scenarios += 1
 end
 
-function Base.append!(sp::StochasticProgram{S},sdata::Vector{S}) where S <: AbstractScenarioData
+function Base.append!(sp::StochasticProgramData{S},sdata::Vector{S}) where S <: AbstractScenarioData
     append!(sp.scenariodata,sdata)
     sp.num_scenarios += length(sdata)
 end
 
 function generate_subproblems(model::JuMP.Model)
     sp = stochastic(model)
-    for i in indices(sp.subproblems)
+    for i in 1:length(sp.subproblems)
         sp.subproblems[i] = sp.generator(sp.scenariodata[i])
     end
 end
@@ -85,9 +82,10 @@ end
 macro define_subproblem(args)
     @capture(args, model_Symbol = modeldef_)
     code = @q begin
-        $(esc(model)).ext[:SP].generator = ($(esc(sdata))::AbstractScenarioData) -> begin
-            $(esc(model)) = Model(solver=JuMP.UnsetSolver())
+        $(esc(model)).ext[:SP].generator = ($(esc(:scenario))::AbstractScenarioData) -> begin
+            $(esc(:model)) = Model(solver=JuMP.UnsetSolver())
             $(esc(modeldef))
+	    return $(esc(:model))
         end
     end
     return prettify(code)

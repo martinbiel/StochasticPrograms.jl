@@ -20,6 +20,6 @@ sds = [s1,s2,s3,s4]
 sp = StochasticProgram(sds)
 
 @define_subproblem sp = begin
-    @variable(subproblem,y)
-    @constraint(subproblem, y <= scenariodata.d)
+    @variable(model, y)
+    @constraint(model, y <= scenario.d)
 end
