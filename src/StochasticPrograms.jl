@@ -14,6 +14,7 @@ export
     subproblems,
     num_scenarios,
     @define_subproblem,
+    DEP,
     EVP
 
 include("util.jl")
