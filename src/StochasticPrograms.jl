@@ -1,15 +1,22 @@
 module StochasticPrograms
 
-using JuMP, MacroTools
+using JuMP, MacroTools, MathProgBase
 using MacroTools.@q
 
 export
     StochasticProgram,
-    getsubproblem,
-    getprobability,
+    AbstractScenarioData,
+    stochastic,
+    scenario,
+    scenarios,
+    probability,
+    subproblem,
+    subproblems,
     num_scenarios,
-    @define_subproblem
+    @define_subproblem,
+    EVP
 
+include("util.jl")
 include("stochasticprogram.jl")
 include("dep.jl")
 include("evp.jl")

@@ -1,3 +1,4 @@
+abstract type AbstractStructuredSolver end
 abstract type AbstractScenarioData end
 
 probability(sd::AbstractScenarioData) = sd.π
@@ -8,18 +9,18 @@ end
 
 mutable struct StochasticProgramData{S <: AbstractScenarioData}
     scenariodata::Vector{S}
-    num_scenarios::Int
     generator::Function
     subproblems::Vector{JuMP.Model}
+    num_scenarios::Int
 
     function (::Type{StochasticProgramData})(::Type{S}) where S <: AbstractScenarioData
-        return new{S}(scenariodata,0,(sdata)->nothing,Vector{JuMP.Model}())
+        return new{S}(scenariodata,(sdata)->nothing,Vector{JuMP.Model}(),0)
     end
 
     function (::Type{StochasticProgramData})(scenariodata::Vector{<:AbstractScenarioData})
         S = eltype(scenariodata)
         num_scenarios = length(scenariodata)
-        return new{S}(scenariodata,num_scenarios,(sdata)->nothing,Vector{JuMP.Model}(num_scenarios))
+        return new{S}(scenariodata,(sdata)->nothing,Vector{JuMP.Model}(num_scenarios),num_scenarios)
     end
 end
 
@@ -34,17 +35,65 @@ function StochasticProgram(scenariodata::Vector{<:AbstractScenarioData})
     return model
 end
 
-_solve(model::Model) = nothing
+function _solve(model::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver(), kwargs...)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    lqmodel = MathProgBase.LinearQuadraticModel(solver)
+    MathProgBase.loadproblem!(lqmodel,load_depmodel(model)...)
 
-# function _solve(model::Model; solver::MathProgBase.AbstractMathProgBaseSolver, kwargs...)
-# Solve dep
+    numRows, numCols = length(model.linconstr), model.numCols
+    model.objBound = NaN
+    model.objVal = NaN
+    model.colVal = fill(NaN, numCols)
+    model.linconstrDuals = Array{Float64}(0)
+
+    optimize!(lqmodel)
+    status = MathProgBase.SolverInterface.status(lqmodel)
+    status == :Optimal || error("LP could not be solved, returned status: ", status)
+
+    if status == :Optimal
+        model.colVal = MathProgBase.getsolution(lqmodel)[1:numCols]
+        model.objVal = MathProgBase.getobjval(lqmodel) + model.obj.aff.constant
+
+        model.redCosts = try
+            MathProgBase.getreducedcosts(lqmodel)[1:numCols]
+        catch
+            fill(NaN, numCols)
+        end
+
+        model.linconstrDuals = try
+            MathProgBase.getconstrduals(lqmodel)[1:numRows]
+        catch
+            fill(NaN, numRows)
+        end
+    else
+        warn("Not solved to optimality, status: $status")
+        if status == :Infeasible
+            m.linconstrDuals = try
+                infray = MathProgBase.getinfeasibilityray(m.internalModel)
+                @assert length(infray) == numRows
+                infray
+            catch
+                suppress_warnings || warn("Infeasibility ray (Farkas proof) not available")
+                fill(NaN, numRows)
+            end
+        elseif status == :Unbounded
+            m.colVal = try
+                unbdray = MathProgBase.getunboundedray(m.internalModel)
+                @assert length(unbdray) == numCols
+                unbdray
+            catch
+                suppress_warnings || warn("Unbounded ray not available")
+                fill(NaN, numCols)
+            end
+        end
+    end
+end
+
+# function _solve(model::JuMP.Model; solver::AbstractStructuredSolver, kwargs...)
+#     haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
 # end
 
-# function _solve(model::Model; solver, kwargs...)
-# Solve struct
-# end
-
-function _printhook(io::IO, model::Model)
+function _printhook(io::IO, model::JuMP.Model)
     print(io, model, ignore_print_hook=true)
     print(io, "*** subproblems ***\n")
     for (id, subproblem) in enumerate(subproblems(model))
@@ -54,13 +103,38 @@ function _printhook(io::IO, model::Model)
     end
 end
 
-stochastic(m::JuMP.Model)       = m.ext[:SP]
-generator(m::JuMP.Model)        = m.ext[:SP].generator
-subproblems(m::JuMP.Model)      = m.ext[:SP].subproblems
-expected_value(m::JuMP.Model)   = m.ext[:SP].evp
-getsubproblem(m::JuMP.Model,i)  = subproblems(m)[i]
-getprobability(m::JuMP.Model,i) = probability(m.ext[:SP].scenariodata[i])
-num_scenarios(m::JuMP.Model)    = m.ext[:SP].num_scenarios
+function stochastic(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP]
+end
+function scenario(model::JuMP.Model,i::Integer)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP].scenariodata[i]
+end
+function scenarios(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP].scenariodata
+end
+function probability(model::JuMP.Model,i::Integer)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return probability(model.ext[:SP].scenariodata[i])
+end
+function generator(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP].generator
+end
+function subproblem(model::JuMP.Model,i::Integer)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return subproblems(model)[i]
+end
+function subproblems(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP].subproblems
+end
+function num_scenarios(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    return model.ext[:SP].num_scenarios
+end
 
 function Base.push!(sp::StochasticProgramData{S},sdata::S) where S <: AbstractScenarioData
     push!(sp.scenariodata,sdata)
@@ -73,20 +147,22 @@ function Base.append!(sp::StochasticProgramData{S},sdata::Vector{S}) where S <: 
 end
 
 function generate_subproblems(model::JuMP.Model)
-    sp = stochastic(model)
-    for i in 1:length(sp.subproblems)
-        sp.subproblems[i] = sp.generator(sp.scenariodata[i])
+    for i in 1:num_scenarios(model)
+        subproblem = Model(solver=JuMP.UnsetSolver())
+        generator(model)(subproblem,scenario(model,i))
+        stochastic(model).subproblems[i] = subproblem
     end
 end
 
 macro define_subproblem(args)
     @capture(args, model_Symbol = modeldef_)
     code = @q begin
-        $(esc(model)).ext[:SP].generator = ($(esc(:scenario))::AbstractScenarioData) -> begin
-            $(esc(:model)) = Model(solver=JuMP.UnsetSolver())
+        $(esc(model)).ext[:SP].generator = ($(esc(:model))::JuMP.Model,$(esc(:scenario))::AbstractScenarioData) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
         end
+        generate_subproblems($(esc(model)))
+        nothing
     end
     return prettify(code)
 end
