@@ -12,7 +12,7 @@ mutable struct StochasticProgramData{S <: AbstractScenarioData}
     generator::Function
     subproblems::Vector{JuMP.Model}
     num_scenarios::Int
-    modelcache::Dict{Symbol,JuMP.Model}
+    problemcache::Dict{Symbol,JuMP.Model}
 
     function (::Type{StochasticProgramData})(::Type{S}) where S <: AbstractScenarioData
         return new{S}(scenariodata,(model,sdata)->nothing,Vector{JuMP.Model}(),0,Dict{Symbol,JuMP.Model}())
@@ -135,7 +135,7 @@ function num_scenarios(model::JuMP.Model)
     haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
     return model.ext[:SP].num_scenarios
 end
-cache(model::JuMP.Model) = model.ext[:SP].modelcache
+problemcache(model::JuMP.Model) = model.ext[:SP].problemcache
 
 function Base.push!(sp::StochasticProgramData{S},sdata::S) where S <: AbstractScenarioData
     push!(sp.scenariodata,sdata)
@@ -172,7 +172,7 @@ end
 
 function invalidate_cache!(model::JuMP.Model)
     haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
-    cache = cache(model)
+    cache = problemcache(model)
     delete!(cache,:evp)
     delete!(cache,:dep)
 end
