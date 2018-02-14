@@ -1,6 +1,14 @@
 function DEP(model::JuMP.Model)
     haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
 
+    cache = model.ext[:SP].modelcache
+    if haskey(cache,:dep)
+        dep = cache[:dep]
+        if dep.numCols == model.numCols && length(dep.linconstr) == length(model.linconstr)
+            return cache[:dep]
+        end
+    end
+
     dep_model = extract_firststage(model)
 
     dim = model.numCols
@@ -51,6 +59,9 @@ function DEP(model::JuMP.Model)
 
         dim += subproblem.numCols
     end
+
+    # Cache dep model
+    cache[:dep] = dep_model
 
     return dep_model
 end

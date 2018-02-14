@@ -12,15 +12,15 @@ mutable struct StochasticProgramData{S <: AbstractScenarioData}
     generator::Function
     subproblems::Vector{JuMP.Model}
     num_scenarios::Int
+    modelcache::Dict{Symbol,JuMP.Model}
 
     function (::Type{StochasticProgramData})(::Type{S}) where S <: AbstractScenarioData
-        return new{S}(scenariodata,(sdata)->nothing,Vector{JuMP.Model}(),0)
+        return new{S}(scenariodata,(model,sdata)->nothing,Vector{JuMP.Model}(),0,Dict{Symbol,JuMP.Model}())
     end
 
     function (::Type{StochasticProgramData})(scenariodata::Vector{<:AbstractScenarioData})
         S = eltype(scenariodata)
-        num_scenarios = length(scenariodata)
-        return new{S}(scenariodata,(sdata)->nothing,Vector{JuMP.Model}(num_scenarios),num_scenarios)
+        return new{S}(scenariodata,(model,sdata)->nothing,Vector{JuMP.Model}(),0,Dict{Symbol,JuMP.Model}())
     end
 end
 
@@ -135,23 +135,46 @@ function num_scenarios(model::JuMP.Model)
     haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
     return model.ext[:SP].num_scenarios
 end
+cache(model::JuMP.Model) = model.ext[:SP].modelcache
 
 function Base.push!(sp::StochasticProgramData{S},sdata::S) where S <: AbstractScenarioData
     push!(sp.scenariodata,sdata)
-    sp.num_scenarios += 1
+end
+function Base.push!(model::JuMP.Model,sdata::AbstractScenarioData)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+
+    push!(stochastic(model),sdata)
+    generate_subproblems!(model)
+    invalidate_cache!(model)
 end
 
 function Base.append!(sp::StochasticProgramData{S},sdata::Vector{S}) where S <: AbstractScenarioData
     append!(sp.scenariodata,sdata)
-    sp.num_scenarios += length(sdata)
+end
+function Base.append!(model::JuMP.Model,sdata::AbstractScenarioData)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+
+    append!(stochastic(model),sdata)
+    generate_subproblems!(model)
+    invalidate_cache!(model)
 end
 
-function generate_subproblems(model::JuMP.Model)
-    for i in 1:num_scenarios(model)
+function generate_subproblems!(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    sp = stochastic(model)
+    for i in sp.num_scenarios+1:length(sp.scenariodata)
         subproblem = Model(solver=JuMP.UnsetSolver())
         generator(model)(subproblem,scenario(model,i))
-        stochastic(model).subproblems[i] = subproblem
+        push!(sp.subproblems,subproblem)
     end
+    sp.num_scenarios = length(sp.scenariodata)
+end
+
+function invalidate_cache!(model::JuMP.Model)
+    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+    cache = cache(model)
+    delete!(cache,:evp)
+    delete!(cache,:dep)
 end
 
 macro define_subproblem(args)
@@ -161,7 +184,7 @@ macro define_subproblem(args)
             $(esc(modeldef))
 	    return $(esc(:model))
         end
-        generate_subproblems($(esc(model)))
+        generate_subproblems!($(esc(model)))
         nothing
     end
     return prettify(code)
