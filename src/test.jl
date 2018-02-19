@@ -18,12 +18,15 @@ sds = [s1,s2]
 
 sp = StochasticProgram(sds)
 
-@variable(sp, x1 >= 40)
-@variable(sp, x2 >= 20)
-@objective(sp, Min, 100*x1 + 150*x2)
-@constraint(sp, x1+x2 <= 120)
+@first_stage sp = begin
+    @variable(model, x1 >= 40)
+    @variable(model, x2 >= 20)
+    @objective(model, Min, 100*x1 + 150*x2)
+    @constraint(model, x1+x2 <= 120)
+end
 
-@define_subproblem sp = begin
+@second_stage sp = begin
+    @decision x1 x2
     s = scenario
     @variable(model, 0 <= y1 <= s.d[1])
     @variable(model, 0 <= y2 <= s.d[2])

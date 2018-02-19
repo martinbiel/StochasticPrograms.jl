@@ -1,28 +1,24 @@
-function EVP(model::JuMP.Model)
-    haskey(model.ext,:SP) || error("The given model is not a stochastic program.")
+function EVP(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
-    cache = problemcache(model)
+    # Return possibly cached model
+    cache = problemcache(stochasticprogram)
     if haskey(cache,:evp)
-        evp = cache[:evp]
-        if evp.numCols == model.numCols && length(evp.linconstr) == length(model.linconstr)
-            evp
-        end
+        return cache[:evp]
     end
-    ev_model = extract_firststage(model)
-    generator(model)(ev_model,expected(scenarios(model)))
-    take_ownership!(ev_model)
+
+    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+
+    ev_model = Model()
+    generator(stochasticprogram,:first_stage)(ev_model)
+    ev_obj = copy(ev_model.obj)
+    generator(stochasticprogram,:second_stage)(ev_model,expected(scenarios(stochasticprogram)),ev_model)
+    append!(ev_obj,ev_model.obj)
+    ev_model.obj = ev_obj
 
     # Cache evp model
     cache[:evp] = ev_model
 
     return ev_model
 end
-
-# function solve_evp(model::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
-#     ev_model = EVP(model)
-#     setsolver(ev_model,solver)
-
-#     solve(ev_model)
-
-#     return ev_model
-# end
