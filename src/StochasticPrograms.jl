@@ -275,20 +275,17 @@ function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPr
         error("Cannot determine EVPI without a solver.")
     end
 
-    evpi = 0.0
+    # Solve DEP model
+    dep = DEP(stochasticprogram, solver)
+    solve(dep)
+    evpi = getobjectivevalue(dep)
 
     # Solve all possible WS models
     for scenario in scenarios(stochasticprogram)
         ws = WS(stochasticprogram,scenario,solver)
         solve(ws)
-        eev += probability(scenario)*getobjectivevalue(ws)
+        evpi -= probability(scenario)*getobjectivevalue(ws)
     end
-
-    # Solve DEP model
-    dep = DEP(stochasticprogram, solver)
-    solve(dep)
-
-    evpi -= getobjectivevalue(dep)
 
     return evpi
 end
@@ -322,6 +319,16 @@ function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     return ev_model
 end
 
+function EV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
+    # Solve EVP model
+    evp = EVP(stochasticprogram, solver)
+    solve(evp)
+
+    return getobjectivevalue(evp)
+end
+
 function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
@@ -344,12 +351,13 @@ end
 function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
+    vss = EEV(stochasticprogram; solver = solver)
+
     # Solve DEP model
     dep = DEP(stochasticprogram, solver)
     solve(dep)
 
-    vss = getobjectivevalue(dep)
-    vss -= EEV(stochasticprogram; solver = solver)
+    vss -= getobjectivevalue(dep)
 
     return vss
 end
