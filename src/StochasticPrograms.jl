@@ -15,7 +15,9 @@ export
     num_scenarios,
     @first_stage,
     @second_stage,
+    WS,
     DEP,
+    EVPI,
     EVP,
     EEV,
     VSS
@@ -197,6 +199,27 @@ function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScena
     return eval_model
 end
 
+WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
+function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    # Abort if no solver was given
+    if isa(solver,JuMP.UnsetSolver)
+        error("Cannot create WS model without a solver.")
+    end
+
+    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+
+    ws_model = Model(solver = solver)
+    generator(stochasticprogram,:first_stage)(ws_model)
+    ws_obj = copy(ws_model.obj)
+    generator(stochasticprogram,:second_stage)(ws_model,scenario,ws_model)
+    append!(ws_obj,ws_model.obj)
+    ws_model.obj = ws_obj
+
+    return ws_model
+end
+
 DEP(stochasticprogram::JuMP.Model) = DEP(stochasticprogram,JuMP.UnsetSolver())
 function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -244,7 +267,33 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     return dep_model
 end
 
-EVP(stochasticprogram) = EVP(stochasticprogram,JuMP.UnsetSolver())
+function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
+    # Abort if no solver was given
+    if isa(solver,JuMP.UnsetSolver)
+        error("Cannot determine EVPI without a solver.")
+    end
+
+    evpi = 0.0
+
+    # Solve all possible WS models
+    for scenario in scenarios(stochasticprogram)
+        ws = WS(stochasticprogram,scenario,solver)
+        solve(ws)
+        eev += probability(scenario)*getobjectivevalue(ws)
+    end
+
+    # Solve DEP model
+    dep = DEP(stochasticprogram, solver)
+    solve(dep)
+
+    evpi -= getobjectivevalue(dep)
+
+    return evpi
+end
+
+EVP(stochasticprogram::JuMP.Model) = EVP(stochasticprogram,JuMP.UnsetSolver())
 function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     # Return possibly cached model
