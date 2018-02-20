@@ -1,4 +1,4 @@
-using StocasticPrograms
+using StochasticPrograms
 using JuMP
 using Base.Test
 

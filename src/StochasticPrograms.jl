@@ -16,7 +16,9 @@ export
     @first_stage,
     @second_stage,
     DEP,
-    EVP
+    EVP,
+    EEV,
+    VSS
 
 abstract type AbstractStructuredSolver end
 abstract type AbstractScenarioData end
@@ -172,67 +174,31 @@ function generate_stage_two!(stochasticprogram::JuMP.Model)
     nothing
 end
 
-function eval_stage_two(stochasticprogram::JuMP.Model,i::Integer,origin::JuMP.Model)
+function eval_first_stage(stochasticprogram::JuMP.Model,origin::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    i <= num_scenarios(stochasticprogram) || error("Subproblem ",i," not in range of scenarios. ",num_scenarios(stochasticprogram), "scenarios are included in the given stochastic program.")
+    all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
+
+    val = 0.0
+    obj = stochasticprogram.obj.aff
+    for (i,var) in enumerate(obj.vars)
+        val += obj.coeffs[i]*origin.colVal[var.col]
+    end
+
+    return val
+end
+
+function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,origin::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:subproblem) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
-    all(isnan.(origin.colVal)) || error("No solution to evaluate in given model. ")
+    all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
     eval_model = Model()
-    generator(stochasticprogram,:subproblem)(eval_model,scenario(stochasticprogram,i),origin)
+    generator(stochasticprogram,:subproblem)(eval_model,scenario,origin)
 
     return eval_model
 end
 
-EVP(stochasticprogram) = EVP(stochasticprogram,JuMP.UnsetSolver())
-function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathProgSolver)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    # Return possibly cached model
-    cache = problemcache(stochasticprogram)
-    if haskey(cache,:evp)
-        return cache[:evp]
-    end
-    # Abort at this stage if no solver was given
-    if isa(solver,JuMP.UnsetSolver)
-        error("Cannot create new EVP model without a solver.")
-    end
-
-    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
-
-    ev_model = Model(solver = solver)
-    generator(stochasticprogram,:first_stage)(ev_model)
-    ev_obj = copy(ev_model.obj)
-    generator(stochasticprogram,:second_stage)(ev_model,expected(scenarios(stochasticprogram)),ev_model)
-    append!(ev_obj,ev_model.obj)
-    ev_model.obj = ev_obj
-
-    # Cache evp model
-    cache[:evp] = ev_model
-
-    return ev_model
-end
-
-function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase::AbstractMathProgSolver = JuMP.UnsetSolver())
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-
-    # Solve EVP model
-    evp = EVP(stochasticprogram, solver)
-    solve(evp)
-
-    eev = getobjectivevalue(evp)
-
-    for scenario in scenarios(stochasticprogram)
-        subproblem = eval_stage_two(stochasticprogram,scenario,evp)
-        setsolver(subproblem,solver)
-        solve(subproblem)
-        eev += probability(scenario)*getobjectivevalue(subproblem)
-    end
-
-    return eev
-end
-
 DEP(stochasticprogram::JuMP.Model) = DEP(stochasticprogram,JuMP.UnsetSolver())
-function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase::AbstractMathProgSolver)
+function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Return possibly cached model
@@ -278,7 +244,55 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase::AbstractMathPr
     return dep_model
 end
 
-function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase::AbstractMathProgSolver = JuMP.UnsetSolver())
+EVP(stochasticprogram) = EVP(stochasticprogram,JuMP.UnsetSolver())
+function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathProgSolver)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    # Return possibly cached model
+    cache = problemcache(stochasticprogram)
+    if haskey(cache,:evp)
+        return cache[:evp]
+    end
+    # Abort at this stage if no solver was given
+    if isa(solver,JuMP.UnsetSolver)
+        error("Cannot create new EVP model without a solver.")
+    end
+
+    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+
+    ev_model = Model(solver = solver)
+    generator(stochasticprogram,:first_stage)(ev_model)
+    ev_obj = copy(ev_model.obj)
+    generator(stochasticprogram,:second_stage)(ev_model,expected(scenarios(stochasticprogram)),ev_model)
+    append!(ev_obj,ev_model.obj)
+    ev_model.obj = ev_obj
+
+    # Cache evp model
+    cache[:evp] = ev_model
+
+    return ev_model
+end
+
+function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
+    # Solve EVP model
+    evp = EVP(stochasticprogram, solver)
+    solve(evp)
+
+    eev = eval_first_stage(stochasticprogram,evp)
+
+    for scenario in scenarios(stochasticprogram)
+        subproblem = eval_second_stage(stochasticprogram,scenario,evp)
+        setsolver(subproblem,solver)
+        solve(subproblem)
+        eev += probability(scenario)*getobjectivevalue(subproblem)
+    end
+
+    return eev
+end
+
+function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Solve DEP model
