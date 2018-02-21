@@ -12,7 +12,7 @@ export
     probability,
     subproblem,
     subproblems,
-    num_scenarios,
+    nscenarios,
     @first_stage,
     @second_stage,
     WS,
@@ -130,7 +130,7 @@ function subproblems(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP].subproblems
 end
-function num_scenarios(stochasticprogram::JuMP.Model)
+function nscenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return length(stochasticprogram.ext[:SP].subproblems)
 end
@@ -165,7 +165,7 @@ function generate_stage_two!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     sp = stochastic(stochasticprogram)
     if has_generator(stochasticprogram,:second_stage)
-        for i in num_scenarios(stochasticprogram)+1:length(sp.scenariodata)
+        for i in nscenarios(stochasticprogram)+1:length(sp.scenariodata)
             subproblem = Model(solver=JuMP.UnsetSolver())
             generator(stochasticprogram,:second_stage)(subproblem,scenario(stochasticprogram,i),stochasticprogram)
             push!(sp.subproblems,subproblem)
