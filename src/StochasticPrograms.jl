@@ -19,6 +19,7 @@ export
     DEP,
     EVPI,
     EVP,
+    EV,
     EEV,
     VSS
 
@@ -189,12 +190,34 @@ function eval_first_stage(stochasticprogram::JuMP.Model,origin::JuMP.Model)
     return val
 end
 
-function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,origin::JuMP.Model)
+function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,origin::JuMP.Model,solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    has_generator(stochasticprogram,:subproblem) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
     all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
-    eval_model = Model()
-    generator(stochasticprogram,:subproblem)(eval_model,scenario,origin)
+    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+
+    eval_model = Model(solver = solver)
+    generator(stochasticprogram,:first_stage)(eval_model)
+    for obj in values(eval_model.objDict)
+        if isa(obj,JuMP.Variable)
+            val = origin.colVal[obj.col]
+            eval_model.colCat[obj.col] = :Fixed
+            eval_model.colVal[obj.col] = val
+            eval_model.colLower[obj.col] = val
+            eval_model.colUpper[obj.col] = val
+        elseif isa(obj,JuMP.JuMPArray{JuMP.Variable})
+            for var in obj.innerArray
+                val = origin.colVal[var.col]
+                eval_model.colCat[var.col] = :Fixed
+                eval_model.colVal[var.col] = val
+                eval_model.colLower[var.col] = val
+                eval_model.colUpper[var.col] = val
+            end
+        else
+            continue
+        end
+    end
+    generator(stochasticprogram,:second_stage)(eval_model,scenario,eval_model)
 
     return eval_model
 end
@@ -243,19 +266,43 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     dep_obj = copy(dep_model.obj)
 
     # Define second-stage problems, renaming variables according to scenario.
-    visited_vars = collect(keys(dep_model.objDict))
+    visited_objs = collect(keys(dep_model.objDict))
     for (i,scenario) in enumerate(scenarios(stochasticprogram))
         generator(stochasticprogram,:second_stage)(dep_model,scenario,dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
-        for (varkey,var) ∈ dep_model.objDict
-            if varkey ∉ visited_vars
-                varname = @sprintf("%s_%d",dep_model.colNames[var.col],i)
-                newkey = Symbol(varname)
-                dep_model.colNames[var.col] = varname
-                dep_model.colNamesIJulia[var.col] = varname
-                dep_model.objDict[newkey] = var
-                delete!(dep_model.objDict,varkey)
-                push!(visited_vars,newkey)
+        for (objkey,obj) ∈ dep_model.objDict
+            if objkey ∉ visited_objs
+                if (isa(obj,JuMP.Variable))
+                    varname = @sprintf("%s_%d",dep_model.colNames[obj.col],i)
+                    newkey = Symbol(varname)
+                    dep_model.colNames[obj.col] = varname
+                    dep_model.colNamesIJulia[obj.col] = varname
+                    dep_model.objDict[newkey] = obj
+                    delete!(dep_model.objDict,objkey)
+                    push!(visited_objs,newkey)
+                elseif isa(obj,JuMP.JuMPArray)
+                    newkey = if isa(obj,JuMP.JuMPArray{JuMP.ConstraintRef})
+                        arrayname = @sprintf("%s_%d",objkey,i)
+                        newkey = Symbol(arrayname)
+                    else
+                        JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
+                        arrayname = @sprintf("%s_%d",dep_model.varData[obj].name,i)
+                        newkey = Symbol(arrayname)
+                        dep_model.varData[obj].name = newkey
+                        for var in obj.innerArray
+                            splitname = split(dep_model.colNames[var.col],"[")
+                            varname = @sprintf("%s_%d[%s",splitname[1],i,splitname[2])
+                            dep_model.colNames[var.col] = varname
+                            dep_model.colNamesIJulia[var.col] = varname
+                        end
+                        newkey
+                    end
+                    dep_model.objDict[newkey] = obj
+                    delete!(dep_model.objDict,objkey)
+                    push!(visited_objs,newkey)
+                else
+                    continue
+                end
             end
         end
     end
@@ -278,13 +325,13 @@ function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPr
     # Solve DEP model
     dep = DEP(stochasticprogram, solver)
     solve(dep)
-    evpi = getobjectivevalue(dep)
+    evpi = (dep.objSense == :Max ? -1 : 1)*getobjectivevalue(dep)
 
     # Solve all possible WS models
     for scenario in scenarios(stochasticprogram)
         ws = WS(stochasticprogram,scenario,solver)
         solve(ws)
-        evpi -= probability(scenario)*getobjectivevalue(ws)
+        evpi += (ws.objSense == :Max ? 1 : -1)*probability(scenario)*getobjectivevalue(ws)
     end
 
     return evpi
@@ -339,8 +386,7 @@ function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
     eev = eval_first_stage(stochasticprogram,evp)
 
     for scenario in scenarios(stochasticprogram)
-        subproblem = eval_second_stage(stochasticprogram,scenario,evp)
-        setsolver(subproblem,solver)
+        subproblem = eval_second_stage(stochasticprogram,scenario,evp,solver)
         solve(subproblem)
         eev += probability(scenario)*getobjectivevalue(subproblem)
     end
@@ -351,13 +397,12 @@ end
 function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
-    vss = EEV(stochasticprogram; solver = solver)
-
     # Solve DEP model
     dep = DEP(stochasticprogram, solver)
     solve(dep)
+    vss = (dep.objSense == :Max ? 1 : -1)*getobjectivevalue(dep)
 
-    vss -= getobjectivevalue(dep)
+    vss += (dep.objSense == :Max ? -1 : 1)*EEV(stochasticprogram; solver = solver)
 
     return vss
 end
@@ -395,27 +440,12 @@ macro second_stage(args)
         return code
     end
 
-    detached_def = postwalk(modeldef) do x
-        @capture(x, @decision args__) || return x
-        code = Expr(:block)
-        for var in args
-            varkey = Meta.quot(var)
-            push!(code.args,:(@variable(model,$var == getvalue(origin.objDict[$varkey]))))
-        end
-        return code
-    end
-
     code = @q begin
         $(esc(model)).ext[:SP].generator[:second_stage] = ($(esc(:model))::JuMP.Model,$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
         generate_stage_two!($(esc(model)))
-
-        $(esc(model)).ext[:SP].generator[:subproblem] = ($(esc(:model))::JuMP.Model,$(esc(:scenario))::AbstractScenarioData,$(esc(:origin))::JuMP.Model) -> begin
-            $(esc(detached_def))
-	    return $(esc(:model))
-        end
         nothing
     end
     return prettify(code)
