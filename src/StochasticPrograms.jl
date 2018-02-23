@@ -1,6 +1,8 @@
 module StochasticPrograms
 
-using JuMP, MacroTools, MathProgBase
+using JuMP
+using MathProgBase
+using MacroTools
 using MacroTools: @q, postwalk
 
 export
@@ -77,9 +79,13 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
 
     if isa(solver,MathProgBase.AbstractMathProgSolver)
         dep = DEP(stochasticprogram,solver)
-        return solve(dep; kwargs...)
-    else
+        status = solve(dep; kwargs...)
+        fill_solution!(stochasticprogram)
+        return status
+    elseif isa(solver,AbstractStructuredSolver)
         # Use structured solver
+    else
+        error("Unknown solver object given. Aborting.")
     end
 end
 
@@ -181,13 +187,7 @@ function eval_first_stage(stochasticprogram::JuMP.Model,origin::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
 
-    val = 0.0
-    obj = stochasticprogram.obj.aff
-    for (i,var) in enumerate(obj.vars)
-        val += obj.coeffs[i]*origin.colVal[var.col]
-    end
-
-    return val
+    return eval_objective(stochasticprogram.obj,origin.colVal)
 end
 
 function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,origin::JuMP.Model,solver::MathProgBase.AbstractMathProgSolver)
@@ -221,7 +221,10 @@ function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScena
 
     return eval_model
 end
+# ========================== #
 
+# SP Constructs #
+# ========================== #
 WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
 function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -405,6 +408,41 @@ function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
     vss += (dep.objSense == :Max ? -1 : 1)*EEV(stochasticprogram; solver = solver)
 
     return vss
+end
+# ========================== #
+
+# Utility #
+# ========================== #
+function eval_objective(objective::JuMP.GenericQuadExpr,x::AbstractVector)
+    aff = objective.aff
+    val = aff.constant
+    for (i,var) in enumerate(aff.vars)
+        val += aff.coeffs[i]*x[var.col]
+    end
+
+    return val
+end
+
+function fill_solution!(stochasticprogram::JuMP.Model)
+    dep = DEP(stochasticprogram)
+
+    # First stage
+    nrows, ncols = length(stochasticprogram.linconstr), stochasticprogram.numCols
+    stochasticprogram.objVal = dep.objVal
+    stochasticprogram.colVal = dep.colVal[1:ncols]
+    stochasticprogram.redCosts = dep.redCosts[1:ncols]
+    stochasticprogram.linconstrDuals = dep.linconstrDuals[1:nrows]
+
+    # Second stage
+    for (i,subproblem) in enumerate(subproblems(stochasticprogram))
+        snrows, sncols = length(subproblem.linconstr), subproblem.numCols
+        subproblem.colVal = dep.colVal[ncols+1:ncols+sncols]
+        subproblem.redCosts = dep.redCosts[ncols+1:ncols+sncols]
+        subproblem.linconstrDuals = dep.linconstrDuals[nrows+1:nrows:snrows]
+        subproblem.objVal = eval_objective(subproblem.obj,subproblem.colVal)
+        ncols += sncols
+        nrows += snrows
+    end
 end
 
 function invalidate_cache!(stochasticprogram::JuMP.Model)
