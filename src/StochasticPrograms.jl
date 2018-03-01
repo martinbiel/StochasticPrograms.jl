@@ -8,6 +8,9 @@ using MacroTools: @q, postwalk
 export
     StochasticProgram,
     AbstractScenarioData,
+    AbstractStructuredSolver,
+    AbstractStructuredModel,
+    StructuredModel,
     stochastic,
     scenario,
     scenarios,
@@ -84,6 +87,12 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
         return status
     elseif isa(solver,AbstractStructuredSolver)
         # Use structured solver
+        structuredmodel = StructuredModel(solver,stochasticprogram; kwargs...)
+        stochasticprogram.internalModel = structuredmodel
+        stochasticprogram.internalModelLoaded = true
+        status = optimize_structured!(structuredmodel)
+        fill_solution!(structuredmodel,stochasticprogram)
+        return status
     else
         error("Unknown solver object given. Aborting.")
     end
@@ -490,5 +499,21 @@ macro second_stage(args)
 end
 # ========================== #
 
+# Structured solver interface
+# ========================== #
+abstract type AbstractStructuredSolver end
+abstract type AbstractStructuredModel end
+
+function StructuredModel(solver::AbstractStructuredSolver,stochasticprogram::JuMP.Model)
+    throw(MethodError(StructuredModel,(solver,stochasticprogram)))
+end
+
+function optimize_structured!(structuredmodel::AbstractStructuredModel)
+    throw(MethodError(optimize!,structuredmodel))
+end
+
+function fill_solution!(structuredmodel::AbstractStructuredModel,stochasticprogram::JuMP.Model)
+    throw(MethodError(optimize!,structuredmodel))
+end
 
 end # module
