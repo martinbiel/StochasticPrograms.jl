@@ -21,7 +21,9 @@ export
     @first_stage,
     @second_stage,
     WS,
+    EWS,
     DEP,
+    RP,
     EVPI,
     EVP,
     EV,
@@ -30,32 +32,42 @@ export
 
 abstract type AbstractStructuredSolver end
 abstract type AbstractScenarioData end
+abstract type AbstractSampler{SD <: AbstractScenarioData} end
+struct NullSampler{SD <: AbstractScenarioData} <: AbstractSampler{SD} end
 
 probability(sd::AbstractScenarioData) = sd.π
 
-function expected(::Vector{<:AbstractScenarioData})
-   error("Not Implemented!")
+function expected(::Vector{SD}) where SD <: AbstractScenarioData
+   error("Expected value operation not implemented for scenariodata type: ", SD)
 end
 
-struct StochasticProgramData{S <: AbstractScenarioData}
-    scenariodata::Vector{S}
+struct StochasticProgramData{SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    scenariodata::Vector{SD}
+    sampler::S
     generator::Dict{Symbol,Function}
     subproblems::Vector{JuMP.Model}
     problemcache::Dict{Symbol,JuMP.Model}
 
-    function (::Type{StochasticProgramData})(::Type{S}) where S <: AbstractScenarioData
-        return new{S}(Vector{S}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+    function (::Type{StochasticProgramData})(::Type{SD}) where SD <: AbstractScenarioData
+        S = NullSampler{SD}
+        return new{SD,S}(Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 
     function (::Type{StochasticProgramData})(scenariodata::Vector{<:AbstractScenarioData})
-        S = eltype(scenariodata)
-        return new{S}(scenariodata,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        SD = eltype(scenariodata)
+        S = NullSampler{SD}
+        return new{SD,S}(scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+    end
+
+    function (::Type{StochasticProgramData})(sampler::AbstractSampler{SD}) where SD <: AbstractScenarioData
+        S = typeof(sampler)
+        return new{SD,S}(Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 end
 
-function StochasticProgram(::Type{S}) where S <: AbstractScenarioData
-    stochasticprogram = JuMP.Model(solver=JuMP.UnsetSolver())
-    stochasticprogram.ext[:SP] = StochasticProgramData(S)
+function StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData
+    stochasticprogram = JuMP.Model(solver=solver)
+    stochasticprogram.ext[:SP] = StochasticProgramData(SD)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -63,9 +75,19 @@ function StochasticProgram(::Type{S}) where S <: AbstractScenarioData
 
     return stochasticprogram
 end
-function StochasticProgram(scenariodata::Vector{S}) where S <: AbstractScenarioData
-    stochasticprogram = JuMP.Model(solver=JuMP.UnsetSolver())
+function StochasticProgram(scenariodata::Vector{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData
+    stochasticprogram = JuMP.Model(solver=solver)
     stochasticprogram.ext[:SP] = StochasticProgramData(scenariodata)
+
+    # Set hooks
+    JuMP.setsolvehook(stochasticprogram, _solve)
+    JuMP.setprinthook(stochasticprogram, _printhook)
+
+    return stochasticprogram
+end
+function StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver())
+    stochasticprogram = JuMP.Model(solver=solver)
+    stochasticprogram.ext[:SP] = StochasticProgramData(sampler)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -80,14 +102,22 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
         generate_subproblems!(stochasticprogram)
     end
 
-    if isa(solver,MathProgBase.AbstractMathProgSolver)
-        dep = DEP(stochasticprogram,solver)
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
+    if optimsolver isa MathProgBase.AbstractMathProgSolver
+        # Standard mathprogbase solver. Fallback to solving DEP model, relying on JuMP.
+        dep = DEP(stochasticprogram,optimsolver)
         status = solve(dep; kwargs...)
         fill_solution!(stochasticprogram)
         return status
-    elseif isa(solver,AbstractStructuredSolver)
+    elseif optimsolver isa AbstractStructuredSolver
         # Use structured solver
-        structuredmodel = StructuredModel(solver,stochasticprogram; kwargs...)
+        structuredmodel = StructuredModel(optimsolver,stochasticprogram; kwargs...)
         stochasticprogram.internalModel = structuredmodel
         stochasticprogram.internalModelLoaded = true
         status = optimize_structured!(structuredmodel)
@@ -154,7 +184,7 @@ problemcache(stochasticprogram::JuMP.Model) = stochasticprogram.ext[:SP].problem
 
 # Base overloads
 # ========================== #
-function Base.push!(sp::StochasticProgramData{S},sdata::S) where S <: AbstractScenarioData
+function Base.push!(sp::StochasticProgramData{SD},sdata::SD) where SD <: AbstractScenarioData
     push!(sp.scenariodata,sdata)
 end
 function Base.push!(stochasticprogram::JuMP.Model,sdata::AbstractScenarioData)
@@ -163,10 +193,10 @@ function Base.push!(stochasticprogram::JuMP.Model,sdata::AbstractScenarioData)
     push!(stochastic(stochasticprogram),sdata)
     invalidate_cache!(stochasticprogram)
 end
-function Base.append!(sp::StochasticProgramData{S},sdata::Vector{S}) where S <: AbstractScenarioData
+function Base.append!(sp::StochasticProgramData{SD},sdata::Vector{SD}) where SD <: AbstractScenarioData
     append!(sp.scenariodata,sdata)
 end
-function Base.append!(stochasticprogram::JuMP.Model,sdata::Vector{S}) where S <: AbstractScenarioData
+function Base.append!(stochasticprogram::JuMP.Model,sdata::Vector{<:AbstractScenarioData})
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     append!(stochastic(stochasticprogram),sdata)
@@ -237,15 +267,21 @@ end
 WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
 function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
     # Abort if no solver was given
-    if isa(solver,JuMP.UnsetSolver)
+    if isa(optimsolver,JuMP.UnsetSolver)
         error("Cannot create WS model without a solver.")
     end
 
     has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
-    ws_model = Model(solver = solver)
+    ws_model = Model(solver = optimsolver)
     generator(stochasticprogram,:first_stage)(ws_model)
     ws_obj = copy(ws_model.obj)
     generator(stochasticprogram,:second_stage)(ws_model,scenario,ws_model)
@@ -253,6 +289,30 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
     ws_model.obj = ws_obj
 
     return ws_model
+end
+function EWS(stochasticprogram::JuMP.Model, scenarios::Vector{<:AbstractScenarioData}; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot determine EVPI without a solver.")
+    end
+
+    # Solve all possible WS models and compute EWS
+    ews = sum([
+        begin
+        ws = WS(stochasticprogram,scenario,optimsolver)
+        solve(ws)
+        probability(scenario)*getobjectivevalue(ws)
+        end for scenario in scenarios])
+    return ews
 end
 
 DEP(stochasticprogram::JuMP.Model) = DEP(stochasticprogram,JuMP.UnsetSolver())
@@ -264,8 +324,14 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     if haskey(cache,:dep)
         return cache[:dep]
     end
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
     # Abort at this stage if no solver was given
-    if isa(solver,JuMP.UnsetSolver)
+    if isa(optimsolver,JuMP.UnsetSolver)
         error("Cannot create new DEP model without a solver.")
     end
 
@@ -273,7 +339,7 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
     # Define first-stage problem
-    dep_model = Model(solver = solver)
+    dep_model = Model(solver = optimsolver)
     generator(stochasticprogram,:first_stage)(dep_model)
     dep_obj = copy(dep_model.obj)
 
@@ -284,14 +350,14 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ dep_model.objDict
             if objkey ∉ visited_objs
-                if (isa(obj,JuMP.Variable))
+                newkey = if (isa(obj,JuMP.Variable))
                     varname = @sprintf("%s_%d",dep_model.colNames[obj.col],i)
-                    newkey = Symbol(varname)
                     dep_model.colNames[obj.col] = varname
                     dep_model.colNamesIJulia[obj.col] = varname
-                    dep_model.objDict[newkey] = obj
-                    delete!(dep_model.objDict,objkey)
-                    push!(visited_objs,newkey)
+                    newkey = Symbol(varname)
+                elseif isa(obj,JuMP.ConstraintRef)
+                    arrayname = @sprintf("%s_%d",objkey,i)
+                    newkey = Symbol(arrayname)
                 elseif isa(obj,JuMP.JuMPArray)
                     newkey = if isa(obj,JuMP.JuMPArray{JuMP.ConstraintRef})
                         arrayname = @sprintf("%s_%d",objkey,i)
@@ -309,12 +375,12 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
                         end
                         newkey
                     end
-                    dep_model.objDict[newkey] = obj
-                    delete!(dep_model.objDict,objkey)
-                    push!(visited_objs,newkey)
-                else
+                 else
                     continue
                 end
+                dep_model.objDict[newkey] = obj
+                delete!(dep_model.objDict,objkey)
+                push!(visited_objs,newkey)
             end
         end
     end
@@ -326,16 +392,45 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     return dep_model
 end
 
+function RP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot determine EVPI without a solver.")
+    end
+
+    # Solve EVP model
+    dep = DEP(stochasticprogram,optimsolver)
+    solve(dep)
+
+    return getobjectivevalue(dep)
+end
+
 function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
     # Abort if no solver was given
-    if isa(solver,JuMP.UnsetSolver)
+    if isa(optimsolver,JuMP.UnsetSolver)
         error("Cannot determine EVPI without a solver.")
     end
 
     # Solve DEP model
-    dep = DEP(stochasticprogram, solver)
+    dep = DEP(stochasticprogram,optimsolver)
     solve(dep)
     evpi = (dep.objSense == :Max ? -1 : 1)*getobjectivevalue(dep)
 
@@ -357,15 +452,21 @@ function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     if haskey(cache,:evp)
         return cache[:evp]
     end
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
     # Abort at this stage if no solver was given
-    if isa(solver,JuMP.UnsetSolver)
+    if isa(optimsolver,JuMP.UnsetSolver)
         error("Cannot create new EVP model without a solver.")
     end
 
     has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
-    ev_model = Model(solver = solver)
+    ev_model = Model(solver = optimsolver)
     generator(stochasticprogram,:first_stage)(ev_model)
     ev_obj = copy(ev_model.obj)
     generator(stochasticprogram,:second_stage)(ev_model,expected(scenarios(stochasticprogram)),ev_model)
@@ -381,6 +482,18 @@ end
 function EV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot determine EVPI without a solver.")
+    end
+
     # Solve EVP model
     evp = EVP(stochasticprogram, solver)
     solve(evp)
@@ -391,14 +504,21 @@ end
 function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
     # Solve EVP model
-    evp = EVP(stochasticprogram, solver)
+    evp = EVP(stochasticprogram,optimsolver)
     solve(evp)
 
     eev = eval_first_stage(stochasticprogram,evp)
 
     for scenario in scenarios(stochasticprogram)
-        subproblem = eval_second_stage(stochasticprogram,scenario,evp,solver)
+        subproblem = eval_second_stage(stochasticprogram,scenario,evp,optimsolver)
         solve(subproblem)
         eev += probability(scenario)*getobjectivevalue(subproblem)
     end
@@ -409,12 +529,19 @@ end
 function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
     # Solve DEP model
-    dep = DEP(stochasticprogram, solver)
+    dep = DEP(stochasticprogram,optimsolver)
     solve(dep)
     vss = (dep.objSense == :Max ? 1 : -1)*getobjectivevalue(dep)
 
-    vss += (dep.objSense == :Max ? -1 : 1)*EEV(stochasticprogram; solver = solver)
+    vss += (dep.objSense == :Max ? -1 : 1)*EEV(stochasticprogram; solver = optimsolver)
 
     return vss
 end

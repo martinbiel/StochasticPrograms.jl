@@ -1,37 +1,36 @@
 using StochasticPrograms
 using JuMP
+using Clp
 using Base.Test
 
-struct SData <: AbstractScenarioData
-    π::Float64
-    d::Vector{Float64}
-    q::Vector{Float64}
+struct SPResult
+    x̄::Vector{Float64}
+    RP::Float64
+    EVPI::Float64
+    VSS::Float64
+    EV::Float64
+    EEV::Float64
 end
 
-function StochasticPrograms.expected(sds::Vector{SData})
-    sd = SData(1,sum([s.π*s.d for s in sds]),sum([s.π*s.q for s in sds]))
+problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
+include("simple.jl")
+include("farmer.jl")
+
+@testset "SP Constructs: $name" for (sp,res,name) in problems
+    solve(sp)
+    @test norm(sp.colVal-res.x̄) <= 1e-2
+    @test abs(sp.objVal-res.RP) <= 1e-2
+    @test abs(EVPI(sp)-res.EVPI) <= 1e-2
+    @test abs(VSS(sp)-res.VSS) <= 1e-2
+    @test abs(EV(sp)-res.EV) <= 1e-2
+    @test abs(EEV(sp)-res.EEV) <= 1e-2
 end
 
-s1 = SData(0.4,[500.0,100],[-24.0,-28])
-s2 = SData(0.6,[300.0,300],[-28.0,-32])
-
-sds = [s1,s2]
-
-sp = StochasticProgram(sds)
-
-@first_stage sp = begin
-    @variable(model, x1 >= 40)
-    @variable(model, x2 >= 20)
-    @objective(model, Min, 100*x1 + 150*x2)
-    @constraint(model, x1+x2 <= 120)
-end
-
-@second_stage sp = begin
-    @decision x1 x2
-    s = scenario
-    @variable(model, 0 <= y1 <= s.d[1])
-    @variable(model, 0 <= y2 <= s.d[2])
-    @objective(model, Min, s.q[1]*y1 + s.q[2]*y2)
-    @constraint(model, 6*y1 + 10*y2 <= 60*x1)
-    @constraint(model, 8*y1 + 5*y2 <= 80*x2)
+@testset "Inequalities: $name" for (sp,res,name) in problems
+    @test EWS(sp,scenarios(sp)) <= RP(sp)
+    @test RP(sp) <= EEV(sp)
+    @test VSS(sp) >= 0
+    @test EVPI(sp) >= 0
+    @test VSS(sp) <= EEV(sp)-EV(sp)
+    @test EVPI(sp) <= EEV(sp)-EV(sp)
 end
