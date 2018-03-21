@@ -639,7 +639,7 @@ macro first_stage(args)
     @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     vardefs = Expr(:block)
     for line in modeldef.args
-        @capture(line, @variable(m_Symbol,vardef_)) && push!(vardefs.args,line)
+        @capture(line, @variable(m_Symbol,vardef__)) && push!(vardefs.args,line)
     end
     code = @q begin
         $(esc(model)).ext[:SP].generator[:first_stage_vars] = ($(esc(:model))::JuMP.Model) -> begin
