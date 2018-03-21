@@ -106,7 +106,7 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
     end
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -286,7 +286,7 @@ end
 
 function eval_decision(stochasticprogram::JuMP.Model,x::AbstractVector; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -308,7 +308,7 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -335,7 +335,7 @@ function EWS(stochasticprogram::JuMP.Model, scenarios::Vector{<:AbstractScenario
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -366,7 +366,7 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
         return cache[:dep]
     end
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -437,7 +437,7 @@ function RP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProg
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -459,7 +459,7 @@ function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPr
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -494,7 +494,7 @@ function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
         return cache[:evp]
     end
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -524,7 +524,7 @@ function EV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProg
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -546,7 +546,7 @@ function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
@@ -570,7 +570,7 @@ function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
         solver
     else
         stochasticprogram.solver
