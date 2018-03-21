@@ -18,6 +18,9 @@ export
     subproblem,
     subproblems,
     nscenarios,
+    stage_two_model,
+    outcome_model,
+    eval_decision,
     @first_stage,
     @second_stage,
     WS,
@@ -206,59 +209,95 @@ end
 
 # Problem generation #
 # ========================== #
+function stage_two_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
+    stage_two_model = Model(solver=JuMP.UnsetSolver())
+    generator(stochasticprogram,:second_stage)(stage_two_model,scenario,stochasticprogram)
+    return stage_two_model
+end
+
 function generate_stage_two!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     sp = stochastic(stochasticprogram)
-    if has_generator(stochasticprogram,:second_stage)
-        for i in nscenarios(stochasticprogram)+1:length(sp.scenariodata)
-            subproblem = Model(solver=JuMP.UnsetSolver())
-            generator(stochasticprogram,:second_stage)(subproblem,scenario(stochasticprogram,i),stochasticprogram)
-            push!(sp.subproblems,subproblem)
-        end
-    else
-        warn("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
-        return nothing
+    for i in nscenarios(stochasticprogram)+1:length(sp.scenariodata)
+        push!(sp.subproblems,stage_two_model(stochasticprogram,scenario(stochasticprogram,i)))
     end
     nothing
 end
 
-function eval_first_stage(stochasticprogram::JuMP.Model,origin::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
-
-    return eval_objective(stochasticprogram.obj,origin.colVal)
-end
-
-function eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,origin::JuMP.Model,solver::MathProgBase.AbstractMathProgSolver)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    all(.!(isnan.(origin.colVal))) || error("No solution to evaluate in given model. ")
-    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+    has_generator(stochasticprogram,:first_stage_vars) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
-    eval_model = Model(solver = solver)
-    generator(stochasticprogram,:first_stage)(eval_model)
-    for obj in values(eval_model.objDict)
+    outcome_model = Model(solver = solver)
+    generator(stochasticprogram,:first_stage_vars)(outcome_model)
+    for obj in values(outcome_model.objDict)
         if isa(obj,JuMP.Variable)
-            val = origin.colVal[obj.col]
-            eval_model.colCat[obj.col] = :Fixed
-            eval_model.colVal[obj.col] = val
-            eval_model.colLower[obj.col] = val
-            eval_model.colUpper[obj.col] = val
+            val = x[obj.col]
+            outcome_model.colCat[obj.col] = :Fixed
+            outcome_model.colVal[obj.col] = val
+            outcome_model.colLower[obj.col] = val
+            outcome_model.colUpper[obj.col] = val
         elseif isa(obj,JuMP.JuMPArray{JuMP.Variable})
             for var in obj.innerArray
-                val = origin.colVal[var.col]
-                eval_model.colCat[var.col] = :Fixed
-                eval_model.colVal[var.col] = val
-                eval_model.colLower[var.col] = val
-                eval_model.colUpper[var.col] = val
+                val = x[var.col]
+                outcome_model.colCat[var.col] = :Fixed
+                outcome_model.colVal[var.col] = val
+                outcome_model.colLower[var.col] = val
+                outcome_model.colUpper[var.col] = val
             end
         else
             continue
         end
     end
-    generator(stochasticprogram,:second_stage)(eval_model,scenario,eval_model)
+    generator(stochasticprogram,:second_stage)(outcome_model,scenario,outcome_model)
 
-    return eval_model
+    return outcome_model
+end
+# ========================== #
+
+# Problem evaluation #
+# ========================== #
+function _eval_first_stage(stochasticprogram::JuMP.Model,x::AbstractVector)
+    return eval_objective(stochasticprogram.obj,x)
+end
+
+function _eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+    outcome = outcome_model(stochasticprogram,scenario,x,solver)
+    solve(outcome)
+
+    return probability(scenario)*getobjectivevalue(outcome)
+end
+
+function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    length(x) == stochasticprogram.numCols || error("Incorrect length of given decision vector, has ",length(x)," should be ",stochasticprogram.numCols)
+    all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
+
+    val = _eval_first_stage(stochasticprogram,x)
+
+    for scenario in scenarios(stochasticprogram)
+        val += _eval_second_stage(stochasticprogram,scenario,x,solver)
+    end
+
+    return val
+end
+
+function eval_decision(stochasticprogram::JuMP.Model,x::AbstractVector; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+    # Prefer cached solver if available
+    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
+        solver
+    else
+        stochasticprogram.solver
+    end
+
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot evaluate decision without a solver.")
+    end
+
+    return _eval(stochasticprogram,x,optimsolver)
 end
 # ========================== #
 
@@ -267,12 +306,14 @@ end
 WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
 function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+
     # Prefer cached solver if available
     optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver
         solver
     else
         stochasticprogram.solver
     end
+
     # Abort if no solver was given
     if isa(optimsolver,JuMP.UnsetSolver)
         error("Cannot create WS model without a solver.")
@@ -511,17 +552,16 @@ function EEV(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
         stochasticprogram.solver
     end
 
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot evaluate decision without a solver.")
+    end
+
     # Solve EVP model
     evp = EVP(stochasticprogram,optimsolver)
     solve(evp)
 
-    eev = eval_first_stage(stochasticprogram,evp)
-
-    for scenario in scenarios(stochasticprogram)
-        subproblem = eval_second_stage(stochasticprogram,scenario,evp,optimsolver)
-        solve(subproblem)
-        eev += probability(scenario)*getobjectivevalue(subproblem)
-    end
+    eev = _eval(stochasticprogram,evp.colVal[1:stochasticprogram.numCols],optimsolver)
 
     return eev
 end
@@ -534,6 +574,11 @@ function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
         solver
     else
         stochasticprogram.solver
+    end
+
+    # Abort if no solver was given
+    if isa(optimsolver,JuMP.UnsetSolver)
+        error("Cannot evaluate decision without a solver.")
     end
 
     # Solve DEP model
@@ -592,7 +637,15 @@ end
 # ========================== #
 macro first_stage(args)
     @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
+    vardefs = Expr(:block)
+    for line in modeldef.args
+        @capture(line, @variable(m_Symbol,vardef_)) && push!(vardefs.args,line)
+    end
     code = @q begin
+        $(esc(model)).ext[:SP].generator[:first_stage_vars] = ($(esc(:model))::JuMP.Model) -> begin
+            $(esc(vardefs))
+	    return $(esc(:model))
+        end
         $(esc(model)).ext[:SP].generator[:first_stage] = ($(esc(:model))::JuMP.Model) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
