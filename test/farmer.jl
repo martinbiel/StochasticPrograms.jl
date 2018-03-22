@@ -26,7 +26,7 @@ s1 = FarmerScenario(Dict(:wheat=>3.0,:corn=>3.6,:beets=>24.0))
 s2 = FarmerScenario(Dict(:wheat=>2.5,:corn=>3.0,:beets=>20.0))
 s3 = FarmerScenario(Dict(:wheat=>2.0,:corn=>2.4,:beets=>16.0))
 
-sp = StochasticProgram([s1,s2,s3],solver=ClpSolver())
+sp = StochasticProgram((REQ,P,S),[s1,s2,s3],solver=ClpSolver())
 
 @first_stage sp = begin
     @variable(model, x[c = CROPS] >= 0)
@@ -36,6 +36,7 @@ end
 
 @second_stage sp = begin
     @decision x
+    (REQ,P,S) = commondata
     s = scenario
     @variable(model, y[p = PURCHASE] >= 0)
     @variable(model, w[s = SELL] >= 0)

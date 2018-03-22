@@ -44,33 +44,35 @@ function expected(::Vector{SD}) where SD <: AbstractScenarioData
    error("Expected value operation not implemented for scenariodata type: ", SD)
 end
 
-struct StochasticProgramData{SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    commondata::D
     scenariodata::Vector{SD}
     sampler::S
     generator::Dict{Symbol,Function}
     subproblems::Vector{JuMP.Model}
     problemcache::Dict{Symbol,JuMP.Model}
 
-    function (::Type{StochasticProgramData})(::Type{SD}) where SD <: AbstractScenarioData
+    function (::Type{StochasticProgramData})(commondata::D,::Type{SD}) where {D,SD <: AbstractScenarioData}
         S = NullSampler{SD}
-        return new{SD,S}(Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(commondata,Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 
-    function (::Type{StochasticProgramData})(scenariodata::Vector{<:AbstractScenarioData})
+    function (::Type{StochasticProgramData})(commondata::D,scenariodata::Vector{<:AbstractScenarioData}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
-        return new{SD,S}(scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(commondata,scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 
-    function (::Type{StochasticProgramData})(sampler::AbstractSampler{SD}) where SD <: AbstractScenarioData
+    function (::Type{StochasticProgramData})(commondata::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
-        return new{SD,S}(Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(commondata,Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 end
 
-function StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData
+StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData = StochasticProgram(nothing,SD; solver=solver)
+function StochasticProgram(commondata::D,::Type{SD}; solver = JuMP.UnsetSolver()) where {D,SD <: AbstractScenarioData}
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(SD)
+    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,SD)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -78,9 +80,10 @@ function StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver()) where SD <: 
 
     return stochasticprogram
 end
-function StochasticProgram(scenariodata::Vector{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData
+StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver()) = StochasticProgram(nothing,scenariodata; solver=solver)
+function StochasticProgram(commondata::D,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver()) where D
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(scenariodata)
+    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,scenariodata)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -88,9 +91,10 @@ function StochasticProgram(scenariodata::Vector{SD}; solver = JuMP.UnsetSolver()
 
     return stochasticprogram
 end
-function StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver())
+StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver()) = StochasticProgram(nothing,sampler; solver=solver)
+function StochasticProgram(commondata::D,sampler::AbstractSampler; solver = JuMP.UnsetSolver()) where D
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(sampler)
+    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,sampler)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -149,6 +153,10 @@ end
 function stochastic(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP]
+end
+function common(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return stochasticprogram.ext[:SP].commondata
 end
 function scenario(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -209,12 +217,27 @@ end
 
 # Problem generation #
 # ========================== #
+function stage_one_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    has_generator(stochasticprogram,:first_stage) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
+    stage_one_model = Model(solver=JuMP.UnsetSolver())
+    generator(stochasticprogram,:first_stage)(stage_one_model,common(stochasticprogram))
+    return stage_one_model
+end
+
 function stage_two_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
     stage_two_model = Model(solver=JuMP.UnsetSolver())
-    generator(stochasticprogram,:second_stage)(stage_two_model,scenario,stochasticprogram)
+    generator(stochasticprogram,:second_stage)(stage_two_model,common(stochasticprogram),scenario,stochasticprogram)
     return stage_two_model
+end
+
+function generate_stage_one!(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    has_generator(stochasticprogram,:first_stage) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
+    generator(stochasticprogram,:first_stage)(stochasticprogram,common(stochasticprogram))
+    nothing
 end
 
 function generate_stage_two!(stochasticprogram::JuMP.Model)
@@ -231,7 +254,7 @@ function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioD
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
     outcome_model = Model(solver = solver)
-    generator(stochasticprogram,:first_stage_vars)(outcome_model)
+    generator(stochasticprogram,:first_stage_vars)(outcome_model,common(stochasticprogram))
     for obj in values(outcome_model.objDict)
         if isa(obj,JuMP.Variable)
             val = x[obj.col]
@@ -251,7 +274,7 @@ function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioD
             continue
         end
     end
-    generator(stochasticprogram,:second_stage)(outcome_model,scenario,outcome_model)
+    generator(stochasticprogram,:second_stage)(outcome_model,common(stochasticprogram),scenario,outcome_model)
 
     return outcome_model
 end
@@ -323,9 +346,9 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
     ws_model = Model(solver = optimsolver)
-    generator(stochasticprogram,:first_stage)(ws_model)
+    generator(stochasticprogram,:first_stage)(ws_model,common(stochasticprogram))
     ws_obj = copy(ws_model.obj)
-    generator(stochasticprogram,:second_stage)(ws_model,scenario,ws_model)
+    generator(stochasticprogram,:second_stage)(ws_model,common(stochasticprogram),scenario,ws_model)
     append!(ws_obj,ws_model.obj)
     ws_model.obj = ws_obj
 
@@ -381,13 +404,13 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
 
     # Define first-stage problem
     dep_model = Model(solver = optimsolver)
-    generator(stochasticprogram,:first_stage)(dep_model)
+    generator(stochasticprogram,:first_stage)(dep_model,common(stochasticprogram))
     dep_obj = copy(dep_model.obj)
 
     # Define second-stage problems, renaming variables according to scenario.
     visited_objs = collect(keys(dep_model.objDict))
     for (i,scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:second_stage)(dep_model,scenario,dep_model)
+        generator(stochasticprogram,:second_stage)(dep_model,common(stochasticprogram),scenario,dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ dep_model.objDict
             if objkey ∉ visited_objs
@@ -508,9 +531,9 @@ function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
     ev_model = Model(solver = optimsolver)
-    generator(stochasticprogram,:first_stage)(ev_model)
+    generator(stochasticprogram,:first_stage)(ev_model,common(stochasticprogram))
     ev_obj = copy(ev_model.obj)
-    generator(stochasticprogram,:second_stage)(ev_model,expected(scenarios(stochasticprogram)),ev_model)
+    generator(stochasticprogram,:second_stage)(ev_model,common(stochasticprogram),expected(scenarios(stochasticprogram)),ev_model)
     append!(ev_obj,ev_model.obj)
     ev_model.obj = ev_obj
 
@@ -642,15 +665,15 @@ macro first_stage(args)
         @capture(line, @variable(m_Symbol,vardef__)) && push!(vardefs.args,line)
     end
     code = @q begin
-        $(esc(model)).ext[:SP].generator[:first_stage_vars] = ($(esc(:model))::JuMP.Model) -> begin
+        $(esc(model)).ext[:SP].generator[:first_stage_vars] = ($(esc(:model))::JuMP.Model,$(esc(:commondata))) -> begin
             $(esc(vardefs))
 	    return $(esc(:model))
         end
-        $(esc(model)).ext[:SP].generator[:first_stage] = ($(esc(:model))::JuMP.Model) -> begin
+        $(esc(model)).ext[:SP].generator[:first_stage] = ($(esc(:model))::JuMP.Model,$(esc(:commondata))) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
         end
-        $(esc(model)).ext[:SP].generator[:first_stage]($(esc(model)))
+        generate_stage_one!($(esc(model)))
     end
     return code
 end
@@ -668,7 +691,7 @@ macro second_stage(args)
     end
 
     code = @q begin
-        $(esc(model)).ext[:SP].generator[:second_stage] = ($(esc(:model))::JuMP.Model,$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
+        $(esc(model)).ext[:SP].generator[:second_stage] = ($(esc(:model))::JuMP.Model,$(esc(:commondata)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
