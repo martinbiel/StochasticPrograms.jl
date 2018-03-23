@@ -38,6 +38,14 @@ abstract type AbstractScenarioData end
 abstract type AbstractSampler{SD <: AbstractScenarioData} end
 struct NullSampler{SD <: AbstractScenarioData} <: AbstractSampler{SD} end
 
+mutable struct CommonData{D}
+    data::D
+
+    function (::Type{CommonData})(data::D) where D
+        return new{D}(data)
+    end
+end
+
 probability(sd::AbstractScenarioData) = sd.π
 
 function expected(::Vector{SD}) where SD <: AbstractScenarioData
@@ -45,7 +53,7 @@ function expected(::Vector{SD}) where SD <: AbstractScenarioData
 end
 
 struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    commondata::D
+    commondata::CommonData{D}
     scenariodata::Vector{SD}
     sampler::S
     generator::Dict{Symbol,Function}
@@ -54,18 +62,18 @@ struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler
 
     function (::Type{StochasticProgramData})(commondata::D,::Type{SD}) where {D,SD <: AbstractScenarioData}
         S = NullSampler{SD}
-        return new{D,SD,S}(commondata,Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(commondata),Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 
     function (::Type{StochasticProgramData})(commondata::D,scenariodata::Vector{<:AbstractScenarioData}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
-        return new{D,SD,S}(commondata,scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(commondata),scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 
     function (::Type{StochasticProgramData})(commondata::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
-        return new{D,SD,S}(commondata,Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(commondata),Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
     end
 end
 
@@ -156,7 +164,7 @@ function stochastic(stochasticprogram::JuMP.Model)
 end
 function common(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].commondata
+    return stochasticprogram.ext[:SP].commondata.data
 end
 function scenario(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
