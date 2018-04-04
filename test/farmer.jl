@@ -1,6 +1,3 @@
-using StochasticPrograms
-using JuMP
-
 CROPS = [:wheat,:corn,:beets]
 PURCHASE = [:wheat,:corn]
 SELL = [:wheat,:corn,:beets_quota,:beets_extra]
@@ -11,15 +8,16 @@ P = Dict(:wheat=>238,:corn=>210)
 S = Dict(:wheat=>170,:corn=>150,:beets_quota=>36,:beets_extra=>10)
 B = 500
 
-struct FarmerScenario <: AbstractScenarioData
-    Y::Dict{Symbol,Float64}
-end
-StochasticPrograms.probability(::FarmerScenario) = 1/3
-
-function StochasticPrograms.expected(sds::Vector{FarmerScenario})
-    sd = FarmerScenario(Dict(:wheat=>sum([probability(s)*s.Y[:wheat] for s in sds]),
-                             :corn=>sum([probability(s)*s.Y[:corn] for s in sds]),
-                             :beets=>sum([probability(s)*s.Y[:beets] for s in sds])))
+@everywhere begin
+    struct FarmerScenario <: StochasticPrograms.AbstractScenarioData
+        Y::Dict{Symbol,Float64}
+    end
+    StochasticPrograms.probability(::FarmerScenario) = 1/3
+    function StochasticPrograms.expected(sds::Vector{FarmerScenario})
+        sd = FarmerScenario(Dict(:wheat=>sum([probability(s)*s.Y[:wheat] for s in sds]),
+                                 :corn=>sum([probability(s)*s.Y[:corn] for s in sds]),
+                                 :beets=>sum([probability(s)*s.Y[:beets] for s in sds])))
+    end
 end
 
 s1 = FarmerScenario(Dict(:wheat=>3.0,:corn=>3.6,:beets=>24.0))

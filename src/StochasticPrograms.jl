@@ -12,6 +12,7 @@ export
     AbstractStructuredModel,
     StructuredModel,
     stochastic,
+    scenarioproblems,
     scenario,
     scenarios,
     probability,
@@ -34,7 +35,13 @@ export
     VSS
 
 abstract type AbstractStructuredSolver end
+
 abstract type AbstractScenarioData end
+probability(sd::AbstractScenarioData) = sd.π
+function expected(::Vector{SD}) where SD <: AbstractScenarioData
+   error("Expected value operation not implemented for scenariodata type: ", SD)
+end
+
 abstract type AbstractSampler{SD <: AbstractScenarioData} end
 struct NullSampler{SD <: AbstractScenarioData} <: AbstractSampler{SD} end
 
@@ -46,41 +53,129 @@ mutable struct CommonData{D}
     end
 end
 
-probability(sd::AbstractScenarioData) = sd.π
-
-function expected(::Vector{SD}) where SD <: AbstractScenarioData
-   error("Expected value operation not implemented for scenariodata type: ", SD)
-end
-
-struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+struct ScenarioProblems{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     commondata::CommonData{D}
     scenariodata::Vector{SD}
     sampler::S
-    generator::Dict{Symbol,Function}
-    subproblems::Vector{JuMP.Model}
-    problemcache::Dict{Symbol,JuMP.Model}
+    problems::Vector{JuMP.Model}
+    parent::JuMP.Model
 
-    function (::Type{StochasticProgramData})(commondata::D,::Type{SD}) where {D,SD <: AbstractScenarioData}
+    function (::Type{ScenarioProblems})(common::D,::Type{SD}) where {D,SD <: AbstractScenarioData}
         S = NullSampler{SD}
-        return new{D,SD,S}(CommonData(commondata),Vector{SD}(),NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(common),Vector{SD}(),NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
     end
 
-    function (::Type{StochasticProgramData})(commondata::D,scenariodata::Vector{<:AbstractScenarioData}) where D
+    function (::Type{ScenarioProblems})(common::D,scenariodata::Vector{<:AbstractScenarioData}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
-        return new{D,SD,S}(CommonData(commondata),scenariodata,NullSampler{SD}(),Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(common),scenariodata,NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
     end
 
-    function (::Type{StochasticProgramData})(commondata::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
+    function (::Type{ScenarioProblems})(common::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
-        return new{D,SD,S}(CommonData(commondata),Vector{SD}(),sampler,Dict{Symbol,Function}(),Vector{JuMP.Model}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S}(CommonData(common),Vector{SD}(),sampler,Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
+    end
+end
+DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S}}}}
+
+function ScenarioProblems(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+    if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
+        return ScenarioProblems(common,SD)
+    else
+        isempty(procs) && error("No requested procs.")
+        length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
+
+        S = NullSampler{SD}
+        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
+
+        finished_workers = Vector{Future}(length(procs))
+        for p in procs
+            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
+            finished_workers[p-1] = remotecall((sp,common,SD)->put!(sp,ScenarioProblems(common,SD)),p,scenarioproblems[p-1],common,SD)
+        end
+        map(wait,finished_workers)
+        return scenarioproblems
     end
 end
 
-StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver()) where SD <: AbstractScenarioData = StochasticProgram(nothing,SD; solver=solver)
-function StochasticProgram(commondata::D,::Type{SD}; solver = JuMP.UnsetSolver()) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(common::D,scenariodata::Vector{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+    if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
+        return ScenarioProblems(common,scenariodata)
+    else
+        isempty(procs) && error("No requested procs.")
+        length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
+
+        S = NullSampler{SD}
+        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
+
+        (nscen,extra) = divrem(length(scenariodata),length(procs))
+        if extra > 0
+            nscen += 1
+        end
+        start = 1
+        stop = nscen
+        finished_workers = Vector{Future}(length(procs))
+        for p in procs
+            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
+            finished_workers[p-1] = remotecall((sp,common,sdata)->put!(sp,ScenarioProblems(common,sdata)),p,scenarioproblems[p-1],common,scenariodata[start:stop])
+            start += nscen
+            stop += nscen
+            stop = min(stop,length(scenariodata))
+        end
+        map(wait,finished_workers)
+        return scenarioproblems
+    end
+end
+
+function ScenarioProblems(common::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+    if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
+        return ScenarioProblems(common,sampler)
+    else
+        isempty(procs) && error("No requested procs.")
+        length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
+        S = typeof(sampler)
+        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
+        finished_workers = Vector{Future}(length(procs))
+        for p in procs
+            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
+            finished_workers[p-1] = remotecall((sp,common,sampler)->put!(sp,ScenarioProblems(common,sampler)),p,scenarioproblems[p-1],common,sampler)
+        end
+        map(wait,finished_workers)
+        return scenarioproblems
+    end
+end
+
+struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}, SP <: Union{ScenarioProblems{D,SD,S},
+                                                                                                  DScenarioProblems{D,SD,S}}}
+    commondata::CommonData{D}
+    scenarioproblems::SP
+    generator::Dict{Symbol,Function}
+    problemcache::Dict{Symbol,JuMP.Model}
+
+    function (::Type{StochasticProgramData})(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+        S = NullSampler{SD}
+        scenarioproblems = ScenarioProblems(common,SD,procs)
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+    end
+
+    function (::Type{StochasticProgramData})(common::D,scenariodata::Vector{<:AbstractScenarioData},procs::Vector{Int}) where D
+        SD = eltype(scenariodata)
+        S = NullSampler{SD}
+        scenarioproblems = ScenarioProblems(common,scenariodata,procs)
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+    end
+
+    function (::Type{StochasticProgramData})(common::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+        S = typeof(sampler)
+        scenarioproblems = ScenarioProblems(common,sampler,procs)
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+    end
+end
+
+StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers()) where SD <: AbstractScenarioData = StochasticProgram(nothing,SD; solver = solver, procs = procs)
+function StochasticProgram(common::Any,::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers) where SD <: AbstractScenarioData
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,SD)
+    stochasticprogram.ext[:SP] = StochasticProgramData(common,SD,procs)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -88,10 +183,10 @@ function StochasticProgram(commondata::D,::Type{SD}; solver = JuMP.UnsetSolver()
 
     return stochasticprogram
 end
-StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver()) = StochasticProgram(nothing,scenariodata; solver=solver)
-function StochasticProgram(commondata::D,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver()) where D
+StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,scenariodata; solver = solver, procs = procs)
+function StochasticProgram(common::Any,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers())
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,scenariodata)
+    stochasticprogram.ext[:SP] = StochasticProgramData(common,scenariodata,procs)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -99,10 +194,10 @@ function StochasticProgram(commondata::D,scenariodata::Vector{<:AbstractScenario
 
     return stochasticprogram
 end
-StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver()) = StochasticProgram(nothing,sampler; solver=solver)
-function StochasticProgram(commondata::D,sampler::AbstractSampler; solver = JuMP.UnsetSolver()) where D
+StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,sampler; solver = solver, procs = procs)
+function StochasticProgram(common::Any,sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers())
     stochasticprogram = JuMP.Model(solver=solver)
-    stochasticprogram.ext[:SP] = StochasticProgramData(commondata,sampler)
+    stochasticprogram.ext[:SP] = StochasticProgramData(common,sampler,procs)
 
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
@@ -162,21 +257,54 @@ function stochastic(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP]
 end
+function scenarioproblems(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return stochasticprogram.ext[:SP].scenarioproblems
+end
 function common(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP].commondata.data
 end
+function common(scenarioproblems::ScenarioProblems)
+    return scenarioproblems.commondata.data
+end
+function scenario(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return scenarioproblems.scenariodata[i]
+end
+function scenario(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    j = 0
+    for p in 1:length(scenarioproblems)
+        n = remotecall_fetch((sp)->length(fetch(sp).scenariodata),p+1,scenarioproblems[p])
+        if i <= n+j
+            return remotecall_fetch((sp,i)->fetch(sp).scenariodata[i],p+1,scenarioproblems[p],i-j)
+        end
+        j += n
+    end
+    throw(BoundsError(scenarioproblems,i))
+end
 function scenario(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].scenariodata[i]
+    return scenario(scenarioproblems(stochasticprogram),i)
+end
+function scenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return scenarioproblems.scenariodata
+end
+function scenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    scenarios = Vector{SD}()
+    for p in 1:length(scenarioproblems)
+        append!(scenarios,remotecall_fetch((sp)->fetch(sp).scenariodata,
+                                           p+1,
+                                           scenarioproblems[p]))
+    end
+    return scenarios
 end
 function scenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].scenariodata
+    return scenarios(scenarioproblems(stochasticprogram))
 end
 function probability(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return probability(stochasticprogram.ext[:SP].scenariodata[i])
+    return probability(scenario(stochasticprogram,i))
 end
 function has_generator(stochasticprogram::JuMP.Model,key::Symbol)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -186,46 +314,99 @@ function generator(stochasticprogram::JuMP.Model,key::Symbol)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP].generator[key]
 end
+function subproblem(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return scenarioproblems.problems[i]
+end
+function subproblem(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    j = 0
+    for p in 1:length(scenarioproblems)
+        n = remotecall_fetch((sp)->length(fetch(sp).scenariodata),p+1,scenarioproblems[p])
+        if i <= n+j
+            return remotecall_fetch((sp,i)->fetch(sp).problems[i],p+1,scenarioproblems[p],i-j)
+        end
+        j += n
+    end
+    throw(BoundsError(scenarioproblems,i))
+end
 function subproblem(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblems(stochasticprogram)[i]
+    return subproblem(scenarioproblems(stochasticprogram),i)
+end
+function subproblems(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return scenarioproblems.problems
+end
+function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    subproblems = Vector{JuMP.Model}()
+    for p in 1:length(scenarioproblems)
+        append!(subproblems,remotecall_fetch((sp)->fetch(sp).problems,
+                                             p+1,
+                                             scenarioproblems[p]))
+    end
+    return subproblems
 end
 function subproblems(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].subproblems
+    return subproblems(scenarioproblems(stochasticprogram))
+end
+function parent(scenarioproblems::ScenarioProblems)
+    return scenarioproblems.parent
+end
+function nscenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return length(scenarioproblems.problems)
+end
+function nscenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return sum([remotecall_fetch((sp) -> length(fetch(sp).problems),
+                                 p+1,
+                                 scenarioproblems[p]) for p in 1:length(scenarioproblems)])
 end
 function nscenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return length(stochasticprogram.ext[:SP].subproblems)
+    return nscenarios(scenarioproblems(stochasticprogram))
 end
 problemcache(stochasticprogram::JuMP.Model) = stochasticprogram.ext[:SP].problemcache
 # ========================== #
 
 # Base overloads
 # ========================== #
-function Base.push!(sp::StochasticProgramData{SD},sdata::SD) where SD <: AbstractScenarioData
+function Base.push!(sp::ScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
     push!(sp.scenariodata,sdata)
+end
+function Base.push!(sp::DScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
+    p = rand(1:length(sp))
+    remotecall_fetch((sp,sdata) -> push!(fetch(sp).scenariodata,sdata),
+                     p+1,
+                     sp[p],
+                     sdata)
 end
 function Base.push!(stochasticprogram::JuMP.Model,sdata::AbstractScenarioData)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
-    push!(stochastic(stochasticprogram),sdata)
+    push!(stochastic(stochasticprogram).scenarioproblems,sdata)
     invalidate_cache!(stochasticprogram)
+    return stochasticprogram
 end
-function Base.append!(sp::StochasticProgramData{SD},sdata::Vector{SD}) where SD <: AbstractScenarioData
+function Base.append!(sp::ScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
     append!(sp.scenariodata,sdata)
+end
+function Base.append!(sp::DScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
+    p = rand(1:length(sp))
+    remotecall_fetch((sp,sdata) -> append!(fetch(sp).scenariodata,sdata),
+                     p+1,
+                     sp[p],
+                     sdata)
 end
 function Base.append!(stochasticprogram::JuMP.Model,sdata::Vector{<:AbstractScenarioData})
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
-    append!(stochastic(stochasticprogram),sdata)
+    append!(stochastic(stochasticprogram).scenarioproblems,sdata)
     invalidate_cache!(stochasticprogram)
+    return stochasticprogram
 end
 # ========================== #
 
 # Problem generation #
 # ========================== #
-function stage_one_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData)
+function stage_one_model(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:first_stage) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
     stage_one_model = Model(solver=JuMP.UnsetSolver())
@@ -233,36 +414,69 @@ function stage_one_model(stochasticprogram::JuMP.Model,scenario::AbstractScenari
     return stage_one_model
 end
 
+function _stage_two_model(generator::Function,common::Any,scenario::AbstractScenarioData,parent::JuMP.Model)
+    stage_two_model = Model(solver=JuMP.UnsetSolver())
+    generator(stage_two_model,common,scenario,parent)
+    return stage_two_model
+end
 function stage_two_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
-    stage_two_model = Model(solver=JuMP.UnsetSolver())
     generator(stochasticprogram,:second_stage)(stage_two_model,common(stochasticprogram),scenario,stochasticprogram)
-    return stage_two_model
+    return _stage_two_model(generator(stochasticprogram,:second_stage),common(stochasticprogram),scenario,stochasticprogram)
+end
+
+function generate_parent!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
+    generator(parent(scenarioproblems),common(scenarioproblems))
+    nothing
+end
+function generate_parent!(scenarioproblems::DScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
+    finished_workers = Vector{Future}(length(scenarioproblems))
+    for p in 1:length(scenarioproblems)
+        finished_workers[p] = remotecall((sp,generator)->generate_parent!(fetch(sp),generator),p+1,scenarioproblems[p],generator)
+    end
+    map(wait,finished_workers)
+    nothing
 end
 
 function generate_stage_one!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    has_generator(stochasticprogram,:first_stage) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:first_stage) && has_generator(stochasticprogram,:first_stage_vars) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
+
     generator(stochasticprogram,:first_stage)(stochasticprogram,common(stochasticprogram))
+    generate_parent!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:first_stage_vars))
     nothing
 end
 
-function generate_stage_two!(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    sp = stochastic(stochasticprogram)
-    for i in nscenarios(stochasticprogram)+1:length(sp.scenariodata)
-        push!(sp.subproblems,stage_two_model(stochasticprogram,scenario(stochasticprogram,i)))
+function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
+    for i in nscenarios(scenarioproblems)+1:length(scenarioproblems.scenariodata)
+        push!(scenarioproblems.problems,_stage_two_model(generator,common(scenarioproblems),scenario(scenarioproblems,i),parent(scenarioproblems)))
     end
     nothing
 end
+function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
+    finished_workers = Vector{Future}(length(scenarioproblems))
+    for p in 1:length(scenarioproblems)
+        finished_workers[p] = remotecall((sp,generator)->generate_stage_two!(fetch(sp),generator),p+1,scenarioproblems[p],generator)
+    end
+    map(wait,finished_workers)
+    nothing
+end
+function generate_stage_two!(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
+    generate_stage_two!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:second_stage))
+    nothing
+end
 
-function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
-    has_generator(stochasticprogram,:first_stage_vars) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
-
+function _outcome_model(stage_one_generator::Function,
+                        stage_two_generator::Function,
+                        common::Any,
+                        scenario::AbstractScenarioData,
+                        x::AbstractVector,
+                        solver::MathProgBase.AbstractMathProgSolver)
     outcome_model = Model(solver = solver)
-    generator(stochasticprogram,:first_stage_vars)(outcome_model,common(stochasticprogram))
+    stage_one_generator(outcome_model,common)
     for obj in values(outcome_model.objDict)
         if isa(obj,JuMP.Variable)
             val = x[obj.col]
@@ -282,9 +496,15 @@ function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioD
             continue
         end
     end
-    generator(stochasticprogram,:second_stage)(outcome_model,common(stochasticprogram),scenario,outcome_model)
+    stage_two_generator(outcome_model,common,scenario,outcome_model)
 
     return outcome_model
+end
+function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+    has_generator(stochasticprogram,:first_stage_vars) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+
+    return _outcome_model(generator(stochasticprogram,:first_stage_vars),generator(stochasticprogram,:second_stage),common(stochasticprogram),scenario,x,solver)
 end
 # ========================== #
 
@@ -294,11 +514,56 @@ function _eval_first_stage(stochasticprogram::JuMP.Model,x::AbstractVector)
     return eval_objective(stochasticprogram.obj,x)
 end
 
-function _eval_second_stage(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+function _eval_second_stage(stochasticprogram::JuMP.Model,x::AbstractVector,scenario::AbstractScenarioData,solver::MathProgBase.AbstractMathProgSolver)
     outcome = outcome_model(stochasticprogram,scenario,x,solver)
     solve(outcome)
 
     return probability(scenario)*getobjectivevalue(outcome)
+end
+
+function _eval_second_stages(stochasticprogram::StochasticProgramData{D,SD,S,ScenarioProblems{D,SD,S}},
+                             x::AbstractVector,
+                             solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return sum([begin
+                outcome = _outcome_model(stochasticprogram.generator[:first_stage_vars],
+                                         stochasticprogram.generator[:second_stage],
+                                         common(stochasticprogram.scenarioproblems),
+                                         scenario,
+                                         x,
+                                         solver)
+                solve(outcome)
+                probability(scenario)*getobjectivevalue(outcome)
+                end for scenario in scenarios(stochasticprogram.scenarioproblems)])
+end
+
+function _eval_second_stages(stochasticprogram::StochasticProgramData{D,SD,S,DScenarioProblems{D,SD,S}},
+                             x::AbstractVector,
+                             solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    finished_workers = Vector{Future}(length(stochasticprogram.scenarioproblems))
+    for p in 1:length(stochasticprogram.scenarioproblems)
+        finished_workers[p] = remotecall((sp,stage_one_generator,stage_two_generator,x,solver)->begin
+                                         scenarioproblems = fetch(sp)
+                                         isempty(scenarioproblems.scenariodata) && return zero(eltype(x))
+                                         return sum([begin
+                                                     outcome = _outcome_model(stage_one_generator,
+                                                                              stage_two_generator,
+                                                                              common(scenarioproblems),
+                                                                              scenario,
+                                                                              x,
+                                                                              solver)
+                                                     solve(outcome)
+                                                     probability(scenario)*getobjectivevalue(outcome)
+                                                     end for scenario in scenarioproblems.scenariodata])
+                                         end,
+                                         p+1,
+                                         stochasticprogram.scenarioproblems[p],
+                                         stochasticprogram.generator[:first_stage_vars],
+                                         stochasticprogram.generator[:second_stage],
+                                         x,
+                                         solver)
+    end
+    map(wait,finished_workers)
+    return sum(fetch.(finished_workers))
 end
 
 function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
@@ -307,10 +572,7 @@ function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgB
     all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
 
     val = _eval_first_stage(stochasticprogram,x)
-
-    for scenario in scenarios(stochasticprogram)
-        val += _eval_second_stage(stochasticprogram,scenario,x,solver)
-    end
+    val += _eval_second_stages(stochastic(stochasticprogram),x,solver)
 
     return val
 end
@@ -334,6 +596,21 @@ end
 
 # SP Constructs #
 # ========================== #
+function _WS(stage_one_generator::Function,
+             stage_two_generator::Function,
+             common::Any,
+             scenario::AbstractScenarioData,
+             solver::MathProgBase.AbstractMathProgSolver)
+    ws_model = Model(solver = solver)
+    stage_one_generator(ws_model,common)
+    ws_obj = copy(ws_model.obj)
+    stage_two_generator(ws_model,common,scenario,ws_model)
+    append!(ws_obj,ws_model.obj)
+    ws_model.obj = ws_obj
+
+    return ws_model
+end
+
 WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
 function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -353,16 +630,50 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
     has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
 
-    ws_model = Model(solver = optimsolver)
-    generator(stochasticprogram,:first_stage)(ws_model,common(stochasticprogram))
-    ws_obj = copy(ws_model.obj)
-    generator(stochasticprogram,:second_stage)(ws_model,common(stochasticprogram),scenario,ws_model)
-    append!(ws_obj,ws_model.obj)
-    ws_model.obj = ws_obj
-
-    return ws_model
+    return _WS(generator(stochasticprogram,:first_stage),generator(stochasticprogram,:second_stage),common(stochasticprogram),scenario,optimsolver)
 end
-function EWS(stochasticprogram::JuMP.Model, scenarios::Vector{<:AbstractScenarioData}; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+
+function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,ScenarioProblems{D,SD,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return sum([begin
+                ws = _WS(stochasticprogram.generator[:first_stage],
+                         stochasticprogram.generator[:second_stage],
+                         common(stochasticprogram.scenarioproblems),
+                         scenario,
+                         solver)
+                solve(ws)
+                probability(scenario)*getobjectivevalue(ws)
+                end for scenario in scenarios(stochasticprogram.scenarioproblems)])
+end
+
+function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,DScenarioProblems{D,SD,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    finished_workers = Vector{Future}(length(stochasticprogram.scenarioproblems))
+    for p in 1:length(stochasticprogram.scenarioproblems)
+        finished_workers[p] = remotecall((sp,stage_one_generator,stage_two_generator,solver)->begin
+                                         scenarioproblems = fetch(sp)
+                                         isempty(scenarioproblems.scenariodata) && return 0.0
+                                         return sum([begin
+                                                     ws = _WS(stage_one_generator,
+                                                              stage_two_generator,
+                                                              common(scenarioproblems),
+                                                              scenario,
+                                                              solver)
+                                                     solve(ws)
+                                                     probability(scenario)*getobjectivevalue(ws)
+                                                     end for scenario in scenarioproblems.scenariodata])
+                                         end,
+                                         p+1,
+                                         stochasticprogram.scenarioproblems[p],
+                                         stochasticprogram.generator[:first_stage],
+                                         stochasticprogram.generator[:second_stage],
+                                         solver)
+    end
+    map(wait,finished_workers)
+    return sum(fetch.(finished_workers))
+end
+
+function EWS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
@@ -378,13 +689,7 @@ function EWS(stochasticprogram::JuMP.Model, scenarios::Vector{<:AbstractScenario
     end
 
     # Solve all possible WS models and compute EWS
-    ews = sum([
-        begin
-        ws = WS(stochasticprogram,scenario,optimsolver)
-        solve(ws)
-        probability(scenario)*getobjectivevalue(ws)
-        end for scenario in scenarios])
-    return ews
+    return _EWS(stochastic(stochasticprogram),optimsolver)
 end
 
 DEP(stochasticprogram::JuMP.Model) = DEP(stochasticprogram,JuMP.UnsetSolver())
@@ -480,10 +785,9 @@ function RP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProg
     end
 
     # Solve EVP model
-    dep = DEP(stochasticprogram,optimsolver)
-    solve(dep)
+    solve(stochasticprogram)
 
-    return getobjectivevalue(dep)
+    return getobjectivevalue(stochasticprogram)
 end
 
 function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
@@ -502,16 +806,11 @@ function EVPI(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPr
     end
 
     # Solve DEP model
-    dep = DEP(stochasticprogram,optimsolver)
-    solve(dep)
-    evpi = (dep.objSense == :Max ? -1 : 1)*getobjectivevalue(dep)
+    solve(stochasticprogram)
+    evpi = getobjectivevalue(stochasticprogram)
 
     # Solve all possible WS models
-    for scenario in scenarios(stochasticprogram)
-        ws = WS(stochasticprogram,scenario,solver)
-        solve(ws)
-        evpi += (ws.objSense == :Max ? 1 : -1)*probability(scenario)*getobjectivevalue(ws)
-    end
+    evpi -= EWS(stochasticprogram)
 
     return evpi
 end
@@ -612,12 +911,12 @@ function VSS(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathPro
         error("Cannot evaluate decision without a solver.")
     end
 
-    # Solve DEP model
-    dep = DEP(stochasticprogram,optimsolver)
-    solve(dep)
-    vss = (dep.objSense == :Max ? 1 : -1)*getobjectivevalue(dep)
+    # Solve EVP and determine EEV
+    vss = EEV(stochasticprogram; solver = optimsolver)
 
-    vss += (dep.objSense == :Max ? -1 : 1)*EEV(stochasticprogram; solver = optimsolver)
+    # Solve DEP model
+    solve(stochasticprogram)
+    vss -= getobjectivevalue(stochasticprogram)
 
     return vss
 end
@@ -655,6 +954,7 @@ function fill_solution!(stochasticprogram::JuMP.Model)
         ncols += sncols
         nrows += snrows
     end
+    nothing
 end
 
 function invalidate_cache!(stochasticprogram::JuMP.Model)
@@ -670,7 +970,8 @@ macro first_stage(args)
     @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     vardefs = Expr(:block)
     for line in modeldef.args
-        @capture(line, @variable(m_Symbol,vardef__)) && push!(vardefs.args,line)
+        (@capture(line, @constraint(m_Symbol,constdef__)) || @capture(line, @objective(m_Symbol,objdef__))) && continue
+        push!(vardefs.args,line)
     end
     code = @q begin
         $(esc(model)).ext[:SP].generator[:first_stage_vars] = ($(esc(:model))::JuMP.Model,$(esc(:commondata))) -> begin

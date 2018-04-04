@@ -1,11 +1,13 @@
-struct SimpleScenario <: AbstractScenarioData
-    π::Float64
-    d::Vector{Float64}
-    q::Vector{Float64}
-end
+@everywhere begin
+    struct SimpleScenario <: StochasticPrograms.AbstractScenarioData
+        π::Float64
+        d::Vector{Float64}
+        q::Vector{Float64}
+    end
 
-function StochasticPrograms.expected(sds::Vector{SimpleScenario})
-    sd = SimpleScenario(1,sum([s.π*s.d for s in sds]),sum([s.π*s.q for s in sds]))
+    function StochasticPrograms.expected(sds::Vector{SimpleScenario})
+        sd = SimpleScenario(1,sum([s.π*s.d for s in sds]),sum([s.π*s.q for s in sds]))
+    end
 end
 
 s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])

@@ -2,6 +2,12 @@ using StochasticPrograms
 using JuMP
 using Clp
 using Base.Test
+include("/opt/julia-0.6/share/julia/test/testenv.jl")
+
+addprocs_with_testenv(3)
+@test nworkers() == 3
+
+@everywhere using Base.Test, StochasticPrograms, Clp
 
 struct SPResult
     x̄::Vector{Float64}
@@ -11,12 +17,11 @@ struct SPResult
     EV::Float64
     EEV::Float64
 end
-
 problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
 include("simple.jl")
 include("farmer.jl")
 
-@testset "SP Constructs: $name" for (sp,res,name) in problems
+@testset "Distributed SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
     @test norm(sp.colVal-res.x̄) <= 1e-2
     @test abs(sp.objVal-res.RP) <= 1e-2
@@ -26,18 +31,11 @@ include("farmer.jl")
     @test abs(EEV(sp)-res.EEV) <= 1e-2
 end
 
-@testset "Inequalities: $name" for (sp,res,name) in problems
+@testset "Distributed Inequalities: $name" for (sp,res,name) in problems
     @test EWS(sp) <= RP(sp)
     @test RP(sp) <= EEV(sp)
     @test VSS(sp) >= 0
     @test EVPI(sp) >= 0
     @test VSS(sp) <= EEV(sp)-EV(sp)
     @test EVPI(sp) <= EEV(sp)-EV(sp)
-end
-
-include("/opt/julia-0.6/share/julia/test/testenv.jl")
-cmd = `$test_exename $test_exeflags run_dtests.jl`
-
-if !success(pipeline(cmd; stdout=STDOUT, stderr=STDERR)) && ccall(:jl_running_on_valgrind,Cint,()) == 0
-    error("Distributed test failed, cmd : $cmd")
 end
