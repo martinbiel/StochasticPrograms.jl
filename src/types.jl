@@ -315,8 +315,12 @@ function subproblems(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return subproblems(scenarioproblems(stochasticprogram))
 end
-function parent(scenarioproblems::ScenarioProblems)
+function parentmodel(scenarioproblems::ScenarioProblems)
     return scenarioproblems.parent
+end
+function parentmodel(scenarioproblems::DScenarioProblems)
+    length(scenarioproblems) > 0 || error("No remote scenario problems.")
+    return fetch(scenarioproblems[1]).parent
 end
 function nscenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return length(scenarioproblems.problems)

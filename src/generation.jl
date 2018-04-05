@@ -21,7 +21,7 @@ function stage_two_model(stochasticprogram::JuMP.Model,scenario::AbstractScenari
 end
 
 function generate_parent!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
-    generator(parent(scenarioproblems),common(scenarioproblems))
+    generator(parentmodel(scenarioproblems),common(scenarioproblems))
     nothing
 end
 function generate_parent!(scenarioproblems::DScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
@@ -44,7 +44,7 @@ end
 
 function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
     for i in nscenarios(scenarioproblems)+1:length(scenarioproblems.scenariodata)
-        push!(scenarioproblems.problems,_stage_two_model(generator,common(scenarioproblems),scenario(scenarioproblems,i),parent(scenarioproblems)))
+        push!(scenarioproblems.problems,_stage_two_model(generator,common(scenarioproblems),scenario(scenarioproblems,i),parentmodel(scenarioproblems)))
     end
     nothing
 end

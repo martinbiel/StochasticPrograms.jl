@@ -18,6 +18,7 @@ export
     probability,
     subproblem,
     subproblems,
+    parentmodel,
     nscenarios,
     stage_two_model,
     outcome_model,
