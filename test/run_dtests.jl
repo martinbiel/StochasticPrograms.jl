@@ -1,13 +1,11 @@
-using StochasticPrograms
-using JuMP
-using Clp
 using Base.Test
 include("/opt/julia-0.6/share/julia/test/testenv.jl")
-
 addprocs_with_testenv(3)
 @test nworkers() == 3
 
-@everywhere using Base.Test, StochasticPrograms, Clp
+using StochasticPrograms
+using JuMP
+using Clp
 
 struct SPResult
     x̄::Vector{Float64}
@@ -17,10 +15,15 @@ struct SPResult
     EV::Float64
     EEV::Float64
 end
+
 problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
+info("Loading test problems...")
+info("Loading simple...")
 include("simple.jl")
+info("Loading farmer...")
 include("farmer.jl")
 
+info("Test problems loaded. Starting test sequence.")
 @testset "Distributed SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
     @test norm(sp.colVal-res.x̄) <= 1e-2

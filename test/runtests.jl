@@ -13,9 +13,13 @@ struct SPResult
 end
 
 problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
+info("Loading test problems...")
+info("Loading simple...")
 include("simple.jl")
+info("Loading farmer...")
 include("farmer.jl")
 
+info("Test problems loaded. Starting test sequence.")
 @testset "SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
     @test norm(sp.colVal-res.x̄) <= 1e-2
@@ -35,7 +39,10 @@ end
     @test EVPI(sp) <= EEV(sp)-EV(sp)
 end
 
+info("Starting distributed tests...")
+
 include("/opt/julia-0.6/share/julia/test/testenv.jl")
+push!(test_exeflags.exec,"--color=yes")
 cmd = `$test_exename $test_exeflags run_dtests.jl`
 
 if !success(pipeline(cmd; stdout=STDOUT, stderr=STDERR)) && ccall(:jl_running_on_valgrind,Cint,()) == 0
