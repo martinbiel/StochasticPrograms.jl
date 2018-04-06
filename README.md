@@ -380,6 +380,96 @@ julia> VSS(sp)
 
 where a solver must be provided as a keyword argument if not specified before.
 
+## Distributed model creation
+
+If multiple Julia processes have been added with `addprocs`, `StochasticPrograms` will automatically distribute the scenario problems on the worker processes. This can be explicitly requested or avoided by specifying the keyword argument `procs` during creation of the recourse model. If `procs = [1]` is specified, the scenarios will not be distributed.
+
+```julia
+
+julia> addprocs(3)
+3-element Array{Int64,1}:
+ 2
+ 3
+ 4
+
+julia> using StochasticPrograms
+
+julia> using Clp
+
+julia> @everywhere begin
+           struct SimpleScenario <: StochasticPrograms.AbstractScenarioData
+               π::Float64
+               d::Vector{Float64}
+               q::Vector{Float64}
+           end
+
+           function StochasticPrograms.expected(sds::Vector{SimpleScenario})
+               sd = SimpleScenario(1,sum([s.π*s.d for s in sds]),sum([s.π*s.q for s in sds]))
+           end
+       end
+
+julia> sp = StochasticProgram(SimpleScenario,procs=workers())
+
+julia> @first_stage sp = begin
+           @variable(model, x₁ >= 40)
+           @variable(model, x₂ >= 20)
+           @objective(model, Min, 100*x₁ + 150*x₂)
+           @constraint(model, x₁+x₂ <= 120)
+       end
+
+julia> @second_stage sp = begin
+           @decision x₁ x₂
+           s = scenario
+           @variable(model, 0 <= y₁ <= s.d[1])
+           @variable(model, 0 <= y₂ <= s.d[2])
+           @objective(model, Min, s.q[1]*y₁ + s.q[2]*y₂)
+           @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+           @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+       end
+
+```
+
+Now, scenario data can be loaded on a worker through for example
+
+```julia
+julia> remotecall_fetch((sp) -> begin
+	       scenarioproblems = fetch(sp)
+		   s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])
+		   push!(scenarioproblems,s1)
+       end,
+	   2,
+	   scenarioproblems(sp))
+```
+
+One can still load scenarios by `push!` or `append!`, but they will be sent to worker processes internally.
+
+```julia
+julia> push!(sp,s2)
+
+julia> generate!(sp)
+
+julia> print(sp)
+First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ + x₂ ≤ 120
+ x₁ ≥ 40
+ x₂ ≥ 20
+Second-stage
+==============
+Subproblem 1:
+Min -24 y₁ - 28 y₂
+Subject to
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 0 ≤ y₁ ≤ 500
+ 0 ≤ y₂ ≤ 100
+
+```
+
+The subproblems above were fetched internally from worker 2 before printing. The distributed features allow for parallel data loading as well as some performance improvements in the `EWS` and `EEV` functions. In addition, distributed structured solvers, such as those provided in [LShapedSolvers.jl][LShaped], can benefit from distributed scenarios as well.
+
 ## Structured Solver Interface
 
 An interface for specialized solvers for stochastic programs is provided. The interface mimics that of [MathProgBase.jl][MathProgBase]. To implement a structured solver, provide an `AbstractStructuredSolver` and an `AbstractStructuredModel`, as well as implement
