@@ -18,20 +18,20 @@ sds = [s1,s2]
 sp = StochasticProgram(sds,solver=ClpSolver())
 
 @first_stage sp = begin
-    @variable(model, x1 >= 40)
-    @variable(model, x2 >= 20)
-    @objective(model, Min, 100*x1 + 150*x2)
-    @constraint(model, x1+x2 <= 120)
+    @variable(model, x₁ >= 40)
+    @variable(model, x₂ >= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁+x₂ <= 120)
 end
 
 @second_stage sp = begin
-    @decision x1 x2
+    @decision x₁ x₂
     s = scenario
-    @variable(model, 0 <= y1 <= s.d[1])
-    @variable(model, 0 <= y2 <= s.d[2])
-    @objective(model, Min, s.q[1]*y1 + s.q[2]*y2)
-    @constraint(model, 6*y1 + 10*y2 <= 60*x1)
-    @constraint(model, 8*y1 + 5*y2 <= 80*x2)
+    @variable(model, 0 <= y₁ <= s.d[1])
+    @variable(model, 0 <= y₂ <= s.d[2])
+    @objective(model, Min, s.q[1]*y₁ + s.q[2]*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 
 res = SPResult([46.67,36.25],-855.83,662.92,286.92,-1445.92,-568.92)

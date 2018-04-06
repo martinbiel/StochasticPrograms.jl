@@ -173,7 +173,7 @@ function DEP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     return dep_model
 end
 
-function RP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+function VRP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
 
     # Prefer cached solver if available
@@ -185,7 +185,7 @@ function RP(stochasticprogram::JuMP.Model; solver::MathProgBase.AbstractMathProg
 
     # Abort if no solver was given
     if isa(optimsolver,JuMP.UnsetSolver)
-        error("Cannot determine EVPI without a solver.")
+        error("Cannot determine VRP without a solver.")
     end
 
     # Solve EVP model

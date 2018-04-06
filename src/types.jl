@@ -175,7 +175,7 @@ end
 function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver = JuMP.UnsetSolver(), kwargs...)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     if length(subproblems(stochasticprogram)) != length(scenarios(stochasticprogram))
-        generate_subproblems!(stochasticprogram)
+        generate!(stochasticprogram)
     end
 
     # Prefer cached solver if available

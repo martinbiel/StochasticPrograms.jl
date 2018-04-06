@@ -38,7 +38,7 @@ macro second_stage(args)
             $(esc(def))
 	    return $(esc(:model))
         end
-        generate_stage_two!($(esc(model)))
+        generate!($(esc(model)))
         nothing
     end
     return prettify(code)

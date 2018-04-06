@@ -20,6 +20,7 @@ export
     subproblems,
     parentmodel,
     nscenarios,
+    generate!,
     stage_two_model,
     outcome_model,
     eval_decision,
@@ -28,12 +29,17 @@ export
     WS,
     EWS,
     DEP,
-    RP,
+    VRP,
     EVPI,
     EVP,
     EV,
     EEV,
     VSS
+
+macro exportJuMP()
+    Expr(:export, names(JuMP)...)
+end
+@exportJuMP
 
 include("types.jl")
 include("generation.jl")

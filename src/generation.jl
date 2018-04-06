@@ -56,7 +56,8 @@ function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD},generator
     map(wait,finished_workers)
     nothing
 end
-function generate_stage_two!(stochasticprogram::JuMP.Model)
+
+function generate!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
     generate_stage_two!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:second_stage))
