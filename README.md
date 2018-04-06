@@ -10,7 +10,7 @@
 
 `StochasticPrograms` is a modeling framework for two-stage stochastic programming problems. In other words, it can be used to model recourse problems where an initial decision is taken, unknown parameters are observed, followed by recourse decisions to hedge the original decisions. The underlying optimization problems are formulated in [JuMP.jl][JuMP]. In `StochasticPrograms`, the construction of second stage models is deferred through anonymous creation functions. As a result, scenario data can be loaded/reloaded to create/rebuild the recourse model at a later stage, possibly on separate machines in a cluster. Another consequence of deferred model creation is that `StochasticPrograms` can provide stochastic programming constructs, such as EVPI and VSS, to gain deeper insights about formulated recourse problems. A good introduction to recourse models, and to the stochastic programming constructs provided in this package, is given in [Introduction to Stochastic Programming][Birge]. Like [StructJuMP.jl][Struct], recourse models can be instantiated in parallel on distributed memory. However, instead of relying on MPI, the parallel capabilities of `StochasticPrograms` are implemented using the standard Julia library for distributed computing.
 
-Recourse models created in `StochasticPrograms` can be solved in two ways. Either, by providing an `AbstractMathProgSolver` which will solve an extensive deterministically equivalent `JuMP` formulation of the recourse model. Or, provide an `AbstractStructuredSolver`, such as those provided in [LShapedSolvers.jl][LShaped], to solve the recourse model using specialized decomposition strategies for stochastic programs.
+Recourse models created in `StochasticPrograms` can be solved in two ways. Either, by providing an `AbstractMathProgSolver` which will solve an extensive deterministically equivalent [JuMP.jl][JuMP] formulation of the recourse model. Or, provide an `AbstractStructuredSolver`, such as those provided in [LShapedSolvers.jl][LShaped], to solve the recourse model using specialized decomposition strategies for stochastic programs.
 
 [JuMP]: https://github.com/JuliaOpt/JuMP.jl
 [Struct]: https://github.com/StructJuMP/StructJuMP.jl
@@ -438,8 +438,7 @@ julia> @first_stage sp = begin
        end
 
 julia> @second_stage sp = begin
-
-@decision x₁ x₂
+           @decision x₁ x₂
            s = scenario
            @variable(model, 0 <= y₁ <= s.d[1])
            @variable(model, 0 <= y₂ <= s.d[2])
