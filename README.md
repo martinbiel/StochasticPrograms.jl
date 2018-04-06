@@ -1,4 +1,4 @@
-# StocasticPrograms
+# StochasticPrograms
 
 [![Build Status](https://travis-ci.org/martinbiel/StocasticPrograms.jl.svg?branch=master)](https://travis-ci.org/martinbiel/StocasticPrograms.jl)
 
