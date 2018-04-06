@@ -15,7 +15,7 @@ Recourse models created in `StochasticPrograms` can be solved in two ways. Eithe
 [JuMP]: https://github.com/JuliaOpt/JuMP.jl
 [Struct]: https://github.com/StructJuMP/StructJuMP.jl
 [Birge]: https://link.springer.com/book/10.1007%2F978-1-4614-0237-4
-[LShaped]:
+[LShaped]: https://github.com/martinbiel/LShapedSolvers.jl
 
 ## Basic Usage
 
@@ -25,13 +25,14 @@ Consider the following simple recourse problem, which will be used to exemplify 
 minimize    100x₁ + 150x₂ + E_ξ(q₁(ξ)y₁ + q₂(ξ)y₂)
 subject to     x₁ + x₂ ≤ 120
             6y₁ + 10y₂ ≤ 60x₁
-			8y₁ + 5y₂  ≤ 80x₂
-				0 ≤ y₁ ≤ d₁(ξ)
-				0 ≤	y₂ ≤ d₂(ξ)
-					x₁ ≥ 40,
-					x₂ ≥ 20,
+             8y₁ + 5y₂ ≤ 80x₂
+                0 ≤ y₁ ≤ d₁(ξ)
+                0 ≤ y₂ ≤ d₂(ξ)
+                    x₁ ≥ 40,
+                    x₂ ≥ 20,
 ```
-where the stochastic variable ``\xi^T = (d_1,d_2,q_1,q_2)`` takes on the values ``(500,100,-24,-28)`` with probability ``0.4`` and ``(300,300,-28,-32)`` with probability ``0.6``.
+
+where the stochastic variable `ξ = (d₁,d₂,q₁,q₂)` takes on the values `(500,100,-24,-28)` with probability `0.4` and `(300,300,-28,-32)` with probability `0.6`.
 
 ### Defining Scenarios
 
@@ -499,4 +500,4 @@ end
 which should fill the first stage and second stage `JuMP` models with the optimal solutions. For an example implementation, see [LShapedSolvers.jl][LShapedImpl].
 
 [MathProgBase]: https://github.com/JuliaOpt/MathProgBase.jl
-[LShapedImpl]: spinterface.jl
+[LShapedImpl]: https://github.com/martinbiel/LShapedSolvers.jl/blob/master/src/spinterface.jl
