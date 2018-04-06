@@ -36,7 +36,7 @@ where the stochastic variable `ξ = (d₁,d₂,q₁,q₂)` takes on the values `
 
 ### Defining Scenarios
 
-The first step to creating the recourse problem above in `StochasticPrograms` it to create a scenario sctructure as a child of the abstract type `AbstractScenarioData`. The structure should contain all stochastic parameters of, as well as the probability, of the modeled scenarios. A possible implementation of the scenarios in the recourse problem above could be as follows:
+The first step to creating the recourse problem above in `StochasticPrograms` is to create a scenario struct as a child of the abstract type `AbstractScenarioData`. The struct should contain all stochastic parameters, as well as the probability, of the modeled scenarios. A possible implementation of the scenarios in the recourse problem above could be as follows:
 
 ```julia
 julia> struct SimpleScenario <: AbstractScenarioData
@@ -49,7 +49,7 @@ julia> StochasticPrograms.probability(s::SimpleScenario) = s.π
 
 ```
 
-where ``\pi`` specifys the probability of the scenario occuring. If the probability function is not specified, `StochasticPrograms` assumes that probability of a scenario is stored in a field named ``\pi``. Now, the two scenarios above can be constructed:
+where `π` specifys the probability of the scenario occuring. If the probability function is not specified, `StochasticPrograms` assumes that probability of a scenario is stored in a field named `π`. Now, the two scenarios above can be constructed:
 
 ```julia
 julia> s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])
@@ -59,7 +59,7 @@ julia> s2 = SimpleScenario(0.6,[300.0,300],[-28.0,-32])
 SimpleScenario(0.6, [300.0, 300.0], [-28.0, -32.0])
 ```
 
-Some stochastic programming constructs requires the expected value of a given set of scenarios, defined here as:
+Some stochastic programming constructs require the expected value of a given set of scenarios, defined here as:
 
 ```julia
 julia> function StochasticPrograms.expected(sds::Vector{SimpleScenario})
@@ -92,10 +92,10 @@ julia> @second_stage sp = begin
            @objective(model, Min, s.q[1]*y₁ + s.q[2]*y₂)
            @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
            @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
-p       end
+       end
 ```
 
-Two things are important to note in the formulation of the second stage problem. First, the decision variables from the first stage that influence the second stage must be annotated with `@decision`. Second, the scenario specific data is accessed through the keyword `scenario`. Above, `scenario` will be structure of type `SimpleScenario`, containing the necessary fields `q` and `d`. As 2 scenarios were preloaded when the `StochasticProgram` was created, a recourse problem is created instantly:
+Two things are important to note in the formulation of the second stage problem. First, the decision variables from the first stage that influence the second stage must be annotated with `@decision`. Second, the scenario specific data is accessed through the keyword `scenario`. Above, `scenario` will be structure of type `SimpleScenario`, containing the necessary fields `q` and `d`. As two scenarios were preloaded when the `StochasticProgram` was created, a recourse problem is created instantly:
 
 ```julia
 julia> print(sp)
@@ -197,9 +197,28 @@ julia> sp.colVal
 
 ```
 
+Alternatively, the recourse model is solved by using some structured solver.
+
+```julia
+julia> using LShapedSolvers
+
+julia> solve(sp,solver=LShapedSolver(:ls,ClpSolver()))
+L-Shaped Gap  Time: 0:00:01 (4 iterations)
+  Objective:       -855.8333333333358
+  Gap:             2.1229209144670507e-15
+  Number of cuts:  5
+:Optimal
+
+julia> sp.colVal
+2-element Array{Float64,1}:
+ 46.6667
+ 36.25
+
+```
+
 ### Evaluating Solutions
 
-The result of some first stage candidate decision, such as `x = [50,50]`, can be evaluated by calling
+The result of some first stage candidate decision, for example `x = [50,50]`, can be evaluated by calling
 
 ```julia
 julia> eval_decision(sp,x,solver=ClpSolver())
@@ -207,7 +226,7 @@ julia> eval_decision(sp,x,solver=ClpSolver())
 
 ```
 
-The decision is evaluated by constructing corresponding outcome models for each scenario
+The decision is evaluated internally by constructing corresponding outcome models for each scenario
 
 ```julia
 julia> outcome = outcome_model(sp,s1,x,ClpSolver())
@@ -234,7 +253,7 @@ and calculating the expected value.
 
 ### Deterministic Equivalent Problem
 
-An deterministically equivalent formulation of the recourse model can be obtained through the `DEP` command. It forms an extensive block structured problem, using all provided scenarios.
+A deterministically equivalent formulation of the recourse model can be obtained through the `DEP` command. It forms an extensive block-structured problem, using all provided scenarios.
 
 ```julia
 julia> dep = DEP(sp)
@@ -260,7 +279,7 @@ Subject to
 
 ```
 
-Note, that a solver must be provided as an argument to `DEP` if none was provided during construction of `sp`. The above formulation is used to solve the recourse model if `AbstractMathProgSolver` solvers are provided. Also, the `VRP` command can be used to directly obtain the optimal value of the recourse problem.
+Note, that a solver must be provided as an argument to `DEP` if none was provided during construction of `sp`. The above formulation is used to solve the recourse model if a `AbstractMathProgSolver` solver is provided. Also, the `VRP` command can be used to directly obtain the optimal value of the recourse problem.
 
 ```julia
 julia> VRP(sp)
@@ -310,7 +329,7 @@ julia> eval_decision(sp,x)
 
 ```
 
-Alternatively, the expected results of using the EV solution (EEV) can be obtained directly through the `EEV` command.
+Alternatively, the expected results of using the EV solution (EEV) can be obtained directly through the `EEV` command:
 
 ```julia
 julia> EEV(sp)
@@ -318,7 +337,7 @@ julia> EEV(sp)
 
 ```
 
-In addition, the `EV` command can be used to obtain the optimal value of the expected value problem directly.
+In addition, the `EV` command can be used to obtain directly the optimal value of the expected value problem:
 
 ```julia
 julia> EV(sp)
@@ -383,7 +402,7 @@ where a solver must be provided as a keyword argument if not specified before.
 
 ## Distributed model creation
 
-If multiple Julia processes have been added with `addprocs`, `StochasticPrograms` will automatically distribute the scenario problems on the worker processes. This can be explicitly requested or avoided by specifying the keyword argument `procs` during creation of the recourse model. If `procs = [1]` is specified, the scenarios will not be distributed.
+If multiple Julia processes have been added with `addprocs`, `StochasticPrograms` will automatically distribute the scenario problems on the worker processes. This can be explicitly requested or avoided by specifying the keyword argument `procs` during creation of the recourse model. If `procs = [1]` is specified, the scenarios will not be distributed, even though workers have been added.
 
 ```julia
 
@@ -419,7 +438,8 @@ julia> @first_stage sp = begin
        end
 
 julia> @second_stage sp = begin
-           @decision x₁ x₂
+
+@decision x₁ x₂
            s = scenario
            @variable(model, 0 <= y₁ <= s.d[1])
            @variable(model, 0 <= y₂ <= s.d[2])
@@ -434,12 +454,12 @@ Now, scenario data can be loaded on a worker through for example
 
 ```julia
 julia> remotecall_fetch((sp) -> begin
-	       scenarioproblems = fetch(sp)
-		   s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])
-		   push!(scenarioproblems,s1)
+           scenarioproblems = fetch(sp)
+           s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])
+           push!(scenarioproblems,s1)
        end,
-	   2,
-	   scenarioproblems(sp))
+       2,
+       scenarioproblems(sp))
 ```
 
 One can still load scenarios by `push!` or `append!`, but they will be sent to worker processes internally.
@@ -469,7 +489,7 @@ Subject to
 
 ```
 
-The subproblems above were fetched internally from worker 2 before printing. The distributed features allow for parallel data loading as well as some performance improvements in the `EWS` and `EEV` functions. In addition, distributed structured solvers, such as those provided in [LShapedSolvers.jl][LShaped], can benefit from distributed scenarios as well.
+The subproblems above were fetched internally from worker 2 before printing. The distributed features allow for parallel data loading as well as some performance improvements in the `EWS` and `EEV` functions. In addition, distributed structured solvers, such as those provided in [LShapedSolvers.jl][LShaped], benefit from distributed scenarios.
 
 ## Structured Solver Interface
 
@@ -489,7 +509,7 @@ function optimize_structured!(structuredmodel::AbstractStructuredModel)
 end
 ```
 
-which should solve the recourse problem using the decomposition strategy, and
+which should solve the recourse problem using the structured optimization algorithm, and
 
 ```julia
 function fill_solution!(structuredmodel::AbstractStructuredModel,stochasticprogram::JuMP.Model)
