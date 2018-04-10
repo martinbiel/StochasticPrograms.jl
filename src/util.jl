@@ -39,4 +39,34 @@ function invalidate_cache!(stochasticprogram::JuMP.Model)
     delete!(cache,:evp)
     delete!(cache,:dep)
 end
+
+function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    model = scenarioproblems.problems[i]
+    parent = parentmodel(scenarioproblems)
+    return [begin
+              if var.m == parent
+                (i,var.col,-constr.terms.coeffs[j])
+              end
+            end for (i,constr) in enumerate(model.linconstr) for (j,var) in enumerate(constr.terms.vars)]
+end
+
+function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    j = 0
+    for p in 1:length(scenarioproblems)
+        n = remotecall_fetch((sp)->length(fetch(sp).scenariodata),p+1,scenarioproblems[p])
+        if i <= n+j
+            return remotecall_fetch((sp,idx) -> begin
+                                      scenarioproblems = fetch(sp)
+                                      model = scenarioproblems.problems[idx]
+                                      parent = parentmodel(scenarioproblems)
+                                      return [(i,var.col,-constr.terms.coeffs[j]) for (i,constr) in enumerate(model.linconstr) for (j,var) in enumerate(constr.terms.vars) if var.m == parent]
+                                    end,
+                                    p+1,
+                                    scenarioproblems[p],
+                                    i-j)
+        end
+        j += n
+    end
+    throw(BoundsError(scenarioproblems,i))
+end
 # ========================== #

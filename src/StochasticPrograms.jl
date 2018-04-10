@@ -19,6 +19,7 @@ export
     subproblem,
     subproblems,
     parentmodel,
+    masterterms,
     nscenarios,
     generate!,
     stage_two_model,

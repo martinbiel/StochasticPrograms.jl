@@ -322,6 +322,10 @@ function parentmodel(scenarioproblems::DScenarioProblems)
     length(scenarioproblems) > 0 || error("No remote scenario problems.")
     return fetch(scenarioproblems[1]).parent
 end
+function masterterms(stochasticprogram::JuMP.Model,i::Integer)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return subproblems(scenarioproblems(stochasticprogram),i)
+end
 function nscenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return length(scenarioproblems.problems)
 end
