@@ -5,7 +5,7 @@ using Base.Test
 
 struct SPResult
     x̄::Vector{Float64}
-    RP::Float64
+    VRP::Float64
     EVPI::Float64
     VSS::Float64
     EV::Float64
@@ -23,7 +23,7 @@ info("Test problems loaded. Starting test sequence.")
 @testset "SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
     @test norm(sp.colVal-res.x̄) <= 1e-2
-    @test abs(sp.objVal-res.RP) <= 1e-2
+    @test abs(sp.objVal-res.VRP) <= 1e-2
     @test abs(EVPI(sp)-res.EVPI) <= 1e-2
     @test abs(VSS(sp)-res.VSS) <= 1e-2
     @test abs(EV(sp)-res.EV) <= 1e-2
@@ -31,8 +31,8 @@ info("Test problems loaded. Starting test sequence.")
 end
 
 @testset "Inequalities: $name" for (sp,res,name) in problems
-    @test EWS(sp) <= RP(sp)
-    @test RP(sp) <= EEV(sp)
+    @test EWS(sp) <= VRP(sp)
+    @test VRP(sp) <= EEV(sp)
     @test VSS(sp) >= 0
     @test EVPI(sp) >= 0
     @test VSS(sp) <= EEV(sp)-EV(sp)
