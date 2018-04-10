@@ -69,4 +69,9 @@ function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) whe
     end
     throw(BoundsError(scenarioproblems,i))
 end
+
+function transfer_model!(dest::StochasticProgramData,src::StochasticProgramData)
+    empty!(dest.generator)
+    copy!(dest.generator,src.generator)
+end
 # ========================== #
