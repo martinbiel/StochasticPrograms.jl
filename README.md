@@ -106,6 +106,7 @@ Subject to
  x₁ + x₂ ≤ 120
  x₁ ≥ 40
  x₂ ≥ 20
+
 Second-stage
 ==============
 Subproblem 1:
@@ -162,6 +163,7 @@ Subject to
  x₁ + x₂ ≤ 120
  x₁ ≥ 40
  x₂ ≥ 20
+
 Second-stage
 ==============
 Subproblem 1:
@@ -476,6 +478,7 @@ Subject to
  x₁ + x₂ ≤ 120
  x₁ ≥ 40
  x₂ ≥ 20
+
 Second-stage
 ==============
 Subproblem 1:
