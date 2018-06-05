@@ -227,26 +227,8 @@ function EVP(stochasticprogram::JuMP.Model, solver::MathProgBase.AbstractMathPro
     if haskey(cache,:evp)
         return cache[:evp]
     end
-    # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
-        solver
-    else
-        stochasticprogram.solver
-    end
-    # Abort at this stage if no solver was given
-    if isa(optimsolver,JuMP.UnsetSolver)
-        error("Cannot create new EVP model without a solver.")
-    end
 
-    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
-
-    ev_model = Model(solver = optimsolver)
-    generator(stochasticprogram,:first_stage)(ev_model,common(stochasticprogram))
-    ev_obj = copy(ev_model.obj)
-    generator(stochasticprogram,:second_stage)(ev_model,common(stochasticprogram),expected(scenarios(stochasticprogram)),ev_model)
-    append!(ev_obj,ev_model.obj)
-    ev_model.obj = ev_obj
+    ev_model = WS(stochasticprogram, expected(scenarios(stochasticprogram)), solver)
 
     # Cache evp model
     cache[:evp] = ev_model
