@@ -15,40 +15,49 @@ end
 abstract type AbstractSampler{SD <: AbstractScenarioData} end
 struct NullSampler{SD <: AbstractScenarioData} <: AbstractSampler{SD} end
 
-mutable struct CommonData{D}
+mutable struct Stage{D}
+    stage::Int
     data::D
 
-    function (::Type{CommonData})(data::D) where D
-        return new{D}(data)
+    function (::Type{StageData})(stage::Integer,data::D) where D
+        return new{D}(stage,data)
     end
 end
 
 struct ScenarioProblems{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    commondata::CommonData{D}
+    stage::Stage{D}
     scenariodata::Vector{SD}
     sampler::S
     problems::Vector{JuMP.Model}
     parent::JuMP.Model
 
-    function (::Type{ScenarioProblems})(common::D,::Type{SD}) where {D,SD <: AbstractScenarioData}
+    function (::Type{ScenarioProblems})(stage::Integer,stagedatas::Vector,::Type{SD}) where {D,SD <: AbstractScenarioData}
+        D = typeof(stagedata)
         S = NullSampler{SD}
-        return new{D,SD,S}(CommonData(common),Vector{SD}(),NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
+        this_stage = if length(stagedatas) == 1
+            Stage(stage,shift!(stagedatas),true)
+        elseif length(stagedatas) > 1
+
+        else
+
+        end
+        return new{D,SD,S}(Stage(stage,stagedata),Vector{SD}(),NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
     end
 
-    function (::Type{ScenarioProblems})(common::D,scenariodata::Vector{<:AbstractScenarioData}) where D
+    function (::Type{ScenarioProblems})(stage::Integer,stagedata::D,scenariodata::Vector{<:AbstractScenarioData}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
-        return new{D,SD,S}(CommonData(common),scenariodata,NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
+        return new{D,SD,S}(Stage(stage,stagedata),scenariodata,NullSampler{SD}(),Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
     end
 
-    function (::Type{ScenarioProblems})(common::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
+    function (::Type{ScenarioProblems})(stage::Integer,stagedata::D,sampler::AbstractSampler{SD}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
-        return new{D,SD,S}(CommonData(common),Vector{SD}(),sampler,Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
+        return new{D,SD,S}(Stage(stage,stagedata),Vector{SD}(),sampler,Vector{JuMP.Model}(),Model(solver=JuMP.UnsetSolver()))
     end
 end
 DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S}}}}
 
-function ScenarioProblems(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer,stagedata::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
         return ScenarioProblems(common,SD)
     else
@@ -61,16 +70,16 @@ function ScenarioProblems(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <
         finished_workers = Vector{Future}(length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
-            finished_workers[p-1] = remotecall((sp,common,SD)->put!(sp,ScenarioProblems(common,SD)),p,scenarioproblems[p-1],common,SD)
+            finished_workers[p-1] = remotecall((sp,stage,stagedata,SD)->put!(sp,ScenarioProblems(stage,stagedata,SD)),p,scenarioproblems[p-1],stage,stagedata,SD)
         end
         map(wait,finished_workers)
         return scenarioproblems
     end
 end
 
-function ScenarioProblems(common::D,scenariodata::Vector{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer,stagedata::D,scenariodata::Vector{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(common,scenariodata)
+        return ScenarioProblems(stage,stagedata,scenariodata)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -87,7 +96,7 @@ function ScenarioProblems(common::D,scenariodata::Vector{SD},procs::Vector{Int})
         finished_workers = Vector{Future}(length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
-            finished_workers[p-1] = remotecall((sp,common,sdata)->put!(sp,ScenarioProblems(common,sdata)),p,scenarioproblems[p-1],common,scenariodata[start:stop])
+            finished_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp,ScenarioProblems(stage,stagedata,sdata)),p,scenarioproblems[p-1],stage,stagedata,scenariodata[start:stop])
             start += nscen
             stop += nscen
             stop = min(stop,length(scenariodata))
@@ -97,9 +106,9 @@ function ScenarioProblems(common::D,scenariodata::Vector{SD},procs::Vector{Int})
     end
 end
 
-function ScenarioProblems(common::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer,stagedata::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(common,sampler)
+        return ScenarioProblems(stage,stagedata,sampler)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -108,7 +117,7 @@ function ScenarioProblems(common::D,sampler::AbstractSampler{SD},procs::Vector{I
         finished_workers = Vector{Future}(length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
-            finished_workers[p-1] = remotecall((sp,common,sampler)->put!(sp,ScenarioProblems(common,sampler)),p,scenarioproblems[p-1],common,sampler)
+            finished_workers[p-1] = remotecall((sp,stage,stagedata,sampler)->put!(sp,ScenarioProblems(stage,stagedata,sampler)),p,scenarioproblems[p-1],stage,stagedata,sampler)
         end
         map(wait,finished_workers)
         return scenarioproblems
@@ -117,29 +126,31 @@ end
 
 struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}, SP <: Union{ScenarioProblems{D,SD,S},
                                                                                                   DScenarioProblems{D,SD,S}}}
-    commondata::CommonData{D}
+    stage::Stage{D}
     scenarioproblems::SP
     generator::Dict{Symbol,Function}
     problemcache::Dict{Symbol,JuMP.Model}
     spsolver::SPSolver
 
-    function (::Type{StochasticProgramData})(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+    function (::Type{StochasticProgramData})(stage::Integer,stagedatas::Vector,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+        isempty(stagedatas) && error("No stage data provided")
+        stagedata = shift!(stagedatas)
         S = NullSampler{SD}
-        scenarioproblems = ScenarioProblems(common,SD,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
+        scenarioproblems = ScenarioProblems(stage+1,stagedatas,SD,procs)
+        return new{D,SD,S,typeof(scenarioproblems)}(StageData(stage,stagedata),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver())
     end
 
     function (::Type{StochasticProgramData})(common::D,scenariodata::Vector{<:AbstractScenarioData},procs::Vector{Int}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
         scenarioproblems = ScenarioProblems(common,scenariodata,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
+        return new{D,SD,S,typeof(scenarioproblems)}(StageData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver())
     end
 
     function (::Type{StochasticProgramData})(common::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
         scenarioproblems = ScenarioProblems(common,sampler,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
+        return new{D,SD,S,typeof(scenarioproblems)}(StageData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver())
     end
 end
 
@@ -235,9 +246,9 @@ function scenarioproblems(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.ext[:SP].scenarioproblems
 end
-function common(stochasticprogram::JuMP.Model)
+function stage(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].commondata.data
+    return stochasticprogram.ext[:SP].stage.data
 end
 function common(scenarioproblems::ScenarioProblems)
     return scenarioproblems.commondata.data
