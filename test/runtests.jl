@@ -22,8 +22,8 @@ include("farmer.jl")
 info("Test problems loaded. Starting test sequence.")
 @testset "SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
-    @test norm(sp.colVal-res.x̄) <= 1e-2
-    @test abs(sp.objVal-res.VRP) <= 1e-2
+    @test norm(optimal_decision(sp)-res.x̄) <= 1e-2
+    @test abs(optimal_value(sp)-res.VRP) <= 1e-2
     @test abs(EVPI(sp)-res.EVPI) <= 1e-2
     @test abs(VSS(sp)-res.VSS) <= 1e-2
     @test abs(EV(sp)-res.EV) <= 1e-2

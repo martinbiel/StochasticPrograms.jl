@@ -27,6 +27,8 @@ export
     stage_two_model,
     outcome_model,
     eval_decision,
+    optimal_decision,
+    optimal_value,
     @first_stage,
     @second_stage,
     WS,

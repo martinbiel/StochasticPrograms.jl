@@ -339,6 +339,22 @@ function nscenarios(stochasticprogram::JuMP.Model)
     return nscenarios(scenarioproblems(stochasticprogram))
 end
 problemcache(stochasticprogram::JuMP.Model) = stochasticprogram.ext[:SP].problemcache
+function optimal_decision(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    decision = stochasticprogram.colVal
+    if any(isnan.(decision))
+        Base.warn("Optimal decision not defined. Check that the model was properly solved.")
+    end
+    return decision
+end
+function optimal_decision(stochasticprogram::JuMP.Model,var::Symbol)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return getvalue(stochasticprogram.objDict[var])
+end
+function optimal_value(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return stochasticprogram.objVal
+end
 # ========================== #
 
 # Base overloads
