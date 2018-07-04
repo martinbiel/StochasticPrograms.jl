@@ -343,7 +343,16 @@ function optimal_decision(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     decision = stochasticprogram.colVal
     if any(isnan.(decision))
-        Base.warn("Optimal decision not defined. Check that the model was properly solved.")
+        warn("Optimal decision not defined. Check that the model was properly solved.")
+    end
+    return decision
+end
+function optimal_decision(stochasticprogram::JuMP.Model,i::Integer)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    submodel = subproblem(stochasticprogram,i)
+    decision = submodel.colVal
+    if any(isnan.(decision))
+        warn("Optimal decision not defined in subproblem $i. Check that the model was properly solved.")
     end
     return decision
 end
