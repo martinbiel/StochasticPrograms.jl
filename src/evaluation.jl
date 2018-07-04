@@ -67,19 +67,13 @@ function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgB
     return val
 end
 
-function eval_decision(stochasticprogram::JuMP.Model,x::AbstractVector; solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+function eval_decision(stochasticprogram::JuMP.Model,x::AbstractVector; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
-        solver
-    else
-        stochasticprogram.solver
-    end
-
+    supplied_solver = pick_solver(stochasticprogram,solver)
     # Abort if no solver was given
-    if isa(optimsolver,JuMP.UnsetSolver)
+    if isa(supplied_solver,JuMP.UnsetSolver)
         error("Cannot evaluate decision without a solver.")
     end
-
-    return _eval(stochasticprogram,x,optimsolver)
+    return _eval(stochasticprogram,x,optimsolver(supplied_solver))
 end
 # ========================== #

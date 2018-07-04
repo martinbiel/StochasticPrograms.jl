@@ -47,5 +47,5 @@ end
     @constraint(model, const_aux, w[:beets_quota] <= 6000)
 end
 
-res = SPResult([170,80,250],-108390,7015.56,1150,-118600,-107240)
+res = SPResult([170,80,250],-108390,-115405.56,7015.56,1150,-118600,-107240)
 push!(problems,(sp,res,"Farmer"))

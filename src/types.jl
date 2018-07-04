@@ -2,10 +2,14 @@
 # ========================== #
 abstract type AbstractStructuredSolver end
 
+mutable struct SPSolver
+    solver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver}
+end
+
 abstract type AbstractScenarioData end
 probability(sd::AbstractScenarioData) = sd.π
 function expected(::Vector{SD}) where SD <: AbstractScenarioData
-   error("Expected value operation not implemented for scenariodata type: ", SD)
+    error("Expected value operation not implemented for scenariodata type: ", SD)
 end
 
 abstract type AbstractSampler{SD <: AbstractScenarioData} end
@@ -117,58 +121,59 @@ struct StochasticProgramData{D, SD <: AbstractScenarioData, S <: AbstractSampler
     scenarioproblems::SP
     generator::Dict{Symbol,Function}
     problemcache::Dict{Symbol,JuMP.Model}
+    spsolver::SPSolver
 
     function (::Type{StochasticProgramData})(common::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
         S = NullSampler{SD}
         scenarioproblems = ScenarioProblems(common,SD,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
     end
 
     function (::Type{StochasticProgramData})(common::D,scenariodata::Vector{<:AbstractScenarioData},procs::Vector{Int}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
         scenarioproblems = ScenarioProblems(common,scenariodata,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
     end
 
     function (::Type{StochasticProgramData})(common::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
         S = typeof(sampler)
         scenarioproblems = ScenarioProblems(common,sampler,procs)
-        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}())
+        return new{D,SD,S,typeof(scenarioproblems)}(CommonData(common),scenarioproblems,Dict{Symbol,Function}(),Dict{Symbol,JuMP.Model}(),SPSolver(JuMP.UnsetSolver()))
     end
 end
 
 StochasticProgram(::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers()) where SD <: AbstractScenarioData = StochasticProgram(nothing,SD; solver = solver, procs = procs)
 function StochasticProgram(common::Any,::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers) where SD <: AbstractScenarioData
-    stochasticprogram = JuMP.Model(solver=solver)
+    stochasticprogram = JuMP.Model()
     stochasticprogram.ext[:SP] = StochasticProgramData(common,SD,procs)
-
+    stochasticprogram.ext[:SP].spsolver.solver = solver
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
     JuMP.setprinthook(stochasticprogram, _printhook)
-
+    # Return stochastic program
     return stochasticprogram
 end
 StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,scenariodata; solver = solver, procs = procs)
 function StochasticProgram(common::Any,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers())
-    stochasticprogram = JuMP.Model(solver=solver)
+    stochasticprogram = JuMP.Model()
     stochasticprogram.ext[:SP] = StochasticProgramData(common,scenariodata,procs)
-
+    stochasticprogram.ext[:SP].spsolver.solver = solver
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
     JuMP.setprinthook(stochasticprogram, _printhook)
-
+    # Return stochastic program
     return stochasticprogram
 end
 StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,sampler; solver = solver, procs = procs)
 function StochasticProgram(common::Any,sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers())
-    stochasticprogram = JuMP.Model(solver=solver)
+    stochasticprogram = JuMP.Model()
     stochasticprogram.ext[:SP] = StochasticProgramData(common,sampler,procs)
-
+    stochasticprogram.ext[:SP].spsolver.solver = solver
     # Set hooks
     JuMP.setsolvehook(stochasticprogram, _solve)
     JuMP.setprinthook(stochasticprogram, _printhook)
-
+    # Return stochastic program
     return stochasticprogram
 end
 
@@ -177,23 +182,18 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
     if length(subproblems(stochasticprogram)) != length(scenarios(stochasticprogram))
         generate!(stochasticprogram)
     end
-
     # Prefer cached solver if available
-    optimsolver = if stochasticprogram.solver isa JuMP.UnsetSolver || !(stochasticprogram.solver isa MathProgBase.AbstractMathProgSolver)
-        solver
-    else
-        stochasticprogram.solver
-    end
-
-    if optimsolver isa MathProgBase.AbstractMathProgSolver
-        # Standard mathprogbase solver. Fallback to solving DEP model, relying on JuMP.
-        dep = DEP(stochasticprogram,optimsolver)
+    supplied_solver = pick_solver(stochasticprogram,solver)
+    # Switch on solver type
+    if supplied_solver isa MathProgBase.AbstractMathProgSolver
+        # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
+        dep = DEP(stochasticprogram,optimsolver(supplied_solver))
         status = solve(dep; kwargs...)
         fill_solution!(stochasticprogram)
         return status
-    elseif optimsolver isa AbstractStructuredSolver
+    elseif supplied_solver isa AbstractStructuredSolver
         # Use structured solver
-        structuredmodel = StructuredModel(optimsolver,stochasticprogram; kwargs...)
+        structuredmodel = StructuredModel(supplied_solver,stochasticprogram; kwargs...)
         stochasticprogram.internalModel = structuredmodel
         stochasticprogram.internalModelLoaded = true
         status = optimize_structured!(structuredmodel)
@@ -211,11 +211,18 @@ function _printhook(io::IO, stochasticprogram::JuMP.Model)
     print(io, "\nSecond-stage \n")
     print(io, "============== \n")
     for (id, subproblem) in enumerate(subproblems(stochasticprogram))
-      @printf(io, "Subproblem %d:\n", id)
-      print(io, subproblem)
-      print(io, "\n")
+        @printf(io, "Subproblem %d:\n", id)
+        print(io, subproblem)
+        print(io, "\n")
     end
 end
+
+function set_spsolver(stochasticprogram::JuMP.Model,spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    stochasticprogram.ext[:SP].spsolver.solver = spsolver
+    nothing
+end
+
 # ========================== #
 
 # Getters #
@@ -339,6 +346,10 @@ function nscenarios(stochasticprogram::JuMP.Model)
     return nscenarios(scenarioproblems(stochasticprogram))
 end
 problemcache(stochasticprogram::JuMP.Model) = stochasticprogram.ext[:SP].problemcache
+function spsolver(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return stochasticprogram.ext[:SP].spsolver.solver
+end
 function optimal_decision(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     decision = stochasticprogram.colVal

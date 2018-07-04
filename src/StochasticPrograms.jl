@@ -11,6 +11,7 @@ export
     AbstractStructuredSolver,
     AbstractStructuredModel,
     StructuredModel,
+    set_spsolver,
     stochastic,
     scenarioproblems,
     common,

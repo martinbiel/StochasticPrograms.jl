@@ -7,11 +7,15 @@ function StructuredModel(solver::AbstractStructuredSolver,stochasticprogram::JuM
     throw(MethodError(StructuredModel,(solver,stochasticprogram)))
 end
 
+function optimsolver(solver::AbstractStructuredSolver)
+    throw(MethodError(optimsolver,solver))
+end
+
 function optimize_structured!(structuredmodel::AbstractStructuredModel)
-    throw(MethodError(optimize!,structuredmodel))
+    throw(MethodError(optimize_structured!,structuredmodel))
 end
 
 function fill_solution!(structuredmodel::AbstractStructuredModel,stochasticprogram::JuMP.Model)
-    throw(MethodError(optimize!,structuredmodel))
+    throw(MethodError(fill_solution!,structuredmodel))
 end
 # ========================== #

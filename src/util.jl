@@ -6,20 +6,17 @@ function eval_objective(objective::JuMP.GenericQuadExpr,x::AbstractVector)
     for (i,var) in enumerate(aff.vars)
         val += aff.coeffs[i]*x[var.col]
     end
-
     return val
 end
 
 function fill_solution!(stochasticprogram::JuMP.Model)
     dep = DEP(stochasticprogram)
-
     # First stage
     nrows, ncols = length(stochasticprogram.linconstr), stochasticprogram.numCols
     stochasticprogram.objVal = dep.objVal
     stochasticprogram.colVal = dep.colVal[1:ncols]
     stochasticprogram.redCosts = dep.redCosts[1:ncols]
     stochasticprogram.linconstrDuals = dep.linconstrDuals[1:nrows]
-
     # Second stage
     for (i,subproblem) in enumerate(subproblems(stochasticprogram))
         snrows, sncols = length(subproblem.linconstr), subproblem.numCols
@@ -74,4 +71,16 @@ function transfer_model!(dest::StochasticProgramData,src::StochasticProgramData)
     empty!(dest.generator)
     copy!(dest.generator,src.generator)
 end
+
+function pick_solver(stochasticprogram,supplied_solver)
+    current_solver = stochasticprogram.ext[:SP].spsolver.solver
+    solver = if current_solver isa JuMP.UnsetSolver
+        supplied_solver
+    else
+        current_solver
+    end
+    return solver
+end
+
+optimsolver(solver::MathProgBase.AbstractMathProgSolver) = solver
 # ========================== #

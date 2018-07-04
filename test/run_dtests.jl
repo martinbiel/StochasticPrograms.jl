@@ -10,6 +10,7 @@ using Clp
 struct SPResult
     x̄::Vector{Float64}
     VRP::Float64
+    EWS::Float64
     EVPI::Float64
     VSS::Float64
     EV::Float64
@@ -28,6 +29,7 @@ info("Test problems loaded. Starting test sequence.")
     solve(sp)
     @test norm(optimal_decision(sp)-res.x̄) <= 1e-2
     @test abs(optimal_value(sp)-res.VRP) <= 1e-2
+    @test abs(EWS(sp)-res.EWS) <= 1e-2
     @test abs(EVPI(sp)-res.EVPI) <= 1e-2
     @test abs(VSS(sp)-res.VSS) <= 1e-2
     @test abs(EV(sp)-res.EV) <= 1e-2

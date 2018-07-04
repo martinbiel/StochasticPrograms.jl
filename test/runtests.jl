@@ -1,4 +1,5 @@
 using StochasticPrograms
+using LShapedSolvers
 using JuMP
 using Clp
 using Base.Test
@@ -6,12 +7,14 @@ using Base.Test
 struct SPResult
     x̄::Vector{Float64}
     VRP::Float64
+    EWS::Float64
     EVPI::Float64
     VSS::Float64
     EV::Float64
     EEV::Float64
 end
 
+lssolver = LShapedSolver(:ls,ClpSolver(),log=false)
 problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
 info("Loading test problems...")
 info("Loading simple...")
@@ -24,6 +27,19 @@ info("Test problems loaded. Starting test sequence.")
     solve(sp)
     @test norm(optimal_decision(sp)-res.x̄) <= 1e-2
     @test abs(optimal_value(sp)-res.VRP) <= 1e-2
+    @test abs(EWS(sp)-res.EWS) <= 1e-2
+    @test abs(EVPI(sp)-res.EVPI) <= 1e-2
+    @test abs(VSS(sp)-res.VSS) <= 1e-2
+    @test abs(EV(sp)-res.EV) <= 1e-2
+    @test abs(EEV(sp)-res.EEV) <= 1e-2
+end
+
+@testset "SP Constructs (L-shaped Solver): $name" for (sp,res,name) in problems
+    set_spsolver(sp,lssolver)
+    solve(sp)
+    @test norm(optimal_decision(sp)-res.x̄) <= 1e-2
+    @test abs(optimal_value(sp)-res.VRP) <= 1e-2
+    @test abs(EWS(sp)-res.EWS) <= 1e-2
     @test abs(EVPI(sp)-res.EVPI) <= 1e-2
     @test abs(VSS(sp)-res.VSS) <= 1e-2
     @test abs(EV(sp)-res.EV) <= 1e-2
