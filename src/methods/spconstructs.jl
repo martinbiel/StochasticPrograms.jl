@@ -2,13 +2,14 @@
 # ========================== #
 function _WS(stage_one_generator::Function,
              stage_two_generator::Function,
-             common::Any,
+             first_stage::Any,
+             second_stage::Any,
              scenario::AbstractScenarioData,
              solver::MathProgBase.AbstractMathProgSolver)
     ws_model = Model(solver = solver)
-    stage_one_generator(ws_model,common)
+    stage_one_generator(ws_model,first_stage)
     ws_obj = copy(ws_model.obj)
-    stage_two_generator(ws_model,common,scenario,ws_model)
+    stage_two_generator(ws_model,second_stage,scenario,ws_model)
     append!(ws_obj,ws_model.obj)
     ws_model.obj = ws_obj
 
@@ -25,10 +26,10 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
         error("Cannot create WS model without a solver.")
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram,:stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Return WS model
-    return _WS(generator(stochasticprogram,:first_stage),generator(stochasticprogram,:second_stage),common(stochasticprogram),scenario,optimsolver(supplied_solver))
+    return _WS(generator(stochasticprogram,:stage_1),generator(stochasticprogram,:stage_2),first_stage_data(stochasticprogram),second_stage_data(stochasticprogram),scenario,optimsolver(supplied_solver))
 end
 function WS_decision(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
@@ -42,12 +43,13 @@ function WS_decision(stochasticprogram::JuMP.Model, scenario::AbstractScenarioDa
     return decision
 end
 
-function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,ScenarioProblems{D,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return sum([begin
-                ws = _WS(stochasticprogram.generator[:first_stage],
-                         stochasticprogram.generator[:second_stage],
-                         common(stochasticprogram.scenarioproblems),
+                ws = _WS(stochasticprogram.generator[:stage_1],
+                         stochasticprogram.generator[:stage_2],
+                         stochasticprogram.first_stage.data,
+                         stage_data(stochasticprogram.scenarioproblems),
                          scenario,
                          solver)
                 solve(ws)
@@ -55,17 +57,18 @@ function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,ScenarioProblems{D
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
 
-function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,DScenarioProblems{D,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     finished_workers = Vector{Future}(length(stochasticprogram.scenarioproblems))
     for p in 1:length(stochasticprogram.scenarioproblems)
-        finished_workers[p] = remotecall((sp,stage_one_generator,stage_two_generator,solver)->begin
+        finished_workers[p] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
                                          scenarioproblems = fetch(sp)
                                          isempty(scenarioproblems.scenariodata) && return 0.0
                                          return sum([begin
                                                      ws = _WS(stage_one_generator,
                                                               stage_two_generator,
-                                                              common(scenarioproblems),
+                                                              first_stage,
+                                                              second_stage,
                                                               scenario,
                                                               solver)
                                                      solve(ws)
@@ -74,8 +77,10 @@ function _EWS(stochasticprogram::StochasticProgramData{D,SD,S,DScenarioProblems{
                                          end,
                                          p+1,
                                          stochasticprogram.scenarioproblems[p],
-                                         stochasticprogram.generator[:first_stage],
-                                         stochasticprogram.generator[:second_stage],
+                                         stochasticprogram.generator[:stage_1],
+                                         stochasticprogram.generator[:stage_2],
+                                         stochasticprogram.first_stage.data,
+                                         stage_data(stochasticprogram.scenarioproblems),
                                          solver)
     end
     map(wait,finished_workers)
@@ -109,16 +114,16 @@ function DEP(stochasticprogram::JuMP.Model, solver)
         error("Cannot create new DEP model without a solver.")
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram,:first_stage) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:second_stage) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram,:stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Define first-stage problem
     dep_model = Model(solver = optimsolver(supplied_solver))
-    generator(stochasticprogram,:first_stage)(dep_model,common(stochasticprogram))
+    generator(stochasticprogram,:stage_1)(dep_model,first_stage_data(stochasticprogram))
     dep_obj = copy(dep_model.obj)
     # Define second-stage problems, renaming variables according to scenario.
     visited_objs = collect(keys(dep_model.objDict))
     for (i,scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:second_stage)(dep_model,common(stochasticprogram),scenario,dep_model)
+        generator(stochasticprogram,:stage_2)(dep_model,second_stage_data(stochasticprogram),scenario,dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ dep_model.objDict
             if objkey ∉ visited_objs

@@ -1,3 +1,4 @@
+__precompile__()
 module StochasticPrograms
 
 using JuMP
@@ -14,7 +15,8 @@ export
     set_spsolver,
     stochastic,
     scenarioproblems,
-    common,
+    first_stage_data,
+    second_stage_data,
     scenario,
     scenarios,
     probability,
@@ -32,6 +34,7 @@ export
     optimal_value,
     @first_stage,
     @second_stage,
+    @stage,
     WS,
     EWS,
     DEP,
@@ -47,12 +50,8 @@ macro exportJuMP()
 end
 @exportJuMP
 
-include("types.jl")
-include("generation.jl")
-include("evaluation.jl")
-include("spconstructs.jl")
-include("util.jl")
-include("creation.jl")
+include("types/types.jl")
+include("methods/methods.jl")
 include("spinterface.jl")
 
 end # module
