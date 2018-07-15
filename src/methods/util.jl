@@ -17,17 +17,56 @@ function fill_solution!(stochasticprogram::JuMP.Model)
     stochasticprogram.colVal = dep.colVal[1:ncols]
     stochasticprogram.redCosts = dep.redCosts[1:ncols]
     stochasticprogram.linconstrDuals = dep.linconstrDuals[1:nrows]
-    # Second stage
-    for (i,subproblem) in enumerate(subproblems(stochasticprogram))
-        snrows, sncols = length(subproblem.linconstr), subproblem.numCols
-        subproblem.colVal = dep.colVal[ncols+1:ncols+sncols]
-        subproblem.redCosts = dep.redCosts[ncols+1:ncols+sncols]
-        subproblem.linconstrDuals = dep.linconstrDuals[nrows+1:nrows:snrows]
-        subproblem.objVal = eval_objective(subproblem.obj,subproblem.colVal)
-        ncols += sncols
-        nrows += snrows
-    end
+    # Second stages
+    fill_solution!(scenarioproblems(stochasticprogram), dep.colVal[ncols+1:end], dep.redCosts[ncols+1:end], dep.linconstrDuals[nrows+1:end])
     nothing
+end
+function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    cbegin = 0
+    rbegin = 0
+    for (i,subproblem) in enumerate(subproblems(scenarioproblems))
+        snrows, sncols = length(subproblem.linconstr), subproblem.numCols
+        subproblem.colVal = x[cbegin+1:cbegin+sncols]
+        subproblem.redCosts = μ[cbegin+1:cbegin+sncols]
+        subproblem.linconstrDuals = λ[rbegin+1:rbegin+snrows]
+        subproblem.objVal = eval_objective(subproblem.obj,subproblem.colVal)
+        cbegin += sncols
+        rbegin += snrows
+    end
+end
+function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    cbegin = 0
+    rbegin = 0
+    active_workers = Vector{Future}(length(scenarioproblems))
+    for p in 1:length(scenarioproblems)
+        wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]),p+1,scenarioproblems[p])
+        wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]),p+1,scenarioproblems[p])
+        active_workers[p] = remotecall((sp,x,μ,λ)->fill_solution!(fetch(sp),x,μ,λ),
+                                       p+1,
+                                       scenarioproblems[p],
+                                       x[cbegin+1:cbegin+wncols],
+                                       μ[cbegin+1:cbegin+wncols],
+                                       λ[rbegin+1:rbegin+wnrows]
+                                       )
+        cbegin += wncols
+        rbegin += wnrows
+    end
+    @async map(wait,active_workers)
+end
+
+function calculate_objective_value(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    objective_value = eval_objective(stochasticprogram.obj,stochasticprogram.colVal)
+    objective_value += calculate_subobjectives(scenarioproblems(stochasticprogram))
+    return objective_value
+end
+function calculate_subobjectives(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return sum([(probability(scenario)*eval_objective(subprob.obj,subprob.colVal))::Float64 for (scenario,subprob) in zip(scenarios(scenarioproblems),subproblems(scenarioproblems))])
+end
+function calculate_subobjectives(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return sum([remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
+                                 p+1,
+                                 scenarioproblems[p]) for p in 1:length(scenarioproblems)])
 end
 
 function invalidate_cache!(stochasticprogram::JuMP.Model)

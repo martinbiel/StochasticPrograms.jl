@@ -195,6 +195,11 @@ function optimal_value(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return stochasticprogram.objVal
 end
+function optimal_value(stochasticprogram::JuMP.Model,i::Integer)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    submodel = subproblem(stochasticprogram,i)
+    return submodel.objVal
+end
 # ========================== #
 
 # Setters

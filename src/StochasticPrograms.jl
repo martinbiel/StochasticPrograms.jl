@@ -32,6 +32,7 @@ export
     eval_decision,
     optimal_decision,
     optimal_value,
+    calculate_objective_value,
     @first_stage,
     @second_stage,
     @stage,
