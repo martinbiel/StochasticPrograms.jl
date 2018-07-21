@@ -121,9 +121,10 @@ function DEP(stochasticprogram::JuMP.Model, solver)
     generator(stochasticprogram,:stage_1)(dep_model,first_stage_data(stochasticprogram))
     dep_obj = copy(dep_model.obj)
     # Define second-stage problems, renaming variables according to scenario.
+    second_stage = second_stage_data(stochasticprogram)
     visited_objs = collect(keys(dep_model.objDict))
     for (i,scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:stage_2)(dep_model,second_stage_data(stochasticprogram),scenario,dep_model)
+        generator(stochasticprogram,:stage_2)(dep_model,second_stage,scenario,dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ dep_model.objDict
             if objkey ∉ visited_objs
