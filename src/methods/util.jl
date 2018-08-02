@@ -37,17 +37,17 @@ end
 function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     cbegin = 0
     rbegin = 0
-    active_workers = Vector{Future}(length(scenarioproblems))
-    for p in 1:length(scenarioproblems)
-        wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]),p+1,scenarioproblems[p])
-        wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]),p+1,scenarioproblems[p])
-        active_workers[p] = remotecall((sp,x,μ,λ)->fill_solution!(fetch(sp),x,μ,λ),
-                                       p+1,
-                                       scenarioproblems[p],
-                                       x[cbegin+1:cbegin+wncols],
-                                       μ[cbegin+1:cbegin+wncols],
-                                       λ[rbegin+1:rbegin+wnrows]
-                                       )
+    active_workers = Vector{Future}(nworkers())
+    for w in workers()
+        wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]),w,scenarioproblems[w-1])
+        wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]),w,scenarioproblems[w-1])
+        active_workers[w-1] = remotecall((sp,x,μ,λ)->fill_solution!(fetch(sp),x,μ,λ),
+                                         w,
+                                         scenarioproblems[w-1],
+                                         x[cbegin+1:cbegin+wncols],
+                                         μ[cbegin+1:cbegin+wncols],
+                                         λ[rbegin+1:rbegin+wnrows]
+                                         )
         cbegin += wncols
         rbegin += wnrows
     end
@@ -65,8 +65,8 @@ function calculate_subobjectives(scenarioproblems::ScenarioProblems{D,SD,S}) whe
 end
 function calculate_subobjectives(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return sum([remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
-                                 p+1,
-                                 scenarioproblems[p]) for p in 1:length(scenarioproblems)])
+                                 w,
+                                 scenarioproblems[w-1]) for w in workers()])
 end
 
 function invalidate_cache!(stochasticprogram::JuMP.Model)
