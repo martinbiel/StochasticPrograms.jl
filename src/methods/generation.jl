@@ -24,42 +24,48 @@ function generate_parent!(scenarioproblems::ScenarioProblems{D,SD},generator::Fu
     nothing
 end
 function generate_parent!(scenarioproblems::DScenarioProblems{D,SD},generator::Function,parentdata::Any) where {D,SD <: AbstractScenarioData}
-    finished_workers = Vector{Future}(length(scenarioproblems))
-    for p in 1:length(scenarioproblems)
-        finished_workers[p] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata),p+1,scenarioproblems[p],generator,parentdata)
+    active_workers = Vector{Future}(nworkers())
+    for w in workers()
+        active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata),w,scenarioproblems[w-1],generator,parentdata)
     end
-    map(wait,finished_workers)
-    nothing
+    map(wait,active_workers)
+    return nothing
 end
 
 function generate_stage_one!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    haskey(stochasticprogram.ext[:SP].problemcache,:stage_1) && return nothing
     has_generator(stochasticprogram,:stage_1) && has_generator(stochasticprogram,:stage_1_vars) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
 
     generator(stochasticprogram,:stage_1)(stochasticprogram,first_stage_data(stochasticprogram))
     generate_parent!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:stage_1_vars),first_stage_data(stochasticprogram))
-    nothing
+    stochasticprogram.ext[:SP].problemcache[:stage_1] = stochasticprogram
+    return nothing
 end
 
 function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
-    for i in nscenarios(scenarioproblems)+1:length(scenarioproblems.scenariodata)
+    for i in length(scenarioproblems)+1:nscenarios(scenarioproblems)
         push!(scenarioproblems.problems,_stage_two_model(generator,stage_data(scenarioproblems),scenario(scenarioproblems,i),parentmodel(scenarioproblems)))
     end
-    nothing
+    return nothing
 end
 function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
-    finished_workers = Vector{Future}(length(scenarioproblems))
-    for p in 1:length(scenarioproblems)
-        finished_workers[p] = remotecall((sp,generator)->generate_stage_two!(fetch(sp),generator),p+1,scenarioproblems[p],generator)
+    active_workers = Vector{Future}(nworkers())
+    for w in workers()
+        active_workers[w-1] = remotecall((sp,generator)->generate_stage_two!(fetch(sp),generator),w,scenarioproblems[w-1],generator)
     end
-    map(wait,finished_workers)
-    nothing
+    map(wait,active_workers)
+    return nothing
 end
 function generate_stage_two!(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
+    if nscenarios(stochasticprogram) > 0
+        p = probability(stochasticprogram)
+        abs(p - 1.0) <= 1e-6 || warn("Scenario probabilities do not add up to one. The probability sum is given by $p")
+    end
     generate_stage_two!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:stage_2))
-    nothing
+    return nothing
 end
 
 function generate!(stochasticprogram::JuMP.Model)
@@ -67,7 +73,7 @@ function generate!(stochasticprogram::JuMP.Model)
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
     generate_stage_one!(stochasticprogram)
     generate_stage_two!(scenarioproblems(stochasticprogram),generator(stochasticprogram,:stage_2))
-    nothing
+    return stochasticprogram
 end
 
 function _outcome_model(stage_one_generator::Function,
@@ -99,7 +105,6 @@ function _outcome_model(stage_one_generator::Function,
         end
     end
     stage_two_generator(outcome_model,second_stage,scenario,outcome_model)
-
     return outcome_model
 end
 function outcome_model(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)

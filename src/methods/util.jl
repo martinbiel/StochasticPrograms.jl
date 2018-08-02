@@ -109,6 +109,12 @@ end
 function transfer_model!(dest::StochasticProgramData,src::StochasticProgramData)
     empty!(dest.generator)
     copy!(dest.generator,src.generator)
+    return dest
+end
+
+function transfer_scenarios!(dest::StochasticProgramData,src::StochasticProgramData)
+    append!(dest,scenarios(src))
+    return dest
 end
 
 function pick_solver(stochasticprogram,supplied_solver)

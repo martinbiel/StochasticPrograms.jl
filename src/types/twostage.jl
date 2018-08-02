@@ -128,9 +128,17 @@ function scenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return scenarios(scenarioproblems(stochasticprogram))
 end
+function scenariotype(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return scenariotype(scenarioproblems(stochasticprogram))
+end
 function probability(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return probability(scenario(stochasticprogram,i))
+end
+function probability(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return probability(stochasticprogram.ext[:SP].scenarioproblems)
 end
 function has_generator(stochasticprogram::JuMP.Model,key::Symbol)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
@@ -142,19 +150,23 @@ function generator(stochasticprogram::JuMP.Model,key::Symbol)
 end
 function subproblem(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblem(scenarioproblems(stochasticprogram),i)
+    return subproblem(stochasticprogram.ext[:SP].scenarioproblems,i)
 end
 function subproblems(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblems(scenarioproblems(stochasticprogram))
+    return subproblems(stochasticprogram.ext[:SP].scenarioproblems)
+end
+function nsubproblems(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return length(stochasticprogram.ext[:SP].scenarioproblems)
 end
 function masterterms(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblems(scenarioproblems(stochasticprogram),i)
+    return subproblems(stochasticprogram.ext[:SP].scenarioproblems,i)
 end
 function nscenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return nscenarios(scenarioproblems(stochasticprogram))
+    return nscenarios(stochasticprogram.ext[:SP].scenarioproblems)
 end
 function nstages(stochasticprogram::JuMP.Model)
     if haskey(stochasticprogram.ext,:SP)
@@ -215,16 +227,23 @@ end
 # ========================== #
 function Base.push!(stochasticprogram::JuMP.Model,sdata::AbstractScenarioData)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-
-    push!(stochastic(stochasticprogram).scenarioproblems,sdata)
+    push!(scenarioproblems(stochasticprogram),sdata)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
 function Base.append!(stochasticprogram::JuMP.Model,sdata::Vector{<:AbstractScenarioData})
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-
-    append!(stochastic(stochasticprogram).scenarioproblems,sdata)
+    append!(scenarioproblems(stochasticprogram),sdata)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
+end
+# ========================== #
+
+# Sampling #
+# ========================== #
+function sample!(stochasticprogram::JuMP.Model,n::Integer)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    sample!(scenarioproblems(stochasticprogram),n)
+    generate_stage_two!(stochasticprogram)
 end
 # ========================== #

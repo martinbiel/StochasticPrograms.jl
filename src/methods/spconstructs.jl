@@ -59,9 +59,9 @@ end
 
 function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    finished_workers = Vector{Future}(length(stochasticprogram.scenarioproblems))
-    for p in 1:length(stochasticprogram.scenarioproblems)
-        finished_workers[p] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
+    active_workers = Vector{Future}(nworkers())
+    for w in workers()
+        active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
                                          scenarioproblems = fetch(sp)
                                          isempty(scenarioproblems.scenariodata) && return 0.0
                                          return sum([begin
@@ -75,16 +75,16 @@ function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,DScenarioProbl
                                                      probability(scenario)*getobjectivevalue(ws)
                                                      end for scenario in scenarioproblems.scenariodata])
                                          end,
-                                         p+1,
-                                         stochasticprogram.scenarioproblems[p],
+                                         w,
+                                         stochasticprogram.scenarioproblems[w-1],
                                          stochasticprogram.generator[:stage_1],
                                          stochasticprogram.generator[:stage_2],
                                          stochasticprogram.first_stage.data,
                                          stage_data(stochasticprogram.scenarioproblems),
                                          solver)
     end
-    map(wait,finished_workers)
-    return sum(fetch.(finished_workers))
+    map(wait,active_workers)
+    return sum(fetch.(active_workers))
 end
 
 function EWS(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())

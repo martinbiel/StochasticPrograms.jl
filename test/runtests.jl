@@ -4,6 +4,8 @@ using JuMP
 using Clp
 using Base.Test
 
+import StochasticPrograms: probability, expected
+
 struct SPResult
     x̄::Vector{Float64}
     VRP::Float64
@@ -53,6 +55,21 @@ end
     @test EVPI(sp) >= 0
     @test VSS(sp) <= EEV(sp)-EV(sp)
     @test EVPI(sp) <= EEV(sp)-EV(sp)
+end
+
+info("Preparing simple sampler...")
+include("sampling.jl")
+@testset "Sampling" begin
+    @test nscenarios(sampled_sp) == 0
+    @test nsubproblems(sampled_sp) == 0
+    sample!(sampled_sp,100)
+    @test nscenarios(sampled_sp) == 100
+    @test nsubproblems(sampled_sp) == 100
+    @test abs(probability(sampled_sp)-1.0) <= 1e-6
+    sample!(sampled_sp,100)
+    @test nscenarios(sampled_sp) == 200
+    @test nsubproblems(sampled_sp) == 200
+    @test abs(probability(sampled_sp)-1.0) <= 1e-6
 end
 
 info("Starting distributed tests...")
