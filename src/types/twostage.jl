@@ -63,7 +63,7 @@ end
 # ========================== #
 function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver = JuMP.UnsetSolver(), kwargs...)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    if length(subproblems(stochasticprogram)) != length(scenarios(stochasticprogram))
+    if nsubproblems(stochasticprogram) != nscenarios(stochasticprogram)
         generate!(stochasticprogram)
     end
     # Prefer cached solver if available
@@ -77,7 +77,7 @@ function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver =
         return status
     elseif supplied_solver isa AbstractStructuredSolver
         # Use structured solver
-        structuredmodel = StructuredModel(supplied_solver,stochasticprogram; kwargs...)
+        structuredmodel = StructuredModel(supplied_solver,stochasticprogram)
         stochasticprogram.internalModel = structuredmodel
         stochasticprogram.internalModelLoaded = true
         status = optimize_structured!(structuredmodel)
