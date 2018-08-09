@@ -128,6 +128,10 @@ function scenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return scenarios(scenarioproblems(stochasticprogram))
 end
+function expected(stochasticprogram::JuMP.Model)
+    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+    return expected(scenarioproblems(stochasticprogram))
+end
 function scenariotype(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     return scenariotype(scenarioproblems(stochasticprogram))

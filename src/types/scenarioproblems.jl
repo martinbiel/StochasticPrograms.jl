@@ -143,6 +143,18 @@ function scenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: 
     end
     return scenarios
 end
+function expected(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return expected(scenarioproblems.scenariodata)
+end
+function expected(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    partial_expecations = Vector{Future}()
+    for w in workers()
+        push!(partial_expecations,remotecall((sp) -> expected(fetch(sp)),w,scenarioproblems[w-1]))
+    end
+    map(wait,partial_expecations)
+    return expected(fetch.(partial_expecations))
+end
 function scenariotype(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return SD
 end
@@ -169,13 +181,12 @@ function subproblems(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <:
 end
 function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    subproblems = Vector{JuMP.Model}()
+    partial_subproblems = Vector{Future}()
     for w in workers()
-        append!(subproblems,remotecall_fetch((sp)->fetch(sp).problems,
-                                             w,
-                                             scenarioproblems[w-1]))
+        push!(partial_subproblems,remotecall((sp)->fetch(sp).problems,w,scenarioproblems[w-1]))
     end
-    return subproblems
+    map(wait,partial_subproblems)
+    return fetch.(partial_subproblems)
 end
 function parentmodel(scenarioproblems::ScenarioProblems)
     return scenarioproblems.parent
@@ -189,18 +200,24 @@ function probability(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <:
 end
 function probability(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    return sum([remotecall_fetch((sp) -> probability(fetch(sp)),
-                                 w,
-                                 scenarioproblems[w-1]) for w in workers()])
+    partial_probabilities = Vector{Future}()
+    for w in workers()
+        push!(partial_probabilities,remotecall((sp) -> probability(fetch(sp)),w,scenarioproblems[w-1]))
+    end
+    map(wait,partial_probabilities)
+    return sum(fetch.(partial_probabilities))
 end
 function nscenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return length(scenarioproblems.scenariodata)
 end
 function nscenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    return sum([remotecall_fetch((sp) -> nscenarios(fetch(sp)),
-                                 w,
-                                 scenarioproblems[w-1]) for w in workers()])
+    partial_nscenarios = Vector{Future}()
+    for w in workers()
+        push!(partial_nscenarios,remotecall((sp) -> nscenarios(fetch(sp)),w,scenarioproblems[w-1]))
+    end
+    map(wait,partial_nscenarios)
+    return sum(fetch.(partial_nscenarios))
 end
 # ========================== #
 
@@ -211,9 +228,12 @@ function Base.length(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <:
 end
 function Base.length(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    return sum([remotecall_fetch((sp) -> length(fetch(sp)),
-                                 w,
-                                 scenarioproblems[w-1]) for w in workers()])
+    partial_lengths = Vector{Future}()
+    for w in workers()
+        push!(partial_lengths,remotecall((sp) -> length(fetch(sp)),w,scenarioproblems[w-1]))
+    end
+    map(wait,partial_lengths)
+    return sum(fetch.(partial_lengths))
 end
 function Base.push!(scenarioproblems::ScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
     push!(scenarioproblems.scenariodata,sdata)

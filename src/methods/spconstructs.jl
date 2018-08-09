@@ -201,7 +201,7 @@ function EVP(stochasticprogram::JuMP.Model, solver)
         return cache[:evp]
     end
     # Create EVP as a wait-and-see model of the expected scenario
-    ev_model = WS(stochasticprogram, expected(scenarios(stochasticprogram)), solver)
+    ev_model = WS(stochasticprogram, expected(stochasticprogram), solver)
     # Cache EVP
     cache[:evp] = ev_model
     # Return EVP

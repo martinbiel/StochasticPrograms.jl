@@ -5,8 +5,9 @@
         q::Vector{Float64}
     end
 
-    function expected(sds::Vector{SimpleScenario})
-        sd = SimpleScenario(1.,sum([s.π*s.d for s in sds]),sum([s.π*s.q for s in sds]))
+    function StochasticPrograms.expected(scenarios::Vector{SimpleScenario})
+        isempty(scenarios) && return SimpleScenario(1.,zeros(2),zeros(2))
+        return SimpleScenario(1.,sum([s.π*s.d for s in scenarios]),sum([s.π*s.q for s in scenarios]))
     end
 end
 
