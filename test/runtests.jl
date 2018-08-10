@@ -74,7 +74,7 @@ end
 
 info("Starting distributed tests...")
 
-include("/opt/julia-0.6/share/julia/test/testenv.jl")
+include("/usr/share/julia/test/testenv.jl")
 push!(test_exeflags.exec,"--color=yes")
 cmd = `$test_exename $test_exeflags run_dtests.jl`
 

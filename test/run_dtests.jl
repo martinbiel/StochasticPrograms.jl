@@ -1,5 +1,5 @@
 using Base.Test
-include("/opt/julia-0.6/share/julia/test/testenv.jl")
+include("/usr/share/julia/test/testenv.jl")
 addprocs_with_testenv(3)
 @test nworkers() == 3
 
