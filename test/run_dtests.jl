@@ -27,6 +27,22 @@ info("Loading farmer...")
 include("farmer.jl")
 
 info("Test problems loaded. Starting test sequence.")
+
+info("Test problems loaded. Starting test sequence.")
+@testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
+    solve(sp)
+    sp_nondist = StochasticProgram(first_stage_data(sp),second_stage_data(sp),scenarios(sp),procs=[1])
+    transfer_model!(stochastic(sp_nondist),stochastic(sp))
+    generate!(sp_nondist)
+    solve(sp_nondist,solver=ClpSolver())
+    @test scenariotype(sp) == scenariotype(sp_nondist)
+    @test abs(probability(sp)-probability(sp_nondist)) <= 1e-6
+    @test nscenarios(sp) == nscenarios(sp)
+    @test nsubproblems(sp) == nsubproblems(sp_nondist)
+    @test norm(optimal_decision(sp)-optimal_decision(sp_nondist)) <= 1e-6
+    @test abs(optimal_value(sp)-optimal_value(sp_nondist)) <= 1e-6
+end
+
 @testset "Distributed SP Constructs: $name" for (sp,res,name) in problems
     solve(sp)
     @test norm(optimal_decision(sp)-res.x̄) <= 1e-2

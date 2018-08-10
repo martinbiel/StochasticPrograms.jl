@@ -135,13 +135,12 @@ function scenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: A
 end
 function scenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    scenarios = Vector{SD}()
+    partial_scenarios = Vector{Future}()
     for w in workers()
-        append!(scenarios,remotecall_fetch((sp)->fetch(sp).scenariodata,
-                                           w,
-                                           scenarioproblems[w-1]))
+        push!(partial_scenarios,remotecall((sp)->fetch(sp).scenariodata,w,scenarioproblems[w-1]))
     end
-    return scenarios
+    map(wait,partial_scenarios)
+    return reduce(vcat,fetch.(partial_scenarios))
 end
 function expected(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return expected(scenarioproblems.scenariodata)
@@ -168,7 +167,7 @@ function subproblem(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) wher
     isempty(scenarioproblems) && error("No remote scenario problems.")
     j = 0
     for w in workers()
-        n = remotecall_fetch((sp)->length(fetch(sp).scenariodata),w,scenarioproblems[w-1])
+        n = remotecall_fetch((sp)->length(fetch(sp).problems),w,scenarioproblems[w-1])
         if i <= n+j
             return remotecall_fetch((sp,i)->fetch(sp).problems[i],w,scenarioproblems[w-1],i-j)
         end
@@ -186,7 +185,7 @@ function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <
         push!(partial_subproblems,remotecall((sp)->fetch(sp).problems,w,scenarioproblems[w-1]))
     end
     map(wait,partial_subproblems)
-    return fetch.(partial_subproblems)
+    return reduce(vcat,fetch.(partial_subproblems))
 end
 function parentmodel(scenarioproblems::ScenarioProblems)
     return scenarioproblems.parent
