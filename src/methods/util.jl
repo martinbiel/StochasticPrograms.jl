@@ -79,27 +79,23 @@ end
 function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     model = scenarioproblems.problems[i]
     parent = parentmodel(scenarioproblems)
-    return [begin
-              if var.m == parent
-                (i,var.col,-constr.terms.coeffs[j])
-              end
-            end for (i,constr) in enumerate(model.linconstr) for (j,var) in enumerate(constr.terms.vars)]
+    masterterms = Vector{Tuple{Int,Int,Float64}}()
+    for (i,constr) in enumerate(model.linconstr)
+        for (j,var) in enumerate(constr.terms.vars)
+            if var.m == parent
+                push!(masterterms,(i,var.col,-constr.terms.coeffs[j]))
+            end
+        end
+    end
+    return masterterms
 end
 
 function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     j = 0
-    for p in 1:length(scenarioproblems)
-        n = remotecall_fetch((sp)->length(fetch(sp).scenariodata),p+1,scenarioproblems[p])
+    for w in workers()
+        n = remotecall_fetch((sp)->length(fetch(sp).problems),w,scenarioproblems[w-1])
         if i <= n+j
-            return remotecall_fetch((sp,idx) -> begin
-                                      scenarioproblems = fetch(sp)
-                                      model = scenarioproblems.problems[idx]
-                                      parent = parentmodel(scenarioproblems)
-                                      return [(i,var.col,-constr.terms.coeffs[j]) for (i,constr) in enumerate(model.linconstr) for (j,var) in enumerate(constr.terms.vars) if var.m == parent]
-                                    end,
-                                    p+1,
-                                    scenarioproblems[p],
-                                    i-j)
+            return remotecall_fetch((sp,idx) -> masterterms(fetch(sp),idx),w,scenarioproblems[w-1],i-j)
         end
         j += n
     end

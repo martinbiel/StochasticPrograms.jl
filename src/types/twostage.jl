@@ -166,7 +166,7 @@ function nsubproblems(stochasticprogram::JuMP.Model)
 end
 function masterterms(stochasticprogram::JuMP.Model,i::Integer)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblems(stochasticprogram.ext[:SP].scenarioproblems,i)
+    return masterterms(stochasticprogram.ext[:SP].scenarioproblems,i)
 end
 function nscenarios(stochasticprogram::JuMP.Model)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
