@@ -1,11 +1,13 @@
-using Base.Test
+using Test
+using Distributed
 include("/usr/share/julia/test/testenv.jl")
 addprocs_with_testenv(3)
 @test nworkers() == 3
 
 @everywhere using StochasticPrograms
 using JuMP
-using Clp
+using LinearAlgebra
+using GLPKMathProgInterface
 
 @everywhere import StochasticPrograms: probability, expected
 
@@ -20,21 +22,19 @@ struct SPResult
 end
 
 problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
-info("Loading test problems...")
-info("Loading simple...")
+@info "Loading test problems..."
+@info "Loading simple..."
 include("simple.jl")
-info("Loading farmer...")
+@info "Loading farmer..."
 include("farmer.jl")
 
-info("Test problems loaded. Starting test sequence.")
-
-info("Test problems loaded. Starting test sequence.")
+@info "Test problems loaded. Starting test sequence."
 @testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
     solve(sp)
     sp_nondist = StochasticProgram(first_stage_data(sp),second_stage_data(sp),scenarios(sp),procs=[1])
     transfer_model!(stochastic(sp_nondist),stochastic(sp))
     generate!(sp_nondist)
-    solve(sp_nondist,solver=ClpSolver())
+    solve(sp_nondist,solver=GLPKSolverLP())
     @test scenariotype(sp) == scenariotype(sp_nondist)
     @test abs(probability(sp)-probability(sp_nondist)) <= 1e-6
     @test nscenarios(sp) == nscenarios(sp)
@@ -63,7 +63,7 @@ end
     @test EVPI(sp) <= EEV(sp)-EV(sp)
 end
 
-info("Preparing simple sampler...")
+@info "Preparing simple sampler..."
 include("sampling.jl")
 @testset "Distributed Sampling" begin
     @test nscenarios(sampled_sp) == 0

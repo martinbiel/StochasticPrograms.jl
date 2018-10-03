@@ -1,6 +1,13 @@
 __precompile__()
 module StochasticPrograms
 
+# Standard library
+using LinearAlgebra
+using SparseArrays
+using Distributed
+using Printf
+
+# External libraries
 using JuMP
 using MathProgBase
 using MacroTools

@@ -2,11 +2,11 @@
     struct SimpleSampler <: AbstractSampler{SimpleScenario} end
 
     function (sampler::SimpleSampler)()
-        return SimpleScenario(rand(),[500.0,100]+(2*rand()-1)*[50.,50],[-24.0,-28]+(2*rand()-1))
+        return SimpleScenario(rand(),[500.0,100]+(2*rand()-1)*[50.,50],[-24.0,-28].+(2*rand()-1))
     end
 end
 
-sampled_sp = StochasticProgram(SimpleSampler(),solver=ClpSolver())
+sampled_sp = StochasticProgram(SimpleSampler(),solver=GLPKSolverLP())
 
 @first_stage sampled_sp = begin
     @variable(model, x₁ >= 40)

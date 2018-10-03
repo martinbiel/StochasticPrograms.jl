@@ -25,29 +25,28 @@ s1 = FarmerScenario(1/3,Dict(:wheat=>3.0,:corn=>3.6,:beets=>24.0))
 s2 = FarmerScenario(1/3,Dict(:wheat=>2.5,:corn=>3.0,:beets=>20.0))
 s3 = FarmerScenario(1/3,Dict(:wheat=>2.0,:corn=>2.4,:beets=>16.0))
 
-sp = StochasticProgram((Crops,Cost,Budget),(Required,PurchasePrice,SellPrice),[s1,s2,s3],solver=ClpSolver())
+farmer = StochasticProgram((Crops,Cost,Budget),(Required,PurchasePrice,SellPrice),[s1,s2,s3],solver=GLPKSolverLP())
 
-@first_stage sp = begin
+@first_stage farmer = begin
     (Crops,Cost,Budget) = stage
     @variable(model, x[c = Crops] >= 0)
     @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
     @constraint(model, sum(x[c] for c in Crops) <= Budget)
 end
 
-@second_stage sp = begin
+@second_stage farmer = begin
     @decision x
     (Required,PurchasePrice,SellPrice) = stage
-    s = scenario
     @variable(model, y[p = Purchased] >= 0)
     @variable(model, w[s = Sold] >= 0)
     @objective(model, Min, sum( PurchasePrice[p] * y[p] for p = Purchased) - sum( SellPrice[s] * w[s] for s in Sold))
 
     @constraint(model, const_minreq[p=Purchased],
-                   s.Yield[p] * x[p] + y[p] - w[p] >= Required[p])
+                   scenario.Yield[p] * x[p] + y[p] - w[p] >= Required[p])
     @constraint(model, const_minreq_beets,
-                   s.Yield[:beets] * x[:beets] - w[:beets_quota] - w[:beets_extra] >= Required[:beets])
+                   scenario.Yield[:beets] * x[:beets] - w[:beets_quota] - w[:beets_extra] >= Required[:beets])
     @constraint(model, const_aux, w[:beets_quota] <= 6000)
 end
 
-res = SPResult([170,80,250],-108390,-115405.56,7015.56,1150,-118600,-107240)
-push!(problems,(sp,res,"Farmer"))
+farmer_res = SPResult([170,80,250],-108390,-115405.56,7015.56,1150,-118600,-107240)
+push!(problems,(farmer,farmer_res,"Farmer"))

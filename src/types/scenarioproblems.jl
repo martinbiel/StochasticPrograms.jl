@@ -40,9 +40,9 @@ function ScenarioProblems(stage::Integer,stagedata::D,::Type{SD},procs::Vector{I
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
 
         S = NullSampler{SD}
-        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
+        scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
 
-        active_workers = Vector{Future}(length(procs))
+        active_workers = Vector{Future}(undef,length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,SD)->put!(sp,ScenarioProblems(stage,stagedata,SD)),p,scenarioproblems[p-1],stage,stagedata,SD)
@@ -60,7 +60,7 @@ function ScenarioProblems(stage::Integer,stagedata::D,scenariodata::Vector{SD},p
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
 
         S = NullSampler{SD}
-        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
+        scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
 
         (nscen,extra) = divrem(length(scenariodata),length(procs))
         if extra > 0
@@ -68,7 +68,7 @@ function ScenarioProblems(stage::Integer,stagedata::D,scenariodata::Vector{SD},p
         end
         start = 1
         stop = nscen
-        active_workers = Vector{Future}(length(procs))
+        active_workers = Vector{Future}(undef,length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp,ScenarioProblems(stage,stagedata,sdata)),p,scenarioproblems[p-1],stage,stagedata,scenariodata[start:stop])
@@ -88,8 +88,8 @@ function ScenarioProblems(stage::Integer,stagedata::D,sampler::AbstractSampler{S
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
         S = typeof(sampler)
-        scenarioproblems = DScenarioProblems{D,SD,S}(length(procs))
-        active_workers = Vector{Future}(length(procs))
+        scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
+        active_workers = Vector{Future}(undef,length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,sampler)->put!(sp,ScenarioProblems(stage,stagedata,sampler)),p,scenarioproblems[p-1],stage,stagedata,sampler)
@@ -187,6 +187,18 @@ function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <
     map(wait,partial_subproblems)
     return reduce(vcat,fetch.(partial_subproblems))
 end
+function nsubproblems(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    return length(scenarioproblems.problems)
+end
+function nsubproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    partial_lengths = Vector{Future}()
+    for w in workers()
+        push!(partial_lengths,remotecall((sp) -> nsubproblems(fetch(sp)),w,scenarioproblems[w-1]))
+    end
+    map(wait,partial_lengths)
+    return sum(fetch.(partial_lengths))
+end
 function parentmodel(scenarioproblems::ScenarioProblems)
     return scenarioproblems.parent
 end
@@ -222,18 +234,6 @@ end
 
 # Base overloads
 # ========================== #
-function Base.length(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    return length(scenarioproblems.problems)
-end
-function Base.length(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    isempty(scenarioproblems) && error("No remote scenario problems.")
-    partial_lengths = Vector{Future}()
-    for w in workers()
-        push!(partial_lengths,remotecall((sp) -> length(fetch(sp)),w,scenarioproblems[w-1]))
-    end
-    map(wait,partial_lengths)
-    return sum(fetch.(partial_lengths))
-end
 function Base.push!(scenarioproblems::ScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
     push!(scenarioproblems.scenariodata,sdata)
 end
@@ -272,7 +272,7 @@ function sample!(scenarioproblems::DScenarioProblems{D,SD,S},n::Integer) where {
     if extra > 0
         nscen += 1
     end
-    active_workers = Vector{Future}(nworkers())
+    active_workers = Vector{Future}(undef,nworkers())
     for p in workers()
         if p == nprocs()
             nscen -= nscen*nworkers() - n

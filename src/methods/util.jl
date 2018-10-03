@@ -37,7 +37,7 @@ end
 function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     cbegin = 0
     rbegin = 0
-    active_workers = Vector{Future}(nworkers())
+    active_workers = Vector{Future}(undef,nworkers())
     for w in workers()
         wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]),w,scenarioproblems[w-1])
         wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]),w,scenarioproblems[w-1])
@@ -51,7 +51,7 @@ function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::Abstract
         cbegin += wncols
         rbegin += wnrows
     end
-    @async map(wait,active_workers)
+    map(wait,active_workers)
 end
 
 function calculate_objective_value(stochasticprogram::JuMP.Model)
@@ -104,7 +104,7 @@ end
 
 function transfer_model!(dest::StochasticProgramData,src::StochasticProgramData)
     empty!(dest.generator)
-    copy!(dest.generator,src.generator)
+    merge!(dest.generator,src.generator)
     return dest
 end
 

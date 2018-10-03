@@ -24,7 +24,7 @@ function generate_parent!(scenarioproblems::ScenarioProblems{D,SD},generator::Fu
     nothing
 end
 function generate_parent!(scenarioproblems::DScenarioProblems{D,SD},generator::Function,parentdata::Any) where {D,SD <: AbstractScenarioData}
-    active_workers = Vector{Future}(nworkers())
+    active_workers = Vector{Future}(undef,nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata),w,scenarioproblems[w-1],generator,parentdata)
     end
@@ -44,13 +44,13 @@ function generate_stage_one!(stochasticprogram::JuMP.Model)
 end
 
 function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
-    for i in length(scenarioproblems)+1:nscenarios(scenarioproblems)
+    for i in nsubproblems(scenarioproblems)+1:nscenarios(scenarioproblems)
         push!(scenarioproblems.problems,_stage_two_model(generator,stage_data(scenarioproblems),scenario(scenarioproblems,i),parentmodel(scenarioproblems)))
     end
     return nothing
 end
 function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD},generator::Function) where {D,SD <: AbstractScenarioData}
-    active_workers = Vector{Future}(nworkers())
+    active_workers = Vector{Future}(undef,nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator)->generate_stage_two!(fetch(sp),generator),w,scenarioproblems[w-1],generator)
     end

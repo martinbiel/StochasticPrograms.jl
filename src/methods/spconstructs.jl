@@ -59,7 +59,7 @@ end
 
 function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    active_workers = Vector{Future}(nworkers())
+    active_workers = Vector{Future}(undef,nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
                                          scenarioproblems = fetch(sp)
