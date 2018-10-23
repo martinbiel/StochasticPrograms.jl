@@ -126,40 +126,38 @@ function DEP(stochasticprogram::JuMP.Model, solver)
     for (i,scenario) in enumerate(scenarios(stochasticprogram))
         generator(stochasticprogram,:stage_2)(dep_model,second_stage,scenario,dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
-        for (objkey,obj) ∈ dep_model.objDict
-            if objkey ∉ visited_objs
-                newkey = if (isa(obj,JuMP.Variable))
-                    varname = @sprintf("%s_%d",dep_model.colNames[obj.col],i)
-                    dep_model.colNames[obj.col] = varname
-                    dep_model.colNamesIJulia[obj.col] = varname
-                    newkey = Symbol(varname)
-                elseif isa(obj,JuMP.ConstraintRef)
+        for (objkey,obj) ∈ filter((k,v)->k ∉ visited_objs, dep_model.objDict)
+            newkey = if (isa(obj,JuMP.Variable))
+                varname = @sprintf("%s_%d",dep_model.colNames[obj.col],i)
+                dep_model.colNames[obj.col] = varname
+                dep_model.colNamesIJulia[obj.col] = varname
+                newkey = Symbol(varname)
+            elseif isa(obj,JuMP.ConstraintRef)
+                arrayname = @sprintf("%s_%d",objkey,i)
+                newkey = Symbol(arrayname)
+            elseif isa(obj,JuMP.JuMPArray)
+                newkey = if isa(obj,JuMP.JuMPArray{JuMP.ConstraintRef})
                     arrayname = @sprintf("%s_%d",objkey,i)
                     newkey = Symbol(arrayname)
-                elseif isa(obj,JuMP.JuMPArray)
-                    newkey = if isa(obj,JuMP.JuMPArray{JuMP.ConstraintRef})
-                        arrayname = @sprintf("%s_%d",objkey,i)
-                        newkey = Symbol(arrayname)
-                    else
-                        JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
-                        arrayname = @sprintf("%s_%d",dep_model.varData[obj].name,i)
-                        newkey = Symbol(arrayname)
-                        dep_model.varData[obj].name = newkey
-                        for var in obj.innerArray
-                            splitname = split(dep_model.colNames[var.col],"[")
-                            varname = @sprintf("%s_%d[%s",splitname[1],i,splitname[2])
-                            dep_model.colNames[var.col] = varname
-                            dep_model.colNamesIJulia[var.col] = varname
-                        end
-                        newkey
+                else
+                    JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
+                    arrayname = @sprintf("%s_%d",dep_model.varData[obj].name,i)
+                    newkey = Symbol(arrayname)
+                    dep_model.varData[obj].name = newkey
+                    for var in obj.innerArray
+                        splitname = split(dep_model.colNames[var.col],"[")
+                        varname = @sprintf("%s_%d[%s",splitname[1],i,splitname[2])
+                        dep_model.colNames[var.col] = varname
+                        dep_model.colNamesIJulia[var.col] = varname
                     end
-                 else
-                    continue
+                    newkey
                 end
-                dep_model.objDict[newkey] = obj
-                delete!(dep_model.objDict,objkey)
-                push!(visited_objs,newkey)
+            else
+                continue
             end
+            dep_model.objDict[newkey] = obj
+            delete!(dep_model.objDict,objkey)
+            push!(visited_objs,newkey)
         end
     end
     dep_model.obj = dep_obj
