@@ -1,6 +1,6 @@
 using Test
 using Distributed
-include("/usr/share/julia/test/testenv.jl")
+include(joinpath(Sys.BINDIR, "..", "share", "julia", "test", "testenv.jl"))
 addprocs_with_testenv(3)
 @test nworkers() == 3
 
