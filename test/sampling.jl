@@ -6,7 +6,7 @@
     end
 end
 
-sampled_sp = StochasticProgram(SimpleSampler(),solver=ClpSolver())
+sampled_sp = StochasticProgram(SimpleSampler(),solver=GLPKSolverLP())
 
 @first_stage sampled_sp = begin
     @variable(model, x₁ >= 40)
