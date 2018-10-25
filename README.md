@@ -1,10 +1,10 @@
 # StochasticPrograms
 
-[![Build Status](https://travis-ci.org/martinbiel/StochasticPrograms.jl.svg?branch=master)](https://travis-ci.org/martinbiel/StochasticPrograms.jl)
+[![Build Status](https://travis-ci.org/martinbiel/StochasticPrograms.jl.svg?branch=test)](https://travis-ci.org/martinbiel/StochasticPrograms.jl)
 
-[![Coverage Status](https://coveralls.io/repos/martinbiel/StochasticPrograms.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/martinbiel/StochasticPrograms.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/martinbiel/StochasticPrograms.jl/badge.svg?branch=test&service=github)](https://coveralls.io/github/martinbiel/StochasticPrograms.jl?branch=test)
 
-[![codecov.io](http://codecov.io/github/martinbiel/StochasticPrograms.jl/coverage.svg?branch=master)](http://codecov.io/github/martinbiel/StochasticPrograms.jl?branch=master)
+[![codecov.io](http://codecov.io/github/martinbiel/StochasticPrograms.jl/coverage.svg?branch=test)](http://codecov.io/github/martinbiel/StochasticPrograms.jl?branch=test)
 
 ## Description
 
