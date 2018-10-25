@@ -9,5 +9,13 @@ julia:
 notifications:
   email: false
 
+branches:
+  except:
+  - master
+
+branches:
+  only:
+  - test
+
 after_success:
     - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("StochasticPrograms")); using Coverage; Codecov.submit(process_folder())'
