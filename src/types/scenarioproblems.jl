@@ -32,17 +32,17 @@ struct ScenarioProblems{D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
 end
 DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S}}}}
 
-function ScenarioProblems(stage::Integer,stagedata::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer, stagedata::D, ::Type{SD}, procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(stage,stagedata,SD)
+        return ScenarioProblems(stage, stagedata, SD)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
 
         S = NullSampler{SD}
-        scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
+        scenarioproblems = DScenarioProblems{D,SD,S}(undef, length(procs))
 
-        active_workers = Vector{Future}(undef,length(procs))
+        active_workers = Vector{Future}(undef, length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,SD)->put!(sp,ScenarioProblems(stage,stagedata,SD)),p,scenarioproblems[p-1],stage,stagedata,SD)
@@ -52,16 +52,14 @@ function ScenarioProblems(stage::Integer,stagedata::D,::Type{SD},procs::Vector{I
     end
 end
 
-function ScenarioProblems(stage::Integer,stagedata::D,scenariodata::Vector{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer, stagedata::D, scenarios::Vector{SD}, procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(stage,stagedata,scenariodata)
+        return ScenarioProblems(stage, stagedata, scenarios)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
-
         S = NullSampler{SD}
         scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
-
         (nscen,extra) = divrem(length(scenariodata),length(procs))
         if extra > 0
             nscen += 1
@@ -71,25 +69,25 @@ function ScenarioProblems(stage::Integer,stagedata::D,scenariodata::Vector{SD},p
         active_workers = Vector{Future}(undef,length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
-            active_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp,ScenarioProblems(stage,stagedata,sdata)),p,scenarioproblems[p-1],stage,stagedata,scenariodata[start:stop])
+            active_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp,ScenarioProblems(stage,stagedata,sdata)),p,scenarioproblems[p-1],stage,stagedata,scenarios[start:stop])
             start += nscen
             stop += nscen
-            stop = min(stop,length(scenariodata))
+            stop = min(stop,length(scenaris))
         end
         map(wait,active_workers)
         return scenarioproblems
     end
 end
 
-function ScenarioProblems(stage::Integer,stagedata::D,sampler::AbstractSampler{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
+function ScenarioProblems(stage::Integer, stagedata::D, sampler::AbstractSampler{SD}, procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(stage,stagedata,sampler)
+        return ScenarioProblems(stage, stagedata, sampler)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
         S = typeof(sampler)
-        scenarioproblems = DScenarioProblems{D,SD,S}(undef,length(procs))
-        active_workers = Vector{Future}(undef,length(procs))
+        scenarioproblems = DScenarioProblems{D,SD,S}(undef, length(procs))
+        active_workers = Vector{Future}(undef, length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D,SD,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,sampler)->put!(sp,ScenarioProblems(stage,stagedata,sampler)),p,scenarioproblems[p-1],stage,stagedata,sampler)

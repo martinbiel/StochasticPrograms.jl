@@ -41,68 +41,54 @@ end
 Return a new stochastic program
 """
 function StochasticProgram(stage_1::D1,stage_2::D2,::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers()) where {D1,D2,SD <: AbstractScenarioData}
-    stochasticprogram = JuMP.Model()
-    stochasticprogram.ext[:SP] = StochasticProgram(stage_1,stage_2,SD,procs)
-    stochasticprogram.ext[:SP].spsolver.solver = solver
-    # Set hooks
-    JuMP.setsolvehook(stochasticprogram, _solve)
-    JuMP.setprinthook(stochasticprogram, _printhook)
+    stochasticprogram = StochasticProgram(stage_1,stage_2,SD,procs)
+    stochasticprogram.spsolver.solver = solver
     # Return stochastic program
     return stochasticprogram
 end
 StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,nothing,scenariodata; solver = solver, procs = procs)
 function StochasticProgram(stage_1::D1,stage_2::D2,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) where {D1,D2}
-    stochasticprogram = JuMP.Model()
-    stochasticprogram.ext[:SP] = StochasticProgram(stage_1,stage_2,scenariodata,procs)
-    stochasticprogram.ext[:SP].spsolver.solver = solver
-    # Set hooks
-    JuMP.setsolvehook(stochasticprogram, _solve)
-    JuMP.setprinthook(stochasticprogram, _printhook)
+    stochasticprogram =  = StochasticProgram(stage_1,stage_2,scenariodata,procs)
+    stochasticprogram.spsolver.solver = solver
     # Return stochastic program
     return stochasticprogram
 end
 StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,nothing,sampler; solver = solver, procs = procs)
 function StochasticProgram(stage_1::D1,stage_2::D2,sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers()) where {D1,D2}
-    stochasticprogram = JuMP.Model()
-    stochasticprogram.ext[:SP] = StochasticProgram(stage_1,stage_2,sampler,procs)
-    stochasticprogram.ext[:SP].spsolver.solver = solver
-    # Set hooks
-    JuMP.setsolvehook(stochasticprogram, _solve)
-    JuMP.setprinthook(stochasticprogram, _printhook)
+    stochasticprogram = StochasticProgram(stage_1,stage_2,sampler,procs)
+    stochasticprogram.spsolver.solver = solver
     # Return stochastic program
     return stochasticprogram
 end
 
-# Hooks #
+#  #
 # ========================== #
-function _solve(stochasticprogram::JuMP.Model; suppress_warnings=false, solver = JuMP.UnsetSolver(), kwargs...)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function solve!(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver(), kwargs...)
     if nsubproblems(stochasticprogram) != nscenarios(stochasticprogram)
         generate!(stochasticprogram)
     end
     # Prefer cached solver if available
-    supplied_solver = pick_solver(stochasticprogram,solver)
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Switch on solver type
-    if supplied_solver isa MathProgBase.AbstractMathProgSolver
-        # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
-        dep = DEP(stochasticprogram,optimsolver(supplied_solver))
-        status = solve(dep; kwargs...)
-        fill_solution!(stochasticprogram)
-        return status
-    elseif supplied_solver isa AbstractStructuredSolver
-        # Use structured solver
-        structuredmodel = StructuredModel(supplied_solver,stochasticprogram)
-        stochasticprogram.internalModel = structuredmodel
-        stochasticprogram.internalModelLoaded = true
-        status = optimize_structured!(structuredmodel)
-        fill_solution!(structuredmodel,stochasticprogram)
-        return status
-    else
-        error("Unknown solver object given. Aborting.")
-    end
+    return _solve(stochasticprogram, supplied_solver)
+end
+function _solve!(stochasticprogram::StochasticProgram, solver::AbstractMathProgSolver)
+    # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
+    dep = DEP(stochasticprogram, supplied_solver)
+    status = solve(dep; kwargs...)
+    fill_solution!(stochasticprogram)
+    return status
+end
+function _solve!(stochasticprogram::StochasticProgram, solver::AbstractStructuredSolver)
+    # Use structured solver
+    structuredmodel = StructuredModel(stochasticprogram, supplied_solver)
+    stochasticprogram.internalmodel = structuredmodel
+    status = optimize_structured!(structuredmodel)
+    fill_solution!(structuredmodel, stochasticprogram)
+    return status
 end
 
-function _printhook(io::IO, stochasticprogram::JuMP.Model)
+function print(io::IO, stochasticprogram::StochasticProgram)
     print(io, "First-stage \n")
     print(io, "============== \n")
     print(io, stochasticprogram, ignore_print_hook=true)
@@ -118,217 +104,183 @@ end
 
 # Getters #
 # ========================== #
-function stochastic(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP]
-end
 """
-    scenarioproblems(stochasticprogram::JuMP.Model)
+    scenarioproblems(stochasticprogram::StochasticPrograms)
 
 Returns the scenario problems in `stochasticprogram`.
 """
-function scenarioproblems(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].scenarioproblems
+function scenarioproblems(stochasticprogram::StochasticPrograms)
+    return stochasticprogram.scenarioproblems
 end
 """
-    first_stage_data(stochasticprogram::JuMP.Model)
+    first_stage_data(stochasticprogram::StochasticPrograms)
 
 Returns the first stage data structure, if any exists, in `stochasticprogram`.
 """
-function first_stage_data(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].first_stage.data
+function first_stage_data(stochasticprogram::StochasticPrograms)
+    return stochasticprogram.first_stage.data
 end
 """
-    second_stage_data(stochasticprogram::JuMP.Model)
+    second_stage_data(stochasticprogram::StochasticPrograms)
 
 Returns the second stage data structure, if any exists, in `stochasticprogram`.
 """
-function second_stage_data(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stage_data(stochasticprogram.ext[:SP].scenarioproblems)
+function second_stage_data(stochasticprogram::StochasticPrograms)
+    return stage_data(stochasticprogram.scenarioproblems)
 end
 """
-    scenario(stochasticprogram::JuMP.Model, i::Integer)
+    scenario(stochasticprogram::StochasticPrograms, i::Integer)
 
 Returns the `i`th scenario in `stochasticprogram`.
 """
-function scenario(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return scenario(scenarioproblems(stochasticprogram),i)
+function scenario(stochasticprogram::StochasticPrograms, i::Integer)
+    return scenario(scenarioproblems(stochasticprogram), i)
 end
 """
-    scenarios(stochasticprogram::JuMP.Model)
+    scenarios(stochasticprogram::StochasticPrograms)
 
 Returns an array of all scenarios in `stochasticprogram`.
 """
-function scenarios(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function scenarios(stochasticprogram::StochasticPrograms)
     return scenarios(scenarioproblems(stochasticprogram))
 end
 """
-    expected(stochasticprogram::JuMP.Model)
+    expected(stochasticprogram::StochasticPrograms)
 
 Returns the exected scenario of all scenarios in `stochasticprogram`.
 """
-function expected(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function expected(stochasticprogram::StochasticPrograms)
     return expected(scenarioproblems(stochasticprogram))
 end
 """
-    scenariotype(stochasticprogram::JuMP.Model)
+    scenariotype(stochasticprogram::StochasticPrograms)
 
 Returns the type of the scenario structure associated with `stochasticprogram`.
 """
-function scenariotype(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function scenariotype(stochasticprogram::StochasticPrograms)
     return scenariotype(scenarioproblems(stochasticprogram))
 end
 """
-    probability(stochasticprogram::JuMP.Model)
+    probability(stochasticprogram::StochasticPrograms)
 
 Returns the probability of scenario `i`th scenario in `stochasticprogram` occuring.
 """
-function probability(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return probability(scenario(stochasticprogram,i))
+function probability(stochasticprogram::StochasticPrograms, i::Integer)
+    return probability(scenario(stochasticprogram, i))
 end
 """
-    probability(stochasticprogram::JuMP.Model)
+    probability(stochasticprogram::StochasticPrograms)
 
 Returns the probability of any scenario in `stochasticprogram` occuring. A well defined model should return 1.
 """
-function probability(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return probability(stochasticprogram.ext[:SP].scenarioproblems)
+function probability(stochasticprogram::StochasticPrograms)
+    return probability(stochasticprogram.scenarioproblems)
 end
 """
-    has_generator(stochasticprogram::JuMP.Model, key::Symbol)
+    has_generator(stochasticprogram::StochasticPrograms, key::Symbol)
 
 Returns true if a problem generator with `key` exists in `stochasticprogram`.
 """
-function has_generator(stochasticprogram::JuMP.Model, key::Symbol)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return haskey(stochasticprogram.ext[:SP].generator,key)
+function has_generator(stochasticprogram::StochasticPrograms, key::Symbol)
+    return haskey(stochasticprogram.generator, key)
 end
 """
-    generator(stochasticprogram::JuMP.Model, key::Symbol)
+    generator(stochasticprogram::StochasticPrograms, key::Symbol)
 
 Returns the problem generator associated with `key` in `stochasticprogram`.
 """
-function generator(stochasticprogram::JuMP.Model, key::Symbol)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].generator[key]
+function generator(stochasticprogram::StochasticPrograms, key::Symbol)
+    return stochasticprogram.generator[key]
 end
 """
-    subproblem(stochasticprogram::JuMP.Model, i::Integer)
+    subproblem(stochasticprogram::StochasticPrograms, i::Integer)
 
 Returns the `i`th subproblem in `stochasticprogram`.
 """
-function subproblem(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblem(stochasticprogram.ext[:SP].scenarioproblems,i)
+function subproblem(stochasticprogram::StochasticPrograms, i::Integer)
+    return subproblem(stochasticprogram.scenarioproblems, i)
 end
 """
-    subproblems(stochasticprogram::JuMP.Model)
+    subproblems(stochasticprogram::StochasticPrograms)
 
 Returns an array of all subproblems in `stochasticprogram`.
 """
-function subproblems(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return subproblems(stochasticprogram.ext[:SP].scenarioproblems)
+function subproblems(stochasticprogram::StochasticPrograms)
+    return subproblems(stochasticprogram.scenarioproblems)
 end
 """
-    nsubproblems(stochasticprogram::JuMP.Model)
+    nsubproblems(stochasticprogram::StochasticPrograms)
 
 Returns the number of subproblems in `stochasticprogram`.
 """
-function nsubproblems(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return nsubproblems(stochasticprogram.ext[:SP].scenarioproblems)
+function nsubproblems(stochasticprogram::StochasticPrograms)
+    return nsubproblems(stochasticprogram.scenarioproblems)
 end
 """
-    masterterms(stochasticprogram::JuMP.Model, i::Integer)
+    masterterms(stochasticprogram::StochasticPrograms, i::Integer)
 
 Returns the first stage terms appearing in scenario `i` in `stochasticprogram`. The master terms are given in sparse format as an array of tuples `(row,col,coeff)` which specify the occurance of master problem variables in the second stage constraints.
 """
-function masterterms(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return masterterms(stochasticprogram.ext[:SP].scenarioproblems,i)
+function masterterms(stochasticprogram::StochasticPrograms, i::Integer)
+    return masterterms(stochasticprogram.scenarioproblems, i)
 end
 """
-    nscenarios(stochasticprogram::JuMP.Model)
+    nscenarios(stochasticprogram::StochasticPrograms)
 
 Returns the number of scenarios in `stochasticprogram`.
 """
-function nscenarios(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return nscenarios(stochasticprogram.ext[:SP].scenarioproblems)
+function nscenarios(stochasticprogram::StochasticPrograms)
+    return nscenarios(stochasticprogram.scenarioproblems)
 end
 """
-    sampler(stochasticprogram::JuMP.Model)
+    sampler(stochasticprogram::StochasticPrograms)
 
 Returns the sampler object, if any, in `stochasticprogram`.
 """
-function sampler(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return sampler(stochasticprogram.ext[:SP].scenarioproblems)
+function sampler(stochasticprogram::StochasticPrograms)
+    return sampler(stochasticprogram.scenarioproblems)
 end
 """
-    nstages(stochasticprogram::JuMP.Model)
+    nstages(stochasticprogram::StochasticPrograms)
 
 Returns the number of stages in `stochasticprogram`. Will return 2 for two-stage problems.
 """
-function nstages(stochasticprogram::JuMP.Model)
-    if haskey(stochasticprogram.ext,:SP)
-        return 2
-    elseif haskey(stochasticprogram.ext,:MSSP)
-        return length(stochasticprogram.ext[:MSSP].stages)+1
-    else
-        error("The given model is not a stochastic program.")
-    end
-end
-problemcache(stochasticprogram::JuMP.Model) = stochasticprogram.ext[:SP].problemcache
+nstages(stochasticprogram::StochasticPrograms) = 2
 """
-    spsolver(stochasticprogram::JuMP.Model)
+    spsolver(stochasticprogram::StochasticPrograms)
 
-Returns the stochastic program solver, if any, in `stochasticprograms`.
+Returns the stochastic program solver `spsolver` in `stochasticprogram`.
 """
-function spsolver(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.ext[:SP].spsolver.solver
+function spsolver(stochasticprogram::StochasticPrograms)
+    return stochasticprogram.spsolver.solver
 end
 """
-    optimal_decision(stochasticprogram::JuMP.Model)
+    optimal_decision(stochasticprogram::StochasticPrograms)
 
 Returns the optimal first stage decision of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    decision = stochasticprogram.colVal
+function optimal_decision(stochasticprogram::StochasticPrograms)
+    decision = get_stage_one(stochasticprogram).colVal
     if any(isnan.(decision))
         @warn "Optimal decision not defined. Check that the model was properly solved."
     end
     return decision
 end
 """
-    optimal_decision(stochasticprogram::JuMP.Model, var::Symbol)
+    optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
 
 Returns the optimal first stage variable `var` of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::JuMP.Model, var::Symbol)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return getvalue(stochasticprogram.objDict[var])
+function optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
+    return getvalue(get_stage_one(stochasticprogram).objDict[var])
 end
 """
-    optimal_decision(stochasticprogram::JuMP.Model, i::Integer)
+    optimal_decision(stochasticprogram::StochasticPrograms, i::Integer)
 
 Returns the optimal second stage decision of `stochasticprogram` in the `i`th scenario, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    submodel = subproblem(stochasticprogram,i)
+function optimal_decision(stochasticprogram::StochasticPrograms, i::Integer)
+    submodel = subproblem(stochasticprogram, i)
     decision = submodel.colVal
     if any(isnan.(decision))
         @warn "Optimal decision not defined in subproblem $i. Check that the model was properly solved."
@@ -336,32 +288,29 @@ function optimal_decision(stochasticprogram::JuMP.Model, i::Integer)
     return decision
 end
 """
-    optimal_decision(stochasticprogram::JuMP.Model, var::Symbol)
+    optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
 
 Returns the optimal second stage variable `var` of `stochasticprogram` in the `i`th scenario, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::JuMP.Model, i::Integer, var::Symbol)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    submodel = subproblem(stochasticprogram,i)
+function optimal_decision(stochasticprogram::StochasticPrograms, i::Integer, var::Symbol)
+    submodel = subproblem(stochasticprogram, i)
     return getvalue(subproblem.objDict[var])
 end
 """
-    optimal_value(stochasticprogram::JuMP.Model)
+    optimal_value(stochasticprogram::StochasticPrograms)
 
 Returns the optimal value of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_value(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    return stochasticprogram.objVal
+function optimal_value(stochasticprogram::StochasticPrograms)
+    return get_stage_one(stochasticprogram).objVal
 end
 """
-    optimal_value(stochasticprogram::JuMP.Model, i::Integer)
+    optimal_value(stochasticprogram::StochasticPrograms, i::Integer)
 
 Returns the optimal value of the `i`th subproblem in `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_value(stochasticprogram::JuMP.Model, i::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    submodel = subproblem(stochasticprogram,i)
+function optimal_value(stochasticprogram::StochasticPrograms, i::Integer)
+    submodel = subproblem(stochasticprogram, i)
     return submodel.objVal
 end
 # ========================== #
@@ -369,47 +318,42 @@ end
 # Setters
 # ========================== #
 """
-    set_spsolver(stochasticprogram::JuMP.Model, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
+    set_spsolver(stochasticprogram::StochasticPrograms, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
 
 Stores the stochastic program solver `spsolver` in `stochasticprogram`.
 """
-function set_spsolver(stochasticprogram::JuMP.Model, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    stochasticprogram.ext[:SP].spsolver.solver = spsolver
+function set_spsolver(stochasticprogram::StochasticPrograms, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
+    stochasticprogram.spsolver.solver = spsolver
     nothing
 end
 """
-    set_first_stage_data(stochasticprogram::JuMP.Model, data::Any)
+    set_first_stage_data(stochasticprogram::StochasticPrograms, data::Any)
 
 Stores the first stage `data` in first stage of `stochasticprogram`.
 """
-function set_first_stage_data!(stochasticprogram::JuMP.Model, data::Any)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    stochasticprogram.ext[:SP].first_stage.data = data
+function set_first_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
+    stochasticprogram.first_stage.data = data
     nothing
 end
 """
-    set_second_stage_data!(stochasticprogram::JuMP.Model, data::Any)
+    set_second_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
 
 Stores the second stage `data` in second stage of `stochasticprogram`.
 """
-function set_second_stage_data!(stochasticprogram::JuMP.Model, data::Any)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    set_stage_data(stochasticprogram.ext[:SP].scenarioproblems, data)
+function set_second_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
+    set_stage_data(stochasticprogram.scenarioproblems, data)
     nothing
 end
-function add_scenario!(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData; defer::Bool = false)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    push!(scenarioproblems(stochasticprogram),sdata)
+function add_scenario!(stochasticprogram::StochasticPrograms, scenario::AbstractScenarioData; defer::Bool = false)
+    add_scenario!(scenarioproblems(stochasticprogram), scenario)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
     end
     return stochasticprogram
 end
-function add_scenarios!(stochasticprogram::JuMP.Model, sdata::Vector{<:AbstractScenarioData}; defer::Bool = false)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    append!(scenarioproblems(stochasticprogram),sdata)
+function add_scenarios!(stochasticprogram::StochasticPrograms, scenarios::Vector{<:AbstractScenarioData}; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram), scenarios)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -418,13 +362,19 @@ end
 # Sampling #
 # ========================== #
 """
-    sample!(stochasticprogram::JuMP.Model, n::Integer)
+    sample!(stochasticprogram::StochasticPrograms, n::Integer)
 
 Samples `n` scenarios from the sampler object in `stochasticprogram`, if any, and generates subproblems for each of them.
 """
-function sample!(stochasticprogram::JuMP.Model, n::Integer)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    sample!(scenarioproblems(stochasticprogram),n)
+function sample!(stochasticprogram::StochasticPrograms, n::Integer)
+    sample!(scenarioproblems(stochasticprogram), n)
     generate_stage_two!(stochasticprogram)
 end
+# ========================== #
+
+# Private #
+# ========================== #
+problemcache(stochasticprogram::StochasticPrograms) = stochasticprogram.problemcache
+get_problem(stochasticprogram::Stochasticprogram, key::Symbol) = stochasticprogram.problemcache[key]
+get_stage_one(stochasticprogram::StochasticProgram) = get_problem(stochasticprogram, :stage_1)
 # ========================== #

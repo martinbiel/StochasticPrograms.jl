@@ -21,11 +21,12 @@ macro first_stage(arg, defer)
         push!(vardefs.args,line)
     end
     code = @q begin
-        $(esc(model)).ext[:SP].generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+        haskey($(esc(model)).problemcache, :stage_1) && delete!($(esc(model)).problemcache, :stage_1)
+        $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
             $(esc(vardefs))
 	    return $(esc(:model))
         end
-        $(esc(model)).ext[:SP].generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+        $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
         end
@@ -58,7 +59,7 @@ macro second_stage(arg, defer)
 
     code = @q begin
         has_generator($(esc(model)), :stage_2) && remove_subproblems!($(esc(model)))
-        $(esc(model)).ext[:SP].generator[:stage_2] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
+        $(esc(model)).generator[:stage_2] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
@@ -81,11 +82,11 @@ macro stage(stage,args)
     # Handle the first stage and the second stages differently
     code = if stage == 1
         code = @q begin
-            $(esc(model)).ext[:MSSP].generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+            $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
                 $(esc(vardefs))
 	        return $(esc(:model))
             end
-            $(esc(model)).ext[:MSSP].generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+            $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
                 $(esc(modeldef))
 	        return $(esc(:model))
             end
@@ -104,11 +105,11 @@ macro stage(stage,args)
         end
         # Create generator function
         code = @q begin
-            $(esc(model)).ext[:MSSP].generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))) -> begin
+            $(esc(model)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))) -> begin
                 $(esc(vardefs))
 	        return $(esc(:model))
             end
-            $(esc(model)).ext[:MSSP].generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
+            $(esc(model)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
                 $(esc(def))
 	        return $(esc(:model))
             end

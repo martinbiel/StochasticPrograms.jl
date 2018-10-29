@@ -1,6 +1,6 @@
-# Utility #
+<# Utility #
 # ========================== #
-function eval_objective(objective::JuMP.GenericQuadExpr,x::AbstractVector)
+function eval_objective(objective::JuMP.GenericQuadExpr, x::AbstractVector)
     aff = objective.aff
     val = aff.constant
     for (i,var) in enumerate(aff.vars)
@@ -9,14 +9,15 @@ function eval_objective(objective::JuMP.GenericQuadExpr,x::AbstractVector)
     return val
 end
 
-function fill_solution!(stochasticprogram::JuMP.Model)
+function fill_solution!(stochasticprogram::StochasticProgram)
     dep = DEP(stochasticprogram)
     # First stage
-    nrows, ncols = length(stochasticprogram.linconstr), stochasticprogram.numCols
-    stochasticprogram.objVal = dep.objVal
-    stochasticprogram.colVal = dep.colVal[1:ncols]
-    stochasticprogram.redCosts = dep.redCosts[1:ncols]
-    stochasticprogram.linconstrDuals = dep.linconstrDuals[1:nrows]
+    first_stage = stochasticprogram.problemcache[:stage_1]
+    nrows, ncols = length(first_stage.linconstr), first_stage.numCols
+    first_stage.objVal = dep.objVal
+    first_stage.colVal = dep.colVal[1:ncols]
+    first_stage.redCosts = dep.redCosts[1:ncols]
+    first_stage.linconstrDuals = dep.linconstrDuals[1:nrows]
     # Second stages
     fill_solution!(scenarioproblems(stochasticprogram), dep.colVal[ncols+1:end], dep.redCosts[ncols+1:end], dep.linconstrDuals[nrows+1:end])
     nothing
@@ -54,9 +55,9 @@ function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::Abstract
     map(wait,active_workers)
 end
 
-function calculate_objective_value(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    objective_value = eval_objective(stochasticprogram.obj,stochasticprogram.colVal)
+function calculate_objective_value(stochasticprogram::StochasticProgram)
+    first_stage = stochasticprogram.problemcache[:stage_1]
+    objective_value = eval_objective(first_stage.obj, first_stage.colVal)
     objective_value += calculate_subobjectives(scenarioproblems(stochasticprogram))
     return objective_value
 end
@@ -69,17 +70,15 @@ function calculate_subobjectives(scenarioproblems::DScenarioProblems{D,SD,S}) wh
                                  scenarioproblems[w-1]) for w in workers()])
 end
 
-function invalidate_cache!(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function invalidate_cache!(stochasticprogram::StochasticProgram)
     cache = problemcache(stochasticprogram)
     delete!(cache,:evp)
     delete!(cache,:dep)
     return nothing
 end
 
-function remove_subproblems!(stochasticprogram::JuMP.Model)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
-    remove_subproblems!(stochasticprogram.ext[:SP].scenarioproblems)
+function remove_subproblems!(stochasticprogram::StochasticProgram)
+    remove_subproblems!(stochasticprogram.scenarioproblems)
     return nothing
 end
 
@@ -109,17 +108,6 @@ function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) whe
     throw(BoundsError(scenarioproblems,i))
 end
 
-function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
-    empty!(dest.generator)
-    merge!(dest.generator, src.generator)
-    return dest
-end
-
-function transfer_scenarios!(dest::StochasticProgram, src::StochasticProgram)
-    add_scenarios!(dest, scenarios(src))
-    return dest
-end
-
 function Base.copy!(dest::SP, src::SP) where {SP <: Union{ScenarioProblems,DScenarioProblems}}
     set_stage_data!(dest, stage_data(src))
     add_scenarios!(dest, scenarios(src))
@@ -130,10 +118,11 @@ function Base.copy!(dest::SP, src::SP) where SP <: StochasticProgram
     dest.spsolver.solver = src.spsolver.solver
     transfer_model!(dest, src)
     if haskey(src.problemcache, :stage_1)
-        dest.problemcache[:stage_1] = JuMP.Model()
+        dest.problemcache[:stage_1] = copy(src.problemcache[:stage_1])
     end
     copy!(dest.scenarioproblems, src.scenarioproblems)
-    generate_parent!(dest.scenarioproblems, dest.generator[:stage_1_vars], dest.first_stage.data)
+    generate!(dest)
+    return dest
 end
 
 function Base.copy(src::StochasticProgram{D1,D2,SD,S}) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
@@ -142,10 +131,10 @@ function Base.copy(src::StochasticProgram{D1,D2,SD,S}) where {D1, D2, SD <: Abst
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     if haskey(src.problemcache, :stage_1)
-        dest.problemcache[:stage_1] = JuMP.Model()
+        dest.problemcache[:stage_1] = copy(src.problemcache[:stage_1])
     end
     add_scenarios!(dest.scenarioproblems, scenarios(src.scenarioproblems))
-    generate_parent!(dest.scenarioproblems, dest.generator[:stage_1_vars], dest.first_stage.data)
+    generate!(dest)
     return dest
 end
 
@@ -155,15 +144,15 @@ function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}) where {D1, 
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     if haskey(src.problemcache, :stage_1)
-        dest.problemcache[:stage_1] = JuMP.Model()
+        dest.problemcache[:stage_1] = copy(src.problemcache[:stage_1])
     end
     add_scenarios!(dest.scenarioproblems, scenarios(src.scenarioproblems))
-    generate_parent!(dest.scenarioproblems, dest.generator[:stage_1_vars], dest.first_stage.data)
+    generate!(dest)
     return dest
 end
 
-function pick_solver(stochasticprogram,supplied_solver)
-    current_solver = stochasticprogram.ext[:SP].spsolver.solver
+function pick_solver(stochasticprogram::StochasticProgram, supplied_solver::SPSolverType)
+    current_solver = stochasticprogram.spsolver.solver
     solver = if current_solver isa JuMP.UnsetSolver
         supplied_solver
     else

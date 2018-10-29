@@ -12,13 +12,11 @@ function _WS(stage_one_generator::Function,
     stage_two_generator(ws_model,second_stage,scenario,ws_model)
     append!(ws_obj,ws_model.obj)
     ws_model.obj = ws_obj
-
     return ws_model
 end
 
-WS(stochasticprogram::JuMP.Model,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
-function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solver)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+WS(stochasticprogram::StochasticProgram,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
+function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData, solver)
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)
     # Abort if no solver was given
@@ -31,7 +29,7 @@ function WS(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData, solve
     # Return WS model
     return _WS(generator(stochasticprogram,:stage_1),generator(stochasticprogram,:stage_2),first_stage_data(stochasticprogram),second_stage_data(stochasticprogram),scenario,optimsolver(supplied_solver))
 end
-function WS_decision(stochasticprogram::JuMP.Model, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
+function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver)
     solve(ws_model)
@@ -87,8 +85,7 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{
     return sum(fetch.(active_workers))
 end
 
-function EWS(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)
     # Abort if no solver was given
@@ -99,9 +96,8 @@ function EWS(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
     return _EWS(stochastic(stochasticprogram),optimsolver(supplied_solver))
 end
 
-DEP(stochasticprogram::JuMP.Model) = DEP(stochasticprogram,JuMP.UnsetSolver())
-function DEP(stochasticprogram::JuMP.Model, solver)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+DEP(stochasticprogram::StochasticProgram) = DEP(stochasticprogram,JuMP.UnsetSolver())
+function DEP(stochasticprogram::StochasticProgram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache,:dep)
@@ -167,15 +163,14 @@ function DEP(stochasticprogram::JuMP.Model, solver)
     return dep_model
 end
 
-function VRP(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
+function VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve DEP
     solve(stochasticprogram,solver=solver)
     # Return optimal value
     return optimal_value(stochasticprogram)
 end
 
-function EVPI(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+function EVPI(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)
     # Abort if no solver was given
@@ -190,9 +185,8 @@ function EVPI(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
     return evpi
 end
 
-EVP(stochasticprogram::JuMP.Model) = EVP(stochasticprogram,JuMP.UnsetSolver())
-function EVP(stochasticprogram::JuMP.Model, solver)
-    haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
+EVP(stochasticprogram::StochasticProgram) = EVP(stochasticprogram,JuMP.UnsetSolver())
+function EVP(stochasticprogram::StochasticProgram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache,:evp)
@@ -205,7 +199,7 @@ function EVP(stochasticprogram::JuMP.Model, solver)
     # Return EVP
     return ev_model
 end
-function EVP_decision(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
+function EVP_decision(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP
     evp = EVP(stochasticprogram, solver)
     solve(evp)
@@ -217,7 +211,7 @@ function EVP_decision(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver()
     return decision
 end
 
-function EV(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
+function EV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP model
     evp = EVP(stochasticprogram, solver)
     solve(evp)
@@ -225,16 +219,16 @@ function EV(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
     return getobjectivevalue(evp)
 end
 
-function EEV(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
+function EEV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP model
     evp_decision = EVP_decision(stochasticprogram; solver=solver)
     # Calculate EEV by evaluating the EVP decision
-    eev = eval_decision(stochasticprogram,evp_decision; solver=solver)
+    eev = evaluate_decision(stochasticprogram,evp_decision; solver=solver)
     # Return EEV
     return eev
 end
 
-function VSS(stochasticprogram::JuMP.Model; solver = JuMP.UnsetSolver())
+function VSS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP and determine EEV
     vss = EEV(stochasticprogram; solver = solver)
     # Calculate VSS as EEV-VRP

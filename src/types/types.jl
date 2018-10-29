@@ -2,8 +2,9 @@
 # ========================== #
 abstract type AbstractStructuredSolver end
 
+SPSolverType = Union{MathProgBase.AbstractMathProgSolver, AbstractStructuredSolver}
 mutable struct SPSolver
-    solver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver}
+    solver::SPSolverType
 end
 
 include("probability.jl")
