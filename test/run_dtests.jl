@@ -63,6 +63,21 @@ include("sampling.jl")
         @test VSS(sp) <= EEV(sp)-EV(sp)
         @test EVPI(sp) <= EEV(sp)-EV(sp)
     end
+    @testset "Distributed Copying: $name" for (sp,res,name) in problems
+        sp_copy = copy(sp)
+        @test nscenarios(sp_copy) == nscenarios(sp)
+        generate!(sp_copy)
+        @test nsubproblems(sp_copy) == nsubproblems(sp)
+        @test solve(sp_copy) == :Optimal
+        solve(sp)
+        @test norm(optimal_decision(sp_copy)-optimal_decision(sp)) <= 1e-2
+        @test abs(optimal_value(sp_copy)-optimal_value(sp)) <= 1e-2
+        @test abs(EWS(sp_copy)-EWS(sp)) <= 1e-2
+        @test abs(EVPI(sp_copy)-EVPI(sp)) <= 1e-2
+        @test abs(VSS(sp_copy)-VSS(sp)) <= 1e-2
+        @test abs(EV(sp_copy)-EV(sp)) <= 1e-2
+        @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
+    end
     @testset "Distributed Sampling" begin
         @test nscenarios(sampled_sp) == 0
         @test nsubproblems(sampled_sp) == 0

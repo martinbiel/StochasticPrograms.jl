@@ -34,7 +34,7 @@ DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S
 
 function ScenarioProblems(stage::Integer,stagedata::D,::Type{SD},procs::Vector{Int}) where {D,SD <: AbstractScenarioData}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(common,SD)
+        return ScenarioProblems(stage,stagedata,SD)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -160,6 +160,13 @@ end
 function scenariotype(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return SD
 end
+function sampler(scenarioproblems::ScenarioProblems)
+    return scenarioproblems.sampler
+end
+function sampler(scenarioproblems::DScenarioProblems)
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    return fetch(scenarioproblems[1]).sampler
+end
 function subproblem(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return scenarioproblems.problems[i]
 end
@@ -232,12 +239,20 @@ function nscenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <:
 end
 # ========================== #
 
-# Base overloads
+# Setters
 # ========================== #
-function Base.push!(scenarioproblems::ScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
+function set_stage_data!(scenarioproblems::ScenarioProblems{D}, data::D) where D
+    scenarioproblems.stage.data = data
+end
+function set_stage_data!(scenarioproblems::DScenarioProblems{D}, data::D) where D
+    for w in workers()
+        remotecall_fetch((sp, data)->set_stage_data(fetch(sp), data), w, scenarioproblems[w-1], data)
+    end
+end
+function add_scenario!(scenarioproblems::ScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
     push!(scenarioproblems.scenariodata,sdata)
 end
-function Base.push!(scenarioproblems::DScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
+function add_scenario!(scenarioproblems::DScenarioProblems{D,SD},sdata::SD) where {D,SD <: AbstractScenarioData}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     w = rand(workers())
     remotecall_fetch((sp,sdata) -> push!(fetch(sp).scenariodata,sdata),
@@ -245,16 +260,24 @@ function Base.push!(scenarioproblems::DScenarioProblems{D,SD},sdata::SD) where {
                      scenarioproblems[w-1],
                      sdata)
 end
-function Base.append!(scenarioproblems::ScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
+function add_scenarios!(scenarioproblems::ScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
     append!(scenarioproblems.scenariodata,sdata)
 end
-function Base.append!(scenarioproblems::DScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
+function add_scenarios!(scenarioproblems::DScenarioProblems{D,SD},sdata::Vector{SD}) where {D,SD <: AbstractScenarioData}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     w = rand(workers())
     remotecall_fetch((sp,sdata) -> append!(fetch(sp).scenariodata,sdata),
                      w,
                      scenarioproblems[w-1],
                      sdata)
+end
+function remove_subproblems!(scenarioproblems::ScenarioProblems)
+    empty!(scenarioproblems.problems)
+end
+function remove_subproblems!(scenarioproblems::DScenarioProblems)
+    for w in workers()
+        remotecall_fetch((sp)->remove_subproblems!(fetch(sp)), w, scenarioproblems[w-1])
+    end
 end
 # ========================== #
 
@@ -296,7 +319,7 @@ function _sample!(scenarioproblems::ScenarioProblems{D,SD,S},n::Integer,m::Integ
         π *= n/(m+n)
     end
     for i = 1:n
-        push!(scenarioproblems,sample(scenarioproblems.sampler,π))
+        add_scenario!(scenarioproblems,sample(scenarioproblems.sampler,π))
     end
     return scenarioproblems
 end

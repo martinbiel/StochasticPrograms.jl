@@ -1,7 +1,20 @@
 # Creation macros #
 # ========================== #
-macro first_stage(args)
-    @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
+"""
+    @first_stage(stochasticprogram::JuMP.Model)
+
+Returns the first stage data structure, if any exists, in `stochasticprogram`.
+"""
+macro first_stage(arg) esc(:(@first_stage $arg generate)) end
+macro first_stage(arg, defer)
+    generate = if defer == :defer
+        :false
+    elseif defer == :generate
+        :true
+    else
+        error("Unknown option $defer")
+    end
+    @capture(arg, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     vardefs = Expr(:block)
     for line in modeldef.args
         (@capture(line, @constraint(m_Symbol,constdef__)) || @capture(line, @objective(m_Symbol,objdef__))) && continue
@@ -16,13 +29,23 @@ macro first_stage(args)
             $(esc(modeldef))
 	    return $(esc(:model))
         end
-        generate_stage_one!($(esc(model)))
+        if $generate
+            generate_stage_one!($(esc(model)))
+        end
     end
     return code
 end
 
-macro second_stage(args)
-    @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
+macro second_stage(arg) esc(:(@second_stage $arg generate)) end
+macro second_stage(arg, defer)
+    generate = if defer == :defer
+        :false
+    elseif defer == :generate
+        :true
+    else
+        error("Unknown option $defer")
+    end
+    @capture(arg, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     def = postwalk(modeldef) do x
         @capture(x, @decision args__) || return x
         code = Expr(:block)
@@ -34,11 +57,14 @@ macro second_stage(args)
     end
 
     code = @q begin
+        has_generator($(esc(model)), :stage_2) && remove_subproblems!($(esc(model)))
         $(esc(model)).ext[:SP].generator[:stage_2] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
-        generate_stage_two!($(esc(model)))
+        if $generate
+            generate_stage_two!($(esc(model)))
+        end
         nothing
     end
     return prettify(code)

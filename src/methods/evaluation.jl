@@ -1,17 +1,15 @@
 # Problem evaluation #
 # ========================== #
-function _eval_first_stage(stochasticprogram::JuMP.Model,x::AbstractVector)
+function _eval_first_stage(stochasticprogram::JuMP.Model, x::AbstractVector)
     return eval_objective(stochasticprogram.obj,x)
 end
-
-function _eval_second_stage(stochasticprogram::JuMP.Model,x::AbstractVector,scenario::AbstractScenarioData,solver::MathProgBase.AbstractMathProgSolver)
+function _eval_second_stage(stochasticprogram::JuMP.Model, x::AbstractVector, scenario::AbstractScenarioData,solver::MathProgBase.AbstractMathProgSolver)
     outcome = outcome_model(stochasticprogram,scenario,x,solver)
     solve(outcome)
 
     return probability(scenario)*getobjectivevalue(outcome)
 end
-
-function _eval_second_stages(stochasticprogram::StochasticProgramData{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
+function _eval_second_stages(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
                              x::AbstractVector,
                              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return sum([begin
@@ -26,8 +24,7 @@ function _eval_second_stages(stochasticprogram::StochasticProgramData{D1,D2,SD,S
                 probability(scenario)*getobjectivevalue(outcome)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
-
-function _eval_second_stages(stochasticprogram::StochasticProgramData{D1, D2, SD,S,DScenarioProblems{D2,SD,S}},
+function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,DScenarioProblems{D2,SD,S}},
                              x::AbstractVector,
                              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     active_workers = Vector{Future}(undef,nworkers())
@@ -59,7 +56,6 @@ function _eval_second_stages(stochasticprogram::StochasticProgramData{D1, D2, SD
     map(wait,active_workers)
     return sum(fetch.(active_workers))
 end
-
 function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
     haskey(stochasticprogram.ext,:SP) || error("The given model is not a stochastic program.")
     length(x) == stochasticprogram.numCols || error("Incorrect length of given decision vector, has ",length(x)," should be ",stochasticprogram.numCols)
@@ -70,7 +66,13 @@ function _eval(stochasticprogram::JuMP.Model,x::AbstractVector,solver::MathProgB
 
     return val
 end
+"""
+    evaluate_decision(stochasticprogram::JuMP.Model,
+                      x::AbstractVector;
+                      solver = JuMP.UnsetSolver())
 
+Evaluates the first stage decision `x` in `stochasticprogram`. This involves evaluatin the first stage objective at `x` as well as solving outcome models of `x` for every available scenario. Optionally, a capable `solver` can be supplied to solve the outome models. The default behaviour is to rely on any previously set solver.
+"""
 function eval_decision(stochasticprogram::JuMP.Model,x::AbstractVector; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)

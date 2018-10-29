@@ -43,7 +43,7 @@ function WS_decision(stochasticprogram::JuMP.Model, scenario::AbstractScenarioDa
     return decision
 end
 
-function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
+function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     return sum([begin
                 ws = _WS(stochasticprogram.generator[:stage_1],
@@ -57,7 +57,7 @@ function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,ScenarioProble
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
 
-function _EWS(stochasticprogram::StochasticProgramData{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
+function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
     active_workers = Vector{Future}(undef,nworkers())
     for w in workers()

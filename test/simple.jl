@@ -16,7 +16,7 @@ s2 = SimpleScenario(0.6,[300.0,300],[-28.0,-32])
 
 sds = [s1,s2]
 
-simple = StochasticProgram(sds,solver=GLPKSolverLP())
+simple = StochasticProgram([s1,s2],solver=GLPKSolverLP())
 
 @first_stage simple = begin
     @variable(model, x₁ >= 40)
