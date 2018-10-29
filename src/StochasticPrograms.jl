@@ -47,6 +47,7 @@ export
     stage_two_model,
     outcome_model,
     evaluate_decision,
+    solve!,
     optimal_decision,
     optimal_value,
     calculate_objective_value,

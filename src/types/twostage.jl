@@ -48,7 +48,7 @@ function StochasticProgram(stage_1::D1,stage_2::D2,::Type{SD}; solver = JuMP.Uns
 end
 StochasticProgram(scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing,nothing,scenariodata; solver = solver, procs = procs)
 function StochasticProgram(stage_1::D1,stage_2::D2,scenariodata::Vector{<:AbstractScenarioData}; solver = JuMP.UnsetSolver(), procs = workers()) where {D1,D2}
-    stochasticprogram =  = StochasticProgram(stage_1,stage_2,scenariodata,procs)
+    stochasticprogram = StochasticProgram(stage_1,stage_2,scenariodata,procs)
     stochasticprogram.spsolver.solver = solver
     # Return stochastic program
     return stochasticprogram
@@ -70,9 +70,9 @@ function solve!(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver(
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Switch on solver type
-    return _solve(stochasticprogram, supplied_solver)
+    return _solve!(stochasticprogram, supplied_solver)
 end
-function _solve!(stochasticprogram::StochasticProgram, solver::AbstractMathProgSolver)
+function _solve!(stochasticprogram::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
     # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
     dep = DEP(stochasticprogram, supplied_solver)
     status = solve(dep; kwargs...)
@@ -105,161 +105,161 @@ end
 # Getters #
 # ========================== #
 """
-    scenarioproblems(stochasticprogram::StochasticPrograms)
+    scenarioproblems(stochasticprogram::StochasticProgram)
 
 Returns the scenario problems in `stochasticprogram`.
 """
-function scenarioproblems(stochasticprogram::StochasticPrograms)
+function scenarioproblems(stochasticprogram::StochasticProgram)
     return stochasticprogram.scenarioproblems
 end
 """
-    first_stage_data(stochasticprogram::StochasticPrograms)
+    first_stage_data(stochasticprogram::StochasticProgram)
 
 Returns the first stage data structure, if any exists, in `stochasticprogram`.
 """
-function first_stage_data(stochasticprogram::StochasticPrograms)
+function first_stage_data(stochasticprogram::StochasticProgram)
     return stochasticprogram.first_stage.data
 end
 """
-    second_stage_data(stochasticprogram::StochasticPrograms)
+    second_stage_data(stochasticprogram::StochasticProgram)
 
 Returns the second stage data structure, if any exists, in `stochasticprogram`.
 """
-function second_stage_data(stochasticprogram::StochasticPrograms)
+function second_stage_data(stochasticprogram::StochasticProgram)
     return stage_data(stochasticprogram.scenarioproblems)
 end
 """
-    scenario(stochasticprogram::StochasticPrograms, i::Integer)
+    scenario(stochasticprogram::StochasticProgram, i::Integer)
 
 Returns the `i`th scenario in `stochasticprogram`.
 """
-function scenario(stochasticprogram::StochasticPrograms, i::Integer)
+function scenario(stochasticprogram::StochasticProgram, i::Integer)
     return scenario(scenarioproblems(stochasticprogram), i)
 end
 """
-    scenarios(stochasticprogram::StochasticPrograms)
+    scenarios(stochasticprogram::StochasticProgram)
 
 Returns an array of all scenarios in `stochasticprogram`.
 """
-function scenarios(stochasticprogram::StochasticPrograms)
+function scenarios(stochasticprogram::StochasticProgram)
     return scenarios(scenarioproblems(stochasticprogram))
 end
 """
-    expected(stochasticprogram::StochasticPrograms)
+    expected(stochasticprogram::StochasticProgram)
 
 Returns the exected scenario of all scenarios in `stochasticprogram`.
 """
-function expected(stochasticprogram::StochasticPrograms)
+function expected(stochasticprogram::StochasticProgram)
     return expected(scenarioproblems(stochasticprogram))
 end
 """
-    scenariotype(stochasticprogram::StochasticPrograms)
+    scenariotype(stochasticprogram::StochasticProgram)
 
 Returns the type of the scenario structure associated with `stochasticprogram`.
 """
-function scenariotype(stochasticprogram::StochasticPrograms)
+function scenariotype(stochasticprogram::StochasticProgram)
     return scenariotype(scenarioproblems(stochasticprogram))
 end
 """
-    probability(stochasticprogram::StochasticPrograms)
+    probability(stochasticprogram::StochasticProgram)
 
 Returns the probability of scenario `i`th scenario in `stochasticprogram` occuring.
 """
-function probability(stochasticprogram::StochasticPrograms, i::Integer)
+function probability(stochasticprogram::StochasticProgram, i::Integer)
     return probability(scenario(stochasticprogram, i))
 end
 """
-    probability(stochasticprogram::StochasticPrograms)
+    probability(stochasticprogram::StochasticProgram)
 
 Returns the probability of any scenario in `stochasticprogram` occuring. A well defined model should return 1.
 """
-function probability(stochasticprogram::StochasticPrograms)
+function probability(stochasticprogram::StochasticProgram)
     return probability(stochasticprogram.scenarioproblems)
 end
 """
-    has_generator(stochasticprogram::StochasticPrograms, key::Symbol)
+    has_generator(stochasticprogram::StochasticProgram, key::Symbol)
 
 Returns true if a problem generator with `key` exists in `stochasticprogram`.
 """
-function has_generator(stochasticprogram::StochasticPrograms, key::Symbol)
+function has_generator(stochasticprogram::StochasticProgram, key::Symbol)
     return haskey(stochasticprogram.generator, key)
 end
 """
-    generator(stochasticprogram::StochasticPrograms, key::Symbol)
+    generator(stochasticprogram::StochasticProgram, key::Symbol)
 
 Returns the problem generator associated with `key` in `stochasticprogram`.
 """
-function generator(stochasticprogram::StochasticPrograms, key::Symbol)
+function generator(stochasticprogram::StochasticProgram, key::Symbol)
     return stochasticprogram.generator[key]
 end
 """
-    subproblem(stochasticprogram::StochasticPrograms, i::Integer)
+    subproblem(stochasticprogram::StochasticProgram, i::Integer)
 
 Returns the `i`th subproblem in `stochasticprogram`.
 """
-function subproblem(stochasticprogram::StochasticPrograms, i::Integer)
+function subproblem(stochasticprogram::StochasticProgram, i::Integer)
     return subproblem(stochasticprogram.scenarioproblems, i)
 end
 """
-    subproblems(stochasticprogram::StochasticPrograms)
+    subproblems(stochasticprogram::StochasticProgram)
 
 Returns an array of all subproblems in `stochasticprogram`.
 """
-function subproblems(stochasticprogram::StochasticPrograms)
+function subproblems(stochasticprogram::StochasticProgram)
     return subproblems(stochasticprogram.scenarioproblems)
 end
 """
-    nsubproblems(stochasticprogram::StochasticPrograms)
+    nsubproblems(stochasticprogram::StochasticProgram)
 
 Returns the number of subproblems in `stochasticprogram`.
 """
-function nsubproblems(stochasticprogram::StochasticPrograms)
+function nsubproblems(stochasticprogram::StochasticProgram)
     return nsubproblems(stochasticprogram.scenarioproblems)
 end
 """
-    masterterms(stochasticprogram::StochasticPrograms, i::Integer)
+    masterterms(stochasticprogram::StochasticProgram, i::Integer)
 
 Returns the first stage terms appearing in scenario `i` in `stochasticprogram`. The master terms are given in sparse format as an array of tuples `(row,col,coeff)` which specify the occurance of master problem variables in the second stage constraints.
 """
-function masterterms(stochasticprogram::StochasticPrograms, i::Integer)
+function masterterms(stochasticprogram::StochasticProgram, i::Integer)
     return masterterms(stochasticprogram.scenarioproblems, i)
 end
 """
-    nscenarios(stochasticprogram::StochasticPrograms)
+    nscenarios(stochasticprogram::StochasticProgram)
 
 Returns the number of scenarios in `stochasticprogram`.
 """
-function nscenarios(stochasticprogram::StochasticPrograms)
+function nscenarios(stochasticprogram::StochasticProgram)
     return nscenarios(stochasticprogram.scenarioproblems)
 end
 """
-    sampler(stochasticprogram::StochasticPrograms)
+    sampler(stochasticprogram::StochasticProgram)
 
 Returns the sampler object, if any, in `stochasticprogram`.
 """
-function sampler(stochasticprogram::StochasticPrograms)
+function sampler(stochasticprogram::StochasticProgram)
     return sampler(stochasticprogram.scenarioproblems)
 end
 """
-    nstages(stochasticprogram::StochasticPrograms)
+    nstages(stochasticprogram::StochasticProgram)
 
 Returns the number of stages in `stochasticprogram`. Will return 2 for two-stage problems.
 """
-nstages(stochasticprogram::StochasticPrograms) = 2
+nstages(stochasticprogram::StochasticProgram) = 2
 """
-    spsolver(stochasticprogram::StochasticPrograms)
+    spsolver(stochasticprogram::StochasticProgram)
 
 Returns the stochastic program solver `spsolver` in `stochasticprogram`.
 """
-function spsolver(stochasticprogram::StochasticPrograms)
+function spsolver(stochasticprogram::StochasticProgram)
     return stochasticprogram.spsolver.solver
 end
 """
-    optimal_decision(stochasticprogram::StochasticPrograms)
+    optimal_decision(stochasticprogram::StochasticProgram)
 
 Returns the optimal first stage decision of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::StochasticPrograms)
+function optimal_decision(stochasticprogram::StochasticProgram)
     decision = get_stage_one(stochasticprogram).colVal
     if any(isnan.(decision))
         @warn "Optimal decision not defined. Check that the model was properly solved."
@@ -267,19 +267,19 @@ function optimal_decision(stochasticprogram::StochasticPrograms)
     return decision
 end
 """
-    optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
+    optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
 
 Returns the optimal first stage variable `var` of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
+function optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
     return getvalue(get_stage_one(stochasticprogram).objDict[var])
 end
 """
-    optimal_decision(stochasticprogram::StochasticPrograms, i::Integer)
+    optimal_decision(stochasticprogram::StochasticProgram, i::Integer)
 
 Returns the optimal second stage decision of `stochasticprogram` in the `i`th scenario, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::StochasticPrograms, i::Integer)
+function optimal_decision(stochasticprogram::StochasticProgram, i::Integer)
     submodel = subproblem(stochasticprogram, i)
     decision = submodel.colVal
     if any(isnan.(decision))
@@ -288,28 +288,28 @@ function optimal_decision(stochasticprogram::StochasticPrograms, i::Integer)
     return decision
 end
 """
-    optimal_decision(stochasticprogram::StochasticPrograms, var::Symbol)
+    optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
 
 Returns the optimal second stage variable `var` of `stochasticprogram` in the `i`th scenario, after a call to `solve(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::StochasticPrograms, i::Integer, var::Symbol)
+function optimal_decision(stochasticprogram::StochasticProgram, i::Integer, var::Symbol)
     submodel = subproblem(stochasticprogram, i)
     return getvalue(subproblem.objDict[var])
 end
 """
-    optimal_value(stochasticprogram::StochasticPrograms)
+    optimal_value(stochasticprogram::StochasticProgram)
 
 Returns the optimal value of `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_value(stochasticprogram::StochasticPrograms)
+function optimal_value(stochasticprogram::StochasticProgram)
     return get_stage_one(stochasticprogram).objVal
 end
 """
-    optimal_value(stochasticprogram::StochasticPrograms, i::Integer)
+    optimal_value(stochasticprogram::StochasticProgram, i::Integer)
 
 Returns the optimal value of the `i`th subproblem in `stochasticprogram`, after a call to `solve(stochasticprogram)`.
 """
-function optimal_value(stochasticprogram::StochasticPrograms, i::Integer)
+function optimal_value(stochasticprogram::StochasticProgram, i::Integer)
     submodel = subproblem(stochasticprogram, i)
     return submodel.objVal
 end
@@ -318,33 +318,33 @@ end
 # Setters
 # ========================== #
 """
-    set_spsolver(stochasticprogram::StochasticPrograms, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
+    set_spsolver(stochasticprogram::StochasticProgram, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
 
 Stores the stochastic program solver `spsolver` in `stochasticprogram`.
 """
-function set_spsolver(stochasticprogram::StochasticPrograms, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
+function set_spsolver(stochasticprogram::StochasticProgram, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
     stochasticprogram.spsolver.solver = spsolver
     nothing
 end
 """
-    set_first_stage_data(stochasticprogram::StochasticPrograms, data::Any)
+    set_first_stage_data(stochasticprogram::StochasticProgram, data::Any)
 
 Stores the first stage `data` in first stage of `stochasticprogram`.
 """
-function set_first_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
+function set_first_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     stochasticprogram.first_stage.data = data
     nothing
 end
 """
-    set_second_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
+    set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
 
 Stores the second stage `data` in second stage of `stochasticprogram`.
 """
-function set_second_stage_data!(stochasticprogram::StochasticPrograms, data::Any)
+function set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     set_stage_data(stochasticprogram.scenarioproblems, data)
     nothing
 end
-function add_scenario!(stochasticprogram::StochasticPrograms, scenario::AbstractScenarioData; defer::Bool = false)
+function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; defer::Bool = false)
     add_scenario!(scenarioproblems(stochasticprogram), scenario)
     invalidate_cache!(stochasticprogram)
     if !defer
@@ -352,7 +352,7 @@ function add_scenario!(stochasticprogram::StochasticPrograms, scenario::Abstract
     end
     return stochasticprogram
 end
-function add_scenarios!(stochasticprogram::StochasticPrograms, scenarios::Vector{<:AbstractScenarioData}; defer::Bool = false)
+function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenarioData}; defer::Bool = false)
     add_scenarios!(scenarioproblems(stochasticprogram), scenarios)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
@@ -362,11 +362,11 @@ end
 # Sampling #
 # ========================== #
 """
-    sample!(stochasticprogram::StochasticPrograms, n::Integer)
+    sample!(stochasticprogram::StochasticProgram, n::Integer)
 
 Samples `n` scenarios from the sampler object in `stochasticprogram`, if any, and generates subproblems for each of them.
 """
-function sample!(stochasticprogram::StochasticPrograms, n::Integer)
+function sample!(stochasticprogram::StochasticProgram, n::Integer)
     sample!(scenarioproblems(stochasticprogram), n)
     generate_stage_two!(stochasticprogram)
 end
@@ -374,7 +374,7 @@ end
 
 # Private #
 # ========================== #
-problemcache(stochasticprogram::StochasticPrograms) = stochasticprogram.problemcache
-get_problem(stochasticprogram::Stochasticprogram, key::Symbol) = stochasticprogram.problemcache[key]
+problemcache(stochasticprogram::StochasticProgram) = stochasticprogram.problemcache
+get_problem(stochasticprogram::StochasticProgram, key::Symbol) = stochasticprogram.problemcache[key]
 get_stage_one(stochasticprogram::StochasticProgram) = get_problem(stochasticprogram, :stage_1)
 # ========================== #

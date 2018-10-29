@@ -8,12 +8,12 @@ Returns a generated copy of the first stage model in `stochasticprogram`.
 function stage_one_model(stochasticprogram::StochasticProgram)
     has_generator(stochasticprogram,:stage_1) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
     stage_one_model = Model(solver=JuMP.UnsetSolver())
-    generator(stochasticprogram,:stage_1)(stage_one_model,first_stage_data(stochasticprogram))
+    generator(stochasticprogram,:stage_1)(stage_one_model, first_stage_data(stochasticprogram))
     return stage_one_model
 end
-function _stage_two_model(generator::Function,stagedata::Any,scenario::AbstractScenarioData,parent::StochasticProgram)
+function _stage_two_model(generator::Function, stagedata::Any, scenario::AbstractScenarioData, parent::JuMP.Model)
     stage_two_model = Model(solver=JuMP.UnsetSolver())
-    generator(stage_two_model,stagedata,scenario,parent)
+    generator(stage_two_model, stagedata, scenario, parent)
     return stage_two_model
 end
 """
@@ -23,7 +23,7 @@ Returns a generated second stage model corresponding to `scenario`, in `stochast
 """
 function stage_two_model(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData)
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
-    return _stage_two_model(generator(stochasticprogram,:stage_2),second_stage_data(stochasticprogram),scenario,stochasticprogram)
+    return _stage_two_model(generator(stochasticprogram,:stage_2),second_stage_data(stochasticprogram),scenario,parentmodel(stochasticprogram.scenarioproblems))
 end
 function generate_parent!(scenarioproblems::ScenarioProblems{D,SD},generator::Function,parentdata::Any) where {D,SD <: AbstractScenarioData}
     generator(parentmodel(scenarioproblems),parentdata)

@@ -15,7 +15,7 @@ function _WS(stage_one_generator::Function,
     return ws_model
 end
 
-WS(stochasticprogram::StochasticProgram,scenario::AbstractScenarioData) = WS(stochasticprogram,scenario,JuMP.UnsetSolver())
+WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData) = WS(stochasticprogram, scenario, JuMP.UnsetSolver())
 function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData, solver)
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)
@@ -93,7 +93,7 @@ function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
         error("Cannot determine EWS without a solver.")
     end
     # Solve all possible WS models and compute EWS
-    return _EWS(stochastic(stochasticprogram),optimsolver(supplied_solver))
+    return _EWS(stochasticprogram, optimsolver(supplied_solver))
 end
 
 DEP(stochasticprogram::StochasticProgram) = DEP(stochasticprogram,JuMP.UnsetSolver())
@@ -165,7 +165,7 @@ end
 
 function VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve DEP
-    solve(stochasticprogram,solver=solver)
+    solve!(stochasticprogram, solver=solver)
     # Return optimal value
     return optimal_value(stochasticprogram)
 end
@@ -204,7 +204,7 @@ function EVP_decision(stochasticprogram::StochasticProgram; solver = JuMP.UnsetS
     evp = EVP(stochasticprogram, solver)
     solve(evp)
     # Return EVP decision
-    decision = evp.colVal[1:stochasticprogram.numCols]
+    decision = evp.colVal[1:get_stage_one(stochasticprogram).numCols]
     if any(isnan.(decision))
         warn("Optimal decision not defined. Check that the EVP model was properly solved.")
     end

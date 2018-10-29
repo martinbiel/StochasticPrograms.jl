@@ -21,7 +21,7 @@ struct SPResult
     EEV::Float64
 end
 
-problems = Vector{Tuple{JuMP.Model,SPResult,String}}()
+problems = Vector{Tuple{StochasticProgram,SPResult,String}}()
 @info "Loading test problems..."
 @info "Loading simple..."
 include("simple.jl")
@@ -33,11 +33,11 @@ include("sampling.jl")
 
 @testset "Distributed Stochastic Programs" begin
     @testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
-        solve(sp)
+        solve!(sp)
         sp_nondist = StochasticProgram(first_stage_data(sp),second_stage_data(sp),scenarios(sp),procs=[1])
         transfer_model!(stochastic(sp_nondist),stochastic(sp))
         generate!(sp_nondist)
-        solve(sp_nondist,solver=GLPKSolverLP())
+        solve!(sp_nondist,solver=GLPKSolverLP())
         @test scenariotype(sp) == scenariotype(sp_nondist)
         @test abs(probability(sp)-probability(sp_nondist)) <= 1e-6
         @test nscenarios(sp) == nscenarios(sp)
@@ -46,7 +46,7 @@ include("sampling.jl")
         @test abs(optimal_value(sp)-optimal_value(sp_nondist)) <= 1e-6
     end
     @testset "Distributed SP Constructs: $name" for (sp,res,name) in problems
-        solve(sp)
+        solve!(sp)
         @test norm(optimal_decision(sp)-res.x̄) <= 1e-2
         @test abs(optimal_value(sp)-res.VRP) <= 1e-2
         @test abs(EWS(sp)-res.EWS) <= 1e-2
@@ -69,7 +69,7 @@ include("sampling.jl")
         generate!(sp_copy)
         @test nsubproblems(sp_copy) == nsubproblems(sp)
         @test solve(sp_copy) == :Optimal
-        solve(sp)
+        solve!(sp)
         @test norm(optimal_decision(sp_copy)-optimal_decision(sp)) <= 1e-2
         @test abs(optimal_value(sp_copy)-optimal_value(sp)) <= 1e-2
         @test abs(EWS(sp_copy)-EWS(sp)) <= 1e-2
