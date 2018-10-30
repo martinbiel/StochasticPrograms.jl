@@ -1,10 +1,16 @@
 # Types #
 # ========================== #
 abstract type AbstractStructuredSolver end
+abstract type AbstractStructuredModel end
 
-SPSolverType = Union{MathProgBase.AbstractMathProgSolver, AbstractStructuredSolver}
+SPSolverType = Union{MPB.AbstractMathProgSolver, AbstractStructuredSolver}
 mutable struct SPSolver
     solver::SPSolverType
+    internal_model
+
+    function (::Type{SPSolver})(solver::SPSolverType)
+        return new(solver, nothing)
+    end
 end
 
 include("probability.jl")

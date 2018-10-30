@@ -17,22 +17,23 @@ macro first_stage(arg, defer)
     @capture(arg, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     vardefs = Expr(:block)
     for line in modeldef.args
-        (@capture(line, @constraint(m_Symbol,constdef__)) || @capture(line, @objective(m_Symbol,objdef__))) && continue
-        push!(vardefs.args,line)
+        (@capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__))) && continue
+        push!(vardefs.args, line)
     end
     code = @q begin
         haskey($(esc(model)).problemcache, :stage_1) && delete!($(esc(model)).problemcache, :stage_1)
-        $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+        $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
             $(esc(vardefs))
 	    return $(esc(:model))
         end
-        $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+        $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
         end
         if $generate
             generate_stage_one!($(esc(model)))
         end
+        $(esc(model))
     end
     return code
 end
@@ -52,21 +53,21 @@ macro second_stage(arg, defer)
         code = Expr(:block)
         for var in args
             varkey = Meta.quot(var)
-            push!(code.args,:($var = parent.objDict[$varkey]))
+            push!(code.args, :($var = parent.objDict[$varkey]))
         end
         return code
     end
 
     code = @q begin
         has_generator($(esc(model)), :stage_2) && remove_subproblems!($(esc(model)))
-        $(esc(model)).generator[:stage_2] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
+        $(esc(model)).generator[:stage_2] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
         if $generate
             generate_stage_two!($(esc(model)))
         end
-        nothing
+        $(esc(model))
     end
     return prettify(code)
 end
@@ -76,8 +77,8 @@ macro stage(stage,args)
     # Save variable definitions separately
     vardefs = Expr(:block)
     for line in modeldef.args
-        (@capture(line, @constraint(m_Symbol,constdef__)) || @capture(line, @objective(m_Symbol,objdef__)) || @capture(line, @decision args__)) && continue
-        push!(vardefs.args,line)
+        (@capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__)) || @capture(line, @decision args__)) && continue
+        push!(vardefs.args, line)
     end
     # Handle the first stage and the second stages differently
     code = if stage == 1
@@ -99,21 +100,21 @@ macro stage(stage,args)
             code = Expr(:block)
             for var in args
                 varkey = Meta.quot(var)
-                push!(code.args,:($var = parent.objDict[$varkey]))
+                push!(code.args, :($var = parent.objDict[$varkey]))
             end
             return code
         end
         # Create generator function
         code = @q begin
-            $(esc(model)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))) -> begin
+            $(esc(model)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))) -> begin
                 $(esc(vardefs))
 	        return $(esc(:model))
             end
-            $(esc(model)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model,$(esc(:stage)),$(esc(:scenario))::AbstractScenarioData,$(esc(:parent))::JuMP.Model) -> begin
+            $(esc(model)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
                 $(esc(def))
 	        return $(esc(:model))
             end
-            nothing
+            $(esc(model))
         end
         code
     end

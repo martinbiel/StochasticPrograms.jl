@@ -3,7 +3,7 @@ abstract type AbstractScenarioData end
 probability(scenario::AbstractScenarioData)::Float64 = scenario.π
 probability(scenarios::Vector{<:AbstractScenarioData}) = sum(probability.(scenarios))
 
-function set_probability!(scenario::AbstractScenarioData,π::AbstractFloat)
+function set_probability!(scenario::AbstractScenarioData, π::AbstractFloat)
     scenario.π.π = π
 end
 

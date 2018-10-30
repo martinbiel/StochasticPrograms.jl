@@ -7,16 +7,16 @@
 
     function StochasticPrograms.expected(scenarios::Vector{SimpleScenario})
         isempty(scenarios) && return SimpleScenario(1.,zeros(2),zeros(2))
-        return SimpleScenario(1.,sum([s.π*s.d for s in scenarios]),sum([s.π*s.q for s in scenarios]))
+        return SimpleScenario(1., sum([s.π*s.d for s in scenarios]), sum([s.π*s.q for s in scenarios]))
     end
 end
 
-s1 = SimpleScenario(0.4,[500.0,100],[-24.0,-28])
-s2 = SimpleScenario(0.6,[300.0,300],[-28.0,-32])
+s1 = SimpleScenario(0.4, [500.0,100], [-24.0,-28])
+s2 = SimpleScenario(0.6, [300.0,300], [-28.0,-32])
 
 sds = [s1,s2]
 
-simple = StochasticProgram([s1,s2],solver=GLPKSolverLP())
+simple = StochasticProgram([s1,s2], solver=GLPKSolverLP())
 
 @first_stage simple = begin
     @variable(model, x₁ >= 40)
@@ -35,5 +35,5 @@ end
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 
-simple_res = SPResult([46.67,36.25],-855.83,-1518.75,662.92,286.92,-1445.92,-568.92)
-push!(problems,(simple,simple_res,"Simple"))
+simple_res = SPResult([46.67,36.25], -855.83, -1518.75, 662.92, 286.92, -1445.92, -568.92)
+push!(problems, (simple,simple_res,"Simple"))

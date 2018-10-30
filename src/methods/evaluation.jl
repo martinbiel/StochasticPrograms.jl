@@ -1,9 +1,10 @@
 # Problem evaluation #
 # ========================== #
 function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVector)
-    return eval_objective(stochasticprogram.obj, x)
+    first_stage = get_stage_one(stochasticprogram)
+    return eval_objective(first_stage.obj, x)
 end
-function _eval_second_stage(stochasticprogram::StochasticProgram, x::AbstractVector, scenario::AbstractScenarioData,solver::MathProgBase.AbstractMathProgSolver)
+function _eval_second_stage(stochasticprogram::StochasticProgram, x::AbstractVector, scenario::AbstractScenarioData, solver::MathProgBase.AbstractMathProgSolver)
     outcome = outcome_model(stochasticprogram, scenario, x, solver)
     solve(outcome)
     return probability(scenario)*getobjectivevalue(outcome)
@@ -30,7 +31,7 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,D
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,x,first_stage,second_stage,solver)->begin
                                          scenarioproblems = fetch(sp)
-                                         isempty(scenarioproblems.scenariodata) && return zero(eltype(x))
+                                         isempty(scenarioproblems.scenarios) && return zero(eltype(x))
                                          return sum([begin
                                                      outcome = _outcome_model(stage_one_generator,
                                                                               stage_two_generator,
@@ -41,7 +42,7 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,D
                                                                               solver)
                                                      solve(outcome)
                                                      probability(scenario)*getobjectivevalue(outcome)
-                                                     end for scenario in scenarioproblems.scenariodata])
+                                                     end for scenario in scenarioproblems.scenarios])
                                          end,
                                          w,
                                          stochasticprogram.scenarioproblems[w-1],
@@ -56,10 +57,11 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,D
     return sum(fetch.(active_workers))
 end
 function _eval(stochasticprogram::StochasticProgram, x::AbstractVector, solver::MathProgBase.AbstractMathProgSolver)
-    length(x) == stochasticprogram.numCols || error("Incorrect length of given decision vector, has ",length(x)," should be ",stochasticprogram.numCols)
+    xlength = decision_length(stochasticprogram)
+    length(x) == xlength || error("Incorrect length of given decision vector, has ", length(x), " should be ", xlength)
     all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
-    val = _eval_first_stage(stochasticprogram,x)
-    val += _eval_second_stages(stochastic(stochasticprogram),x,solver)
+    val = _eval_first_stage(stochasticprogram, x)
+    val += _eval_second_stages(stochasticprogram, x, solver)
     return val
 end
 """
@@ -67,15 +69,17 @@ end
                       x::AbstractVector;
                       solver = JuMP.UnsetSolver())
 
-Evaluates the first stage decision `x` in `stochasticprogram`. This involves evaluatin the first stage objective at `x` as well as solving outcome models of `x` for every available scenario. Optionally, a capable `solver` can be supplied to solve the outome models. The default behaviour is to rely on any previously set solver.
+Evaluate the first stage decision `x` in `stochasticprogram`.
+
+This involves evaluating the first stage objective at `x` as well as solving outcome models of `x` for every available scenario. Optionally, a capable `solver` can be supplied to solve the outome models. The default behaviour is to rely on any previously set solver.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram, x::AbstractVector; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
-    supplied_solver = pick_solver(stochasticprogram,solver)
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver,JuMP.UnsetSolver)
+    if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot evaluate decision without a solver.")
     end
-    return _eval(stochasticprogram,x,optimsolver(supplied_solver))
+    return _eval(stochasticprogram, x, optimsolver(supplied_solver))
 end
 # ========================== #

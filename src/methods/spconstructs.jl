@@ -7,10 +7,10 @@ function _WS(stage_one_generator::Function,
              scenario::AbstractScenarioData,
              solver::MathProgBase.AbstractMathProgSolver)
     ws_model = Model(solver = solver)
-    stage_one_generator(ws_model,first_stage)
+    stage_one_generator(ws_model, first_stage)
     ws_obj = copy(ws_model.obj)
-    stage_two_generator(ws_model,second_stage,scenario,ws_model)
-    append!(ws_obj,ws_model.obj)
+    stage_two_generator(ws_model, second_stage, scenario, ws_model)
+    append!(ws_obj, ws_model.obj)
     ws_model.obj = ws_obj
     return ws_model
 end
@@ -20,21 +20,21 @@ function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData
     # Prefer cached solver if available
     supplied_solver = pick_solver(stochasticprogram,solver)
     # Abort if no solver was given
-    if isa(supplied_solver,JuMP.UnsetSolver)
+    if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot create WS model without a solver.")
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram,:stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Return WS model
-    return _WS(generator(stochasticprogram,:stage_1),generator(stochasticprogram,:stage_2),first_stage_data(stochasticprogram),second_stage_data(stochasticprogram),scenario,optimsolver(supplied_solver))
+    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), first_stage_data(stochasticprogram), second_stage_data(stochasticprogram), scenario, optimsolver(supplied_solver))
 end
 function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver)
     solve(ws_model)
     # Return WS decision
-    decision = ws_model.colVal[1:stochasticprogram.numCols]
+    decision = ws_model.colVal[1:decision_length(stochasticprogram)]
     if any(isnan.(decision))
         warn("Optimal decision not defined. Check that the EVP model was properly solved.")
     end
@@ -57,11 +57,11 @@ end
 
 function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
-    active_workers = Vector{Future}(undef,nworkers())
+    active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
                                          scenarioproblems = fetch(sp)
-                                         isempty(scenarioproblems.scenariodata) && return 0.0
+                                         isempty(scenarioproblems.scenarios) && return 0.0
                                          return sum([begin
                                                      ws = _WS(stage_one_generator,
                                                               stage_two_generator,
@@ -71,7 +71,7 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{
                                                               solver)
                                                      solve(ws)
                                                      probability(scenario)*getobjectivevalue(ws)
-                                                     end for scenario in scenarioproblems.scenariodata])
+                                                     end for scenario in scenarioproblems.scenarios])
                                          end,
                                          w,
                                          stochasticprogram.scenarioproblems[w-1],
@@ -81,22 +81,22 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{
                                          stage_data(stochasticprogram.scenarioproblems),
                                          solver)
     end
-    map(wait,active_workers)
+    map(wait, active_workers)
     return sum(fetch.(active_workers))
 end
 
 function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
-    supplied_solver = pick_solver(stochasticprogram,solver)
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver,JuMP.UnsetSolver)
+    if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot determine EWS without a solver.")
     end
     # Solve all possible WS models and compute EWS
     return _EWS(stochasticprogram, optimsolver(supplied_solver))
 end
 
-DEP(stochasticprogram::StochasticProgram) = DEP(stochasticprogram,JuMP.UnsetSolver())
+DEP(stochasticprogram::StochasticProgram) = DEP(stochasticprogram, JuMP.UnsetSolver())
 function DEP(stochasticprogram::StochasticProgram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
@@ -104,23 +104,23 @@ function DEP(stochasticprogram::StochasticProgram, solver)
         return cache[:dep]
     end
     # Prefer cached solver if available
-    supplied_solver = pick_solver(stochasticprogram,solver)
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort at this stage if no solver was given
-    if isa(supplied_solver,JuMP.UnsetSolver)
+    if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot create new DEP model without a solver.")
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram,:stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Define first-stage problem
     dep_model = Model(solver = optimsolver(supplied_solver))
-    generator(stochasticprogram,:stage_1)(dep_model,first_stage_data(stochasticprogram))
+    generator(stochasticprogram,:stage_1)(dep_model, first_stage_data(stochasticprogram))
     dep_obj = copy(dep_model.obj)
     # Define second-stage problems, renaming variables according to scenario.
     second_stage = second_stage_data(stochasticprogram)
     visited_objs = collect(keys(dep_model.objDict))
-    for (i,scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:stage_2)(dep_model,second_stage,scenario,dep_model)
+    for (i, scenario) in enumerate(scenarios(stochasticprogram))
+        generator(stochasticprogram,:stage_2)(dep_model, second_stage, scenario, dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, dep_model.objDict)
             newkey = if (isa(obj,JuMP.Variable))
@@ -165,27 +165,27 @@ end
 
 function VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve DEP
-    solve!(stochasticprogram, solver=solver)
+    optimize!(stochasticprogram, solver=solver)
     # Return optimal value
     return optimal_value(stochasticprogram)
 end
 
 function EVPI(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
-    supplied_solver = pick_solver(stochasticprogram,solver)
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver,JuMP.UnsetSolver)
+    if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot determine EVPI without a solver.")
     end
     # Solve DEP
     evpi = VRP(stochasticprogram, solver=supplied_solver)
     # Solve all possible WS models and calculate EVPI = VRP-EWS
-    evpi -= _EWS(stochastic(stochasticprogram),optimsolver(supplied_solver))
+    evpi -= _EWS(stochasticprogram, optimsolver(supplied_solver))
     # Return EVPI
     return evpi
 end
 
-EVP(stochasticprogram::StochasticProgram) = EVP(stochasticprogram,JuMP.UnsetSolver())
+EVP(stochasticprogram::StochasticProgram) = EVP(stochasticprogram, JuMP.UnsetSolver())
 function EVP(stochasticprogram::StochasticProgram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
@@ -204,7 +204,7 @@ function EVP_decision(stochasticprogram::StochasticProgram; solver = JuMP.UnsetS
     evp = EVP(stochasticprogram, solver)
     solve(evp)
     # Return EVP decision
-    decision = evp.colVal[1:get_stage_one(stochasticprogram).numCols]
+    decision = evp.colVal[1:decision_length(stochasticprogram)]
     if any(isnan.(decision))
         warn("Optimal decision not defined. Check that the EVP model was properly solved.")
     end
@@ -223,7 +223,7 @@ function EEV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP model
     evp_decision = EVP_decision(stochasticprogram; solver=solver)
     # Calculate EEV by evaluating the EVP decision
-    eev = evaluate_decision(stochasticprogram,evp_decision; solver=solver)
+    eev = evaluate_decision(stochasticprogram, evp_decision; solver=solver)
     # Return EEV
     return eev
 end

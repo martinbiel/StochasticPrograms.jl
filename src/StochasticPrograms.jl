@@ -13,6 +13,8 @@ using MathProgBase
 using MacroTools
 using MacroTools: @q, postwalk
 
+const MPB = MathProgBase
+
 export
     StochasticProgram,
     Probability,
@@ -22,12 +24,17 @@ export
     AbstractStructuredModel,
     StructuredModel,
     spsolver,
+    distributed,
+    deferred,
     set_spsolver,
-    stochastic,
+    internal_model,
+    add_scenario!,
+    add_scenarios!,
     scenarioproblems,
     first_stage_data,
     second_stage_data,
     stage_data,
+    nstages,
     scenario,
     scenarios,
     scenariotype,
@@ -42,12 +49,13 @@ export
     transfer_model!,
     transfer_scenarios!,
     nscenarios,
+    sampler,
     sample!,
     generate!,
     stage_two_model,
     outcome_model,
     evaluate_decision,
-    solve!,
+    optimize!,
     optimal_decision,
     optimal_value,
     calculate_objective_value,

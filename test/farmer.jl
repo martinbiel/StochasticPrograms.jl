@@ -21,11 +21,11 @@ Budget = 500
     end
 end
 
-s1 = FarmerScenario(1/3,Dict(:wheat=>3.0,:corn=>3.6,:beets=>24.0))
-s2 = FarmerScenario(1/3,Dict(:wheat=>2.5,:corn=>3.0,:beets=>20.0))
-s3 = FarmerScenario(1/3,Dict(:wheat=>2.0,:corn=>2.4,:beets=>16.0))
+s1 = FarmerScenario(1/3, Dict(:wheat=>3.0,:corn=>3.6,:beets=>24.0))
+s2 = FarmerScenario(1/3, Dict(:wheat=>2.5,:corn=>3.0,:beets=>20.0))
+s3 = FarmerScenario(1/3, Dict(:wheat=>2.0,:corn=>2.4,:beets=>16.0))
 
-farmer = StochasticProgram((Crops,Cost,Budget),(Required,PurchasePrice,SellPrice),[s1,s2,s3],solver=GLPKSolverLP())
+farmer = StochasticProgram((Crops,Cost,Budget), (Required,PurchasePrice,SellPrice), [s1,s2,s3], solver=GLPKSolverLP())
 
 @first_stage farmer = begin
     (Crops,Cost,Budget) = stage
@@ -48,5 +48,5 @@ end
     @constraint(model, const_aux, w[:beets_quota] <= 6000)
 end
 
-farmer_res = SPResult([170,80,250],-108390,-115405.56,7015.56,1150,-118600,-107240)
-push!(problems,(farmer,farmer_res,"Farmer"))
+farmer_res = SPResult([170,80,250], -108390, -115405.56, 7015.56, 1150, -118600, -107240)
+push!(problems, (farmer,farmer_res,"Farmer"))

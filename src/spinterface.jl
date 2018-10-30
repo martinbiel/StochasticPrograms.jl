@@ -1,21 +1,22 @@
 # Structured solver interface
 # ========================== #
-abstract type AbstractStructuredSolver end
-abstract type AbstractStructuredModel end
-
-function StructuredModel(solver::AbstractStructuredSolver,stochasticprogram::JuMP.Model)
-    throw(MethodError(StructuredModel,(solver,stochasticprogram)))
+function StructuredModel(stochasticprogram::StochasticProgram, solver::AbstractStructuredSolver)
+    throw(MethodError(StructuredModel, (stochasticprogram, solver)))
 end
 
 function optimsolver(solver::AbstractStructuredSolver)
-    throw(MethodError(optimsolver,solver))
+    throw(MethodError(optimsolver, solver))
 end
 
 function optimize_structured!(structuredmodel::AbstractStructuredModel)
-    throw(MethodError(optimize_structured!,structuredmodel))
+    throw(MethodError(optimize_structured!, structuredmodel))
 end
 
-function fill_solution!(structuredmodel::AbstractStructuredModel,stochasticprogram::JuMP.Model)
-    throw(MethodError(fill_solution!,structuredmodel))
+function fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::AbstractStructuredModel)
+    throw(MethodError(fill_solution!, stochasticprogram, structuredmodel))
+end
+
+function solverstr(solver::AbstractStructuredModel)
+    throw(MethodError(solverstr, solver))
 end
 # ========================== #
