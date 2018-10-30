@@ -76,7 +76,7 @@ end
 
 Generate the `stochasticprogram` after giving model definitions with @first_stage and @second_stage.
 
-The first stage model will be generated once. Second stage models will be generated for each supplied scenario structure that has not been considered yet.
+Generate the first stage model once, and generate second stage models for each supplied scenario  that has not been considered yet.
 """
 function generate!(stochasticprogram::StochasticProgram)
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")

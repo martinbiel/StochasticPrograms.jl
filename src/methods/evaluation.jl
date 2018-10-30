@@ -71,7 +71,7 @@ end
 
 Evaluate the first stage decision `x` in `stochasticprogram`.
 
-This involves evaluating the first stage objective at `x` as well as solving outcome models of `x` for every available scenario. Optionally, a capable `solver` can be supplied to solve the outome models. The default behaviour is to rely on any previously set solver.
+In other words, evaluate the first stage objective at `x` and solve outcome models of `x` for every available scenario. Optionally, supply a capable `solver` to solve the outcome models. The default behaviour is to rely on any previously set solver.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram, x::AbstractVector; solver = JuMP.UnsetSolver())
     # Prefer cached solver if available
