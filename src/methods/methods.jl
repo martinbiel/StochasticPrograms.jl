@@ -1,3 +1,4 @@
+include("api.jl")
 include("generation.jl")
 include("evaluation.jl")
 include("spconstructs.jl")

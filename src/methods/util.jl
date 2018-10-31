@@ -62,10 +62,10 @@ function calculate_objective_value!(stochasticprogram::StochasticProgram)
     first_stage.objVal = objective_value
     return nothing
 end
-function calculate_subobjectives(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function calculate_subobjectives(scenarioproblems::ScenarioProblems)
     return sum([(probability(scenario)*eval_objective(subprob.obj,subprob.colVal))::Float64 for (scenario,subprob) in zip(scenarios(scenarioproblems),subproblems(scenarioproblems))])
 end
-function calculate_subobjectives(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function calculate_subobjectives(scenarioproblems::DScenarioProblems)
     return sum([remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
                                  w,
                                  scenarioproblems[w-1]) for w in workers()])
@@ -75,6 +75,28 @@ function invalidate_cache!(stochasticprogram::StochasticProgram)
     cache = problemcache(stochasticprogram)
     delete!(cache,:evp)
     delete!(cache,:dep)
+    return nothing
+end
+
+function remove_first_stage!(stochasticprogram::StochasticProgram)
+    delete!(stochasticprogram.problemcache, :stage_1)
+    clear_parent!(scenarioproblems(stochasticprogram))
+    return nothing
+end
+function clear_parent!(scenarioproblems::ScenarioProblems)
+    empty!(scenarioproblems.parent.colLower)
+    empty!(scenarioproblems.parent.colUpper)
+    empty!(scenarioproblems.parent.colVal)
+    empty!(scenarioproblems.parent.colCat)
+    empty!(scenarioproblems.parent.colNames)
+    empty!(scenarioproblems.parent.colNamesIJulia)
+    empty!(scenarioproblems.parent.objDict)
+    return nothing
+end
+function clear_parent!(scenarioproblems::DScenarioProblems)
+    for w in workers()
+        remotecall_fetch((sp) -> clear_parent!(sp), w, scenarioproblems[w-1])
+    end
     return nothing
 end
 

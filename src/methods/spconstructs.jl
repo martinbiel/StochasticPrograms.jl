@@ -1,7 +1,7 @@
 # SP Constructs #
 # ========================== #
 """
-    WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
+    WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioaDta; solver = JuMP.UnsetSolver())
 
 Generate a **wait-and-see** (`WS`) model of the `stochasticprogram`, corresponding to `scenario`.
 
@@ -269,7 +269,7 @@ Calculate the optimal value of the `EVP` in `stochasticprogram`.
 
 Optionally, supply a capable `solver` to solve the expected value problem. The default behaviour is to rely on any previously set solver.
 
-See also: [`EVP`](@ref), [`EEP_decision`](@ref), [`EEV`](@ref)
+See also: [`EVP`](@ref), [`EVP_decision`](@ref), [`EEV`](@ref)
 """
 function EV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve EVP model

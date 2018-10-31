@@ -41,10 +41,10 @@ function generate_parent!(stochasticprogram::StochasticProgram)
     generate_parent!(scenarioproblems(stochasticprogram), generator(stochasticprogram, :stage_1_vars), first_stage_data(stochasticprogram))
 end
 function generate_stage_one!(stochasticprogram::StochasticProgram)
-    haskey(stochasticprogram.problemcache,:stage_1) && return nothing
-    has_generator(stochasticprogram,:stage_1) && has_generator(stochasticprogram,:stage_1_vars) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
+    haskey(stochasticprogram.problemcache, :stage_1) && return nothing
+    has_generator(stochasticprogram, :stage_1) && has_generator(stochasticprogram, :stage_1_vars) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
     stochasticprogram.problemcache[:stage_1] = JuMP.Model()
-    generator(stochasticprogram,:stage_1)(stochasticprogram.problemcache[:stage_1], first_stage_data(stochasticprogram))
+    generator(stochasticprogram, :stage_1)(stochasticprogram.problemcache[:stage_1], first_stage_data(stochasticprogram))
     generate_parent!(stochasticprogram)
     return nothing
 end

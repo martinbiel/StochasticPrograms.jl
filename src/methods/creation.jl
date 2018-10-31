@@ -16,6 +16,7 @@ Optionally, give the keyword `defer` after the  to delay generation of the first
 ## Examples
 
 The following defines the following first stage model:
+
 ```math
   minimize 100x₁ + 150x₂
     s.t  x₁ + x₂ ≤ 120
@@ -24,23 +25,36 @@ The following defines the following first stage model:
 ```
 
 ```jldoctest
-julia> @first_stage simple = begin
-           @variable(model, x₁ >= 40)
-           @variable(model, x₂ >= 20)
-           @objective(model, Min, 100*x₁ + 150*x₂)
-           @constraint(model, x₁+x₂ <= 120)
-       end
+@first_stage sp = begin
+    @variable(model, x₁ >= 40)
+    @variable(model, x₂ >= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁+x₂ <= 120)
+end
+
+# output
+Stochastic program with:
+ * 2 decision variables
+ * 0 scenarios
+Solver is default solver
+
 ```
 
 The following defines the same first stage model, but defers generation.
 
 ```jldoctest
-julia> @first_stage simple = begin
-           @variable(model, x₁ >= 40)
-           @variable(model, x₂ >= 20)
-           @objective(model, Min, 100*x₁ + 150*x₂)
-           @constraint(model, x₁+x₂ <= 120)
-       end defer
+@first_stage sp = begin
+    @variable(model, x₁ >= 40)
+    @variable(model, x₂ >= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁+x₂ <= 120)
+end defer
+
+# output
+Stochastic program (deferred) with:
+ * 0 decision variables
+ * 0 scenarios
+Solver is default solver
 ```
 
 See also: [`@second_stage`](@ref)
@@ -54,27 +68,27 @@ macro first_stage(arg, defer)
     else
         error("Unknown option $defer")
     end
-    @capture(arg, model_Symbol = modeldef_) || error("Invalid syntax. Expected: stochasticprogram = begin JuMPdef end")
+    @capture(arg, sp_Symbol = modeldef_) || error("Invalid syntax. Expected: stochasticprogram = begin JuMPdef end")
     vardefs = Expr(:block)
     for line in modeldef.args
         (@capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__))) && continue
         push!(vardefs.args, line)
     end
     code = @q begin
-        isa($(esc(model)), StochasticProgram) || error("Given object is not a stochastic program.")
-        haskey($(esc(model)).problemcache, :stage_1) && delete!($(esc(model)).problemcache, :stage_1)
-        $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+        isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
+        haskey($(esc(sp)).problemcache, :stage_1) && remove_first_stage!($(esc(sp)))
+        $(esc(sp)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
             $(esc(vardefs))
 	    return $(esc(:model))
         end
-        $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+        $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
             $(esc(modeldef))
 	    return $(esc(:model))
         end
         if $generate
-            generate_stage_one!($(esc(model)))
+            generate_stage_one!($(esc(sp)))
         end
-        $(esc(model))
+        $(esc(sp))
     end
     return code
 end
@@ -95,6 +109,18 @@ Optionally, give the keyword `defer` after the  to delay generation of the first
 
 ## Examples
 
+```@meta
+DocTestSetup = quote
+    add_scenarios!(sp, [s1,s2])
+    @first_stage sp = begin
+        @variable(model, x₁ >= 40)
+        @variable(model, x₂ >= 20)
+        @objective(model, Min, 100*x₁ + 150*x₂)
+        @constraint(model, x₁+x₂ <= 120)
+    end
+end
+```
+
 The following defines the following second stage model:
 ```math
   minimize q₁(ξ)y₁ + q₂(ξ)y₂
@@ -106,29 +132,45 @@ The following defines the following second stage model:
 where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables.
 
 ```jldoctest
-julia> @second_stage simple = begin
-           @decision x₁ x₂
-           q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
-           @variable(model, 0 <= y₁ <= d₁)
-           @variable(model, 0 <= y₂ <= d₂)
-           @objective(model, Min, q₁*y₁ + q₂*y₂)
-           @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-           @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
-       end
+@second_stage sp = begin
+    @decision x₁ x₂
+    ξ = scenario
+    q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
+    @variable(model, 0 <= y₁ <= d₁)
+    @variable(model, 0 <= y₂ <= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+end
+
+# output
+Stochastic program with:
+ * 2 decision variables
+ * 2 scenarios
+Solver is default solver
+
 ```
 
 The following defines the same second stage model, but defers generation.
 
 ```jldoctest
-julia> @second_stage simple = begin
-           @decision x₁ x₂
-           q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
-           @variable(model, 0 <= y₁ <= d₁)
-           @variable(model, 0 <= y₂ <= d₂)
-           @objective(model, Min, q₁*y₁ + q₂*y₂)
-           @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-           @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
-       end defer
+@second_stage sp = begin
+    @decision x₁ x₂
+    ξ = scenario
+    q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
+    @variable(model, 0 <= y₁ <= d₁)
+    @variable(model, 0 <= y₂ <= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+end defer
+
+# output
+Stochastic program (deferred) with:
+ * 2 decision variables
+ * 2 scenarios
+Solver is default solver
+
 ```
 
 See also: [`@first_stage`](@ref)
@@ -142,7 +184,7 @@ macro second_stage(arg, defer)
     else
         error("Unknown option $defer")
     end
-    @capture(arg, model_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
+    @capture(arg, sp_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
     def = postwalk(modeldef) do x
         @capture(x, @decision args__) || return x
         code = Expr(:block)
@@ -154,22 +196,22 @@ macro second_stage(arg, defer)
     end
 
     code = @q begin
-        isa($(esc(model)), StochasticProgram) || error("Given object is not a stochastic program.")
-        has_generator($(esc(model)), :stage_2) && remove_subproblems!($(esc(model)))
-        $(esc(model)).generator[:stage_2] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
+        isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
+        has_generator($(esc(sp)), :stage_2) && remove_subproblems!($(esc(sp)))
+        $(esc(sp)).generator[:stage_2] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))
         end
         if $generate
-            generate_stage_two!($(esc(model)))
+            generate_stage_two!($(esc(sp)))
         end
-        $(esc(model))
+        $(esc(sp))
     end
     return prettify(code)
 end
 
 macro stage(stage,args)
-    @capture(args, model_Symbol = modeldef_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
+    @capture(args, sp_Symbol = modeldef_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
     # Save variable definitions separately
     vardefs = Expr(:block)
     for line in modeldef.args
@@ -179,12 +221,12 @@ macro stage(stage,args)
     # Handle the first stage and the second stages differently
     code = if stage == 1
         code = @q begin
-            isa($(esc(model)), StochasticProgram) || error("Given object is not a stochastic program.")
-            $(esc(model)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+            isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
+            $(esc(sp)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
                 $(esc(vardefs))
 	        return $(esc(:model))
             end
-            $(esc(model)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
+            $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
                 $(esc(modeldef))
 	        return $(esc(:model))
             end
@@ -203,16 +245,16 @@ macro stage(stage,args)
         end
         # Create generator function
         code = @q begin
-            isa($(esc(model)), StochasticProgram) || error("Given object is not a stochastic program.")
-            $(esc(model)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))) -> begin
+            isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
+            $(esc(sp)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))) -> begin
                 $(esc(vardefs))
 	        return $(esc(:model))
             end
-            $(esc(model)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
+            $(esc(sp)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenarioData, $(esc(:parent))::JuMP.Model) -> begin
                 $(esc(def))
 	        return $(esc(:model))
             end
-            $(esc(model))
+            $(esc(sp))
         end
         code
     end
