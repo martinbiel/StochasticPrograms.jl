@@ -40,7 +40,7 @@ end
                       solver = JuMP.UnsetSolver(),
                       procs = workers()) where {SD <: AbstractScenarioData}
 
-Create a new stochastic program with stage data given by `first_stage_data` and `second_stage_data`. After construction, scenarios of type `SD` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be distributed in memory on these processes. This can be avoided by setting `procs = [1]`.
+Create a new stochastic program with stage data given by `first_stage_data` and `second_stage_data`. After construction, scenarios of type `SD` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
 function StochasticProgram(first_stage_data::Any, second_stage_data::Any, ::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers()) where {SD <: AbstractScenarioData}
     return StochasticProgram(first_stage_data, second_stage_data, SD, solver, procs)
@@ -163,7 +163,7 @@ function optimize!(stochasticprogram::StochasticProgram; solver::SPSolverType = 
 end
 function _optimize!(stochasticprogram::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver; kwargs...)
     # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
-    dep = DEP(stochasticprogram, solver)
+    dep = DEP(stochasticprogram; solver = solver)
     status = solve(dep; kwargs...)
     stochasticprogram.spsolver.internal_model = dep.internalModel
     fill_solution!(stochasticprogram)
@@ -253,6 +253,36 @@ Return the first stage data structure, if any exists, in `stochasticprogram`.
 """
 function first_stage_data(stochasticprogram::StochasticProgram)
     return stochasticprogram.first_stage.data
+end
+"""
+    decision_length(stochasticprogram::StochasticProgram)
+
+Return the length of the first stage decision in `stochasticprogram`.
+"""
+function decision_length(stochasticprogram::StochasticProgram)
+    !haskey(stochasticprogram.problemcache, :stage_1) && return 0
+    first_stage = get_stage_one(stochasticprogram)
+    return first_stage.numCols
+end
+"""
+    first_stage_nconstraints(stochasticprogram::StochasticProgram)
+
+Return the number of constraints in the the first stage of `stochasticprogram`.
+"""
+function first_stage_nconstraints(stochasticprogram::StochasticProgram)
+    !haskey(stochasticprogram.problemcache, :stage_1) && return 0
+    first_stage = get_stage_one(stochasticprogram)
+    return length(first_stage.linconstr)
+end
+"""
+    first_stage_dims(stochasticprogram::StochasticProgram)
+
+Return a the number of variables and the number of constraints in the the first stage of `stochasticprogram` as a tuple.
+"""
+function first_stage_dims(stochasticprogram::StochasticProgram)
+    !haskey(stochasticprogram.problemcache, :stage_1) && return 0, 0
+    first_stage = get_stage_one(stochasticprogram)
+    return length(first_stage.linconstr), first_stage.numCols
 end
 """
     second_stage_data(stochasticprogram::StochasticProgram)

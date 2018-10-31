@@ -91,7 +91,7 @@ function _outcome_model(stage_one_generator::Function,
                         second_stage::Any,
                         scenario::AbstractScenarioData,
                         x::AbstractVector,
-                        solver::MathProgBase.AbstractMathProgSolver)
+                        solver::MPB.AbstractMathProgSolver)
     outcome_model = Model(solver = solver)
     stage_one_generator(outcome_model,first_stage)
     for obj in values(outcome_model.objDict)
@@ -120,11 +120,12 @@ end
 """
     outcome_model(stochasticprogram::StochasticProgram,
                   scenario::AbstractScenarioData,
-                  x::AbstractVector)
+                  x::AbstractVector;
+                  solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
 
-Return the resulting second stage model if `x` is the first stage decision in scenario `ì`, in `stochasticprogram`.
+Return the resulting second stage model if `x` is the first stage decision in scenario `ì`, in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """
-function outcome_model(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData, x::AbstractVector,solver::MathProgBase.AbstractMathProgSolver)
+function outcome_model(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData, x::AbstractVector; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver())
     has_generator(stochasticprogram,:stage_1_vars) || error("No first-stage problem generator. Consider using @first_stage or @stage 1 when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
 

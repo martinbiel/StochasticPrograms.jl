@@ -27,10 +27,11 @@ end
 
 @second_stage simple = begin
     @decision x₁ x₂
-    s = scenario
-    @variable(model, 0 <= y₁ <= s.d[1])
-    @variable(model, 0 <= y₂ <= s.d[2])
-    @objective(model, Min, s.q[1]*y₁ + s.q[2]*y₂)
+    ξ = scenario
+    q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
+    @variable(model, 0 <= y₁ <= d₁)
+    @variable(model, 0 <= y₂ <= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end

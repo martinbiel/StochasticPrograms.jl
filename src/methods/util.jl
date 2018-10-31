@@ -146,30 +146,12 @@ function get_stage_one(stochasticprogram::StochasticProgram)
     haskey(stochasticprogram.problemcache, :stage_1) || error("First-stage problem not defined in stochastic program. Use @first_stage when defining stochastic program. Aborting.")
     return stochasticprogram.problemcache[:stage_1]
 end
-function decision_length(stochasticprogram::StochasticProgram)
-    !haskey(stochasticprogram.problemcache, :stage_1) && return 0
-    first_stage = get_stage_one(stochasticprogram)
-    return first_stage.numCols
-end
-function first_stage_nconstraints(stochasticprogram::StochasticProgram)
-    !haskey(stochasticprogram.problemcache, :stage_1) && return 0
-    first_stage = get_stage_one(stochasticprogram)
-    return length(first_stage.linconstr)
-end
-function first_stage_dims(stochasticprogram::StochasticProgram)
-    !haskey(stochasticprogram.problemcache, :stage_1) && return 0, 0
-    first_stage = get_stage_one(stochasticprogram)
-    return length(first_stage.linconstr), first_stage.numCols
-end
 
 function pick_solver(stochasticprogram::StochasticProgram, supplied_solver::SPSolverType)
-    current_solver = stochasticprogram.spsolver.solver
-    solver = if current_solver isa JuMP.UnsetSolver
-        supplied_solver
-    else
-        current_solver
+    if supplied_solver isa JuMP.UnsetSolver
+        return stochasticprogram.spsolver.solver
     end
-    return solver
+    return supplied_solver
 end
 
 optimsolver(solver::MathProgBase.AbstractMathProgSolver) = solver
