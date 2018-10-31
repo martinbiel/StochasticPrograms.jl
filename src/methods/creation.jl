@@ -7,7 +7,7 @@ Add a first stage model generation recipe to `stochasticprogram` using the synta
 ```julia
 @first_stage stochasticprogram::StochasticProgram = begin
     ...
-end
+end [defer]
 ```
 where JuMP syntax is used inside the block to define the first stage model. During definition, the first stage model is referenced through the reserved keyword `model`.
 
@@ -24,7 +24,7 @@ The following defines the following first stage model:
          x₂ ≥ 20
 ```
 
-```jldoctest
+```jldoctest def
 @first_stage sp = begin
     @variable(model, x₁ >= 40)
     @variable(model, x₂ >= 20)
@@ -33,28 +33,12 @@ The following defines the following first stage model:
 end
 
 # output
+
 Stochastic program with:
  * 2 decision variables
  * 0 scenarios
 Solver is default solver
 
-```
-
-The following defines the same first stage model, but defers generation.
-
-```jldoctest
-@first_stage sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
-    @objective(model, Min, 100*x₁ + 150*x₂)
-    @constraint(model, x₁+x₂ <= 120)
-end defer
-
-# output
-Stochastic program (deferred) with:
- * 0 decision variables
- * 0 scenarios
-Solver is default solver
 ```
 
 See also: [`@second_stage`](@ref)
@@ -101,25 +85,13 @@ Add a second stage model generation recipe to `stochasticprogram` using the synt
 @second_stage stochasticprogram::StochasticProgram = begin
     @decision var1 var2 ...
     ...
-end
+end [defer]
 ```
 where JuMP syntax is used inside the block to define the second stage model. Annotate each first stage decision that appears in the second stage model with `@decision`. During definition, the second stage model is referenced through the reserved keyword `model` and the scenario specific data is referenced through the reserved keyword `scenario`.
 
 Optionally, give the keyword `defer` after the  to delay generation of the first stage model.
 
 ## Examples
-
-```@meta
-DocTestSetup = quote
-    add_scenarios!(sp, [s1,s2])
-    @first_stage sp = begin
-        @variable(model, x₁ >= 40)
-        @variable(model, x₂ >= 20)
-        @objective(model, Min, 100*x₁ + 150*x₂)
-        @constraint(model, x₁+x₂ <= 120)
-    end
-end
-```
 
 The following defines the following second stage model:
 ```math
@@ -131,7 +103,7 @@ The following defines the following second stage model:
 ```
 where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables.
 
-```jldoctest
+```jldoctest def
 @second_stage sp = begin
     @decision x₁ x₂
     ξ = scenario
@@ -144,29 +116,8 @@ where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` a
 end
 
 # output
+
 Stochastic program with:
- * 2 decision variables
- * 2 scenarios
-Solver is default solver
-
-```
-
-The following defines the same second stage model, but defers generation.
-
-```jldoctest
-@second_stage sp = begin
-    @decision x₁ x₂
-    ξ = scenario
-    q₁, q₂, d₁, d₂ = ξ.q[1], ξ.q[2], ξ.d[1], ξ.d[2]
-    @variable(model, 0 <= y₁ <= d₁)
-    @variable(model, 0 <= y₂ <= d₂)
-    @objective(model, Min, q₁*y₁ + q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
-end defer
-
-# output
-Stochastic program (deferred) with:
  * 2 decision variables
  * 2 scenarios
 Solver is default solver

@@ -80,6 +80,6 @@ function evaluate_decision(stochasticprogram::StochasticProgram, x::AbstractVect
     if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot evaluate decision without a solver.")
     end
-    return _eval(stochasticprogram, x, optimsolver(supplied_solver))
+    return _eval(stochasticprogram, x, internal_solver(supplied_solver))
 end
 # ========================== #

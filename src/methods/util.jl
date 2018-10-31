@@ -176,7 +176,7 @@ function pick_solver(stochasticprogram::StochasticProgram, supplied_solver::SPSo
     return supplied_solver
 end
 
-optimsolver(solver::MathProgBase.AbstractMathProgSolver) = solver
+internal_solver(solver::MathProgBase.AbstractMathProgSolver) = solver
 
 solverstr(solver::MathProgBase.AbstractMathProgSolver) = split(split(string(solver), "Solver")[1], ".")[2]
 

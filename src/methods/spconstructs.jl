@@ -20,7 +20,7 @@ function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData
     has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Return WS model
-    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), first_stage_data(stochasticprogram), second_stage_data(stochasticprogram), scenario, optimsolver(supplied_solver))
+    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), first_stage_data(stochasticprogram), second_stage_data(stochasticprogram), scenario, internal_solver(supplied_solver))
 end
 function _WS(stage_one_generator::Function,
              stage_two_generator::Function,
@@ -64,7 +64,7 @@ function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
         error("Cannot determine EWS without a solver.")
     end
     # Solve all possible WS models and compute EWS
-    return _EWS(stochasticprogram, optimsolver(supplied_solver))
+    return _EWS(stochasticprogram, internal_solver(supplied_solver))
 end
 function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
@@ -133,7 +133,7 @@ function DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
     # Define first-stage problem
-    dep_model = Model(solver = optimsolver(supplied_solver))
+    dep_model = Model(solver = internal_solver(supplied_solver))
     generator(stochasticprogram,:stage_1)(dep_model, first_stage_data(stochasticprogram))
     dep_obj = copy(dep_model.obj)
     # Define second-stage problems, renaming variables according to scenario.
@@ -216,7 +216,7 @@ function EVPI(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve DEP
     evpi = VRP(stochasticprogram, solver=supplied_solver)
     # Solve all possible WS models and calculate EVPI = VRP-EWS
-    evpi -= _EWS(stochasticprogram, optimsolver(supplied_solver))
+    evpi -= _EWS(stochasticprogram, internal_solver(supplied_solver))
     # Return EVPI
     return evpi
 end
