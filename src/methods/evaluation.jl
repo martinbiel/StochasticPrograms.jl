@@ -4,14 +4,14 @@ function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVect
     first_stage = get_stage_one(stochasticprogram)
     return eval_objective(first_stage.obj, x)
 end
-function _eval_second_stage(stochasticprogram::StochasticProgram, x::AbstractVector, scenario::AbstractScenarioData, solver::MPB.AbstractMathProgSolver)
+function _eval_second_stage(stochasticprogram::StochasticProgram, x::AbstractVector, scenario::AbstractScenario, solver::MPB.AbstractMathProgSolver)
     outcome = outcome_model(stochasticprogram, scenario, x, solver)
     solve(outcome)
     return probability(scenario)*getobjectivevalue(outcome)
 end
 function _eval_second_stages(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+                             solver::MPB.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     return sum([begin
                 outcome = _outcome_model(stochasticprogram.generator[:stage_1_vars],
                                          stochasticprogram.generator[:stage_2],
@@ -26,7 +26,7 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1,D2,SD,S,Sce
 end
 function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,DScenarioProblems{D2,SD,S}},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+                             solver::MPB.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     active_workers = Vector{Future}(undef,nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,x,first_stage,second_stage,solver)->begin

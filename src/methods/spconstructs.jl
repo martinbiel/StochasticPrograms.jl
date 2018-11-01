@@ -9,7 +9,7 @@ In other words, generate the first stage and the second stage of the `stochastic
 
 See also: [`DEP`](@ref), [`EVP`](@ref)
 """
-function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
+function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
@@ -26,7 +26,7 @@ function _WS(stage_one_generator::Function,
              stage_two_generator::Function,
              first_stage::Any,
              second_stage::Any,
-             scenario::AbstractScenarioData,
+             scenario::AbstractScenario,
              solver::MathProgBase.AbstractMathProgSolver)
     ws_model = Model(solver = solver)
     stage_one_generator(ws_model, first_stage)
@@ -36,7 +36,7 @@ function _WS(stage_one_generator::Function,
     ws_model.obj = ws_obj
     return ws_model
 end
-function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; solver = JuMP.UnsetSolver())
+function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver)
     solve(ws_model)
@@ -67,7 +67,7 @@ function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     return _EWS(stochasticprogram, internal_solver(supplied_solver))
 end
 function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     return sum([begin
                 ws = _WS(stochasticprogram.generator[:stage_1],
                          stochasticprogram.generator[:stage_2],
@@ -80,7 +80,7 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
 function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin

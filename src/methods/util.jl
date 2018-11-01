@@ -22,7 +22,7 @@ function fill_solution!(stochasticprogram::StochasticProgram)
     fill_solution!(scenarioproblems(stochasticprogram), dep.colVal[ncols+1:end], dep.redCosts[ncols+1:end], dep.linconstrDuals[nrows+1:end])
     nothing
 end
-function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     cbegin = 0
     rbegin = 0
     for (i,subproblem) in enumerate(subproblems(scenarioproblems))
@@ -35,7 +35,7 @@ function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractV
         rbegin += snrows
     end
 end
-function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     cbegin = 0
     rbegin = 0
     active_workers = Vector{Future}(undef,nworkers())
@@ -105,7 +105,7 @@ function remove_subproblems!(stochasticprogram::StochasticProgram)
     return nothing
 end
 
-function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     model = scenarioproblems.problems[i]
     parent = parentmodel(scenarioproblems)
     masterterms = Vector{Tuple{Int,Int,Float64}}()
@@ -119,7 +119,7 @@ function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) wher
     return masterterms
 end
 
-function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     j = 0
     for w in workers()
         n = remotecall_fetch((sp)->length(fetch(sp).problems), w, scenarioproblems[w-1])
@@ -141,7 +141,7 @@ function Base.copy!(dest::StochasticProgram, src::StochasticProgram)
     return dest
 end
 
-function Base.copy(src::StochasticProgram{D1,D2,SD,S}; procs = workers()) where {D1, D2, SD <: AbstractScenarioData, S <: AbstractSampler{SD}}
+function Base.copy(src::StochasticProgram{D1,D2,SD,S}; procs = workers()) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     dest = StochasticProgram(src.first_stage.data, stage_data(src.scenarioproblems), sampler(src), procs)
     dest.spsolver.solver = src.spsolver.solver
     empty!(dest.generator)
@@ -150,13 +150,31 @@ function Base.copy(src::StochasticProgram{D1,D2,SD,S}; procs = workers()) where 
     return dest
 end
 
-function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}; procs = workers()) where {D1, D2, SD <: AbstractScenarioData}
+function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}; procs = workers()) where {D1, D2, SD <: AbstractScenario}
     dest = StochasticProgram(src.first_stage.data, stage_data(src.scenarioproblems), SD; procs = procs)
     dest.spsolver.solver = src.spsolver.solver
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     add_scenarios!(dest.scenarioproblems, scenarios(src.scenarioproblems))
     return dest
+end
+
+function supports_expected(types::Vector, provided_def::Bool)
+    for vartype in types
+        if !hasmethod(zero, (vartype, ))
+            !provided_def && @warn "Zero not defined for $vartype. Cannot generate expectation function."
+            return false
+        end
+        if !hasmethod(+, (vartype, vartype))
+            !provided_def && @warn "Addition not defined for $vartype. Cannot generate expectation function."
+            return false
+        end
+        if !hasmethod(*, (Float64, vartype))
+            !provided_def && @warn "Scalar multiplication with Float64 not defined for $vartype. Cannot generate expectation function."
+            return false
+        end
+    end
+    return true
 end
 
 problemcache(stochasticprogram::StochasticProgram) = stochasticprogram.problemcache

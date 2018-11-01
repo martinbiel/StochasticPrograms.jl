@@ -5,7 +5,7 @@ struct MultiStageStochasticProgram
     problemcache::Dict{Symbol,JuMP.Model}
     spsolver::SPSolver
 
-    function (::Type{MultiStageStochasticProgram})(nstages::Integer, ::Type{SD}) where {SD <: AbstractScenarioData}
+    function (::Type{MultiStageStochasticProgram})(nstages::Integer, ::Type{SD}) where {SD <: AbstractScenario}
         stages = Vector{ScenarioProblems}(nstages-1)
         for i in 2:nstages
             stages[i-1] = ScenarioProblems(i, nothing, SD)
@@ -13,7 +13,7 @@ struct MultiStageStochasticProgram
         return new(Stage(1,nothing), stages, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(JuMP.UnsetSolver()))
     end
 
-    function (::Type{MultiStageStochasticProgram})(stagedatas::Vector, ::Type{SD}) where {SD <: AbstractScenarioData}
+    function (::Type{MultiStageStochasticProgram})(stagedatas::Vector, ::Type{SD}) where {SD <: AbstractScenario}
         isempty(stagedatas) && error("No stage data provided")
         nstages = length(stagedatas)
         stages = Vector{ScenarioProblems}(nstages-1)
@@ -25,14 +25,14 @@ struct MultiStageStochasticProgram
 end
 
 StochasticProgram(stagedatas::Vector; solver = JuMP.UnsetSolver()) = StochasticProgram(stagedatas, ScenarioData; solver=solver)
-function StochasticProgram(stagedatas::Vector, ::Type{SD}; solver = JuMP.UnsetSolver()) where {SD <: AbstractScenarioData}
+function StochasticProgram(stagedatas::Vector, ::Type{SD}; solver = JuMP.UnsetSolver()) where {SD <: AbstractScenario}
     multistage = MultiStageStochasticProgram(stagedatas, SD)
     multistage.spsolver.solver = solver
     return multistage
 end
 
 StochasticProgram(; nstages::Integer = 2, solver = JuMP.UnsetSolver()) = StochasticProgram(ScenarioData; nstages = nstages, solver=solver)
-function StochasticProgram(::Type{SD}; nstages::Integer = 2, solver = JuMP.UnsetSolver()) where {SD <: AbstractScenarioData}
+function StochasticProgram(::Type{SD}; nstages::Integer = 2, solver = JuMP.UnsetSolver()) where {SD <: AbstractScenario}
     if nstages < 2
         error("A Stochastic program should at least have two stages")
     elseif nstages == 2
@@ -51,12 +51,12 @@ function set_stage(multistage::MultiStageStochasticProgram, stage::Integer, data
     multistage.stages[stage].stage.data = data
     return multistage
 end
-function add_scenario!(multistage::MultiStageStochasticProgram, stage::Integer, scenario::AbstractScenarioData)
+function add_scenario!(multistage::MultiStageStochasticProgram, stage::Integer, scenario::AbstractScenario)
     (stage > 1 && stage <= nstages(multistage)) || error("Stage index outside range of multi-stage program.")
     add_scenario!(multistage.stages[stage-1], scenario)
     return multistage
 end
-function add_scenarios!(multistage::MultiStageStochasticProgram, stage::Integer, scenarios::Vector{<:AbstractScenarioData})
+function add_scenarios!(multistage::MultiStageStochasticProgram, stage::Integer, scenarios::Vector{<:AbstractScenario})
     (stage > 1 && stage <= nstages(multistage)) || error("Stage index outside range of multi-stage program.")
     add_scenarios!(multistage.stages[stage-1], scenarios)
     return multistage

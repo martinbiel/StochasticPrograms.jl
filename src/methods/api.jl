@@ -11,29 +11,27 @@ Optimize `sp` after calls to `@first_stage sp = begin ... end` and `second_stage
 
 The following solves the stochastic program `sp` using the L-shaped algorithm.
 
-```jldoctest
+```julia
 using LShapedSolvers
 using GLPKMathProgInterface
 
-optimize!(sp, solver = LShapedSolver(:ls, GLPKSolverLP()))
+optimize!(sp, solver = LShapedSolver(:ls, GLPKSolverLP()));
 
 # output
 
 L-Shaped Gap  Time: 0:00:01 (4 iterations)
-  Objective:       -855.8333333333358
-  Gap:             4.250802890466926e-15
-  Number of cuts:  8
+  Objective:       -855.8333333333339
+  Gap:             0.0
+  Number of cuts:  7
 :Optimal
 ```
 
 The following solves the stochastic program `sp` using GLPK on the extended form.
 
-```jldoctest
+```julia
 using GLPKMathProgInterface
 
 optimize!(sp, solver = GLPKSolverLP())
-
-# output
 
 :Optimal
 ```
@@ -364,13 +362,13 @@ function set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     nothing
 end
 """
-    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; defer::Bool = false)
+    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
 
 Store the second stage `scenario` in the second stage of `stochasticprogram`.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData; defer::Bool = false)
+function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
     add_scenario!(scenarioproblems(stochasticprogram), scenario)
     invalidate_cache!(stochasticprogram)
     if !defer
@@ -379,13 +377,13 @@ function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractS
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenarioData}; defer::Bool = false)
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
 
 Store the colllection of second stage `scenarios` in the second stage of `stochasticprogram`.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenarioData}; defer::Bool = false)
+function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
     add_scenarios!(scenarioproblems(stochasticprogram), scenarios)
     invalidate_cache!(stochasticprogram)
     if !defer

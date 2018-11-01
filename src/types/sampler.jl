@@ -1,4 +1,4 @@
-abstract type AbstractSampler{SD <: AbstractScenarioData} end
+abstract type AbstractSampler{SD <: AbstractScenario} end
 
 function sample(sampler::AbstractSampler)
     return sampler()
@@ -9,4 +9,4 @@ function sample(sampler::AbstractSampler, π::AbstractFloat)
     return scenario
 end
 
-struct NullSampler{SD <: AbstractScenarioData} <: AbstractSampler{SD} end
+struct NullSampler{SD <: AbstractScenario} <: AbstractSampler{SD} end

@@ -11,7 +11,7 @@ function stage_one_model(stochasticprogram::StochasticProgram)
     generator(stochasticprogram,:stage_1)(stage_one_model, first_stage_data(stochasticprogram))
     return stage_one_model
 end
-function _stage_two_model(generator::Function, stagedata::Any, scenario::AbstractScenarioData, parent::JuMP.Model)
+function _stage_two_model(generator::Function, stagedata::Any, scenario::AbstractScenario, parent::JuMP.Model)
     stage_two_model = Model(solver=JuMP.UnsetSolver())
     generator(stage_two_model, stagedata, scenario, parent)
     return stage_two_model
@@ -21,15 +21,15 @@ end
 
 Return a generated second stage model corresponding to `scenario`, in `stochasticprogram`.
 """
-function stage_two_model(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData)
+function stage_two_model(stochasticprogram::StochasticProgram, scenario::AbstractScenario)
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Use @second_stage when defining stochastic program. Aborting.")
     return _stage_two_model(generator(stochasticprogram,:stage_2),second_stage_data(stochasticprogram),scenario,parentmodel(stochasticprogram.scenarioproblems))
 end
-function generate_parent!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenarioData}
+function generate_parent!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenario}
     generator(parentmodel(scenarioproblems), parentdata)
     return nothing
 end
-function generate_parent!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenarioData}
+function generate_parent!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenario}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata), w, scenarioproblems[w-1], generator, parentdata)
@@ -48,13 +48,13 @@ function generate_stage_one!(stochasticprogram::StochasticProgram)
     generate_parent!(stochasticprogram)
     return nothing
 end
-function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenarioData}
+function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenario}
     for i in nsubproblems(scenarioproblems)+1:nscenarios(scenarioproblems)
         push!(scenarioproblems.problems, _stage_two_model(generator, stage_data(scenarioproblems), scenario(scenarioproblems,i), parentmodel(scenarioproblems)))
     end
     return nothing
 end
-function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenarioData}
+function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenario}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator)->generate_stage_two!(fetch(sp), generator), w, scenarioproblems[w-1], generator)
@@ -89,7 +89,7 @@ function _outcome_model(stage_one_generator::Function,
                         stage_two_generator::Function,
                         first_stage::Any,
                         second_stage::Any,
-                        scenario::AbstractScenarioData,
+                        scenario::AbstractScenario,
                         x::AbstractVector,
                         solver::MPB.AbstractMathProgSolver)
     outcome_model = Model(solver = solver)
@@ -119,13 +119,13 @@ function _outcome_model(stage_one_generator::Function,
 end
 """
     outcome_model(stochasticprogram::StochasticProgram,
-                  scenario::AbstractScenarioData,
+                  scenario::AbstractScenario,
                   x::AbstractVector;
                   solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
 
 Return the resulting second stage model if `x` is the first stage decision in scenario `ì`, in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """
-function outcome_model(stochasticprogram::StochasticProgram, scenario::AbstractScenarioData, x::AbstractVector; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver())
+function outcome_model(stochasticprogram::StochasticProgram, scenario::AbstractScenario, x::AbstractVector; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver())
     has_generator(stochasticprogram,:stage_1_vars) || error("No first-stage problem generator. Consider using @first_stage or @stage 1 when defining stochastic program. Aborting.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
 

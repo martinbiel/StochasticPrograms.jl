@@ -13,7 +13,6 @@ mutable struct SPSolver
     end
 end
 
-include("probability.jl")
 include("scenario.jl")
 include("sampler.jl")
 include("stage.jl")

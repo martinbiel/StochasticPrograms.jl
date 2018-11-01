@@ -18,7 +18,7 @@ const MPB = MathProgBase
 export
     StochasticProgram,
     Probability,
-    AbstractScenarioData,
+    AbstractScenario,
     AbstractSampler,
     AbstractStructuredSolver,
     AbstractStructuredModel,
@@ -62,6 +62,8 @@ export
     optimal_decision,
     optimal_value,
     calculate_objective_value,
+    @scenario,
+    @sampler,
     @first_stage,
     @second_stage,
     @stage,
