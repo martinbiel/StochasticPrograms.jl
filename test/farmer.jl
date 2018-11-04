@@ -11,11 +11,14 @@ Budget = 500
 @scenario Farmer = begin
     Yield::Dict{Symbol, Float64}
 
-    function expected(scenarios::Vector{FarmerScenario})
-        isempty(scenarios) && return FarmerScenario(Dict(:wheat=>0.,:corn=>0.,:beets=>0.), probability = 1.0)
+    @zero begin
+        return FarmerScenario(Dict(:wheat=>0.,:corn=>0.,:beets=>0.))
+    end
+
+    @expectation begin
         return FarmerScenario(Dict(:wheat=>sum([probability(s)*s.Yield[:wheat] for s in scenarios]),
                                    :corn=>sum([probability(s)*s.Yield[:corn] for s in scenarios]),
-                                   :beets=>sum([probability(s)*s.Yield[:beets] for s in scenarios])), probability = 1.0)
+                                   :beets=>sum([probability(s)*s.Yield[:beets] for s in scenarios])))
     end
 end
 
@@ -34,7 +37,7 @@ end
 
 @second_stage farmer = begin
     @decision x
-    (Required,PurchasePrice,SellPrice) = stage
+    (Required, PurchasePrice, SellPrice) = stage
     @variable(model, y[p = Purchased] >= 0)
     @variable(model, w[s = Sold] >= 0)
     @objective(model, Min, sum( PurchasePrice[p] * y[p] for p = Purchased) - sum( SellPrice[s] * w[s] for s in Sold))

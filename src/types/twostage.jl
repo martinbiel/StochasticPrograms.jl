@@ -91,15 +91,19 @@ StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs =
 # ========================== #
 function Base.show(io::IO, stochasticprogram::StochasticProgram)
     plural(n) = (n==1 ? "" : "s")
-    defer(sp) = deferred(sp) ? " (deferred)" : ""
-    dist(sp) = distributed(sp) ? "Distributed stochastic program$(defer(sp)) with:" : "Stochastic program$(defer(sp)) with:"
-    println(io, dist(stochasticprogram))
-    xdim = decision_length(stochasticprogram)
-    println(io, " * $(xdim) decision variable$(plural(xdim))")
+    defer_stage_1(sp) = deferred_first_stage(sp) ? " * deferred first stage" :  " * $(xdim) decision variable$(plural(xdim))"
+    defer_stage_2(sp) = deferred_second_stage(sp) ? " * deferred second stage" :  " * $(ydim) recourse variable$(plural(xdim))"
+    stage_1(sp) = has_generator(sp, :stage_1) ? defer_stage_1(sp) : " * undefined first stage"
+    stage_2(sp) = has_generator(sp, :stage_2) ? defer_stage_2(sp) : " * undefined second stage"
+    dist(sp) = distributed(sp) ? "Distributed stochastic program with:" : "Stochastic program with:"
+    xdim = has_generator(stochasticprogram, :stage_1) ? decision_length(stochasticprogram) : 0
+    ydim = has_generator(stochasticprogram, :stage_2) ? recourse_length(stochasticprogram) : 0
     n = nscenarios(stochasticprogram)
-    println(io, " * $(n) scenario$(plural(n))")
     ns = nsubproblems(stochasticprogram)
-    println(io, " * $(ns) second stage model$(plural(ns))")
+    println(io, dist(stochasticprogram))
+    println(io, " * $(n) scenario$(plural(n)) of type $(scenariotype(stochasticprogram).name.name)")
+    println(io, stage_1(stochasticprogram))
+    println(io, stage_2(stochasticprogram))
     print(io, "Solver is ")
     if isa(spsolver(stochasticprogram), JuMP.UnsetSolver)
         print(io, "default solver")

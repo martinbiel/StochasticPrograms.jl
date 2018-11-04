@@ -105,6 +105,11 @@ function remove_subproblems!(stochasticprogram::StochasticProgram)
     return nothing
 end
 
+function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
+    empty!(dest.generator)
+    merge!(dest.generator, src.generator)
+end
+
 function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     model = scenarioproblems.problems[i]
     parent = parentmodel(scenarioproblems)
@@ -159,12 +164,18 @@ function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}; procs = wor
     return dest
 end
 
-function supports_expected(types::Vector, provided_def::Bool)
+function supports_zero(types::Vector)
     for vartype in types
         if !hasmethod(zero, (vartype, ))
-            !provided_def && @warn "Zero not defined for $vartype. Cannot generate expectation function."
+            !provided_def && @warn "Zero not defined for $vartype. Cannot generate zero function."
             return false
         end
+    end
+    return true
+end
+
+function supports_expected(types::Vector, provided_def::Bool)
+    for vartype in types
         if !hasmethod(+, (vartype, vartype))
             !provided_def && @warn "Addition not defined for $vartype. Cannot generate expectation function."
             return false

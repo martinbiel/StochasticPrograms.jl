@@ -1,13 +1,14 @@
 using Documenter, StochasticPrograms
 
 makedocs(sitename = "StochasticPrograms.jl",
+         doctest = false,
          clean = false,
          pages = [
              "Home" => "index.md",
              "Manual" => Any[
                  "Quick start" => "manual/quickstart.md",
+                 "Scenarios" => "manual/scenarios.md",
                  "Model definition" => "manual/modeldef.md",
-                 "Senarios" => "manual/scenarios.md",
                  "Distributed stochastic programs" => "manual/distributed.md",
                  "Structured solvers" => "manual/structuredsolvers.md",
                  "Examples" => "manual/examples.md",

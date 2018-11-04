@@ -12,13 +12,9 @@ See also: [`DEP`](@ref), [`EVP`](@ref)
 function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot create WS model without a solver.")
-    end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
     # Return WS model
     return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), first_stage_data(stochasticprogram), second_stage_data(stochasticprogram), scenario, internal_solver(supplied_solver))
 end
@@ -38,7 +34,7 @@ function _WS(stage_one_generator::Function,
 end
 function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
-    ws_model = WS(stochasticprogram, scenario, solver)
+    ws_model = WS(stochasticprogram, scenario, solver = solver)
     solve(ws_model)
     # Return WS decision
     decision = ws_model.colVal[1:decision_length(stochasticprogram)]
@@ -118,20 +114,18 @@ In other words, generate the extended form the `stochasticprogram` as a single J
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
 function DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    # Use cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache,:dep)
-        return cache[:dep]
-    end
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort at this stage if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot create new DEP model without a solver.")
+        dep = cache[:dep]
+        setsolver(dep, supplied_solver)
+        return dep
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram, :stage_1) || error("No first-stage problem generator. Consider using @first_stage when defining stochastic program. Aborting.")
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Aborting.")
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
     # Define first-stage problem
     dep_model = Model(solver = internal_solver(supplied_solver))
     generator(stochasticprogram,:stage_1)(dep_model, first_stage_data(stochasticprogram))
@@ -230,10 +224,14 @@ In other words, generate a wait-and-see model corresponding to the expected scen
 See also: [`EVP_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
 """
 function EVP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    # Use cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache,:evp)
-        return cache[:evp]
+        evp = cache[:evp]
+        setsolver(evp, supplied_solver)
+        return evp
     end
     # Create EVP as a wait-and-see model of the expected scenario
     ev_model = WS(stochasticprogram, expected(stochasticprogram), solver = solver)

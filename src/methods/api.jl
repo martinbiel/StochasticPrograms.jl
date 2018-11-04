@@ -150,6 +150,7 @@ end
 Return the length of the first stage decision in `stochasticprogram`.
 """
 function decision_length(stochasticprogram::StochasticProgram)
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0
     first_stage = get_stage_one(stochasticprogram)
     return first_stage.numCols
@@ -183,6 +184,16 @@ function second_stage_data(stochasticprogram::StochasticProgram)
     return stage_data(stochasticprogram.scenarioproblems)
 end
 """
+    recourse_length(stochasticprogram::StochasticProgram)
+
+Return the length of the second stage decision in `stochasticprogram`.
+"""
+function recourse_length(stochasticprogram::StochasticProgram)
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
+    nsubproblems(stochasticprogram) == 0 && return 0
+    return subproblem(stochasticprogram, 1).numCols
+end
+"""
     scenario(stochasticprogram::StochasticProgram, i::Integer)
 
 Return the `i`th scenario in `stochasticprogram`.
@@ -204,7 +215,7 @@ end
 Return the exected scenario of all scenarios in `stochasticprogram`.
 """
 function expected(stochasticprogram::StochasticProgram)
-    return expected(scenarioproblems(stochasticprogram))
+    return expected(scenarioproblems(stochasticprogram)).scenario
 end
 """
     scenariotype(stochasticprogram::StochasticProgram)
@@ -313,7 +324,9 @@ distributed(stochasticprogram::StochasticProgram) = distributed(scenarioproblems
 
 Return true if `stochasticprogram` is not fully generated.
 """
-deferred(stochasticprogram::StochasticProgram) = (has_generator(stochasticprogram, :stage_1) && !haskey(stochasticprogram.problemcache, :stage_1)) || nsubproblems(stochasticprogram) < nscenarios(stochasticprogram)
+deferred(stochasticprogram::StochasticProgram) = deferred_first_stage(stochasticprogram) || deferred_second_stage(stochasticprogram)
+deferred_first_stage(stochasticprogram::StochasticProgram) = has_generator(stochasticprogram, :stage_1) && !haskey(stochasticprogram.problemcache, :stage_1)
+deferred_second_stage(stochasticprogram::StochasticProgram) = nsubproblems(stochasticprogram) < nscenarios(stochasticprogram)
 """
     spsolver(stochasticprogram::StochasticProgram)
 
