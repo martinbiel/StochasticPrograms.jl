@@ -104,36 +104,38 @@ macro scenario(arg)
     # Define scenario type
     code = @q begin
         if StochasticPrograms.supports_expected([$(vartypes...)], $provided_expectdef) || $provided_expectdef
-            struct $scenarioname <: AbstractScenario
-                probability::Probability
-                $def
-                function (::Type{$scenarioname})($(vardefs...); probability::AbstractFloat = 1.0)
-                    return new(Probability(probability), $(vars...))
+            if StochasticPrograms.supports_zero([$(vartypes...)], $provided_zerodef) || $provided_zerodef
+                struct $scenarioname <: AbstractScenario
+                    probability::Probability
+                    $def
+                    function (::Type{$scenarioname})($(vardefs...); probability::AbstractFloat = 1.0)
+                        return new(Probability(probability), $(vars...))
+                    end
                 end
-            end
-            if $provided_zerodef
-                function Base.zero(::Type{$scenarioname})
-                    $zerodef
+                if $provided_zerodef
+                    function Base.zero(::Type{$scenarioname})
+                        $zerodef
+                    end
+                else
+                    function Base.zero(::Type{$scenarioname})
+                        return $scenarioname(zero.([$(vartypes...)])...; probability = 1.0)
+                    end
                 end
-            elseif StochasticPrograms.supports_zero([$(vartypes...)])
-                function Base.zero(::Type{$scenarioname})
-                    return $scenarioname(zero.([$(vartypes...)])...; probability = 1.0)
+                if $provided_expectdef
+                    function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
+                        isempty(scenarios) && return zero($scenarioname)
+                        $expectdef
+                    end
+                else
+                    function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
+                        isempty(scenarios) && return zero($scenarioname)
+                        return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s1, s2
+                                                                   $combine
+                                                                   end)
+                    end
                 end
             else
                 @warn "The scenario type $(string($(Meta.quot(name)))) was not defined. A user-provided implementation \n\n    function zero(::Type{{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
-            end
-            if $provided_expectdef
-                function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
-                    isempty(scenarios) && return zero($scenarioname)
-                    $expectdef
-                end
-            else
-                function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
-                    isempty(scenarios) && return zero($scenarioname)
-                    return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s1, s2
-                        $combine
-                    end)
-                end
             end
         else
             @warn "The scenario type $(string($(Meta.quot(name)))) was not defined. A user-provided implementation \n\n    function expected(scenarios::Vector{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
@@ -352,7 +354,11 @@ macro first_stage(arg, defer)
     end
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        haskey($(esc(sp)).problemcache, :stage_1) && remove_first_stage!($(esc(sp)))
+        if haskey($(esc(sp)).problemcache, :stage_1)
+            remove_first_stage!($(esc(sp)))
+            remove_subproblems!($(esc(sp)))
+            invalidate_cache!($(esc(sp)))
+        end
         $(esc(sp)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
             $(esc(vardefs))
 	    return $(esc(:model))
@@ -439,7 +445,10 @@ macro second_stage(arg, defer)
 
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        has_generator($(esc(sp)), :stage_2) && remove_subproblems!($(esc(sp)))
+        if has_generator($(esc(sp)), :stage_2)
+            remove_subproblems!($(esc(sp)))
+            invalidate_cache!($(esc(sp)))
+        end
         $(esc(sp)).generator[:stage_2] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario, $(esc(:parent))::JuMP.Model) -> begin
             $(esc(def))
 	    return $(esc(:model))

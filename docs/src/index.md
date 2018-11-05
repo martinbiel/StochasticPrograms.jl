@@ -24,7 +24,7 @@ See the [Index](@ref main-index) for the complete list of documented functions a
 ## Manual Outline
 
 ```@contents
-Pages = ["manual/quickstart.md", "manual/modeldef.md", "manual/scenarios.md", "manual/distributed.md", "manual/structuredsolvers.md", "manual/examples.md"]
+Pages = ["manual/quickstart.md", "manual/data.md", "manual/modeldef.md", "manual/distributed.md", "manual/structuredsolvers.md", "manual/examples.md"]
 ```
 
 ## Library Outline

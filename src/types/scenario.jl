@@ -17,7 +17,9 @@ end
 
 Return the probability of `scenario` occuring.
 
-Is always defined for scenarios created through @scenario. Other user defined scenario types must implement this method to generate a proper probability.
+Is always defined for scenarios created through @scenario. Other user defined scenario types must implement this method to generate a proper probability. The default behaviour is to assume that `scenario` has a `probability` field of type [`Probability`](@ref)
+
+See also: [`Probability`](@ref)
 """
 probability(scenario::AbstractScenario)::Float64 = scenario.probability.π
 """
@@ -42,6 +44,13 @@ end
 function Base.show(io::IO, scenario::S) where S <: AbstractScenario
     print(io, "$(S.name.name) with probability $(probability(scenario))")
 end
+"""
+    ExpectedScenario{S <: AbstractScenario}
+
+Wrapper type around an `AbstractScenario`. Should for convenience be used as the result of a call to `expected`.
+
+See also [`expected`](@ref)
+"""
 struct ExpectedScenario{S <: AbstractScenario} <: AbstractScenario
     scenario::S
 
@@ -53,11 +62,13 @@ end
 """
     expected(scenarios::Vector{<:AbstractScenario})
 
-Return the expected scenario out of the collection `scenarios`.
+Return the expected scenario out of the collection `scenarios` in an [`ExpectedScenario`](@ref) wrapper.
 
 This is defined through classical expectation: sum([probability(s)*s for s in scenarios]), and is always defined for scenarios created through @scenario, if the requested fields support it.
 
 Otherwise, user-defined scenario types must implement this method for full functionality.
+
+See also [`ExpectedScenario`](@ref)
 """
 function expected(::Vector{S}) where S <: AbstractScenario
     error("Expectation not implemented for scenario type: ", S)

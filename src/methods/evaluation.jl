@@ -20,7 +20,10 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1,D2,SD,S,Sce
                                          scenario,
                                          x,
                                          solver)
-                solve(outcome)
+                status = solve(outcome)
+                if status != :Optimal
+                    error("Outcome model could not be solved, returned status: $status")
+                end
                 probability(scenario)*getobjectivevalue(outcome)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
@@ -40,7 +43,10 @@ function _eval_second_stages(stochasticprogram::StochasticProgram{D1, D2, SD,S,D
                                                                               scenario,
                                                                               x,
                                                                               solver)
-                                                     solve(outcome)
+                                                     status = solve(outcome)
+                                                     if status != :Optimal
+                                                         error("Outcome model could not be solved, returned status: $status")
+                                                     end
                                                      probability(scenario)*getobjectivevalue(outcome)
                                                      end for scenario in scenarioproblems.scenarios])
                                          end,
@@ -81,5 +87,33 @@ function evaluate_decision(stochasticprogram::StochasticProgram, x::AbstractVect
         error("Cannot evaluate decision without a solver.")
     end
     return _eval(stochasticprogram, x, internal_solver(supplied_solver))
+end
+"""
+    evaluate_decision(stochasticprogram::StochasticProgram,
+                      scenario::AbstractScenario,
+                      x::AbstractVector;
+                      solver = JuMP.UnsetSolver())
+
+Evaluate the result of taking the first stage decision `x` if `scenario` is the actual outcome in `stochasticprogram`.
+"""
+function evaluate_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario, x::AbstractVector; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver())
+    # Prefer cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
+    # Abort if no solver was given
+    if isa(supplied_solver, JuMP.UnsetSolver)
+        error("Cannot evaluate decision without a solver.")
+    end
+    outcome = _outcome_model(stochasticprogram.generator[:stage_1_vars],
+                             stochasticprogram.generator[:stage_2],
+                             stochasticprogram.first_stage.data,
+                             stage_data(stochasticprogram.scenarioproblems),
+                             scenario,
+                             x,
+                             solver)
+    status = solve(outcome)
+    if status == :Optimal
+        return _eval_first_stage(stochasticprogram, x) + getobjectivevalue(outcome)
+    end
+    error("Outcome model could not be solved, returned status: $status")
 end
 # ========================== #

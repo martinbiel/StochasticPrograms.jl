@@ -29,6 +29,11 @@ Modules = [StochasticPrograms]
 Pages   = ["scenario.jl"]
 ```
 
+```@docs
+AbstractSampler
+sample
+```
+
 ```@meta
 DocTestSetup = quote
     using StochasticPrograms

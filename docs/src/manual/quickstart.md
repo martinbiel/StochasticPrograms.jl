@@ -18,7 +18,7 @@ To showcase the use of StochasticPrograms we will walk through a simple example.
 ```math
 \DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
- \minimize_{x_1, x_2 \in \mathbb{R}} & \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi)\right] \\
+ \minimize_{x_1, x_2 \in \mathbb{R}} & \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi(\omega))\right] \\
  \text{s.t.} & \quad x_1+x_2 \leq 120 \\
  & \quad x_1 \geq 40 \\
  & \quad x_2 \geq 20
@@ -27,17 +27,17 @@ To showcase the use of StochasticPrograms we will walk through a simple example.
 where
 ```math
 \begin{aligned}
- Q(x_1,x_2,\xi) = \min_{y_1,y_2 \in \mathbb{R}} & \quad q_1(\xi)y_1 + q_2(\xi)y_2 \\
+ Q(x_1,x_2,\xi(\omega)) = \min_{y_1,y_2 \in \mathbb{R}} & \quad q_1(\omega)y_1 + q_2(\omega)y_2 \\
  \text{s.t.} & \quad 6y_1+10y_2 \leq 60x_1 \\
  & \quad 8y_1 + 5y_2 \leq 80x_2 \\
- & \quad 0 \leq y_1 \leq d_1(\xi) \\
- & \quad 0 \leq y_2 \leq d_2(\xi)
+ & \quad 0 \leq y_1 \leq d_1(\omega) \\
+ & \quad 0 \leq y_2 \leq d_2(\omega)
 \end{aligned}
 ```
 and the stochastic variable
 ```math
-  \xi = \begin{pmatrix}
-    d_1 & d_2 & q_1 & q_2
+  \xi(\omega) = \begin{pmatrix}
+    d_1(\omega) & d_2(\omega) & q_1(\omega) & q_2(\omega)
   \end{pmatrix}^T
 ```
 takes on the value
@@ -84,11 +84,13 @@ Moreover, we can form the expected scenario out of a given set:
 
 ## Stochastic program definition
 
-We are now ready to create a stochastic program based on the introduced scenario type. Consider:
+We are now ready to create a stochastic program based on the introduced scenario type. Optionally, we can also supply a capable MathProgBase solver that can be used internally when necessary. Consider:
 ```@example simple
-sp = StochasticProgram([ξ₁, ξ₂])
+using GLPKMathProgInterface
+
+sp = StochasticProgram([ξ₁, ξ₂], solver = GLPKSolverLP())
 ```
-The above command creates a stochastic program and preloads the two defined scenarios. Now, we provide model recipes for the first and second stage of the example problem. The first stage is straightforward, and is defined using JuMP syntax inside a `@first_stage` block:
+The above command creates a stochastic program and preloads the two defined scenarios. The provided solver will be used internally when necessary. For clarity, we will still explicitly supply a solver when it is required. Now, we provide model recipes for the first and second stage of the example problem. The first stage is straightforward, and is defined using JuMP syntax inside a `@first_stage` block:
 ```@example simple
 @first_stage sp = begin
     @variable(model, x₁ >= 40)
@@ -139,21 +141,46 @@ dep = DEP(sp)
 print(dep)
 ```
 
+## Evaluate decisions
+
+With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:
+```@example simple
+x = [40., 20.]
+```
+The expected result of taking this decision can be determined through:
+```@example simple
+evaluate_decision(sp, x, solver = GLPKSolverLP())
+```
+The supplied solver is used to solve all available second stage models, with fixed first stage values. These outcome models can be built manually by supplying a scenario and the first stage decision.
+```@example simple
+print(outcome_model(sp, ξ₁, x))
+```
+Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:
+```@example simple
+evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())
+```
+
 ## Optimal first stage decision
 
-The defined stochastic program can be optimized by supplying a capable solver. Structure exploiting solvers are outlined in [Structured solvers](@ref). In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve `sp` with the GLPK solver as follows:
+The optimal first stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in [Structured solvers](@ref). In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve `sp` with the GLPK solver as follows:
 ```@example simple
-using GLPKMathProgInterface
-
 optimize!(sp, solver = GLPKSolverLP())
 ```
-Internally, this solve the extended form of `sp` above. We can now inspect the optimal first stage decision through:
+Internally, this generates and solves the extended form of `sp`. We can now inspect the optimal first stage decision through:
 ```@example simple
-optimal_decision(sp)
+x_opt = optimal_decision(sp)
 ```
 Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:
 ```@example simple
 optimal_value(sp)
+```
+which of course coincides with the result of evaluating the optimal decision:
+```@example simple
+evaluate_decision(sp, x_opt, solver = GLPKSolverLP())
+```
+This value is commonly referred to as the *value of the recourse problem* (VRP). We can also calculate it directly through:
+```@example simple
+VRP(sp, solver = GLPKSolverLP())
 ```
 
 ## Wait-and-see models
@@ -165,7 +192,19 @@ print(ws)
 ```
 The optimal first stage decision in this scenario can be determined through:
 ```@example simple
-WS_decision(sp, ξ₁, solver = GLPKSolverLP())
+x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())
+```
+We can evaluate this decision:
+```@example simple
+evaluate_decision(sp, x₁, solver = GLPKSolverLP())
+```
+The outcome is of course worse than taking the optimal decision. However, it would perform better if ``ξ₁`` is the actual outcome:
+```@example simple
+evaluate_decision(sp, ξ₁, x₁, solver = GLPKSolverLP())
+```
+as compared to:
+```@example simple
+evaluate_decision(sp, ξ₁, x_opt, solver = GLPKSolverLP())
 ```
 Another important concept is the wait-and-see model corresponding to the expected future scenario. This is referred to as the *expected value problem* and can be generated through:
 ```@example simple
@@ -174,7 +213,15 @@ print(evp)
 ```
 Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first stage decision associated with the expected value problem is conviently determined using
 ```@example simple
-EVP_decision(sp, solver = GLPKSolverLP())
+x̄ = EVP_decision(sp, solver = GLPKSolverLP())
+```
+Again, we can evaluate this decision:
+```@example simple
+evaluate_decision(sp, x̄, solver = GLPKSolverLP())
+```
+This value is often referred to as *the expected result of using the expected value solution* (EEV), and is also available through:
+```@example simple
+EEV(sp, solver = GLPKSolverLP())
 ```
 
 ## Stochastic performance
@@ -183,17 +230,8 @@ Finally, we consider some performance measures of the defined model. The *expect
 ```@example simple
 EVPI(sp, solver = GLPKSolverLP())
 ```
-Another
+The resulting value indicates the expected gain of having perfect information about future scenarios. Another concept is the *value of the stochastic solution*, which is the difference between the value of the recourse problem and the EEV. We calculate it as follows:
 ```@example simple
 VSS(sp, solver = GLPKSolverLP())
 ```
-
-```@example simple
-ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.3)
-ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.5)
-ξ₃ = SimpleScenario(-38.0, -42.0, 100.0, 400.0, probability = 0.2)
-sp2 = StochasticProgram([ξ₁, ξ₂, ξ₃])
-transfer_model!(sp2, sp)
-generate!(sp2)
-VSS(sp2, solver = GLPKSolverLP())
-```
+The resulting value indicates the gain of including uncertainty in the model formulation.

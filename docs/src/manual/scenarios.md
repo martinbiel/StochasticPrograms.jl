@@ -1,5 +1,0 @@
-# Scenarios
-
-## Define scenario
-
-## Sampling

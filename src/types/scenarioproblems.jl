@@ -16,18 +16,21 @@ struct ScenarioProblems{D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
 
     function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, ::Type{SD}) where {D, SD <: AbstractScenario}
         S = NullSampler{SD}
-        return new{D,SD,S}(Stage(stage, stagedata), Vector{SD}(), NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
+        D_ = D == Nothing ? Any : D
+        return new{D_,SD,S}(Stage(stage, stagedata), Vector{SD}(), NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
     end
 
     function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, scenariodata::Vector{<:AbstractScenario}) where D
         SD = eltype(scenariodata)
         S = NullSampler{SD}
-        return new{D,SD,S}(Stage(stage, stagedata), scenariodata, NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
+        D_ = D == Nothing ? Any : D
+        return new{D_,SD,S}(Stage(stage, stagedata), scenariodata, NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
     end
 
     function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, sampler::AbstractSampler{SD}) where {D, SD <: AbstractScenario}
         S = typeof(sampler)
-        return new{D,SD,S}(Stage(stage, stagedata), Vector{SD}(), sampler, Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
+        D_ = D == Nothing ? Any : D
+        return new{D_,SD,S}(Stage(stage, stagedata), Vector{SD}(), sampler, Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
     end
 end
 DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S}}}}

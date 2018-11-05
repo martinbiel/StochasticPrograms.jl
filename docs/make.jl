@@ -5,22 +5,22 @@ makedocs(sitename = "StochasticPrograms.jl",
          clean = false,
          pages = [
              "Home" => "index.md",
-             "Manual" => Any[
+             hide("Manual" => "manual/quickstart.md", Any[
                  "Quick start" => "manual/quickstart.md",
-                 "Scenarios" => "manual/scenarios.md",
+                 "Stochastic data" => "manual/data.md",
                  "Model definition" => "manual/modeldef.md",
                  "Distributed stochastic programs" => "manual/distributed.md",
                  "Structured solvers" => "manual/structuredsolvers.md",
                  "Examples" => "manual/examples.md",
-             ],
-             "LShapedSolvers.jl" => Any[
+             ]),
+             hide("LShapedSolvers.jl" => "lshaped/overview.md", Any[
                  "Overview" => "lshaped/overview.md",
-             ],
-             "ProgressiveHedgingSolvers.jl" => Any[
+             ]),
+             hide("ProgressiveHedgingSolvers.jl" => "progressivehedging/overview.md", Any[
                  "Overview" => "progressivehedging/overview.md",
-             ],
-             "Library" => Any[
+             ]),
+             hide("Library" => "library/public.md", Any[
                  "Public interface" => "library/public.md",
                  "Solver interface" => "library/solverinterface.md"
-             ]
+             ])
          ])

@@ -3,31 +3,37 @@
 
 A mathematical model of a stochastic optimization problem. Every instance is linked to some given scenario type `AbstractScenario`. A StochasticProgram can be memory-distributed on multiple Julia processes.
 """
-struct StochasticProgram{D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}, SP <: Union{ScenarioProblems{D2,SD,S},
-                                                                                                   DScenarioProblems{D2,SD,S}}}
-    first_stage::Stage{D1}
+struct StochasticProgram{D₁, D₂, SD <: AbstractScenario, S <: AbstractSampler{SD}, SP <: Union{ScenarioProblems{D₂,SD,S},
+                                                                                               DScenarioProblems{D₂,SD,S}}}
+    first_stage::Stage{D₁}
     scenarioproblems::SP
     generator::Dict{Symbol,Function}
     problemcache::Dict{Symbol,JuMP.Model}
     spsolver::SPSolver
 
-    function (::Type{StochasticProgram})(stage_1::D1, stage_2::D2, ::Type{SD}, solver::SPSolverType, procs::Vector{Int}) where {D1, D2, SD <: AbstractScenario}
+    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, ::Type{SD}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂, SD <: AbstractScenario}
         S = NullSampler{SD}
         scenarioproblems = ScenarioProblems(2, stage_2, SD, procs)
-        return new{D1,D2,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
+        D₁_ = D₁ == Nothing ? Any : D₁
+        D₂_ = D₂ == Nothing ? Any : D₂
+        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
     end
 
-    function (::Type{StochasticProgram})(stage_1::D1, stage_2::D2, scenarios::Vector{<:AbstractScenario}, solver::SPSolverType, procs::Vector{Int}) where {D1, D2}
+    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, scenarios::Vector{<:AbstractScenario}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂}
         SD = eltype(scenarios)
         S = NullSampler{SD}
         scenarioproblems = ScenarioProblems(2, stage_2, scenarios, procs)
-        return new{D1,D2,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
+        D₁_ = D₁ == Nothing ? Any : D₁
+        D₂_ = D₂ == Nothing ? Any : D₂
+        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
     end
 
-    function (::Type{StochasticProgram})(stage_1::D1, stage_2::D2, sampler::AbstractSampler{SD}, solver::SPSolverType, procs::Vector{Int}) where {D1, D2, SD <: AbstractScenario}
+    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, sampler::AbstractSampler{SD}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂, SD <: AbstractScenario}
         S = typeof(sampler)
         scenarioproblems = ScenarioProblems(2, stage_2, sampler, procs)
-        return new{D1,D2,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
+        D₁_ = D₁ == Nothing ? Any : D₁
+        D₂_ = D₂ == Nothing ? Any : D₂
+        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
     end
 end
 
@@ -92,7 +98,7 @@ StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs =
 function Base.show(io::IO, stochasticprogram::StochasticProgram)
     plural(n) = (n==1 ? "" : "s")
     defer_stage_1(sp) = deferred_first_stage(sp) ? " * deferred first stage" :  " * $(xdim) decision variable$(plural(xdim))"
-    defer_stage_2(sp) = deferred_second_stage(sp) ? " * deferred second stage" :  " * $(ydim) recourse variable$(plural(xdim))"
+    defer_stage_2(sp) = deferred_second_stage(sp) ? " * deferred second stage" :  " * $(ydim) recourse variable$(plural(ydim))"
     stage_1(sp) = has_generator(sp, :stage_1) ? defer_stage_1(sp) : " * undefined first stage"
     stage_2(sp) = has_generator(sp, :stage_2) ? defer_stage_2(sp) : " * undefined second stage"
     dist(sp) = distributed(sp) ? "Distributed stochastic program with:" : "Stochastic program with:"
@@ -101,7 +107,7 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram)
     n = nscenarios(stochasticprogram)
     ns = nsubproblems(stochasticprogram)
     println(io, dist(stochasticprogram))
-    println(io, " * $(n) scenario$(plural(n)) of type $(scenariotype(stochasticprogram).name.name)")
+    println(io, " * $(n) scenario$(plural(n)) of type $(typename(scenariotype(stochasticprogram)))")
     println(io, stage_1(stochasticprogram))
     println(io, stage_2(stochasticprogram))
     print(io, "Solver is ")

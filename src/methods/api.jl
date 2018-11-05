@@ -357,12 +357,14 @@ function set_spsolver(stochasticprogram::StochasticProgram, spsolver::Union{Math
     nothing
 end
 """
-    set_first_stage_data(stochasticprogram::StochasticProgram, data::Any)
+    set_first_stage_data!(stochasticprogram::StochasticProgram, data::Any)
 
 Store the first stage `data` in the first stage of `stochasticprogram`.
 """
 function set_first_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     stochasticprogram.first_stage.data = data
+    remove_first_stage!(stochasticprogram)
+    invalidate_cache!(stochasticprogram)
     nothing
 end
 """
@@ -372,6 +374,8 @@ Store the second stage `data` in the second stage of `stochasticprogram`.
 """
 function set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     set_stage_data!(stochasticprogram.scenarioproblems, data)
+    remove_subproblems!(stochasticprogram)
+    invalidate_cache!(stochasticprogram)
     nothing
 end
 """

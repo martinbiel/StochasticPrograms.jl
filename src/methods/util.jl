@@ -30,7 +30,7 @@ function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractV
         subproblem.colVal = x[cbegin+1:cbegin+sncols]
         subproblem.redCosts = μ[cbegin+1:cbegin+sncols]
         subproblem.linconstrDuals = λ[rbegin+1:rbegin+snrows]
-        subproblem.objVal = eval_objective(subproblem.obj,subproblem.colVal)
+        subproblem.objVal = eval_objective(subproblem.obj, subproblem.colVal)
         cbegin += sncols
         rbegin += snrows
     end
@@ -73,12 +73,13 @@ end
 
 function invalidate_cache!(stochasticprogram::StochasticProgram)
     cache = problemcache(stochasticprogram)
-    delete!(cache,:evp)
-    delete!(cache,:dep)
+    delete!(cache, :evp)
+    delete!(cache, :dep)
     return nothing
 end
 
 function remove_first_stage!(stochasticprogram::StochasticProgram)
+    haskey(stochasticprogram.problemcache, :stage_1) || return nothing
     delete!(stochasticprogram.problemcache, :stage_1)
     clear_parent!(scenarioproblems(stochasticprogram))
     return nothing
@@ -91,6 +92,7 @@ function clear_parent!(scenarioproblems::ScenarioProblems)
     empty!(scenarioproblems.parent.colNames)
     empty!(scenarioproblems.parent.colNamesIJulia)
     empty!(scenarioproblems.parent.objDict)
+    scenarioproblems.parent.numCols = 0
     return nothing
 end
 function clear_parent!(scenarioproblems::DScenarioProblems)
@@ -108,6 +110,7 @@ end
 function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
+    return dest
 end
 
 function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
@@ -164,9 +167,9 @@ function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}; procs = wor
     return dest
 end
 
-function supports_zero(types::Vector)
+function supports_zero(types::Vector, provided_def::Bool)
     for vartype in types
-        if !hasmethod(zero, (vartype, ))
+        if !hasmethod(zero, (Type{vartype}, ))
             !provided_def && @warn "Zero not defined for $vartype. Cannot generate zero function."
             return false
         end
@@ -180,7 +183,7 @@ function supports_expected(types::Vector, provided_def::Bool)
             !provided_def && @warn "Addition not defined for $vartype. Cannot generate expectation function."
             return false
         end
-        if !hasmethod(*, (Float64, vartype))
+        if !hasmethod(*, (Float64, vartype)) || Base.code_typed(*, (Float64, vartype))[1].second != vartype
             !provided_def && @warn "Scalar multiplication with Float64 not defined for $vartype. Cannot generate expectation function."
             return false
         end
@@ -208,6 +211,9 @@ end
 internal_solver(solver::MathProgBase.AbstractMathProgSolver) = solver
 
 solverstr(solver::MathProgBase.AbstractMathProgSolver) = split(split(string(solver), "Solver")[1], ".")[2]
+
+typename(dtype::UnionAll) = dtype.body.name.name
+typename(dtype::DataType) = dtype.name.name
 
 function set_decision!(stochasticprogram::StochasticProgram, x::AbstractVector)
     first_stage = get_stage_one(stochasticprogram)
