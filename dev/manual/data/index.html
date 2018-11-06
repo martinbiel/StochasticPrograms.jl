@@ -60,7 +60,7 @@ Subject to
 Subproblem 2:
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -1 ≤ y ≤ 1
 
 VRP = StochasticPrograms.VRP(sp, solver = GLPKSolverLP())</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
@@ -88,7 +88,7 @@ Second-stage
 Subproblem 1:
 Max y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2:
@@ -298,7 +298,7 @@ Subject to
 Subproblem 5:
 Min y
 Subject to
- y + x = -1.3873072876077712
+ x + y = -1.3873072876077712
  y</code></pre></div><p>Sampled stochastic programs are solved as usual:</p><div><pre><code class="language-julia">using GLPKMathProgInterface
 
 optimize!(sp, solver = GLPKSolverLP())
@@ -310,7 +310,7 @@ sample!(sp, 10000)
 evaluate_decision(sp, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">0.0077543398585399</code></pre></div><p>Again, if the functionality offered by <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> is not adequate, consider <a href="#Custom-scenarios-1">Custom scenarios</a>.</p><h2><a class="nav-anchor" id="Custom-scenarios-1" href="#Custom-scenarios-1">Custom scenarios</a></h2><div></div><p>More complex scenario designs are probably not implementable using <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>. However, it is still possible to create a custom scenario type as long as:</p><ul><li>The type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>, which should return an additive zero element if given an empty array</li></ul><p>The restriction on <code>expected</code> is there to support taking expectations in a distributed environment.</p><p>As an example, consider the following generalized stochastic program:</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
  \minimize_{x \in \mathbb{R}} &amp; \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
-\end{aligned}\]</div><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><pre><code class="language-">using StochasticPrograms
+\end{aligned}\]</div><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><div><pre><code class="language-julia">using StochasticPrograms
 using Distributions
 
 struct DistributionScenario{D &lt;: UnivariateDistribution} &lt;: AbstractScenario
@@ -327,7 +327,7 @@ function StochasticPrograms.expected(scenarios::Vector{&lt;:DistributionScenario
     isempty(scenarios) &amp;&amp; return DistributionScenario(D(), 0.0)
     distribution = scenarios[1].distribution
     return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))
-end</code></pre><p>The fallback <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a> method is viable as long as the scenario type contains a <a href="../../library/public/#StochasticPrograms.Probability"><code>Probability</code></a> field named <code>probability</code>. The implementation of <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.</p><p>We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>We can implement a sampler that generates exponentially distributed scenarios as follows:</p><pre><code class="language-">struct ExponentialSampler &lt;: AbstractSampler{DistributionScenario{Exponential{Float64}}}
+end</code></pre></div><p>The fallback <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a> method is viable as long as the scenario type contains a <a href="../../library/public/#StochasticPrograms.Probability"><code>Probability</code></a> field named <code>probability</code>. The implementation of <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.</p><p>We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>We can implement a sampler that generates exponentially distributed scenarios as follows:</p><div><pre><code class="language-julia">struct ExponentialSampler &lt;: AbstractSampler{DistributionScenario{Exponential{Float64}}}
     distribution::Exponential
 
     ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))
@@ -336,7 +336,7 @@ end
 function (sampler::ExponentialSampler)()
     ξ = rand(sampler.distribution)
     return DistributionScenario(sampler.distribution, ξ)
-end</code></pre><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-">using Ipopt
+end</code></pre></div><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-">using Ipopt
 
 sampler = ExponentialSampler(2.)
 sp = StochasticProgram(sampler)
