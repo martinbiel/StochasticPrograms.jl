@@ -1,6 +1,16 @@
 # Types #
 # ========================== #
+"""
+    AbstractScenario
+
+Abstract supertype for structured solver interface objects.
+"""
 abstract type AbstractStructuredSolver end
+"""
+    AbstractStructuredModel
+
+Abstract supertype for structured solver objects.
+"""
 abstract type AbstractStructuredModel end
 
 SPSolverType = Union{MPB.AbstractMathProgSolver, AbstractStructuredSolver}

@@ -187,7 +187,7 @@ println("Expectated X: $(s.scenario.X)")
 println("Expectated Y: $(s.scenario.Y)")
 println("Expectated Z: $(s.scenario.Z)")
 ```
-For most problems, [`@scenario`](@ref) will probably be adequate. Otherwise consider defining [`Custom scenarios`](@ref).
+For most problems, [`@scenario`](@ref) will probably be adequate. Otherwise consider defining [Custom scenarios](@ref).
 
 ## Sampling
 
@@ -230,7 +230,7 @@ sampler = ExampleSampler(2.)
 s = sampler()
 
 println(s)
-println("w: $(s.w)")
+println("ξ: $(s.ξ)")
 ```
 It is possible to create other sampler objects for the `ExampleScenario`, by providing a new unique name:
 ```@example sampling
@@ -252,7 +252,7 @@ another = AnotherSampler(2., 6.)
 s = another()
 
 println(s)
-println("w: $(s.w)")
+println("ξ: $(s.ξ)")
 ```
 Now, lets use the first sampler to create a stochastic program:
 ```@example sampling
@@ -265,8 +265,8 @@ end
 
 @second_stage sp = begin
     @decision x
-    ξ = scenario
-    @variable(model, y >= 0)
+    ξ = scenario.ξ
+    @variable(model, y)
     @objective(model, Min, y)
     @constraint(model, y + x == ξ)
 end
@@ -298,7 +298,7 @@ x = optimal_decision(sp)
 sample!(sp, 10000)
 evaluate_decision(sp, x, solver = GLPKSolverLP())
 ```
-Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [`Custom scenarios`](@ref).
+Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [Custom scenarios](@ref).
 
 ## Custom scenarios
 
@@ -396,7 +396,6 @@ println("Optimal value: $(optimal_value(sp))")
 Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
 ```@example custom
 println("EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))")
-println("EEV decision: $(EEV(sp, solver = IpoptSolver(print_level=0)))")
-
 println("VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))")
 ```
+Accordingly, the VSS is small.

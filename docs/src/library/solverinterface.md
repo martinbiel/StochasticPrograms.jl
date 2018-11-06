@@ -10,6 +10,11 @@ Pages = ["solverinterface.md"]
 
 ## Interface
 
+```@docs
+AbstractStructuredSolver
+AbstractStructuredModel
+```
+
 ```@autodocs
 Modules = [StochasticPrograms]
 Pages   = ["spinterface.jl"]
