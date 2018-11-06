@@ -151,7 +151,7 @@ function expected(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: A
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_expecations = Vector{Future}()
     for w in workers()
-        push!(partial_expecations,remotecall((sp) -> expected(fetch(sp)), w, scenarioproblems[w-1]))
+        push!(partial_expecations,remotecall((sp) -> expected(fetch(sp)).scenario, w, scenarioproblems[w-1]))
     end
     map(wait, partial_expecations)
     return expected(fetch.(partial_expecations))
@@ -220,7 +220,7 @@ function recourse_length(scenarioproblems::ScenarioProblems)
 end
 function recourse_length(scenarioproblems::DScenarioProblems)
     isempty(scenarioproblems) && error("No remote scenario problems.")
-    return remotecall_fetch((sp)->recourse_length(sp), 2, scenarioproblems[1])
+    return remotecall_fetch((sp)->recourse_length(fetch(sp)), 2, scenarioproblems[1])
 end
 function probability(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
     return probability(scenarioproblems.scenarios)

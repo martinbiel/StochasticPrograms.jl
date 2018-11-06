@@ -123,12 +123,12 @@ macro scenario(arg)
                 end
                 if $provided_expectdef
                     function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
-                        isempty(scenarios) && return zero($scenarioname)
+                        isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero($scenarioname))
                         $expectdef
                     end
                 else
                     function StochasticPrograms.expected(scenarios::Vector{$scenarioname})
-                        isempty(scenarios) && return zero($scenarioname)
+                        isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero($scenarioname))
                         return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s1, s2
                                                                    $combine
                                                                    end)
@@ -328,9 +328,9 @@ end
 # output
 
 Stochastic program with:
+ * 0 scenarios of type SimpleScenario
  * 2 decision variables
- * 0 scenarios
- * 0 second stage models
+ * undefined second stage
 Solver is default solver
 
 ```
@@ -414,9 +414,9 @@ end
 # output
 
 Stochastic program with:
+ * 2 scenarios of type SimpleScenario
  * 2 decision variables
- * 2 scenarios
- * 2 second stage models
+ * 2 recourse variables
 Solver is default solver
 
 ```
