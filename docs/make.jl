@@ -1,7 +1,6 @@
 using Documenter, StochasticPrograms
 
 makedocs(sitename = "StochasticPrograms.jl",
-         doctest = false,
          clean = false,
          pages = [
              "Home" => "index.md",
@@ -18,3 +17,7 @@ makedocs(sitename = "StochasticPrograms.jl",
                  "Solver interface" => "library/solverinterface.md"
              ]
          ])
+
+deploydocs(
+    repo = "github.com/martinbiel/StochasticPrograms.jl.git",
+)

@@ -16,3 +16,14 @@ branches:
 
 after_success:
     - julia -e 'using Pkg; Pkg.add("Coverage"); cd(Pkg.dir("StochasticPrograms")); using Coverage; Codecov.submit(process_folder())'
+
+jobs:
+  include:
+    - stage: "Documentation"
+      julia: 1.0
+      os: linux
+      script:
+        - julia --project=docs/ -e 'using Pkg; Pkg.instantiate();
+                                    Pkg.develop(PackageSpec(path=pwd()))'
+        - julia --project=docs/ docs/make.jl
+      after_success: skip
