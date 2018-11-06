@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Model definition · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li class="current"><a class="toctext" href>Model definition</a><ul class="internal"></ul></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Model definition</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/modeldef.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Model definition</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Model-definition-1" href="#Model-definition-1">Model definition</a></h1><p>Another central idea in StochasticPrograms is deferred model instantiation. Consider again the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>, but with some slight differences:</p><div><pre><code class="language-julia">using StochasticPrograms
+
+@scenario Simple = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end
+
+sp = StochasticProgram(SimpleScenario)
+
+@first_stage sp = begin
+    @variable(model, x₁ &gt;= 40)
+    @variable(model, x₂ &gt;= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁ + x₂ &lt;= 120)
+end defer
+
+@second_stage sp = begin
+    @decision x₁ x₂
+    ξ = scenario
+    @variable(model, 0 &lt;= y₁ &lt;= ξ.d₁)
+    @variable(model, 0 &lt;= y₂ &lt;= ξ.d₂)
+    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+end</code></pre><pre><code class="language-none">Stochastic program with:
+ * 0 scenarios of type SimpleScenario
+ * deferred first stage
+ * 0 recourse variables
+Solver is default solver</code></pre></div><p>There are two things to note here. First, no scenarios have been loaded yet, so no second stage models were instansiated. Moreover, the first stage was defined with the <code>defer</code> keyword, and the printout states that the first stage is deferred. This means that the first stage model has not yet been instansiated, but the stochastic program instance has a model recipe that can be used to generate it when required:</p><div><pre><code class="language-julia">println(has_generator(sp, :stage_1))
+println(has_generator(sp, :stage_2))</code></pre><pre><code class="language-none">true
+true</code></pre></div><p>Now, we add the simple scenarios to the stochastic program instance, also with a defer keyword:</p><div><pre><code class="language-julia">ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
+ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
+add_scenarios!(sp, [ξ₁, ξ₂], defer = true)</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * deferred first stage
+ * deferred second stage
+Solver is default solver</code></pre></div><p>The two scenarios are loaded, but no second stage models were instansiated. Deferred stochastic programs will always be generated in full when required. For instance, this occurs when calling <a href="../../library/public/#StochasticPrograms.optimize!-Tuple{StochasticProgram}"><code>optimize!</code></a>. Furthermore, we can explicitly instansiate the stochastic program using <a href="../../library/public/#StochasticPrograms.generate!-Tuple{StochasticProgram}"><code>generate!</code></a>:</p><div><pre><code class="language-julia">generate!(sp)</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * 2 decision variables
+ * 2 recourse variables
+Solver is default solver</code></pre></div><p>This gives a clear separation between data design and model design, and gives flexibility when defining stochastic programs. The model recipes are also used internally to create different stochastic programming constructs, such as outcome models and wait-and-see models. Moreover, deferred model instantiation is the foundation for the distributed functionality in Stochastic Programs, to be described next.</p><footer><hr/><a class="previous" href="../data/"><span class="direction">Previous</span><span class="title">Stochastic data</span></a><a class="next" href="../distributed/"><span class="direction">Next</span><span class="title">Distributed stochastic programs</span></a></footer></article></body></html>
