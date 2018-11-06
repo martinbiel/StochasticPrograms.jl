@@ -288,6 +288,15 @@ optimize!(sp, solver = GLPKSolverLP())
 println("optimal decision: $(optimal_decision(sp))")
 println("optimal value: $(optimal_value(sp))")
 ```
+[`SSA`](@ref) is a shorthand for the above sequence of commands, which also accepts another sampler object over the same scenario type. For example:
+```@example sampling
+using GLPKMathProgInterface
+
+res = SSA(sp, another, 5, solver = GLPKSolverLP())
+
+println("optimal decision: $(optimal_decision(sp))")
+println("optimal value: $res")
+```
 The quality of the model can be checked in different ways. One indicator is:
 ```@example sampling
 VSS(sp, solver = GLPKSolverLP())

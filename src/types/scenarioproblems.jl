@@ -271,7 +271,7 @@ function add_scenario!(scenarioproblems::DScenarioProblems{D,SD}, scenario::SD; 
                      scenario)
 end
 function add_scenario!(scenarioproblems::ScenarioProblems, scenariogenerator::Function; w = rand(workers()))
-    add_scenario!(scenarioproblems.scenarios, scenariogenerator())
+    add_scenario!(scenarioproblems, scenariogenerator())
 end
 function add_scenario!(scenarioproblems::DScenarioProblems, scenariogenerator::Function; w = rand(workers()))
     isempty(scenarioproblems) && error("No remote scenario problems.")
@@ -289,6 +289,14 @@ function add_scenarios!(scenarioproblems::DScenarioProblems{D,SD}, scenarios::Ve
                      w,
                      scenarioproblems[w-1],
                      scenarios)
+end
+function remove_scenarios!(scenarioproblems::ScenarioProblems)
+    empty!(scenarioproblems.scenarios)
+end
+function remove_scenarios!(scenarioproblems::DScenarioProblems)
+    for w in workers()
+        remotecall_fetch((sp)->remove_scenarios!(fetch(sp)), w, scenarioproblems[w-1])
+    end
 end
 function remove_subproblems!(scenarioproblems::ScenarioProblems)
     empty!(scenarioproblems.problems)

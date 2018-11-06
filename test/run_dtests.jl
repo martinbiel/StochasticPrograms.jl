@@ -79,11 +79,11 @@ include("sampling.jl")
     @testset "Distributed Sampling" begin
         @test nscenarios(sampled_sp) == 0
         @test nsubproblems(sampled_sp) == 0
-        sample!(sampled_sp,100)
+        sample!(sampled_sp, 100)
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
-        sample!(sampled_sp,100)
+        sample!(sampled_sp, 100)
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6

@@ -105,6 +105,46 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{
     return sum(fetch.(active_workers))
 end
 """
+    SSA(stochasticprogram::StochasticProgram, n::Integer; solver = JuMP.UnsetSolver())
+
+Generate a **sample average approximation** (`SSA`) of size `n` for the `stochasticprogram`.
+
+In other words, sample `n` scenarios, if a sampler exists, and solve the resulting stochastic program. Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+
+See also: [`sample!`](@ref)
+"""
+function SSA(stochasticprogram::StochasticProgram, n::Integer; solver = JuMP.UnsetSolver())
+    # Use cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
+    # Sample n scenarios
+    sample!(stochasticprogram, n)
+    # Solve the resulting problem
+    return VRP(stochasticprogram, solver = solver)
+end
+"""
+    SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+
+Generate a **sample average approximation** (`SSA`) of size `n` for the `stochasticprogram` using the `sampler`.
+
+In other words, sample `n` scenarios, of type consistent with `stochasticprogram`, and solve the resulting stochastic program. Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+
+See also: [`sample!`](@ref)
+"""
+function SSA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {D₁, D₂, S <: AbstractScenario}
+    # Use cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
+    # Remove any old scenarios
+    remove_scenarios!(stochasticprogram)
+    # Sample n scenarios
+    for i = 1:n
+        add_scenario!(stochasticprogram) do
+            return sample(sampler, 1/n)
+        end
+    end
+    # Solve the resulting problem
+    return VRP(stochasticprogram, solver = solver)
+end
+"""
     DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
 
 Generate the **deterministically equivalent problem** (`DEP`) of the `stochasticprogram`.
@@ -187,7 +227,7 @@ See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
 function VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve DEP
-    optimize!(stochasticprogram, solver=solver)
+    optimize!(stochasticprogram, solver = solver)
     # Return optimal value
     return optimal_value(stochasticprogram)
 end

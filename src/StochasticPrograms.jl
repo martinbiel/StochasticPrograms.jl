@@ -84,6 +84,7 @@ export
     WS,
     WS_decision,
     EWS,
+    SSA,
     DEP,
     VRP,
     EVPI,

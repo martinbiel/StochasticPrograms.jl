@@ -26,6 +26,8 @@ include("deferred.jl")
 include("farmer.jl")
 @info "Preparing simple sampler..."
 include("sampling.jl")
+@info "Preparing SSA..."
+include("SSA.jl")
 @info "Test problems loaded. Starting test sequence."
 
 @testset "Stochastic Programs" begin
@@ -83,6 +85,12 @@ include("sampling.jl")
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
+    end
+    @testset "SSA" begin
+        SSA(ssa, SSASampler(2.), 100)
+        @test nscenarios(ssa) == 100
+        @test nsubproblems(ssa) == 100
+        @test abs(probability(ssa)-1.0) <= 1e-6
     end
 end
 

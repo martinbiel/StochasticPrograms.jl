@@ -102,6 +102,11 @@ function clear_parent!(scenarioproblems::DScenarioProblems)
     return nothing
 end
 
+function remove_scenarios!(stochasticprogram::StochasticProgram)
+    remove_scenarios!(stochasticprogram.scenarioproblems)
+    return nothing
+end
+
 function remove_subproblems!(stochasticprogram::StochasticProgram)
     remove_subproblems!(stochasticprogram.scenarioproblems)
     return nothing
