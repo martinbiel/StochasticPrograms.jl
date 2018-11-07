@@ -1,6 +1,6 @@
 # StochasticPrograms.jl
 
-*a modeling framework for stochastic programming problems*
+*A modeling framework for stochastic programming problems*
 
 ## Summary
 

@@ -1,6 +1,6 @@
 # StochasticPrograms
 
-*a modeling framework for stochastic programming problems*
+*A modeling framework for stochastic programming problems*
 
 [![Build Status](https://travis-ci.org/martinbiel/StochasticPrograms.jl.svg?branch=test)](https://travis-ci.org/martinbiel/StochasticPrograms.jl)
 [![Coverage Status](https://coveralls.io/repos/martinbiel/StochasticPrograms.jl/badge.svg?branch=test&service=github)](https://coveralls.io/github/martinbiel/StochasticPrograms.jl?branch=test)

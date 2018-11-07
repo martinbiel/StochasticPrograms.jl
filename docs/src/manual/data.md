@@ -62,7 +62,7 @@ end
 
 print(sp)
 
-print("VRP = $VRP(sp, solver = GLPKSolverLP())")
+print("VRP = $(VRP(sp, solver = GLPKSolverLP()))")
 ```
 Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:
 ```@example stage
@@ -80,7 +80,7 @@ generate!(sp) # Regenerate problem
 
 print(sp)
 
-print("VRP = $VRP(sp, solver = GLPKSolverLP())")
+print("VRP = $(VRP(sp, solver = GLPKSolverLP()))")
 ```
 
 ## Scenario data
@@ -373,7 +373,7 @@ function (sampler::ExponentialSampler)()
 end
 ```
 Now, lets attempt to define the generalized stochastic program using the available modeling tools:
-```@example custom
+```julia
 using Ipopt
 
 sampler = ExponentialSampler(2.)
@@ -391,20 +391,42 @@ end
     @objective(model, Min, y)
 end
 ```
+```julia
+Stochastic program with:
+ * 0 scenarios of type DistributionScenario
+ * 1 decision variable
+ * 0 recourse variables
+Solver is default solver
+```
 The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets sample 1000 exponentially distributed numbers with equal probability:
-```@example custom
+```julia
 StochasticPrograms.sample!(sp, 1000) # Sample 1000 exponentially distributed scenarios (qualified call due to name clash with Distributions.jl)
 ```
+```julia
+Stochastic program with:
+ * 1000 scenarios of type DistributionScenario
+ * 1 decision variable
+ * 1 recourse variable
+Solver is default solver
+```
 By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
-```@example custom
+```julia
 optimize!(sp, solver = IpoptSolver(print_level=0))
 
 println("Optimal decision: $(optimal_decision(sp))")
 println("Optimal value: $(optimal_value(sp))")
 ```
+```julia
+Optimal decision: [2.07583]
+Optimal value: 4.00553678799426
+```
 Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
-```@example custom
+```julia
 println("EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))")
 println("VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))")
+```
+```julia
+EVP decision: [2.0]
+VSS: 0.005750340653017716
 ```
 Accordingly, the VSS is small.
