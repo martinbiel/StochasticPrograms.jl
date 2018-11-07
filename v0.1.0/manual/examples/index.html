@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li><a class="toctext" href="../modeldef/">Model definition</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li class="current"><a class="toctext" href>Examples</a><ul class="internal"><li><a class="toctext" href="#Farmer-problem-1">Farmer problem</a></li></ul></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Examples</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Examples</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Examples-1" href="#Examples-1">Examples</a></h1><h2><a class="nav-anchor" id="Farmer-problem-1" href="#Farmer-problem-1">Farmer problem</a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><div><pre><code class="language-julia">using StochasticPrograms
+using GLPKMathProgInterface</code></pre></div><p>We begin by introducing some variable indices:</p><div><pre><code class="language-julia">Crops = [:wheat, :corn, :beets];
+Purchased = [:wheat, :corn];
+Sold = [:wheat,:corn,:beets_quota,:beets_extra];</code></pre></div><p>The price of beets drops after a certain quantity (6000), so we introduce an extra variable to handle the excess beets. Using the variable indices, we define the deterministic problem parameters:</p><div><pre><code class="language-julia">Cost = Dict(:wheat=&gt;150, :corn=&gt;230, :beets=&gt;260);
+Required = Dict(:wheat=&gt;200, :corn=&gt;240, :beets=&gt;0);
+PurchasePrice = Dict(:wheat=&gt;238, :corn=&gt;210);
+SellPrice = Dict(:wheat=&gt;170, :corn=&gt;150, :beets_quota=&gt;36, :beets_extra=&gt;10);
+Budget = 500;</code></pre></div><p>In the first stage, the farmer needs to know what crops to plant, the cost of planting them, and the available land. Therefore, we introduce the first stage data:</p><div><pre><code class="language-julia">first_stage_data = (Crops, Cost, Budget)</code></pre><pre><code class="language-none">(Symbol[:wheat, :corn, :beets], Dict(:wheat=&gt;150,:beets=&gt;260,:corn=&gt;230), 500)</code></pre></div><p>In the second stage, the farmer needs to know the required quantity of each crop, the purchase price, and the sell price:</p><div><pre><code class="language-julia">second_stage_data = (Required, PurchasePrice, SellPrice)</code></pre><pre><code class="language-none">(Dict(:wheat=&gt;200,:beets=&gt;0,:corn=&gt;240), Dict(:wheat=&gt;238,:corn=&gt;210), Dict(:wheat=&gt;170,:beets_extra=&gt;10,:corn=&gt;150,:beets_quota=&gt;36))</code></pre></div><p>The uncertainty lies in the future yield of each crop. We define a scenario type to capture this:</p><div><pre><code class="language-julia">@scenario Farmer = begin
+    Yield::Dict{Symbol, Float64}
+
+    @zero begin
+        return FarmerScenario(Dict(:wheat=&gt;0., :corn=&gt;0., :beets=&gt;0.))
+    end
+
+    @expectation begin
+        return FarmerScenario(Dict(:wheat=&gt;sum([probability(s)*s.Yield[:wheat] for s in scenarios]),
+                                   :corn=&gt;sum([probability(s)*s.Yield[:corn] for s in scenarios]),
+                                   :beets=&gt;sum([probability(s)*s.Yield[:beets] for s in scenarios])))
+    end
+end</code></pre></div><p>We provide an implementation of <code>expected</code> since it can not be autogenerated for the internal <code>Dict</code> type. The three predicted outcomes can be defined through:</p><div><pre><code class="language-julia">s₁ = FarmerScenario(Dict(:wheat=&gt;3.0,:corn=&gt;3.6,:beets=&gt;24.0), probability = 1/3)
+s₂ = FarmerScenario(Dict(:wheat=&gt;2.5,:corn=&gt;3.0,:beets=&gt;20.0), probability = 1/3)
+s₃ = FarmerScenario(Dict(:wheat=&gt;2.0,:corn=&gt;2.4,:beets=&gt;16.0), probability = 1/3)</code></pre><pre><code class="language-none">FarmerScenario with probability 0.3333333333333333</code></pre></div><p>Now, we create a stochastic program with the defined data:</p><div><pre><code class="language-julia">farmer = StochasticProgram(first_stage_data, second_stage_data, [s₁,s₂,s₃], solver=GLPKSolverLP())</code></pre><pre><code class="language-none">Stochastic program with:
+ * 3 scenarios of type FarmerScenario
+ * undefined first stage
+ * undefined second stage
+Solver is GLPKInterfaceLP</code></pre></div><p>Finally, we define the optimization models:</p><div><pre><code class="language-julia">@first_stage farmer = begin
+    (Crops,Cost,Budget) = stage
+    @variable(model, x[c = Crops] &gt;= 0)
+    @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
+    @constraint(model, sum(x[c] for c in Crops) &lt;= Budget)
+end
+@second_stage farmer = begin
+    @decision x
+    (Required, PurchasePrice, SellPrice) = stage
+    @variable(model, y[p = Purchased] &gt;= 0)
+    @variable(model, w[s = Sold] &gt;= 0)
+    @objective(model, Min, sum( PurchasePrice[p] * y[p] for p = Purchased) - sum( SellPrice[s] * w[s] for s in Sold))
+
+    @constraint(model, const_minreq[p=Purchased],
+                   scenario.Yield[p] * x[p] + y[p] - w[p] &gt;= Required[p])
+    @constraint(model, const_minreq_beets,
+                   scenario.Yield[:beets] * x[:beets] - w[:beets_quota] - w[:beets_extra] &gt;= Required[:beets])
+    @constraint(model, const_aux, w[:beets_quota] &lt;= 6000)
+end</code></pre><pre><code class="language-none">Stochastic program with:
+ * 3 scenarios of type FarmerScenario
+ * 3 decision variables
+ * 6 recourse variables
+Solver is GLPKInterfaceLP</code></pre></div><p>We can now optimize the model:</p><div><pre><code class="language-julia">optimize!(farmer)
+x = optimal_decision(farmer, :x)
+println(&quot;Wheat: $(x[:wheat])&quot;)
+println(&quot;Corn: $(x[:corn])&quot;)
+println(&quot;Beets: $(x[:beets])&quot;)
+println(&quot;Profit: $(optimal_value(farmer))&quot;)</code></pre><pre><code class="language-none">Wheat: 170.00000000000006
+Corn: 80.00000000000001
+Beets: 250.0
+Profit: -108390.00000000001</code></pre></div><p>Finally, we calculate the stochastic performance of the model:</p><div><pre><code class="language-julia">println(&quot;EVPI: $(EVPI(farmer))&quot;)
+println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre><code class="language-none">EVPI: 7015.555555555533
+VSS: 1150.0000000000437</code></pre></div><footer><hr/><a class="previous" href="../structuredsolvers/"><span class="direction">Previous</span><span class="title">Structured solvers</span></a><a class="next" href="../../library/public/"><span class="direction">Next</span><span class="title">Public interface</span></a></footer></article></body></html>

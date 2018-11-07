@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quick start · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li class="current"><a class="toctext" href>Quick start</a><ul class="internal"><li><a class="toctext" href="#Installation-1">Installation</a></li><li><a class="toctext" href="#A-simple-stochastic-program-1">A simple stochastic program</a></li><li><a class="toctext" href="#Scenario-definition-1">Scenario definition</a></li><li><a class="toctext" href="#Stochastic-program-definition-1">Stochastic program definition</a></li><li><a class="toctext" href="#Deterministically-equivalent-problem-1">Deterministically equivalent problem</a></li><li><a class="toctext" href="#Evaluate-decisions-1">Evaluate decisions</a></li><li><a class="toctext" href="#Optimal-first-stage-decision-1">Optimal first stage decision</a></li><li><a class="toctext" href="#Wait-and-see-models-1">Wait-and-see models</a></li><li><a class="toctext" href="#Stochastic-performance-1">Stochastic performance</a></li></ul></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li><a class="toctext" href="../modeldef/">Model definition</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Quick start</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/quickstart.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Quick start</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Quick-start-1" href="#Quick-start-1">Quick start</a></h1><h2><a class="nav-anchor" id="Installation-1" href="#Installation-1">Installation</a></h2><p>StochasticPrograms is not yet registered and is therefore installed as follows:</p><pre><code class="language-julia">pkg&gt; add https://github.com/martinbiel/StochasticPrograms.jl</code></pre><p>Afterwards, the functionality can be made available in a module or REPL through:</p><div><pre><code class="language-julia">using StochasticPrograms</code></pre></div><h2><a class="nav-anchor" id="A-simple-stochastic-program-1" href="#A-simple-stochastic-program-1">A simple stochastic program</a></h2><p>To showcase the use of StochasticPrograms we will walk through a simple example. Consider the following stochastic program: (taken from <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>).</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x_1, x_2 \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi(\omega))\right] \\
+ \text{s.t.} &amp; \quad x_1+x_2 \leq 120 \\
+ &amp; \quad x_1 \geq 40 \\
+ &amp; \quad x_2 \geq 20
+\end{aligned}\]</div><p>where</p><div>\[\begin{aligned}
+ Q(x_1,x_2,\xi(\omega)) = \min_{y_1,y_2 \in \mathbb{R}} &amp; \quad q_1(\omega)y_1 + q_2(\omega)y_2 \\
+ \text{s.t.} &amp; \quad 6y_1+10y_2 \leq 60x_1 \\
+ &amp; \quad 8y_1 + 5y_2 \leq 80x_2 \\
+ &amp; \quad 0 \leq y_1 \leq d_1(\omega) \\
+ &amp; \quad 0 \leq y_2 \leq d_2(\omega)
+\end{aligned}\]</div><p>and the stochastic variable</p><div>\[  \xi(\omega) = \begin{pmatrix}
+     q_1(\omega) &amp; q_2(\omega) &amp; d_1(\omega) &amp; d_2(\omega)
+  \end{pmatrix}^T\]</div><p>takes on the value</p><div>\[  \xi_1 = \begin{pmatrix}
+    -24 &amp; -28 &amp; 500 &amp; 100
+  \end{pmatrix}^T\]</div><p>with probability <span>$0.4$</span> and</p><div>\[  \xi_1 = \begin{pmatrix}
+    -28 &amp; -32 &amp; 300 &amp; 300
+  \end{pmatrix}^T\]</div><p>with probability <span>$0.6$</span>. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms.</p><h2><a class="nav-anchor" id="Scenario-definition-1" href="#Scenario-definition-1">Scenario definition</a></h2><p>First, we introduce a scenario type that can encompass the scenarios <span>$\xi_1$</span> and <span>$\xi_2$</span> above. This can be achieved conviently through the <code>@scenario</code> macro:</p><div><pre><code class="language-julia">@scenario Simple = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre></div><p>Now, <span>$\xi_1$</span> and <span>$\xi_2$</span> can be created through:</p><div><pre><code class="language-julia">ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)</code></pre><pre><code class="language-none">SimpleScenario with probability 0.4</code></pre></div><p>and</p><div><pre><code class="language-julia">ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)</code></pre><pre><code class="language-none">SimpleScenario with probability 0.6</code></pre></div><p>Some useful functionality is automatically made available when introducing scenarios in this way. For example, we can check the discrete probability of a given scenario occuring:</p><div><pre><code class="language-julia">probability(ξ₁)</code></pre><pre><code class="language-none">0.4</code></pre></div><p>Moreover, we can form the expected scenario out of a given set:</p><div><pre><code class="language-julia">ξ̄ = expected([ξ₁, ξ₂])</code></pre><pre><code class="language-none">Expected scenario of type SimpleScenario</code></pre></div><h2><a class="nav-anchor" id="Stochastic-program-definition-1" href="#Stochastic-program-definition-1">Stochastic program definition</a></h2><p>We are now ready to create a stochastic program based on the introduced scenario type. Optionally, we can also supply a capable MathProgBase solver that can be used internally when necessary. Consider:</p><div><pre><code class="language-julia">using GLPKMathProgInterface
+
+sp = StochasticProgram([ξ₁, ξ₂], solver = GLPKSolverLP())</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * undefined first stage
+ * undefined second stage
+Solver is GLPKInterfaceLP</code></pre></div><p>The above command creates a stochastic program and preloads the two defined scenarios. The provided solver will be used internally when necessary. For clarity, we will still explicitly supply a solver when it is required. Now, we provide model recipes for the first and second stage of the example problem. The first stage is straightforward, and is defined using JuMP syntax inside a <code>@first_stage</code> block:</p><div><pre><code class="language-julia">@first_stage sp = begin
+    @variable(model, x₁ &gt;= 40)
+    @variable(model, x₂ &gt;= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁ + x₂ &lt;= 120)
+end</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * 2 decision variables
+ * undefined second stage
+Solver is GLPKInterfaceLP</code></pre></div><p>The recipe was immediately used to generate an instance of the first stage model. Next, we give a second stage recipe inside a <code>@second_stage</code> block:</p><div><pre><code class="language-julia">@second_stage sp = begin
+    @decision x₁ x₂
+    ξ = scenario
+    @variable(model, 0 &lt;= y₁ &lt;= ξ.d₁)
+    @variable(model, 0 &lt;= y₂ &lt;= ξ.d₂)
+    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+end</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * 2 decision variables
+ * 2 recourse variables
+Solver is GLPKInterfaceLP</code></pre></div><p>Every first stage variable that occurs in the second stage model is annotated with <code>@decision</code> at the beginning of the definition. Moreover, the scenario data is referenced through <code>scenario</code>. Instances of the defined scenario <code>SimpleScenario</code> will be injected to create instances of the second stage model. The second stage recipe is immediately used to generate second stage models for each preloaded scenario. Hence, the stochastic program definition is complete. We can now print the program and confirm that it indeed models the example recourse problem given above:</p><div><pre><code class="language-julia">print(sp)</code></pre><pre><code class="language-none">First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ + x₂ ≤ 120
+ x₁ ≥ 40
+ x₂ ≥ 20
+
+Second-stage
+==============
+Subproblem 1:
+Min -24 y₁ - 28 y₂
+Subject to
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 0 ≤ y₁ ≤ 500
+ 0 ≤ y₂ ≤ 100
+
+Subproblem 2:
+Min -28 y₁ - 32 y₂
+Subject to
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 0 ≤ y₁ ≤ 300
+ 0 ≤ y₂ ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Deterministically-equivalent-problem-1" href="#Deterministically-equivalent-problem-1">Deterministically equivalent problem</a></h2><p>Since the example problem is small it is straightforward to work out the extended form:</p><div>\[\begin{aligned}
+ \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
+ \text{s.t.} &amp; \quad x_1 + x_2 \leq 120 \\
+ &amp; \quad 6 y_{11} + 10 y_{21} \leq 60 x_1 \\
+ &amp; \quad 8 y_{11} + 5 y_{21} \leq 80 x_2 \\
+ &amp; \quad 6 y_{12} + 10 y_{22} \leq 60 x_1 \\
+ &amp; \quad 8 y_{12} + 5 y_{22} \leq 80 x_2 \\
+ &amp; \quad x_1 \geq 40 \\
+ &amp; \quad x_2 \geq 20 \\
+ &amp; \quad 0 \leq y_{11} \leq 500 \\
+ &amp; \quad 0 \leq y_{21} \leq 100 \\
+ &amp; \quad 0 \leq y_{12} \leq 300 \\
+ &amp; \quad 0 \leq y_{22} \leq 300
+\end{aligned}\]</div><p>which is also commonly referred to as the deterministically equivalent problem. This construct is available in StochasticPrograms through:</p><div><pre><code class="language-julia">dep = DEP(sp)
+print(dep)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁_1 - 11.200000000000001 y₂_1 - 16.8 y₁_2 - 19.2 y₂_2
+Subject to
+ x₁ + x₂ ≤ 120
+ 6 y₁_1 + 10 y₂_1 - 60 x₁ ≤ 0
+ 8 y₁_1 + 5 y₂_1 - 80 x₂ ≤ 0
+ 6 y₁_2 + 10 y₂_2 - 60 x₁ ≤ 0
+ 8 y₁_2 + 5 y₂_2 - 80 x₂ ≤ 0
+ x₁ ≥ 40
+ x₂ ≥ 20
+ 0 ≤ y₁_1 ≤ 500
+ 0 ≤ y₂_1 ≤ 100
+ 0 ≤ y₁_2 ≤ 300
+ 0 ≤ y₂_2 ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Evaluate-decisions-1" href="#Evaluate-decisions-1">Evaluate decisions</a></h2><p>With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:</p><div><pre><code class="language-julia">x = [40., 20.]</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 40.0
+ 20.0</code></pre></div><p>The expected result of taking this decision can be determined through:</p><div><pre><code class="language-julia">evaluate_decision(sp, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-470.39999999999964</code></pre></div><p>The supplied solver is used to solve all available second stage models, with fixed first stage values. These outcome models can be built manually by supplying a scenario and the first stage decision.</p><div><pre><code class="language-julia">print(outcome_model(sp, ξ₁, x))</code></pre><pre><code class="language-none">Min -24 y₁ - 28 y₂
+Subject to
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ x₁ = 40
+ x₂ = 20
+ 0 ≤ y₁ ≤ 500
+ 0 ≤ y₂ ≤ 100</code></pre></div><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><div><pre><code class="language-julia">evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">900.0</code></pre></div><h2><a class="nav-anchor" id="Optimal-first-stage-decision-1" href="#Optimal-first-stage-decision-1">Optimal first stage decision</a></h2><p>The optimal first stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in <a href="../structuredsolvers/#Structured-solvers-1">Structured solvers</a>. In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve <code>sp</code> with the GLPK solver as follows:</p><div><pre><code class="language-julia">optimize!(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">:Optimal</code></pre></div><p>Internally, this generates and solves the extended form of <code>sp</code>. We can now inspect the optimal first stage decision through:</p><div><pre><code class="language-julia">x_opt = optimal_decision(sp)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 46.66666666666667
+ 36.25</code></pre></div><p>Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:</p><div><pre><code class="language-julia">optimal_value(sp)</code></pre><pre><code class="language-none">-855.8333333333321</code></pre></div><p>which of course coincides with the result of evaluating the optimal decision:</p><div><pre><code class="language-julia">evaluate_decision(sp, x_opt, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre></div><p>This value is commonly referred to as the <em>value of the recourse problem</em> (VRP). We can also calculate it directly through:</p><div><pre><code class="language-julia">VRP(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre></div><h2><a class="nav-anchor" id="Wait-and-see-models-1" href="#Wait-and-see-models-1">Wait-and-see models</a></h2><p>If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><div><pre><code class="language-julia">ws = WS(sp, ξ₁)
+print(ws)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
+Subject to
+ x₁ + x₂ ≤ 120
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ x₁ ≥ 40
+ x₂ ≥ 20
+ 0 ≤ y₁ ≤ 500
+ 0 ≤ y₂ ≤ 100</code></pre></div><p>The optimal first stage decision in this scenario can be determined through:</p><div><pre><code class="language-julia">x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 40.0
+ 29.583333333333336</code></pre></div><p>We can evaluate this decision:</p><div><pre><code class="language-julia">evaluate_decision(sp, x₁, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-762.5</code></pre></div><p>The outcome is of course worse than taking the optimal decision. However, it would perform better if <span>$ξ₁$</span> is the actual outcome:</p><div><pre><code class="language-julia">evaluate_decision(sp, ξ₁, x₁, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">37.5</code></pre></div><p>as compared to:</p><div><pre><code class="language-julia">evaluate_decision(sp, ξ₁, x_opt, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">104.16666666666788</code></pre></div><p>Another important concept is the wait-and-see model corresponding to the expected future scenario. This is referred to as the <em>expected value problem</em> and can be generated through:</p><div><pre><code class="language-julia">evp = EVP(sp)
+print(evp)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 26.400000000000002 y₁ - 30.4 y₂
+Subject to
+ x₁ + x₂ ≤ 120
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ x₁ ≥ 40
+ x₂ ≥ 20
+ 0 ≤ y₁ ≤ 380
+ 0 ≤ y₂ ≤ 220</code></pre></div><p>Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first stage decision associated with the expected value problem is conviently determined using</p><div><pre><code class="language-julia">x̄ = EVP_decision(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 71.45833333333334
+ 48.54166666666667</code></pre></div><p>Again, we can evaluate this decision:</p><div><pre><code class="language-julia">evaluate_decision(sp, x̄, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-568.9166666666679</code></pre></div><p>This value is often referred to as <em>the expected result of using the expected value solution</em> (EEV), and is also available through:</p><div><pre><code class="language-julia">EEV(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-568.9166666666679</code></pre></div><h2><a class="nav-anchor" id="Stochastic-performance-1" href="#Stochastic-performance-1">Stochastic performance</a></h2><p>Finally, we consider some performance measures of the defined model. The <em>expected value of perfect information</em> is the difference between the value of the recourse problem and the expected result of having perfect knowledge. In other words, it involes solving the recourse problem as well as every wait-and-see model that can be formed from the available scenarios. We calculate it as follows:</p><div><pre><code class="language-julia">EVPI(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">662.9166666666679</code></pre></div><p>The resulting value indicates the expected gain of having perfect information about future scenarios. Another concept is the <em>value of the stochastic solution</em>, which is the difference between the value of the recourse problem and the EEV. We calculate it as follows:</p><div><pre><code class="language-julia">VSS(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">286.91666666666424</code></pre></div><p>The resulting value indicates the gain of including uncertainty in the model formulation.</p><footer><hr/><a class="previous" href="../../"><span class="direction">Previous</span><span class="title">Home</span></a><a class="next" href="../data/"><span class="direction">Next</span><span class="title">Stochastic data</span></a></footer></article></body></html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Distributed stochastic programs · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li><a class="toctext" href="../modeldef/">Model definition</a></li><li class="current"><a class="toctext" href>Distributed stochastic programs</a><ul class="internal"></ul></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Distributed stochastic programs</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/distributed.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Distributed stochastic programs</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Distributed-stochastic-programs-1" href="#Distributed-stochastic-programs-1">Distributed stochastic programs</a></h1><p>Stochastic programs related to industrial applications are often associated with complex models and vast numbers of scenarios, often in the order of <code>1000-1000000</code>. Hence, the extensive form can have billions of variables and constraints, and often does not fit in memory on a single machine. This clarifies the need for solution approaches that work in parallel on distributed data when instansiating and optimizing large-scale stochastic programs.</p><p>If multiple Julia processes are available, locally or in a cluster, StochasticPrograms natively distributes any defined stochastic programs on the available processing nodes. As an example, we revisit the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><pre><code class="language-julia">using Distributed
+
+addprocs(3)
+
+using StochasticPrograms
+
+@scenario Simple = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><p><a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a> automatically ensures that the introduced scenario type is available on all processes. Define the stochastic program in the usual way:</p><pre><code class="language-julia">sp = StochasticProgram(SimpleScenario)
+@first_stage sp = begin
+    @variable(model, x₁ &gt;= 40)
+    @variable(model, x₂ &gt;= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁ + x₂ &lt;= 120)
+end
+@second_stage sp = begin
+    @decision x₁ x₂
+    ξ = scenario
+    @variable(model, 0 &lt;= y₁ &lt;= ξ.d₁)
+    @variable(model, 0 &lt;= y₂ &lt;= ξ.d₂)
+    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+end</code></pre><pre><code class="language-julia">Distributed stochastic program with:
+ * 0 scenarios of type SimpleScenario
+ * 2 decision variables
+ * 0 recourse variables
+Solver is default solver</code></pre><p>The printout indicates that the created stochastic program is distributed. Technically, nothing has been distributed yet since there are no scenarios. The first stage problem always reside on the master node. Let us now add the two scenarios. We could add the in the usual way with <a href="../../library/public/#StochasticPrograms.add_scenario!-Tuple{Function,StochasticProgram}"><code>add_scenario!</code></a>. However, this would create the scenario data on the master node and then send the data. This is fine for this small scenario, but for a large-scale program this would involve a lot of data passing. As stated <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a> made the scenario type available on all nodes, so a better approach is to:</p><pre><code class="language-julia">add_scenario!(sp; defer = true, w = 2) do
+    return SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
+end
+add_scenario!(sp; defer = true, w = 3) do
+    return SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
+end</code></pre><pre><code class="language-julia">Distributed stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * 2 decision variables
+ * deferred second stage
+Solver is default solver</code></pre><p>This instansiates the scenarios locally on each node and loads them into local storage. An even more effective paradigm is to only send a lightweight <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> object to each node, and have them sample any required scenario. This is the recommended approach for large-scale stochastic programs. The model generation was purposefully deferred to make a final point. If we now call:</p><pre><code class="language-julia">generate!(sp)</code></pre><pre><code class="language-julia">Distributed stochastic program with:
+ * 2 scenarios of type SimpleScenario
+ * 2 decision variables
+ * 2 recourse variables
+Solver is default solver</code></pre><p>the lightweight model recipes are passed to all worker nodes. The worker nodes then use the recipes to instansiate second stage models in parallel. This is one of the intended outcomes of the design choices made in StochasticPrograms. The separation between data design and model design allows us to minimize data passing in a natural way.</p><p>Many operations in StochasticPrograms are embarassingly parallel which is exploited throughout when a stochastic program is distributed. Notably:</p><ul><li><a href="../../library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticProgram,AbstractArray{T,1} where T}"><code>evaluate_decision</code></a></li><li><a href="../../library/public/#StochasticPrograms.EVPI-Tuple{StochasticProgram}"><code>EVPI</code></a></li><li><a href="../../library/public/#StochasticPrograms.VSS-Tuple{StochasticProgram}"><code>VSS</code></a></li></ul><p>Perform many subproblem independent operations in parallel. The best performance is achieved if the optimization of the recourse problem is performed by an algorithm that can operate in parallel on the distributed stochastic programs. The solver suites <a href="../structuredsolvers/#LShapedSolvers.jl-1">LShapedSolvers.jl</a> and <a href="../structuredsolvers/#ProgressiveHedgingSolvers.jl-1">ProgressiveHedgingSolvers.jl</a> are examples of this. For example, we can optimize the distributed version of the simple stochastic program with a parallelized L-shaped algorithm as follows:</p><pre><code class="language-julia">using LShapedSolvers
+using GLPKMathProgInterface
+
+optimize!(sp, solver = LShapedSolver(:dls, GLPKSolverLP()))</code></pre><pre><code class="language-julia">Distributed L-Shaped Gap  Time: 0:00:03 (6 iterations)
+  Objective:       -855.8333333333339
+  Gap:             0.0
+  Number of cuts:  7
+:Optimal</code></pre><p>A quick note should also be made about the API calls that become less efficient in a distributed setting. This includes all calls that collect data that reside on remote processes. The functions in this category that involve the most data passing is <a href="../../library/public/#StochasticPrograms.scenarios-Tuple{StochasticProgram}"><code>scenarios</code></a>, which fetches all scenarios in the stochastic program, and <a href="../../library/public/#StochasticPrograms.subproblems-Tuple{StochasticProgram}"><code>subproblems</code></a>, which fetches all second stage models in the stochastic program. If these collections are required frequently it is recommended to not distribute the stochastic program. This can be ensured by supplying <code>procs = [1]</code> to the constructor call. Individual queries <code>scenario(stochasticprogram, i)</code> and <code>subproblem(stochasticprogram, i)</code> are viable depending on the size of the scenarios/models. If a <code>MathProgBase</code> solver is supplied to a distributed stochastic program it will fetch all scenarios to the master node and attempt to build the extensive form. Long computation times are expected for large-scale models, assuming they fit in memory. If so, it is again recommended to avoid distributing the stochastic program through <code>procs = [1]</code>. The best approach is to use a structured solver that can operate on distributed stochastic programs, such as <a href="../structuredsolvers/#LShapedSolvers.jl-1">LShapedSolvers.jl</a> or <a href="../structuredsolvers/#ProgressiveHedgingSolvers.jl-1">ProgressiveHedgingSolvers.jl</a>.</p><footer><hr/><a class="previous" href="../modeldef/"><span class="direction">Previous</span><span class="title">Model definition</span></a><a class="next" href="../structuredsolvers/"><span class="direction">Next</span><span class="title">Structured solvers</span></a></footer></article></body></html>
