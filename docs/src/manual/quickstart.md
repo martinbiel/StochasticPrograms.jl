@@ -37,19 +37,19 @@ where
 and the stochastic variable
 ```math
   \xi(\omega) = \begin{pmatrix}
-    d_1(\omega) & d_2(\omega) & q_1(\omega) & q_2(\omega)
+     q_1(\omega) & q_2(\omega) & d_1(\omega) & d_2(\omega)
   \end{pmatrix}^T
 ```
 takes on the value
 ```math
   \xi_1 = \begin{pmatrix}
-    500 & 100 & -24 & -28
+    -24 & -28 & 500 & 100
   \end{pmatrix}^T
 ```
 with probability ``0.4`` and
 ```math
   \xi_1 = \begin{pmatrix}
-    300 & 300 & -28 & -32
+    -28 & -32 & 300 & 300
   \end{pmatrix}^T
 ```
 with probability ``0.6``. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms.

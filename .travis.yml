@@ -9,11 +9,6 @@ julia:
 notifications:
   email: false
 
-branches:
-  only:
-  - master
-  - test
-
 addons:
   apt_packages:
   - gfortran

@@ -17,3 +17,7 @@ makedocs(sitename = "StochasticPrograms.jl",
                  "Solver interface" => "library/solverinterface.md"
              ]
          ])
+
+deploydocs(
+    repo = "github.com/martinbiel/StochasticPrograms.jl.git",
+)
