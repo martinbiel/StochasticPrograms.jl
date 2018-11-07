@@ -12,11 +12,11 @@
  &amp; \quad 0 \leq y_1 \leq d_1(\omega) \\
  &amp; \quad 0 \leq y_2 \leq d_2(\omega)
 \end{aligned}\]</div><p>and the stochastic variable</p><div>\[  \xi(\omega) = \begin{pmatrix}
-    d_1(\omega) &amp; d_2(\omega) &amp; q_1(\omega) &amp; q_2(\omega)
+     q_1(\omega) &amp; q_2(\omega) &amp; d_1(\omega) &amp; d_2(\omega)
   \end{pmatrix}^T\]</div><p>takes on the value</p><div>\[  \xi_1 = \begin{pmatrix}
-    500 &amp; 100 &amp; -24 &amp; -28
+    -24 &amp; -28 &amp; 500 &amp; 100
   \end{pmatrix}^T\]</div><p>with probability <span>$0.4$</span> and</p><div>\[  \xi_1 = \begin{pmatrix}
-    300 &amp; 300 &amp; -28 &amp; -32
+    -28 &amp; -32 &amp; 300 &amp; 300
   \end{pmatrix}^T\]</div><p>with probability <span>$0.6$</span>. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms.</p><h2><a class="nav-anchor" id="Scenario-definition-1" href="#Scenario-definition-1">Scenario definition</a></h2><p>First, we introduce a scenario type that can encompass the scenarios <span>$\xi_1$</span> and <span>$\xi_2$</span> above. This can be achieved conviently through the <code>@scenario</code> macro:</p><div><pre><code class="language-julia">@scenario Simple = begin
     q₁::Float64
     q₂::Float64
@@ -70,8 +70,8 @@ Subject to
 Subproblem 2:
 Min -28 y₁ - 32 y₂
 Subject to
- 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
- 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
  0 ≤ y₁ ≤ 300
  0 ≤ y₂ ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Deterministically-equivalent-problem-1" href="#Deterministically-equivalent-problem-1">Deterministically equivalent problem</a></h2><p>Since the example problem is small it is straightforward to work out the extended form:</p><div>\[\begin{aligned}
  \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
