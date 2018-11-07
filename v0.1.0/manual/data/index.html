@@ -43,7 +43,7 @@ end
 
 print(sp)
 
-print(&quot;VRP = $VRP(sp, solver = GLPKSolverLP())&quot;)</code></pre><pre><code class="language-none">First-stage
+print(&quot;VRP = $(VRP(sp, solver = GLPKSolverLP()))&quot;)</code></pre><pre><code class="language-none">First-stage
 ==============
 Max x
 Subject to
@@ -63,7 +63,7 @@ Subject to
  y + x ≤ 2
  -1 ≤ y ≤ 1
 
-VRP = StochasticPrograms.VRP(sp, solver = GLPKSolverLP())</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
+VRP = 2.0</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
 u₁ = 2.
 
 U = 2.
@@ -77,7 +77,7 @@ generate!(sp) # Regenerate problem
 
 print(sp)
 
-print(&quot;VRP = $VRP(sp, solver = GLPKSolverLP())&quot;)</code></pre><pre><code class="language-none">First-stage
+print(&quot;VRP = $(VRP(sp, solver = GLPKSolverLP()))&quot;)</code></pre><pre><code class="language-none">First-stage
 ==============
 Max x
 Subject to
@@ -88,16 +88,16 @@ Second-stage
 Subproblem 1:
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2:
 Max -y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
-VRP = StochasticPrograms.VRP(sp, solver = GLPKSolverLP())</code></pre></div><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that adhere to this abstraction. If the identified uncertain parameters is a collection of numerical values, this is the recommended way to define the required scenario type.</p><div><pre><code class="language-julia">using StochasticPrograms
+VRP = 2.25</code></pre></div><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that adhere to this abstraction. If the identified uncertain parameters is a collection of numerical values, this is the recommended way to define the required scenario type.</p><div><pre><code class="language-julia">using StochasticPrograms
 
 @scenario Example = begin
     X::Float64
@@ -274,7 +274,7 @@ Second-stage
 Subproblem 1:
 Min y
 Subject to
- x + y = -1.678053708777528
+ y + x = -1.678053708777528
  y
 
 Subproblem 2:
@@ -286,13 +286,13 @@ Subject to
 Subproblem 3:
 Min y
 Subject to
- y + x = 1.1674165751375571
+ x + y = 1.1674165751375571
  y
 
 Subproblem 4:
 Min y
 Subject to
- y + x = -1.0446735148430168
+ x + y = -1.0446735148430168
  y
 
 Subproblem 5:
@@ -342,7 +342,7 @@ end
 function (sampler::ExponentialSampler)()
     ξ = rand(sampler.distribution)
     return DistributionScenario(sampler.distribution, ξ)
-end</code></pre></div><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><div><pre><code class="language-julia">using Ipopt
+end</code></pre></div><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-julia">using Ipopt
 
 sampler = ExponentialSampler(2.)
 sp = StochasticProgram(sampler)
@@ -357,25 +357,18 @@ end
     @variable(model, y)
     @constraint(model, y == (x - ξ)^2)
     @objective(model, Min, y)
-end</code></pre><pre><code class="language-none">Stochastic program with:
+end</code></pre><pre><code class="language-julia">Stochastic program with:
  * 0 scenarios of type DistributionScenario
  * 1 decision variable
  * 0 recourse variables
-Solver is default solver</code></pre></div><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets sample 1000 exponentially distributed numbers with equal probability:</p><div><pre><code class="language-julia">StochasticPrograms.sample!(sp, 1000) # Sample 1000 exponentially distributed scenarios (qualified call due to name clash with Distributions.jl)</code></pre><pre><code class="language-none">Stochastic program with:
+Solver is default solver</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets sample 1000 exponentially distributed numbers with equal probability:</p><pre><code class="language-julia">StochasticPrograms.sample!(sp, 1000) # Sample 1000 exponentially distributed scenarios (qualified call due to name clash with Distributions.jl)</code></pre><pre><code class="language-julia">Stochastic program with:
  * 1000 scenarios of type DistributionScenario
  * 1 decision variable
  * 1 recourse variable
-Solver is default solver</code></pre></div><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><div><pre><code class="language-julia">optimize!(sp, solver = IpoptSolver(print_level=0))
+Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(sp, solver = IpoptSolver(print_level=0))
 
 println(&quot;Optimal decision: $(optimal_decision(sp))&quot;)
-println(&quot;Optimal value: $(optimal_value(sp))&quot;)</code></pre><pre><code class="language-none">
-******************************************************************************
-This program contains Ipopt, a library for large-scale nonlinear optimization.
- Ipopt is released as open source code under the Eclipse Public License (EPL).
-         For more information visit http://projects.coin-or.org/Ipopt
-******************************************************************************
-
-Optimal decision: [2.07583]
-Optimal value: 4.00553678799426</code></pre></div><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><div><pre><code class="language-julia">println(&quot;EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))&quot;)
-println(&quot;VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))&quot;)</code></pre><pre><code class="language-none">EVP decision: [2.0]
-VSS: 0.005750340653017716</code></pre></div><p>Accordingly, the VSS is small.</p><footer><hr/><a class="previous" href="../quickstart/"><span class="direction">Previous</span><span class="title">Quick start</span></a><a class="next" href="../modeldef/"><span class="direction">Next</span><span class="title">Model definition</span></a></footer></article></body></html>
+println(&quot;Optimal value: $(optimal_value(sp))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.07583]
+Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))&quot;)
+println(&quot;VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
+VSS: 0.005750340653017716</code></pre><p>Accordingly, the VSS is small.</p><footer><hr/><a class="previous" href="../quickstart/"><span class="direction">Previous</span><span class="title">Quick start</span></a><a class="next" href="../modeldef/"><span class="direction">Next</span><span class="title">Model definition</span></a></footer></article></body></html>
