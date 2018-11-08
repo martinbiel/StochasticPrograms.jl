@@ -60,7 +60,7 @@ Subject to
 Subproblem 2:
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -1 ≤ y ≤ 1
 
 VRP = 2.0</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
@@ -88,7 +88,7 @@ Second-stage
 Subproblem 1:
 Max y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2:
@@ -274,7 +274,7 @@ Second-stage
 Subproblem 1:
 Min y
 Subject to
- y + x = -1.678053708777528
+ x + y = -1.678053708777528
  y
 
 Subproblem 2:
