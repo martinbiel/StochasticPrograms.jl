@@ -2,9 +2,9 @@
 
 ## Installation
 
-StochasticPrograms is not yet registered and is therefore installed as follows:
+StochasticPrograms is installed as follows:
 ```julia
-pkg> add https://github.com/martinbiel/StochasticPrograms.jl
+pkg> add StochasticPrograms
 ```
 Afterwards, the functionality can be made available in a module or REPL through:
 ```@example simple

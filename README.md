@@ -11,7 +11,7 @@
 ## Installation
 
 ```julia
-pkg> add https://github.com/martinbiel/StochasticPrograms.jl
+pkg> add StochasticPrograms
 ```
 
 ## Summary
