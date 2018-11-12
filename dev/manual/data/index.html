@@ -54,13 +54,13 @@ Second-stage
 Subproblem 1:
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -1 ≤ y ≤ 1
 
 Subproblem 2:
 Max -y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -1 ≤ y ≤ 1
 
 VRP = 2.0</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
@@ -88,7 +88,7 @@ Second-stage
 Subproblem 1:
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2:
@@ -280,25 +280,25 @@ Subject to
 Subproblem 2:
 Min y
 Subject to
- y + x = -4.534172697601061
+ x + y = -4.534172697601061
  y
 
 Subproblem 3:
 Min y
 Subject to
- y + x = 1.1674165751375571
+ x + y = 1.1674165751375571
  y
 
 Subproblem 4:
 Min y
 Subject to
- y + x = -1.0446735148430168
+ x + y = -1.0446735148430168
  y
 
 Subproblem 5:
 Min y
 Subject to
- y + x = -1.3873072876077712
+ x + y = -1.3873072876077712
  y</code></pre></div><p>Sampled stochastic programs are solved as usual:</p><div><pre><code class="language-julia">using GLPKMathProgInterface
 
 optimize!(sp, solver = GLPKSolverLP())

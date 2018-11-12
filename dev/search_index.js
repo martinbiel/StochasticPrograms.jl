@@ -77,7 +77,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Installation",
     "category": "section",
-    "text": "StochasticPrograms is not yet registered and is therefore installed as follows:pkg> add https://github.com/martinbiel/StochasticPrograms.jlAfterwards, the functionality can be made available in a module or REPL through:using StochasticPrograms"
+    "text": "StochasticPrograms is installed as follows:pkg> add StochasticProgramsAfterwards, the functionality can be made available in a module or REPL through:using StochasticPrograms"
 },
 
 {
