@@ -238,4 +238,15 @@ function set_first_stage_duals!(stochasticprogram::StochasticProgram, λ::Abstra
     first_stage.linconstrDuals = copy(λ)
     return nothing
 end
+
+function add_subscript(src::AbstractString, subscript::Integer)
+    return @sprintf("%s%s", src, unicode_subscript(subscript))
+end
+
+function unicode_subscript(subscript::Integer)
+    if subscript < 0
+        error("$subscript is negative")
+    end
+    return join('₀'+d for d in reverse(digits(subscript)))
+end
 # ========================== #
