@@ -242,6 +242,7 @@ end
 function add_subscript(src::AbstractString, subscript::Integer)
     return @sprintf("%s%s", src, unicode_subscript(subscript))
 end
+add_subscript(src::Symbol, subscript::Integer) = add_subscript(String(src), subscript)
 
 function unicode_subscript(subscript::Integer)
     if subscript < 0
