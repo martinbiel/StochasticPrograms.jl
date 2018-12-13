@@ -87,19 +87,19 @@ Subject to
  &amp; \quad 0 \leq y_{12} \leq 300 \\
  &amp; \quad 0 \leq y_{22} \leq 300
 \end{aligned}\]</div><p>which is also commonly referred to as the deterministically equivalent problem. This construct is available in StochasticPrograms through:</p><div><pre><code class="language-julia">dep = DEP(sp)
-print(dep)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁_1 - 11.200000000000001 y₂_1 - 16.8 y₁_2 - 19.2 y₂_2
+print(dep)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁₁ - 11.200000000000001 y₂₁ - 16.8 y₁₂ - 19.2 y₂₂
 Subject to
  x₁ + x₂ ≤ 120
- 6 y₁_1 + 10 y₂_1 - 60 x₁ ≤ 0
- 8 y₁_1 + 5 y₂_1 - 80 x₂ ≤ 0
- 6 y₁_2 + 10 y₂_2 - 60 x₁ ≤ 0
- 8 y₁_2 + 5 y₂_2 - 80 x₂ ≤ 0
+ 6 y₁₁ + 10 y₂₁ - 60 x₁ ≤ 0
+ 8 y₁₁ + 5 y₂₁ - 80 x₂ ≤ 0
+ 6 y₁₂ + 10 y₂₂ - 60 x₁ ≤ 0
+ 8 y₁₂ + 5 y₂₂ - 80 x₂ ≤ 0
  x₁ ≥ 40
  x₂ ≥ 20
- 0 ≤ y₁_1 ≤ 500
- 0 ≤ y₂_1 ≤ 100
- 0 ≤ y₁_2 ≤ 300
- 0 ≤ y₂_2 ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Evaluate-decisions-1" href="#Evaluate-decisions-1">Evaluate decisions</a></h2><p>With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:</p><div><pre><code class="language-julia">x = [40., 20.]</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 0 ≤ y₁₁ ≤ 500
+ 0 ≤ y₂₁ ≤ 100
+ 0 ≤ y₁₂ ≤ 300
+ 0 ≤ y₂₂ ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Evaluate-decisions-1" href="#Evaluate-decisions-1">Evaluate decisions</a></h2><p>With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:</p><div><pre><code class="language-julia">x = [40., 20.]</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
  40.0
  20.0</code></pre></div><p>The expected result of taking this decision can be determined through:</p><div><pre><code class="language-julia">evaluate_decision(sp, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-470.39999999999964</code></pre></div><p>The supplied solver is used to solve all available second stage models, with fixed first stage values. These outcome models can be built manually by supplying a scenario and the first stage decision.</p><div><pre><code class="language-julia">print(outcome_model(sp, ξ₁, x))</code></pre><pre><code class="language-none">Min -24 y₁ - 28 y₂
 Subject to
