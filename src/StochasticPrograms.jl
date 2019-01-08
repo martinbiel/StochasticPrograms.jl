@@ -9,6 +9,7 @@ using Printf
 
 # External libraries
 using JuMP
+using Distributions
 using MathProgBase
 using MacroTools
 using MacroTools: @q, postwalk

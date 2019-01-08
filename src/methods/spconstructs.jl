@@ -62,8 +62,8 @@ function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
     # Solve all possible WS models and compute EWS
     return _EWS(stochasticprogram, internal_solver(supplied_solver))
 end
-function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D2,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
     return sum([begin
                 ws = _WS(stochasticprogram.generator[:stage_1],
                          stochasticprogram.generator[:stage_2],
@@ -75,8 +75,8 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,ScenarioProblems{D
                 probability(scenario)*getobjectivevalue(ws)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
-function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{D2,SD,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
+              solver::MathProgBase.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
@@ -105,44 +105,28 @@ function _EWS(stochasticprogram::StochasticProgram{D1,D2,SD,S,DScenarioProblems{
     return sum(fetch.(active_workers))
 end
 """
-    SSA(stochasticprogram::StochasticProgram, n::Integer; solver = JuMP.UnsetSolver())
-
-Generate a **sample average approximation** (`SSA`) of size `n` for the `stochasticprogram`.
-
-In other words, sample `n` scenarios, if a sampler exists, and solve the resulting stochastic program. Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
-
-See also: [`sample!`](@ref)
-"""
-function SSA(stochasticprogram::StochasticProgram, n::Integer; solver = JuMP.UnsetSolver())
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Sample n scenarios
-    sample!(stochasticprogram, n)
-    # Solve the resulting problem
-    return VRP(stochasticprogram, solver = solver)
-end
-"""
     SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
 
 Generate a **sample average approximation** (`SSA`) of size `n` for the `stochasticprogram` using the `sampler`.
 
-In other words, sample `n` scenarios, of type consistent with `stochasticprogram`, and solve the resulting stochastic program. Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+In other words, sample `n` scenarios, of type consistent with `stochasticprogram`, and return the resulting stochastic program instance. Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
 
 See also: [`sample!`](@ref)
 """
 function SSA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {D₁, D₂, S <: AbstractScenario}
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
-    # Remove any old scenarios
-    remove_scenarios!(stochasticprogram)
+    # Create new stochastic program instance
+    ssa = copy(stochasticprogram)
+    set_spsolver(ssa, solver)
     # Sample n scenarios
     for i = 1:n
-        add_scenario!(stochasticprogram) do
+        add_scenario!(ssa) do
             return sample(sampler, 1/n)
         end
     end
-    # Solve the resulting problem
-    return VRP(stochasticprogram, solver = solver)
+    # Return the SSA instance
+    return ssa
 end
 """
     DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())

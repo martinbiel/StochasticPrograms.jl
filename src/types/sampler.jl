@@ -22,5 +22,3 @@ function sample(sampler::AbstractSampler, π::AbstractFloat)
     set_probability!(scenario, π)
     return scenario
 end
-
-struct NullSampler{S <: AbstractScenario} <: AbstractSampler{S} end

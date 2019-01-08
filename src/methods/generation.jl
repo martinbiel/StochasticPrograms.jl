@@ -25,11 +25,11 @@ function stage_two_model(stochasticprogram::StochasticProgram, scenario::Abstrac
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage")
     return _stage_two_model(generator(stochasticprogram,:stage_2),second_stage_data(stochasticprogram),scenario,parentmodel(stochasticprogram.scenarioproblems))
 end
-function generate_parent!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenario}
+function generate_parent!(scenarioproblems::ScenarioProblems{D,S}, generator::Function, parentdata::Any) where {D, S <: AbstractScenario}
     generator(parentmodel(scenarioproblems), parentdata)
     return nothing
 end
-function generate_parent!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function, parentdata::Any) where {D, SD <: AbstractScenario}
+function generate_parent!(scenarioproblems::DScenarioProblems{D,S}, generator::Function, parentdata::Any) where {D, S <: AbstractScenario}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata), w, scenarioproblems[w-1], generator, parentdata)
@@ -48,13 +48,13 @@ function generate_stage_one!(stochasticprogram::StochasticProgram)
     generate_parent!(stochasticprogram)
     return nothing
 end
-function generate_stage_two!(scenarioproblems::ScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenario}
+function generate_stage_two!(scenarioproblems::ScenarioProblems{D,S}, generator::Function) where {D, S <: AbstractScenario}
     for i in nsubproblems(scenarioproblems)+1:nscenarios(scenarioproblems)
         push!(scenarioproblems.problems, _stage_two_model(generator, stage_data(scenarioproblems), scenario(scenarioproblems,i), parentmodel(scenarioproblems)))
     end
     return nothing
 end
-function generate_stage_two!(scenarioproblems::DScenarioProblems{D,SD}, generator::Function) where {D, SD <: AbstractScenario}
+function generate_stage_two!(scenarioproblems::DScenarioProblems{D,S}, generator::Function) where {D, S <: AbstractScenario}
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator)->generate_stage_two!(fetch(sp), generator), w, scenarioproblems[w-1], generator)
@@ -115,7 +115,6 @@ function _outcome_model(stage_one_generator::Function,
     end
     stage_two_generator(outcome_model, second_stage, scenario, outcome_model)
     return outcome_model
-
 end
 """
     outcome_model(stochasticprogram::StochasticProgram,

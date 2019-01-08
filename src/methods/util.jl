@@ -22,7 +22,7 @@ function fill_solution!(stochasticprogram::StochasticProgram)
     fill_solution!(scenarioproblems(stochasticprogram), dep.colVal[ncols+1:end], dep.redCosts[ncols+1:end], dep.linconstrDuals[nrows+1:end])
     nothing
 end
-function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function fill_solution!(scenarioproblems::ScenarioProblems, x::AbstractVector, μ::AbstractVector, λ::AbstractVector)
     cbegin = 0
     rbegin = 0
     for (i,subproblem) in enumerate(subproblems(scenarioproblems))
@@ -35,7 +35,7 @@ function fill_solution!(scenarioproblems::ScenarioProblems{D,SD,S}, x::AbstractV
         rbegin += snrows
     end
 end
-function fill_solution!(scenarioproblems::DScenarioProblems{D,SD,S}, x::AbstractVector, μ::AbstractVector, λ::AbstractVector) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function fill_solution!(scenarioproblems::DScenarioProblems, x::AbstractVector, μ::AbstractVector, λ::AbstractVector)
     cbegin = 0
     rbegin = 0
     active_workers = Vector{Future}(undef,nworkers())
@@ -118,7 +118,7 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     return dest
 end
 
-function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function masterterms(scenarioproblems::ScenarioProblems, i::Integer)
     model = scenarioproblems.problems[i]
     parent = parentmodel(scenarioproblems)
     masterterms = Vector{Tuple{Int,Int,Float64}}()
@@ -132,7 +132,7 @@ function masterterms(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) wher
     return masterterms
 end
 
-function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function masterterms(scenarioproblems::DScenarioProblems, i::Integer)
     j = 0
     for w in workers()
         n = remotecall_fetch((sp)->length(fetch(sp).problems), w, scenarioproblems[w-1])
@@ -144,31 +144,20 @@ function masterterms(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) whe
     throw(BoundsError(scenarioproblems, i))
 end
 
-function Base.copy!(dest::StochasticProgram, src::StochasticProgram)
-    dest.first_stage.data = src.first_stage.data
+function Base.copy!(dest::StochasticProgram{D₁,D₂,S}, src::StochasticProgram{D₁,D₂,S}) where {D₁, D₂, S <: AbstractScenario}
+    dest.first_stage.data = first_stage_data(src)
     dest.spsolver.solver = src.spsolver.solver
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     set_second_stage_data!(dest, second_stage_data(src))
-    add_scenarios!(dest, scenarios(src))
     return dest
 end
 
-function Base.copy(src::StochasticProgram{D1,D2,SD,S}; procs = workers()) where {D1, D2, SD <: AbstractScenario, S <: AbstractSampler{SD}}
-    dest = StochasticProgram(src.first_stage.data, stage_data(src.scenarioproblems), sampler(src), procs)
+function Base.copy(src::StochasticProgram{D₁,D₂,S}; procs = workers()) where {D₁, D₂, S <: AbstractScenario}
+    dest = StochasticProgram(first_stage_data(src), second_stage_data(src), S; procs = procs)
     dest.spsolver.solver = src.spsolver.solver
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
-    add_scenarios!(dest.scenarioproblems, scenarios(src.scenarioproblems))
-    return dest
-end
-
-function Base.copy(src::StochasticProgram{D1,D2,SD,NullSampler{SD}}; procs = workers()) where {D1, D2, SD <: AbstractScenario}
-    dest = StochasticProgram(src.first_stage.data, stage_data(src.scenarioproblems), SD; procs = procs)
-    dest.spsolver.solver = src.spsolver.solver
-    empty!(dest.generator)
-    merge!(dest.generator, src.generator)
-    add_scenarios!(dest.scenarioproblems, scenarios(src.scenarioproblems))
     return dest
 end
 

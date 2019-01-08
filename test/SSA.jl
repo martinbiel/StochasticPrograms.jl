@@ -13,13 +13,13 @@ end
     end
 end
 
-ssa = StochasticProgram(SSAScenario, solver=GLPKSolverLP())
+ssa_gen = StochasticProgram(SSAScenario)
 
-@first_stage ssa = begin
+@first_stage ssa_gen = begin
     @variable(model, x >= 0)
 end
 
-@second_stage ssa = begin
+@second_stage ssa_gen = begin
     @decision x
     ξ = scenario.ξ
     @variable(model, y)

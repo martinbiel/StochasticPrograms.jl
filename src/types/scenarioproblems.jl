@@ -7,62 +7,51 @@ mutable struct ScenarioData{D} <: AbstractScenario
     end
 end
 
-struct ScenarioProblems{D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+struct ScenarioProblems{D, S <: AbstractScenario}
     stage::Stage{D}
-    scenarios::Vector{SD}
-    sampler::S
+    scenarios::Vector{S}
     problems::Vector{JuMP.Model}
     parent::JuMP.Model
 
-    function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, ::Type{SD}) where {D, SD <: AbstractScenario}
-        S = NullSampler{SD}
+    function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, ::Type{S}) where {D, S <: AbstractScenario}
         D_ = D == Nothing ? Any : D
-        return new{D_,SD,S}(Stage(stage, stagedata), Vector{SD}(), NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
+        return new{D_,S}(Stage(stage, stagedata), Vector{S}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
     end
 
     function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, scenariodata::Vector{<:AbstractScenario}) where D
-        SD = eltype(scenariodata)
-        S = NullSampler{SD}
+        S = eltype(scenariodata)
         D_ = D == Nothing ? Any : D
-        return new{D_,SD,S}(Stage(stage, stagedata), scenariodata, NullSampler{SD}(), Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
-    end
-
-    function (::Type{ScenarioProblems})(stage::Integer, stagedata::D, sampler::AbstractSampler{SD}) where {D, SD <: AbstractScenario}
-        S = typeof(sampler)
-        D_ = D == Nothing ? Any : D
-        return new{D_,SD,S}(Stage(stage, stagedata), Vector{SD}(), sampler, Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
+        return new{D_,S}(Stage(stage, stagedata), scenariodata, Vector{JuMP.Model}(), Model(solver=JuMP.UnsetSolver()))
     end
 end
-DScenarioProblems{D,SD,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,SD,S}}}}
+DScenarioProblems{D,S} = Vector{RemoteChannel{Channel{ScenarioProblems{D,S}}}}
 
-function ScenarioProblems(stage::Integer, stagedata::D, ::Type{SD}, procs::Vector{Int}) where {D, SD <: AbstractScenario}
+function ScenarioProblems(stage::Integer, stagedata::D, ::Type{S}, procs::Vector{Int}) where {D, S <: AbstractScenario}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(stage, stagedata, SD)
+        return ScenarioProblems(stage, stagedata, S)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
-        S = NullSampler{SD}
         D_ = D == Nothing ? Any : D
-        scenarioproblems = DScenarioProblems{D_,SD,S}(undef, length(procs))
+        scenarioproblems = DScenarioProblems{D_,S}(undef, length(procs))
         active_workers = Vector{Future}(undef, length(procs))
         for p in procs
-            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,SD,S}}(1), p)
-            active_workers[p-1] = remotecall((sp,stage,stagedata,SD)->put!(sp, ScenarioProblems(stage,stagedata,SD)), p, scenarioproblems[p-1], stage, stagedata, SD)
+            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,S}}(1), p)
+            active_workers[p-1] = remotecall((sp,stage,stagedata,S)->put!(sp, ScenarioProblems(stage,stagedata,S)), p, scenarioproblems[p-1], stage, stagedata, S)
         end
         map(wait, active_workers)
         return scenarioproblems
     end
 end
 
-function ScenarioProblems(stage::Integer, stagedata::D, scenarios::Vector{SD}, procs::Vector{Int}) where {D, SD <: AbstractScenario}
+function ScenarioProblems(stage::Integer, stagedata::D, scenarios::Vector{S}, procs::Vector{Int}) where {D, S <: AbstractScenario}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
         return ScenarioProblems(stage, stagedata, scenarios)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
-        S = NullSampler{SD}
         D_ = D == Nothing ? Any : D
-        scenarioproblems = DScenarioProblems{D_,SD,S}(undef, length(procs))
+        scenarioproblems = DScenarioProblems{D_,S}(undef, length(procs))
         (nscen,extra) = divrem(length(scenarios),length(procs))
         if extra > 0
             nscen += 1
@@ -71,30 +60,11 @@ function ScenarioProblems(stage::Integer, stagedata::D, scenarios::Vector{SD}, p
         stop = nscen
         active_workers = Vector{Future}(undef, length(procs))
         for p in procs
-            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,SD,S}}(1), p)
+            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp, ScenarioProblems(stage,stagedata,sdata)), p, scenarioproblems[p-1], stage, stagedata, scenarios[start:stop])
             start += nscen
             stop += nscen
             stop = min(stop, length(scenarios))
-        end
-        map(wait, active_workers)
-        return scenarioproblems
-    end
-end
-
-function ScenarioProblems(stage::Integer, stagedata::D, sampler::AbstractSampler{SD}, procs::Vector{Int}) where {D,SD <: AbstractScenario}
-    if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(stage, stagedata, sampler)
-    else
-        isempty(procs) && error("No requested procs.")
-        length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
-        S = typeof(sampler)
-        D_ = D == Nothing ? Any : D
-        scenarioproblems = DScenarioProblems{D_,SD,S}(undef, length(procs))
-        active_workers = Vector{Future}(undef, length(procs))
-        for p in procs
-            scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,SD,S}}(1), p)
-            active_workers[p-1] = remotecall((sp,stage,stagedata,sampler)->put!(sp, ScenarioProblems(stage,stagedata,sampler)), p, scenarioproblems[p-1], stage, stagedata, sampler)
         end
         map(wait, active_workers)
         return scenarioproblems
@@ -117,10 +87,10 @@ function stage_data(scenarioproblems::DScenarioProblems)
     isempty(scenarioproblems) && error("No remote scenario problems.")
     return fetch(scenarioproblems[1]).stage.data
 end
-function scenario(scenarioproblems::ScenarioProblems{D,SD,S}, i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function scenario(scenarioproblems::ScenarioProblems{D,S}, i::Integer) where {D, S <: AbstractScenario}
     return scenarioproblems.scenarios[i]
 end
-function scenario(scenarioproblems::DScenarioProblems{D,SD,S}, i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function scenario(scenarioproblems::DScenarioProblems{D,S}, i::Integer) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     j = 0
     for w in workers()
@@ -132,10 +102,10 @@ function scenario(scenarioproblems::DScenarioProblems{D,SD,S}, i::Integer) where
     end
     throw(BoundsError(scenarioproblems, i))
 end
-function scenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function scenarios(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return scenarioproblems.scenarios
 end
-function scenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function scenarios(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_scenarios = Vector{Future}()
     for w in workers()
@@ -144,10 +114,10 @@ function scenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: 
     map(wait, partial_scenarios)
     return reduce(vcat, fetch.(partial_scenarios))
 end
-function expected(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function expected(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return expected(scenarioproblems.scenarios)
 end
-function expected(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function expected(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_expecations = Vector{Future}()
     for w in workers()
@@ -156,23 +126,16 @@ function expected(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: A
     map(wait, partial_expecations)
     return expected(fetch.(partial_expecations))
 end
-function scenariotype(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
-    return SD
+function scenariotype(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
+    return S
 end
-function scenariotype(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
-    return SD
+function scenariotype(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
+    return S
 end
-function sampler(scenarioproblems::ScenarioProblems)
-    return scenarioproblems.sampler
-end
-function sampler(scenarioproblems::DScenarioProblems)
-    isempty(scenarioproblems) && error("No remote scenario problems.")
-    return fetch(scenarioproblems[1]).sampler
-end
-function subproblem(scenarioproblems::ScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function subproblem(scenarioproblems::ScenarioProblems{D,S}, i::Integer) where {D, S <: AbstractScenario}
     return scenarioproblems.problems[i]
 end
-function subproblem(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function subproblem(scenarioproblems::DScenarioProblems{D,S}, i::Integer) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     j = 0
     for w in workers()
@@ -184,10 +147,10 @@ function subproblem(scenarioproblems::DScenarioProblems{D,SD,S},i::Integer) wher
     end
     throw(BoundsError(scenarioproblems,i))
 end
-function subproblems(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function subproblems(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return scenarioproblems.problems
 end
-function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function subproblems(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_subproblems = Vector{Future}()
     for w in workers()
@@ -196,10 +159,10 @@ function subproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <
     map(wait,partial_subproblems)
     return reduce(vcat,fetch.(partial_subproblems))
 end
-function nsubproblems(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function nsubproblems(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return length(scenarioproblems.problems)
 end
-function nsubproblems(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function nsubproblems(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_lengths = Vector{Future}()
     for w in workers()
@@ -222,10 +185,10 @@ function recourse_length(scenarioproblems::DScenarioProblems)
     isempty(scenarioproblems) && error("No remote scenario problems.")
     return remotecall_fetch((sp)->recourse_length(fetch(sp)), 2, scenarioproblems[1])
 end
-function probability(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function probability(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return probability(scenarioproblems.scenarios)
 end
-function probability(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function probability(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_probabilities = Vector{Future}()
     for w in workers()
@@ -234,10 +197,10 @@ function probability(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <
     map(wait, partial_probabilities)
     return sum(fetch.(partial_probabilities))
 end
-function nscenarios(scenarioproblems::ScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function nscenarios(scenarioproblems::ScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     return length(scenarioproblems.scenarios)
 end
-function nscenarios(scenarioproblems::DScenarioProblems{D,SD,S}) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function nscenarios(scenarioproblems::DScenarioProblems{D,S}) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     partial_nscenarios = Vector{Future}()
     for w in workers()
@@ -260,30 +223,30 @@ function set_stage_data!(scenarioproblems::DScenarioProblems{D}, data::D) where 
         remotecall_fetch((sp, data)->set_stage_data(fetch(sp), data), w, scenarioproblems[w-1], data)
     end
 end
-function add_scenario!(scenarioproblems::ScenarioProblems{D,SD}, scenario::SD; w = rand(workers())) where {D,SD <: AbstractScenario}
+function add_scenario!(scenarioproblems::ScenarioProblems{D,S}, scenario::S; w = rand(workers())) where {D, S <: AbstractScenario}
     push!(scenarioproblems.scenarios, scenario)
 end
-function add_scenario!(scenarioproblems::DScenarioProblems{D,SD}, scenario::SD; w = rand(workers())) where {D,SD <: AbstractScenario}
+function add_scenario!(scenarioproblems::DScenarioProblems{D,S}, scenario::S; w = rand(workers())) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, scenario) -> add_scenario!(fetch(sp), scenario),
                      w,
                      scenarioproblems[w-1],
                      scenario)
 end
-function add_scenario!(scenarioproblems::ScenarioProblems, scenariogenerator::Function; w = rand(workers()))
+function add_scenario!(scenariogenerator::Function, scenarioproblems::ScenarioProblems; w = rand(workers()))
     add_scenario!(scenarioproblems, scenariogenerator())
 end
-function add_scenario!(scenarioproblems::DScenarioProblems, scenariogenerator::Function; w = rand(workers()))
+function add_scenario!(scenariogenerator::Function, scenarioproblems::DScenarioProblems; w = rand(workers()))
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, generator) -> add_scenario!(fetch(sp), generator()),
                      w,
                      scenarioproblems[w-1],
                      scenariogenerator)
 end
-function add_scenarios!(scenarioproblems::ScenarioProblems{D,SD}, scenarios::Vector{SD}; w = rand(workers())) where {D,SD <: AbstractScenario}
+function add_scenarios!(scenarioproblems::ScenarioProblems{D,S}, scenarios::Vector{S}; w = rand(workers())) where {D, S <: AbstractScenario}
     append!(scenarioproblems.scenarios, scenarios)
 end
-function add_scenarios!(scenarioproblems::DScenarioProblems{D,SD}, scenarios::Vector{SD}; w = rand(workers())) where {D,SD <: AbstractScenario}
+function add_scenarios!(scenarioproblems::DScenarioProblems{D,S}, scenarios::Vector{S}; w = rand(workers())) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, scenarios) -> add_scenarios!(fetch(sp), scenarios),
                      w,
@@ -310,12 +273,10 @@ end
 
 # Sampling #
 # ========================== #
-sample!(scenarioproblems::ScenarioProblems, n::Integer) = _sample!(scenarioproblems, n, nscenarios(scenarioproblems), 1/n)
-function sample!(scenarioproblems::ScenarioProblems{D,SD,NullSampler{SD}}, n::Integer) where {D, SD <: AbstractScenario}
-    warn("No sampler provided.")
-    return scenarioproblems
+function sample!(scenarioproblems::ScenarioProblems{D,S}, sampler::AbstractSampler{S}, n::Integer) where {D , S <: AbstractScenario}
+    _sample!(scenarioproblems, sampler, n, nscenarios(scenarioproblems), 1/n)
 end
-function sample!(scenarioproblems::DScenarioProblems{D,SD,S}, n::Integer) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function sample!(scenarioproblems::DScenarioProblems{D,S}, sampler::AbstractSampler{S}, n::Integer) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     m = nscenarios(scenarioproblems)
     (nscen, extra) = divrem(n, nworkers())
@@ -327,16 +288,12 @@ function sample!(scenarioproblems::DScenarioProblems{D,SD,S}, n::Integer) where 
         if p == nprocs()
             nscen -= nscen*nworkers() - n
         end
-        active_workers[p-1] = remotecall((sp,n,m,π)->_sample!(fetch(sp),n,m,π), p, scenarioproblems[p-1], nscen, m, 1/n)
+        active_workers[p-1] = remotecall((sp,sampler,n,m,π)->_sample!(fetch(sp),sampler,n,m,π), p, scenarioproblems[p-1], sampler, nscen, m, 1/n)
     end
     map(wait, active_workers)
     return scenarioproblems
 end
-function sample!(scenarioproblems::DScenarioProblems{D,SD,NullSampler{SD}}, n::Integer) where {D, SD <: AbstractScenario}
-    warn("No sampler provided.")
-    return scenarioproblems
-end
-function _sample!(scenarioproblems::ScenarioProblems{D,SD,S},n::Integer, m::Integer, π::AbstractFloat) where {D, SD <: AbstractScenario, S <: AbstractSampler{SD}}
+function _sample!(scenarioproblems::ScenarioProblems{D,S}, sampler::AbstractSampler{S}, n::Integer, m::Integer, π::AbstractFloat) where {D, S <: AbstractScenario}
     if m > 0
         # Rescale probabilities of existing scenarios
         for scenario in scenarioproblems.scenarios
@@ -346,7 +303,9 @@ function _sample!(scenarioproblems::ScenarioProblems{D,SD,S},n::Integer, m::Inte
         π *= n/(m+n)
     end
     for i = 1:n
-        add_scenario!(scenarioproblems, sample(scenarioproblems.sampler,π))
+        add_scenario!(scenarioproblems) do
+            return sample(sampler, π)
+        end
     end
     return scenarioproblems
 end

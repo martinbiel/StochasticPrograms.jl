@@ -3,37 +3,26 @@
 
 A mathematical model of a stochastic optimization problem. Every instance is linked to some given scenario type `AbstractScenario`. A StochasticProgram can be memory-distributed on multiple Julia processes.
 """
-struct StochasticProgram{D₁, D₂, SD <: AbstractScenario, S <: AbstractSampler{SD}, SP <: Union{ScenarioProblems{D₂,SD,S},
-                                                                                               DScenarioProblems{D₂,SD,S}}}
+struct StochasticProgram{D₁, D₂, S <: AbstractScenario, SP <: Union{ScenarioProblems{D₂,S}, DScenarioProblems{D₂,S}}}
     first_stage::Stage{D₁}
     scenarioproblems::SP
     generator::Dict{Symbol,Function}
     problemcache::Dict{Symbol,JuMP.Model}
     spsolver::SPSolver
 
-    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, ::Type{SD}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂, SD <: AbstractScenario}
-        S = NullSampler{SD}
-        scenarioproblems = ScenarioProblems(2, stage_2, SD, procs)
+    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, ::Type{S}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂, S <: AbstractScenario}
+        scenarioproblems = ScenarioProblems(2, stage_2, S, procs)
         D₁_ = D₁ == Nothing ? Any : D₁
         D₂_ = D₂ == Nothing ? Any : D₂
-        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
+        return new{D₁_,D₂_,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
     end
 
     function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, scenarios::Vector{<:AbstractScenario}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂}
-        SD = eltype(scenarios)
-        S = NullSampler{SD}
+        S = eltype(scenarios)
         scenarioproblems = ScenarioProblems(2, stage_2, scenarios, procs)
         D₁_ = D₁ == Nothing ? Any : D₁
         D₂_ = D₂ == Nothing ? Any : D₂
-        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
-    end
-
-    function (::Type{StochasticProgram})(stage_1::D₁, stage_2::D₂, sampler::AbstractSampler{SD}, solver::SPSolverType, procs::Vector{Int}) where {D₁, D₂, SD <: AbstractScenario}
-        S = typeof(sampler)
-        scenarioproblems = ScenarioProblems(2, stage_2, sampler, procs)
-        D₁_ = D₁ == Nothing ? Any : D₁
-        D₂_ = D₂ == Nothing ? Any : D₂
-        return new{D₁_,D₂_,SD,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
+        return new{D₁_,D₂_,S,typeof(scenarioproblems)}(Stage(1,stage_1), scenarioproblems, Dict{Symbol,Function}(), Dict{Symbol,JuMP.Model}(), SPSolver(solver))
     end
 end
 
@@ -42,21 +31,21 @@ end
 """
     StochasticProgram(first_stage_data::Any,
                       second_stage_data::Any,
-                      ::Type{SD};
+                      ::Type{S};
                       solver = JuMP.UnsetSolver(),
-                      procs = workers()) where {SD <: AbstractScenario}
+                      procs = workers()) where {S <: AbstractScenario}
 
-Create a new stochastic program with stage data given by `first_stage_data` and `second_stage_data`. After construction, scenarios of type `SD` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
+Create a new stochastic program with stage data given by `first_stage_data` and `second_stage_data`. After construction, scenarios of type `S` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
-function StochasticProgram(first_stage_data::Any, second_stage_data::Any, ::Type{SD}; solver = JuMP.UnsetSolver(), procs = workers()) where {SD <: AbstractScenario}
-    return StochasticProgram(first_stage_data, second_stage_data, SD, solver, procs)
+function StochasticProgram(first_stage_data::Any, second_stage_data::Any, ::Type{S}; solver = JuMP.UnsetSolver(), procs = workers()) where {S <: AbstractScenario}
+    return StochasticProgram(first_stage_data, second_stage_data, S, solver, procs)
 end
 """
     StochasticProgram(first_stage_data::Any,
                       second_stage_data::Any,
                       scenarios::Vector{<:AbstractScenario};
                       solver = JuMP.UnsetSolver(),
-                      procs = workers()) where {SD <: AbstractScenario}
+                      procs = workers())
 
 Create a new stochastic program with a given collection of `scenarios`
 """
@@ -71,26 +60,6 @@ end
 Create a new stochastic program with a given collection of `scenarios` and no stage data.
 """
 StochasticProgram(scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing, nothing, scenarios; solver = solver, procs = procs)
-"""
-    StochasticProgram(first_stage_data::Any,
-                      second_stage_data::Any,
-                      sampler::AbstractSampler;
-                      solver = JuMP.UnsetSolver(),
-                      procs = workers()) where {SD <: AbstractScenario}
-
-Create a new stochastic program with a `sampler` that implicitly defines the scenario type.
-"""
-function StochasticProgram(first_stage_data::Any, second_stage_data::Any, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers())
-    return StochasticProgram(first_stage_data, second_stage_data, sampler, solver, procs)
-end
-"""
-    StochasticProgram(scenarios::Vector{<:AbstractScenario};
-                      solver = JuMP.UnsetSolver(),
-                      procs = workers()) where {SD <: AbstractScenario}
-
-Create a new stochastic program with a `sampler` and no stage data.
-"""
-StochasticProgram(sampler::AbstractSampler; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing, nothing, sampler; solver = solver, procs = procs)
 # ========================== #
 
 # Printing #

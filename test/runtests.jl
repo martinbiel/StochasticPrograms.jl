@@ -61,6 +61,7 @@ include("SSA.jl")
     end
     @testset "Copying: $name" for (sp,res,name) in problems
         sp_copy = copy(sp)
+        add_scenarios!(sp_copy, scenarios(sp))
         @test nscenarios(sp_copy) == nscenarios(sp)
         generate!(sp_copy)
         @test nsubproblems(sp_copy) == nsubproblems(sp)
@@ -77,17 +78,17 @@ include("SSA.jl")
     @testset "Sampling" begin
         @test nscenarios(sampled_sp) == 0
         @test nsubproblems(sampled_sp) == 0
-        sample!(sampled_sp, 100)
+        sample!(sampled_sp, SimpleSampler(), 100)
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
-        sample!(sampled_sp, 100)
+        sample!(sampled_sp, SimpleSampler(), 100)
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
     end
     @testset "SSA" begin
-        SSA(ssa, SSASampler(2.), 100)
+        ssa = SSA(ssa_gen, SSASampler(2.), 100)
         @test nscenarios(ssa) == 100
         @test nsubproblems(ssa) == 100
         @test abs(probability(ssa)-1.0) <= 1e-6

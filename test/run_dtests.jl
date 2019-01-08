@@ -35,6 +35,7 @@ include("sampling.jl")
     @testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
         optimize!(sp)
         sp_nondist = copy(sp, procs = [1])
+        add_scenarios!(sp_nondist, scenarios(sp))
         optimize!(sp_nondist,solver=GLPKSolverLP())
         @test scenariotype(sp) == scenariotype(sp_nondist)
         @test abs(probability(sp)-probability(sp_nondist)) <= 1e-6
@@ -63,6 +64,7 @@ include("sampling.jl")
     end
     @testset "Distributed Copying: $name" for (sp,res,name) in problems
         sp_copy = copy(sp)
+        add_scenarios!(sp_copy, scenarios(sp))
         @test nscenarios(sp_copy) == nscenarios(sp)
         generate!(sp_copy)
         @test nsubproblems(sp_copy) == nsubproblems(sp)
@@ -79,11 +81,11 @@ include("sampling.jl")
     @testset "Distributed Sampling" begin
         @test nscenarios(sampled_sp) == 0
         @test nsubproblems(sampled_sp) == 0
-        sample!(sampled_sp, 100)
+        sample!(sampled_sp, SimpleSampler(), 100)
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
-        sample!(sampled_sp, 100)
+        sample!(sampled_sp, SimpleSampler(), 100)
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6

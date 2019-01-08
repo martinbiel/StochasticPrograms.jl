@@ -401,7 +401,7 @@ Store the second stage scenario returned by `scenariogenerator` in the second st
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the worker that the scenario should be loaded on can be set through `w`.
 """
 function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false, w = rand(workers()))
-    add_scenario!(scenarioproblems(stochasticprogram), scenariogenerator; w = w)
+    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram); w = w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -430,8 +430,8 @@ Sample `n` scenarios from the sampler object in `stochasticprogram`, if any, and
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function sample!(stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)
-    sample!(scenarioproblems(stochasticprogram), n)
+function sample!(stochasticprogram::StochasticProgram{D₁,D₂,S}, sampler::AbstractSampler{S}, n::Integer; defer::Bool = false) where {D₁, D₂, S <: AbstractScenario}
+    sample!(scenarioproblems(stochasticprogram), sampler, n)
     if !defer
         generate!(stochasticprogram)
     end
