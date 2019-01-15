@@ -254,9 +254,9 @@ s = another()
 println(s)
 println("ξ: $(s.ξ)")
 ```
-Now, lets use the first sampler to create a stochastic program:
+Now, lets create a stochastic program based on the `ExampleScenario` type:
 ```@example sampling
-sp = StochasticProgram(sampler)
+sp = StochasticProgram(ExampleScenario)
 
 @first_stage sp = begin
     @variable(model, x >= 0)
@@ -271,9 +271,9 @@ end
     @constraint(model, y + x == ξ)
 end
 ```
-Now, we can sample ``5`` scenarios to generate ``5`` subproblems:
+Now, we can sample ``5`` scenarios using the first sampler to generate ``5`` subproblems:
 ```@example sampling
-sample!(sp, 5)
+sample!(sp, sampler, 5)
 ```
 Printing yields:
 ```@example sampling
@@ -288,26 +288,14 @@ optimize!(sp, solver = GLPKSolverLP())
 println("optimal decision: $(optimal_decision(sp))")
 println("optimal value: $(optimal_value(sp))")
 ```
-[`SSA`](@ref) is a shorthand for the above sequence of commands, which also accepts another sampler object over the same scenario type. For example:
-```@example sampling
-using GLPKMathProgInterface
-
-res = SSA(sp, another, 5, solver = GLPKSolverLP())
-
-println("optimal decision: $(optimal_decision(sp))")
-println("optimal value: $res")
-```
-The quality of the model can be checked in different ways. One indicator is:
-```@example sampling
-VSS(sp, solver = GLPKSolverLP())
-```
-Another is acquired by evaluating the optimal decision on a larger number of sampled scenarios:
-```@example sampling
-x = optimal_decision(sp)
-sample!(sp, 10000)
-evaluate_decision(sp, x, solver = GLPKSolverLP())
-```
 Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [Custom scenarios](@ref).
+
+## SSA
+
+The command `SSA` is used to create sampled average approximations of a given stochastic program by supplying a sampler object.
+```@example sampling
+ssa = SSA(sp, sampler, 10)
+```
 
 ## Custom scenarios
 
@@ -376,8 +364,7 @@ Now, lets attempt to define the generalized stochastic program using the availab
 ```julia
 using Ipopt
 
-sampler = ExponentialSampler(2.)
-sp = StochasticProgram(sampler)
+sp = StochasticProgram(DistributionScenario)
 
 @first_stage sp = begin
     @variable(model, x)
@@ -398,9 +385,11 @@ Stochastic program with:
  * 0 recourse variables
 Solver is default solver
 ```
-The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets sample 1000 exponentially distributed numbers with equal probability:
+The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:
 ```julia
-StochasticPrograms.sample!(sp, 1000) # Sample 1000 exponentially distributed scenarios (qualified call due to name clash with Distributions.jl)
+sampler = ExponentialSampler(2.) # Create a sampler
+
+ssa = SSA(sp, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA model
 ```
 ```julia
 Stochastic program with:
@@ -411,10 +400,10 @@ Solver is default solver
 ```
 By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
 ```julia
-optimize!(sp, solver = IpoptSolver(print_level=0))
+optimize!(ssa, solver = IpoptSolver(print_level=0))
 
-println("Optimal decision: $(optimal_decision(sp))")
-println("Optimal value: $(optimal_value(sp))")
+println("Optimal decision: $(optimal_decision(ssa))")
+println("Optimal value: $(optimal_value(ssa))")
 ```
 ```julia
 Optimal decision: [2.07583]
@@ -422,8 +411,8 @@ Optimal value: 4.00553678799426
 ```
 Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
 ```julia
-println("EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))")
-println("VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))")
+println("EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))")
+println("VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))")
 ```
 ```julia
 EVP decision: [2.0]

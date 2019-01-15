@@ -499,7 +499,7 @@ function add_scenarios!(scenariogenerator::Function, stochasticprogram::Stochast
     return stochasticprogram
 end
 """
-    sample!(stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)
+    sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; defer::Bool = false)
 
 Sample `n` scenarios using `sampler` and add to `stochasticprogram`.
 

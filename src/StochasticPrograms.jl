@@ -69,6 +69,7 @@ export
     stage_two_model,
     outcome_model,
     evaluate_decision,
+    lower_bound,
     optimize!,
     optimal_decision,
     optimal_value,

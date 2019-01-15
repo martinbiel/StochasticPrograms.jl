@@ -11,6 +11,27 @@ Afterwards, the functionality can be made available in a module or REPL through:
 using StochasticPrograms
 ```
 
+## Stochastic programs
+
+A two-stage linear stochastic program has the following mathematical representation:
+```math
+\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}^n} & \quad c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right] \\
+ \text{s.t.} & \quad Ax = b \\
+ & \quad x \geq 0
+\end{aligned}
+```
+where
+```math
+\begin{aligned}
+    Q(x,\xi(\omega)) = \min_{y \in \mathbb{R}^m} & \quad q_{\omega}^T y \\
+    \text{s.t.} & \quad T_{\omega}x + Wy = h_{\omega} \\
+    & \quad y \geq 0
+  \end{aligned}
+```
+If the sample space ``\Omega`` is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space ``\Omega`` is infinite, sampling techniques can be used to represent the stochastic program using finite [SSA](@ref) instances.
+
 ## A simple stochastic program
 
 To showcase the use of StochasticPrograms we will walk through a simple example. Consider the following stochastic program: (taken from [Introduction to Stochastic Programming](https://link.springer.com/book/10.1007%2F978-1-4614-0237-4)).
@@ -99,7 +120,7 @@ The above command creates a stochastic program and preloads the two defined scen
     @constraint(model, x₁ + x₂ <= 120)
 end
 ```
-The recipe was immediately used to generate an instance of the first stage model. Next, we give a second stage recipe inside a `@second_stage` block:
+The recipe was immediately used to generate an instance of the first-stage model. Next, we give a second stage recipe inside a `@second_stage` block:
 ```@example simple
 @second_stage sp = begin
     @decision x₁ x₂
@@ -111,7 +132,7 @@ The recipe was immediately used to generate an instance of the first stage model
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 ```
-Every first stage variable that occurs in the second stage model is annotated with `@decision` at the beginning of the definition. Moreover, the scenario data is referenced through `scenario`. Instances of the defined scenario `SimpleScenario` will be injected to create instances of the second stage model. The second stage recipe is immediately used to generate second stage models for each preloaded scenario. Hence, the stochastic program definition is complete. We can now print the program and confirm that it indeed models the example recourse problem given above:
+Every first-stage variable that occurs in the second stage model is annotated with `@decision` at the beginning of the definition. Moreover, the scenario data is referenced through `scenario`. Instances of the defined scenario `SimpleScenario` will be injected to create instances of the second stage model. The second stage recipe is immediately used to generate second stage models for each preloaded scenario. Hence, the stochastic program definition is complete. We can now print the program and confirm that it indeed models the example recourse problem given above:
 ```@example simple
 print(sp)
 ```
@@ -143,15 +164,19 @@ print(dep)
 
 ## Evaluate decisions
 
-With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:
+With the stochastic program defined, we can evaluate the performance of different first-stage decisions. The expected value of a given first-stage decision ``x`` is given by
+```math
+V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]
+```
+If the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:
 ```@example simple
 x = [40., 20.]
 ```
-The expected result of taking this decision can be determined through:
+The expected result of taking this decision in the simple model can be determined through:
 ```@example simple
 evaluate_decision(sp, x, solver = GLPKSolverLP())
 ```
-The supplied solver is used to solve all available second stage models, with fixed first stage values. These outcome models can be built manually by supplying a scenario and the first stage decision.
+The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.
 ```@example simple
 print(outcome_model(sp, ξ₁, x))
 ```
@@ -160,13 +185,15 @@ Moreover, we can evaluate the result of the decision in a given scenario, i.e. s
 evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())
 ```
 
-## Optimal first stage decision
+In the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider [`evaluate_decision`](@ref) and [`lower_bound`](@ref).
 
-The optimal first stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in [Structured solvers](@ref). In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve `sp` with the GLPK solver as follows:
+## Optimal first-stage decision
+
+The optimal first-stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in [Structured solvers](@ref). In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve `sp` with the GLPK solver as follows:
 ```@example simple
 optimize!(sp, solver = GLPKSolverLP())
 ```
-Internally, this generates and solves the extended form of `sp`. We can now inspect the optimal first stage decision through:
+Internally, this generates and solves the extended form of `sp`. We can now inspect the optimal first-stage decision through:
 ```@example simple
 x_opt = optimal_decision(sp)
 ```
@@ -190,7 +217,7 @@ If we assume that we know what the actual outcome will be, we would be intereste
 ws = WS(sp, ξ₁)
 print(ws)
 ```
-The optimal first stage decision in this scenario can be determined through:
+The optimal first-stage decision in this scenario can be determined through:
 ```@example simple
 x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())
 ```
@@ -211,7 +238,7 @@ Another important concept is the wait-and-see model corresponding to the expecte
 evp = EVP(sp)
 print(evp)
 ```
-Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first stage decision associated with the expected value problem is conviently determined using
+Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first-stage decision associated with the expected value problem is conviently determined using
 ```@example simple
 x̄ = EVP_decision(sp, solver = GLPKSolverLP())
 ```
