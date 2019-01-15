@@ -81,6 +81,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "manual/quickstart/#Stochastic-programs-1",
+    "page": "Quick start",
+    "title": "Stochastic programs",
+    "category": "section",
+    "text": "A two-stage linear stochastic program has the following mathematical representation:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedwherebeginaligned\n    Q(xxi(omega)) = min_y in mathbbR^m  quad q_omega^T y \n    textst  quad T_omegax + Wy = h_omega \n     quad y geq 0\n  endalignedIf the sample space Omega is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space Omega is infinite, sampling techniques can be used to represent the stochastic program using finite SSA instances."
+},
+
+{
     "location": "manual/quickstart/#A-simple-stochastic-program-1",
     "page": "Quick start",
     "title": "A simple stochastic program",
@@ -101,7 +109,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Stochastic program definition",
     "category": "section",
-    "text": "We are now ready to create a stochastic program based on the introduced scenario type. Optionally, we can also supply a capable MathProgBase solver that can be used internally when necessary. Consider:using GLPKMathProgInterface\n\nsp = StochasticProgram([ξ₁, ξ₂], solver = GLPKSolverLP())The above command creates a stochastic program and preloads the two defined scenarios. The provided solver will be used internally when necessary. For clarity, we will still explicitly supply a solver when it is required. Now, we provide model recipes for the first and second stage of the example problem. The first stage is straightforward, and is defined using JuMP syntax inside a @first_stage block:@first_stage sp = begin\n    @variable(model, x₁ >= 40)\n    @variable(model, x₂ >= 20)\n    @objective(model, Min, 100*x₁ + 150*x₂)\n    @constraint(model, x₁ + x₂ <= 120)\nendThe recipe was immediately used to generate an instance of the first stage model. Next, we give a second stage recipe inside a @second_stage block:@second_stage sp = begin\n    @decision x₁ x₂\n    ξ = scenario\n    @variable(model, 0 <= y₁ <= ξ.d₁)\n    @variable(model, 0 <= y₂ <= ξ.d₂)\n    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\nendEvery first stage variable that occurs in the second stage model is annotated with @decision at the beginning of the definition. Moreover, the scenario data is referenced through scenario. Instances of the defined scenario SimpleScenario will be injected to create instances of the second stage model. The second stage recipe is immediately used to generate second stage models for each preloaded scenario. Hence, the stochastic program definition is complete. We can now print the program and confirm that it indeed models the example recourse problem given above:print(sp)"
+    "text": "We are now ready to create a stochastic program based on the introduced scenario type. Optionally, we can also supply a capable MathProgBase solver that can be used internally when necessary. Consider:using GLPKMathProgInterface\n\nsp = StochasticProgram([ξ₁, ξ₂], solver = GLPKSolverLP())The above command creates a stochastic program and preloads the two defined scenarios. The provided solver will be used internally when necessary. For clarity, we will still explicitly supply a solver when it is required. Now, we provide model recipes for the first and second stage of the example problem. The first stage is straightforward, and is defined using JuMP syntax inside a @first_stage block:@first_stage sp = begin\n    @variable(model, x₁ >= 40)\n    @variable(model, x₂ >= 20)\n    @objective(model, Min, 100*x₁ + 150*x₂)\n    @constraint(model, x₁ + x₂ <= 120)\nendThe recipe was immediately used to generate an instance of the first-stage model. Next, we give a second stage recipe inside a @second_stage block:@second_stage sp = begin\n    @decision x₁ x₂\n    ξ = scenario\n    @variable(model, 0 <= y₁ <= ξ.d₁)\n    @variable(model, 0 <= y₂ <= ξ.d₂)\n    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\nendEvery first-stage variable that occurs in the second stage model is annotated with @decision at the beginning of the definition. Moreover, the scenario data is referenced through scenario. Instances of the defined scenario SimpleScenario will be injected to create instances of the second stage model. The second stage recipe is immediately used to generate second stage models for each preloaded scenario. Hence, the stochastic program definition is complete. We can now print the program and confirm that it indeed models the example recourse problem given above:print(sp)"
 },
 
 {
@@ -117,15 +125,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Evaluate decisions",
     "category": "section",
-    "text": "With the stochastic program defined, we can now evaluate the performance of different first stage decisions. Consider the following first stage decision:x = [40., 20.]The expected result of taking this decision can be determined through:evaluate_decision(sp, x, solver = GLPKSolverLP())The supplied solver is used to solve all available second stage models, with fixed first stage values. These outcome models can be built manually by supplying a scenario and the first stage decision.print(outcome_model(sp, ξ₁, x))Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())"
+    "text": "With the stochastic program defined, we can evaluate the performance of different first-stage decisions. The expected value of a given first-stage decision x is given byV(x) = c^T x + operatornamemathbbE_omega leftQ(xxi(omega))rightIf the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:x = [40., 20.]The expected result of taking this decision in the simple model can be determined through:evaluate_decision(sp, x, solver = GLPKSolverLP())The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.print(outcome_model(sp, ξ₁, x))Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())In the sample space is infinite, or if the underlying random variable xi is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider evaluate_decision and lower_bound."
 },
 
 {
     "location": "manual/quickstart/#Optimal-first-stage-decision-1",
     "page": "Quick start",
-    "title": "Optimal first stage decision",
+    "title": "Optimal first-stage decision",
     "category": "section",
-    "text": "The optimal first stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in Structured solvers. In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve sp with the GLPK solver as follows:optimize!(sp, solver = GLPKSolverLP())Internally, this generates and solves the extended form of sp. We can now inspect the optimal first stage decision through:x_opt = optimal_decision(sp)Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:optimal_value(sp)which of course coincides with the result of evaluating the optimal decision:evaluate_decision(sp, x_opt, solver = GLPKSolverLP())This value is commonly referred to as the value of the recourse problem (VRP). We can also calculate it directly through:VRP(sp, solver = GLPKSolverLP())"
+    "text": "The optimal first-stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in Structured solvers. In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve sp with the GLPK solver as follows:optimize!(sp, solver = GLPKSolverLP())Internally, this generates and solves the extended form of sp. We can now inspect the optimal first-stage decision through:x_opt = optimal_decision(sp)Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:optimal_value(sp)which of course coincides with the result of evaluating the optimal decision:evaluate_decision(sp, x_opt, solver = GLPKSolverLP())This value is commonly referred to as the value of the recourse problem (VRP). We can also calculate it directly through:VRP(sp, solver = GLPKSolverLP())"
 },
 
 {
@@ -133,7 +141,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Wait-and-see models",
     "category": "section",
-    "text": "If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if ξ₁ is believed to be the actual outcome, we can define a wait-and-see model as follows:ws = WS(sp, ξ₁)\nprint(ws)The optimal first stage decision in this scenario can be determined through:x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())We can evaluate this decision:evaluate_decision(sp, x₁, solver = GLPKSolverLP())The outcome is of course worse than taking the optimal decision. However, it would perform better if ξ₁ is the actual outcome:evaluate_decision(sp, ξ₁, x₁, solver = GLPKSolverLP())as compared to:evaluate_decision(sp, ξ₁, x_opt, solver = GLPKSolverLP())Another important concept is the wait-and-see model corresponding to the expected future scenario. This is referred to as the expected value problem and can be generated through:evp = EVP(sp)\nprint(evp)Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first stage decision associated with the expected value problem is conviently determined usingx̄ = EVP_decision(sp, solver = GLPKSolverLP())Again, we can evaluate this decision:evaluate_decision(sp, x̄, solver = GLPKSolverLP())This value is often referred to as the expected result of using the expected value solution (EEV), and is also available through:EEV(sp, solver = GLPKSolverLP())"
+    "text": "If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if ξ₁ is believed to be the actual outcome, we can define a wait-and-see model as follows:ws = WS(sp, ξ₁)\nprint(ws)The optimal first-stage decision in this scenario can be determined through:x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())We can evaluate this decision:evaluate_decision(sp, x₁, solver = GLPKSolverLP())The outcome is of course worse than taking the optimal decision. However, it would perform better if ξ₁ is the actual outcome:evaluate_decision(sp, ξ₁, x₁, solver = GLPKSolverLP())as compared to:evaluate_decision(sp, ξ₁, x_opt, solver = GLPKSolverLP())Another important concept is the wait-and-see model corresponding to the expected future scenario. This is referred to as the expected value problem and can be generated through:evp = EVP(sp)\nprint(evp)Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first-stage decision associated with the expected value problem is conviently determined usingx̄ = EVP_decision(sp, solver = GLPKSolverLP())Again, we can evaluate this decision:evaluate_decision(sp, x̄, solver = GLPKSolverLP())This value is often referred to as the expected result of using the expected value solution (EEV), and is also available through:EEV(sp, solver = GLPKSolverLP())"
 },
 
 {
@@ -181,7 +189,15 @@ var documenterSearchIndex = {"docs": [
     "page": "Stochastic data",
     "title": "Sampling",
     "category": "section",
-    "text": "using Random\nRandom.seed!(1)Typically, we do not have exact knowledge of all possible future scenarios. However, we often have access to some model of the uncertainty. For example, scenarios could originate from:A stochastic variable with known distribution\nA time series fitted to data\nA nerual network predictionEven if the exact scenario distribution is unknown, or not all possible scenarios are available, we can still formulate a stochastic program that approximates the model we wish to formulate. This is achieved through a technique called sampled average approximation, which is based on sampling. The idea is to sample a large number n of scenarios with equal probability frac1n and then use them to generate and solve a stochastic program. By the law of large numbers, the result will converge with probability 1 to the \"true\" solution with increasing n.StochasticPrograms accepts AbstractSampler objects in place of AbstractScenario. However, an AbstractSampler is always linked to some underlying AbstractScenario type, which is reflected in the resulting stochastic program as well. Samplers are conviniently created using @sampler. We can define a simple scenario type and a simple sampler as follows:using StochasticPrograms\n\n@scenario Example = begin\n    ξ::Float64\nend\n\n@sampler Example = begin\n    w::Float64\n\n    Example(w::AbstractFloat) = new(w)\n\n    @sample begin\n        w = sampler.w\n        return ExampleScenario(w*randn(), probability = rand())\n    end\nendThis creates a new AbstractSampler type called ExampleSampler, which samples ExampleScenarios. Now, we can create a sampler object and sample a scenariosampler = ExampleSampler(2.)\n\ns = sampler()\n\nprintln(s)\nprintln(\"ξ: $(s.ξ)\")It is possible to create other sampler objects for the ExampleScenario, by providing a new unique name:@sampler Another Example = begin\n    w::Float64\n    d::Float64\n\n    Another(w::AbstractFloat, d::AbstractFloat) = new(w, d)\n\n    @sample begin\n        w = sampler.w\n        d = sampler.d\n        return ExampleScenario(w*randn() + d, probability = rand())\n    end\nend\n\nanother = AnotherSampler(2., 6.)\n\ns = another()\n\nprintln(s)\nprintln(\"ξ: $(s.ξ)\")Now, lets use the first sampler to create a stochastic program:sp = StochasticProgram(sampler)\n\n@first_stage sp = begin\n    @variable(model, x >= 0)\n    @objective(model, Min, x)\nend\n\n@second_stage sp = begin\n    @decision x\n    ξ = scenario.ξ\n    @variable(model, y)\n    @objective(model, Min, y)\n    @constraint(model, y + x == ξ)\nendNow, we can sample 5 scenarios to generate 5 subproblems:sample!(sp, 5)Printing yields:print(sp)Sampled stochastic programs are solved as usual:using GLPKMathProgInterface\n\noptimize!(sp, solver = GLPKSolverLP())\n\nprintln(\"optimal decision: $(optimal_decision(sp))\")\nprintln(\"optimal value: $(optimal_value(sp))\")SSA is a shorthand for the above sequence of commands, which also accepts another sampler object over the same scenario type. For example:using GLPKMathProgInterface\n\nres = SSA(sp, another, 5, solver = GLPKSolverLP())\n\nprintln(\"optimal decision: $(optimal_decision(sp))\")\nprintln(\"optimal value: $res\")The quality of the model can be checked in different ways. One indicator is:VSS(sp, solver = GLPKSolverLP())Another is acquired by evaluating the optimal decision on a larger number of sampled scenarios:x = optimal_decision(sp)\nsample!(sp, 10000)\nevaluate_decision(sp, x, solver = GLPKSolverLP())Again, if the functionality offered by @sampler is not adequate, consider Custom scenarios."
+    "text": "using Random\nRandom.seed!(1)Typically, we do not have exact knowledge of all possible future scenarios. However, we often have access to some model of the uncertainty. For example, scenarios could originate from:A stochastic variable with known distribution\nA time series fitted to data\nA nerual network predictionEven if the exact scenario distribution is unknown, or not all possible scenarios are available, we can still formulate a stochastic program that approximates the model we wish to formulate. This is achieved through a technique called sampled average approximation, which is based on sampling. The idea is to sample a large number n of scenarios with equal probability frac1n and then use them to generate and solve a stochastic program. By the law of large numbers, the result will converge with probability 1 to the \"true\" solution with increasing n.StochasticPrograms accepts AbstractSampler objects in place of AbstractScenario. However, an AbstractSampler is always linked to some underlying AbstractScenario type, which is reflected in the resulting stochastic program as well. Samplers are conviniently created using @sampler. We can define a simple scenario type and a simple sampler as follows:using StochasticPrograms\n\n@scenario Example = begin\n    ξ::Float64\nend\n\n@sampler Example = begin\n    w::Float64\n\n    Example(w::AbstractFloat) = new(w)\n\n    @sample begin\n        w = sampler.w\n        return ExampleScenario(w*randn(), probability = rand())\n    end\nendThis creates a new AbstractSampler type called ExampleSampler, which samples ExampleScenarios. Now, we can create a sampler object and sample a scenariosampler = ExampleSampler(2.)\n\ns = sampler()\n\nprintln(s)\nprintln(\"ξ: $(s.ξ)\")It is possible to create other sampler objects for the ExampleScenario, by providing a new unique name:@sampler Another Example = begin\n    w::Float64\n    d::Float64\n\n    Another(w::AbstractFloat, d::AbstractFloat) = new(w, d)\n\n    @sample begin\n        w = sampler.w\n        d = sampler.d\n        return ExampleScenario(w*randn() + d, probability = rand())\n    end\nend\n\nanother = AnotherSampler(2., 6.)\n\ns = another()\n\nprintln(s)\nprintln(\"ξ: $(s.ξ)\")Now, lets create a stochastic program based on the ExampleScenario type:sp = StochasticProgram(ExampleScenario)\n\n@first_stage sp = begin\n    @variable(model, x >= 0)\n    @objective(model, Min, x)\nend\n\n@second_stage sp = begin\n    @decision x\n    ξ = scenario.ξ\n    @variable(model, y)\n    @objective(model, Min, y)\n    @constraint(model, y + x == ξ)\nendNow, we can sample 5 scenarios using the first sampler to generate 5 subproblems:sample!(sp, sampler, 5)Printing yields:print(sp)Sampled stochastic programs are solved as usual:using GLPKMathProgInterface\n\noptimize!(sp, solver = GLPKSolverLP())\n\nprintln(\"optimal decision: $(optimal_decision(sp))\")\nprintln(\"optimal value: $(optimal_value(sp))\")Again, if the functionality offered by @sampler is not adequate, consider Custom scenarios."
+},
+
+{
+    "location": "manual/data/#SSA-1",
+    "page": "Stochastic data",
+    "title": "SSA",
+    "category": "section",
+    "text": "The command SSA is used to create sampled average approximations of a given stochastic program by supplying a sampler object.ssa = SSA(sp, sampler, 10)"
 },
 
 {
@@ -189,7 +205,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Stochastic data",
     "title": "Custom scenarios",
     "category": "section",
-    "text": "using Random\nRandom.seed!(1)More complex scenario designs are probably not implementable using @scenario. However, it is still possible to create a custom scenario type as long as:The type is a subtype of AbstractScenario\nThe type implements probability\nThe type implements expected, which should return an additive zero element if given an empty arrayThe restriction on expected is there to support taking expectations in a distributed environment.As an example, consider the following generalized stochastic program:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR  quad operatornamemathbbE_omega left(x - xi(omega))^2right \nendalignedwhere xi(omega) is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:using StochasticPrograms\nusing Distributions\n\nstruct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario\n    probability::Probability\n    distribution::D\n    ξ::Float64\n\n    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)\n        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))\n    end\nend\n\nfunction StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution\n    isempty(scenarios) && return DistributionScenario(D(), 0.0)\n    distribution = scenarios[1].distribution\n    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))\nendThe fallback probability method is viable as long as the scenario type contains a Probability field named probability. The implementation of expected is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.We are also free to define custom sampler objects, as long as:The sampler type is a subtype of AbstractSampler\nThe sampler type implements a functor call that performs the samplingWe can implement a sampler that generates exponentially distributed scenarios as follows:struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}\n    distribution::Exponential\n\n    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))\nend\n\nfunction (sampler::ExponentialSampler)()\n    ξ = rand(sampler.distribution)\n    return DistributionScenario(sampler.distribution, ξ)\nendNow, lets attempt to define the generalized stochastic program using the available modeling tools:using Ipopt\n\nsampler = ExponentialSampler(2.)\nsp = StochasticProgram(sampler)\n\n@first_stage sp = begin\n    @variable(model, x)\nend\n\n@second_stage sp = begin\n    @decision x\n    ξ = scenario.ξ\n    @variable(model, y)\n    @constraint(model, y == (x - ξ)^2)\n    @objective(model, Min, y)\nendStochastic program with:\n * 0 scenarios of type DistributionScenario\n * 1 decision variable\n * 0 recourse variables\nSolver is default solverThe mean of the given exponential distribution is 20, which is the optimal solution to the general problem. Now, lets sample 1000 exponentially distributed numbers with equal probability:StochasticPrograms.sample!(sp, 1000) # Sample 1000 exponentially distributed scenarios (qualified call due to name clash with Distributions.jl)Stochastic program with:\n * 1000 scenarios of type DistributionScenario\n * 1 decision variable\n * 1 recourse variable\nSolver is default solverBy the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:optimize!(sp, solver = IpoptSolver(print_level=0))\n\nprintln(\"Optimal decision: $(optimal_decision(sp))\")\nprintln(\"Optimal value: $(optimal_value(sp))\")Optimal decision: [2.07583]\nOptimal value: 4.00553678799426Now, due to the special implementation of the expected function, it actually holds that the expected value solution solves the generalized problem. Consider:println(\"EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))\")\nprintln(\"VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))\")EVP decision: [2.0]\nVSS: 0.005750340653017716Accordingly, the VSS is small."
+    "text": "using Random\nRandom.seed!(1)More complex scenario designs are probably not implementable using @scenario. However, it is still possible to create a custom scenario type as long as:The type is a subtype of AbstractScenario\nThe type implements probability\nThe type implements expected, which should return an additive zero element if given an empty arrayThe restriction on expected is there to support taking expectations in a distributed environment.As an example, consider the following generalized stochastic program:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR  quad operatornamemathbbE_omega left(x - xi(omega))^2right \nendalignedwhere xi(omega) is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:using StochasticPrograms\nusing Distributions\n\nstruct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario\n    probability::Probability\n    distribution::D\n    ξ::Float64\n\n    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)\n        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))\n    end\nend\n\nfunction StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution\n    isempty(scenarios) && return DistributionScenario(D(), 0.0)\n    distribution = scenarios[1].distribution\n    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))\nendThe fallback probability method is viable as long as the scenario type contains a Probability field named probability. The implementation of expected is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.We are also free to define custom sampler objects, as long as:The sampler type is a subtype of AbstractSampler\nThe sampler type implements a functor call that performs the samplingWe can implement a sampler that generates exponentially distributed scenarios as follows:struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}\n    distribution::Exponential\n\n    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))\nend\n\nfunction (sampler::ExponentialSampler)()\n    ξ = rand(sampler.distribution)\n    return DistributionScenario(sampler.distribution, ξ)\nendNow, lets attempt to define the generalized stochastic program using the available modeling tools:using Ipopt\n\nsp = StochasticProgram(DistributionScenario)\n\n@first_stage sp = begin\n    @variable(model, x)\nend\n\n@second_stage sp = begin\n    @decision x\n    ξ = scenario.ξ\n    @variable(model, y)\n    @constraint(model, y == (x - ξ)^2)\n    @objective(model, Min, y)\nendStochastic program with:\n * 0 scenarios of type DistributionScenario\n * 1 decision variable\n * 0 recourse variables\nSolver is default solverThe mean of the given exponential distribution is 20, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:sampler = ExponentialSampler(2.) # Create a sampler\n\nssa = SSA(sp, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA modelStochastic program with:\n * 1000 scenarios of type DistributionScenario\n * 1 decision variable\n * 1 recourse variable\nSolver is default solverBy the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:optimize!(ssa, solver = IpoptSolver(print_level=0))\n\nprintln(\"Optimal decision: $(optimal_decision(ssa))\")\nprintln(\"Optimal value: $(optimal_value(ssa))\")Optimal decision: [2.07583]\nOptimal value: 4.00553678799426Now, due to the special implementation of the expected function, it actually holds that the expected value solution solves the generalized problem. Consider:println(\"EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))\")\nprintln(\"VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))\")EVP decision: [2.0]\nVSS: 0.005750340653017716Accordingly, the VSS is small."
 },
 
 {
@@ -329,27 +345,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{AbstractSampler}",
+    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{Any,Any,Array{#s12,1} where #s12<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.StochasticProgram",
     "category": "method",
-    "text": "StochasticProgram(scenarios::Vector{<:AbstractScenario};\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers()) where {SD <: AbstractScenario}\n\nCreate a new stochastic program with a sampler and no stage data.\n\n\n\n\n\n"
-},
-
-{
-    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{Any,Any,AbstractSampler}",
-    "page": "Public interface",
-    "title": "StochasticPrograms.StochasticProgram",
-    "category": "method",
-    "text": "StochasticProgram(first_stage_data::Any,\n                  second_stage_data::Any,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers()) where {SD <: AbstractScenario}\n\nCreate a new stochastic program with a sampler that implicitly defines the scenario type.\n\n\n\n\n\n"
-},
-
-{
-    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{Any,Any,Array{#s14,1} where #s14<:AbstractScenario}",
-    "page": "Public interface",
-    "title": "StochasticPrograms.StochasticProgram",
-    "category": "method",
-    "text": "StochasticProgram(first_stage_data::Any,\n                  second_stage_data::Any,\n                  scenarios::Vector{<:AbstractScenario};\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers()) where {SD <: AbstractScenario}\n\nCreate a new stochastic program with a given collection of scenarios\n\n\n\n\n\n"
+    "text": "StochasticProgram(first_stage_data::Any,\n                  second_stage_data::Any,\n                  scenarios::Vector{<:AbstractScenario};\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers())\n\nCreate a new stochastic program with a given collection of scenarios\n\n\n\n\n\n"
 },
 
 {
@@ -361,11 +361,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.StochasticProgram-Union{Tuple{SD}, Tuple{Any,Any,Type{SD}}} where SD<:AbstractScenario",
+    "location": "library/public/#StochasticPrograms.StochasticProgram-Union{Tuple{S}, Tuple{Any,Any,Type{S}}} where S<:AbstractScenario",
     "page": "Public interface",
     "title": "StochasticPrograms.StochasticProgram",
     "category": "method",
-    "text": "StochasticProgram(first_stage_data::Any,\n                  second_stage_data::Any,\n                  ::Type{SD};\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers()) where {SD <: AbstractScenario}\n\nCreate a new stochastic program with stage data given by first_stage_data and second_stage_data. After construction, scenarios of type SD can be added through add_scenario!. Optionally, a capable solver can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting procs = [1].\n\n\n\n\n\n"
+    "text": "StochasticProgram(first_stage_data::Any,\n                  second_stage_data::Any,\n                  ::Type{S};\n                  solver = JuMP.UnsetSolver(),\n                  procs = workers()) where {S <: AbstractScenario}\n\nCreate a new stochastic program with stage data given by first_stage_data and second_stage_data. After construction, scenarios of type S can be added through add_scenario!. Optionally, a capable solver can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting procs = [1].\n\n\n\n\n\n"
 },
 
 {
@@ -529,11 +529,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.add_scenario!-Tuple{Function,StochasticProgram,Integer}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.add_scenario!",
+    "category": "method",
+    "text": "add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)\n\nStore the second stage scenario returned by scenariogenerator in the second stage of stochasticprogram in worker node w.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called.\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.add_scenario!-Tuple{Function,StochasticProgram}",
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenario!",
     "category": "method",
-    "text": "add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false, w = rand(workers()))\n\nStore the second stage scenario returned by scenariogenerator in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, the worker that the scenario should be loaded on can be set through w.\n\n\n\n\n\n"
+    "text": "add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)\n\nStore the second stage scenario returned by scenariogenerator in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, the scenario will be defined on the node that currently has the fewest scenarios.\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.add_scenario!-Tuple{StochasticProgram,AbstractScenario,Integer}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.add_scenario!",
+    "category": "method",
+    "text": "add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer; defer::Bool = false)\n\nStore the second stage scenario in the second stage of stochasticprogram in worker node w.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called.\n\n\n\n\n\n"
 },
 
 {
@@ -541,7 +557,31 @@ var documenterSearchIndex = {"docs": [
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenario!",
     "category": "method",
-    "text": "add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false, w = rand(workers()))\n\nStore the second stage scenario in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, the worker that the scenario should be loaded on can be set through w.\n\n\n\n\n\n"
+    "text": "add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)\n\nStore the second stage scenario in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, the scenario will be defined on the node that currently has the fewest scenarios.\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{Function,StochasticProgram,Integer,Integer}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.add_scenarios!",
+    "category": "method",
+    "text": "add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)\n\nGenerate n second-stage scenarios using scenariogeneratorand store in the second stage of stochasticprogram in worker node w.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called.\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{Function,StochasticProgram,Integer}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.add_scenarios!",
+    "category": "method",
+    "text": "add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)\n\nGenerate n second-stage scenarios using scenariogeneratorand store in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, scenarios will be distributed evenly across workers.\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s14,1} where #s14<:AbstractScenario,Integer}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.add_scenarios!",
+    "category": "method",
+    "text": "add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)\n\nStore the collection of second stage scenarios in the second stage of stochasticprogram in worker node w.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called.\n\n\n\n\n\n"
 },
 
 {
@@ -549,7 +589,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenarios!",
     "category": "method",
-    "text": "add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false, w = rand(workers()))\n\nStore the colllection of second stage scenarios in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, the worker that the scenario should be loaded on can be set through w.\n\n\n\n\n\n"
+    "text": "add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)\n\nStore the collection of second stage scenarios in the second stage of stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, scenarios will be distributed evenly across workers.\n\n\n\n\n\n"
 },
 
 {
@@ -745,11 +785,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.sample!-Tuple{StochasticProgram,Integer}",
+    "location": "library/public/#StochasticPrograms.sample!-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
     "page": "Public interface",
     "title": "StochasticPrograms.sample!",
     "category": "method",
-    "text": "sample!(stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)\n\nSample n scenarios from the sampler object in stochasticprogram, if any, and generates subproblems for each of them.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called.\n\n\n\n\n\n"
+    "text": "sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; defer::Bool = false)\n\nSample n scenarios using sampler and add to stochasticprogram.\n\nIf defer is true, then model creation is deferred until generate!(stochasticprogram) is called. If the stochasticprogram is distributed, scenarios will be distributed evenly across workers.\n\n\n\n\n\n"
 },
 
 {
@@ -889,6 +929,22 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.evaluate_decision-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractArray{T,1} where T,AbstractSampler{S}}} where S<:AbstractScenario where D₂ where D₁",
+    "page": "Public interface",
+    "title": "StochasticPrograms.evaluate_decision",
+    "category": "method",
+    "text": "evaluate_decision(stochasticprogram::StochasticProgram,\n                  x::AbstractVector,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  confidence = 0.9,\n                  N = 1000)\n\nReturn a statistical estimate of the objective of stochasticprogram at x, and an upper bound at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, evaluate x on an SSA model of size N. Generate an upper bound using the sample variance of the evaluation.\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.lower_bound-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S}}} where S<:AbstractScenario where D₂ where D₁",
+    "page": "Public interface",
+    "title": "StochasticPrograms.lower_bound",
+    "category": "method",
+    "text": "lower_bound(stochasticprogram::StochasticProgram,\n            x::AbstractVector,\n            sampler::AbstractSampler;\n            solver = JuMP.UnsetSolver(),\n            confidence = 0.9,\n            N = 100,\n            M = 10)\n\nGenerate a lower bound of the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.stage_one_model-Tuple{StochasticProgram}",
     "page": "Public interface",
     "title": "StochasticPrograms.stage_one_model",
@@ -961,19 +1017,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.SSA-Tuple{StochasticProgram,Integer}",
+    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
     "page": "Public interface",
     "title": "StochasticPrograms.SSA",
     "category": "method",
-    "text": "SSA(stochasticprogram::StochasticProgram, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) of size n for the stochasticprogram.\n\nIn other words, sample n scenarios, if a sampler exists, and solve the resulting stochastic program. Optionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
-},
-
-{
-    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,S1,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S,S1}}},1}, ScenarioProblems{D₂,S,S1}} where S1<:AbstractSampler{S},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
-    "page": "Public interface",
-    "title": "StochasticPrograms.SSA",
-    "category": "method",
-    "text": "SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) of size n for the stochasticprogram using the sampler.\n\nIn other words, sample n scenarios, of type consistent with stochasticprogram, and solve the resulting stochastic program. Optionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+    "text": "SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) of size n for the stochasticprogram using the sampler.\n\nIn other words, sample n scenarios, of type consistent with stochasticprogram, and return the resulting stochastic program instance. Optionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {
