@@ -52,19 +52,18 @@ function ScenarioProblems(stage::Integer, stagedata::D, scenarios::Vector{S}, pr
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
         D_ = D == Nothing ? Any : D
         scenarioproblems = DScenarioProblems{D_,S}(undef, length(procs))
-        (nscen,extra) = divrem(length(scenarios),length(procs))
-        if extra > 0
-            nscen += 1
-        end
+        (nscen, extra) = divrem(length(scenarios),length(procs))
         start = 1
-        stop = nscen
+        stop = nscen + (extra > 0)
+        extra -= 1
         active_workers = Vector{Future}(undef, length(procs))
         for p in procs
             scenarioproblems[p-1] = RemoteChannel(() -> Channel{ScenarioProblems{D_,S}}(1), p)
             active_workers[p-1] = remotecall((sp,stage,stagedata,sdata)->put!(sp, ScenarioProblems(stage,stagedata,sdata)), p, scenarioproblems[p-1], stage, stagedata, scenarios[start:stop])
-            start += nscen
-            stop += nscen
+            start = stop + 1
+            stop += nscen + (extra > 0)
             stop = min(stop, length(scenarios))
+            extra -= 1
         end
         map(wait, active_workers)
         return scenarioproblems
@@ -223,35 +222,91 @@ function set_stage_data!(scenarioproblems::DScenarioProblems{D}, data::D) where 
         remotecall_fetch((sp, data)->set_stage_data(fetch(sp), data), w, scenarioproblems[w-1], data)
     end
 end
-function add_scenario!(scenarioproblems::ScenarioProblems{D,S}, scenario::S; w = rand(workers())) where {D, S <: AbstractScenario}
+function add_scenario!(scenarioproblems::ScenarioProblems{D,S}, scenario::S) where {D, S <: AbstractScenario}
     push!(scenarioproblems.scenarios, scenario)
 end
-function add_scenario!(scenarioproblems::DScenarioProblems{D,S}, scenario::S; w = rand(workers())) where {D, S <: AbstractScenario}
+function add_scenario!(scenarioproblems::DScenarioProblems{D,S}, scenario::S) where {D, S <: AbstractScenario}
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    nscen = [remotecall_fetch((sp)->nscenarios(fetch(sp)), w, scenarioproblems[w-1]) for w in workers()]
+    _, w = findmin(nscen)
+    add_scenario!(scenarioproblems, scenario, w+1)
+end
+function add_scenario!(scenarioproblems::DScenarioProblems{D,S}, scenario::S, w::Integer) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, scenario) -> add_scenario!(fetch(sp), scenario),
                      w,
                      scenarioproblems[w-1],
                      scenario)
 end
-function add_scenario!(scenariogenerator::Function, scenarioproblems::ScenarioProblems; w = rand(workers()))
+function add_scenario!(scenariogenerator::Function, scenarioproblems::ScenarioProblems)
     add_scenario!(scenarioproblems, scenariogenerator())
 end
-function add_scenario!(scenariogenerator::Function, scenarioproblems::DScenarioProblems; w = rand(workers()))
+function add_scenario!(scenariogenerator::Function, scenarioproblems::DScenarioProblems)
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    nscen = [remotecall_fetch((sp)->nscenarios(fetch(sp)), w, scenarioproblems[w-1]) for w in workers()]
+    _, w = findmin(nscen)
+    add_scenario!(scenariogenerator, scenarioproblems, w+1)
+end
+function add_scenario!(scenariogenerator::Function, scenarioproblems::DScenarioProblems, w::Integer)
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, generator) -> add_scenario!(fetch(sp), generator()),
                      w,
                      scenarioproblems[w-1],
                      scenariogenerator)
 end
-function add_scenarios!(scenarioproblems::ScenarioProblems{D,S}, scenarios::Vector{S}; w = rand(workers())) where {D, S <: AbstractScenario}
+function add_scenarios!(scenarioproblems::ScenarioProblems{D,S}, scenarios::Vector{S}) where {D, S <: AbstractScenario}
     append!(scenarioproblems.scenarios, scenarios)
 end
-function add_scenarios!(scenarioproblems::DScenarioProblems{D,S}, scenarios::Vector{S}; w = rand(workers())) where {D, S <: AbstractScenario}
+function add_scenarios!(scenariogenerator::Function, scenarioproblems::ScenarioProblems{D,S}, n::Integer) where {D, S <: AbstractScenario}
+    for i = 1:n
+        add_scenario!(scenarioproblems) do
+            return scenariogenerator()
+        end
+    end
+end
+function add_scenarios!(scenarioproblems::DScenarioProblems{D,S}, scenarios::Vector{S}) where {D, S <: AbstractScenario}
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    (nscen, extra) = divrem(length(scenarios), nworkers())
+    start = 1
+    stop = nscen + (extra > 0)
+    extra -= 1
+    for w in workers()
+        remotecall_fetch((sp, scenarios) -> add_scenarios!(fetch(sp), scenarios),
+                         w,
+                         scenarioproblems[w-1],
+                         scenarios[start:stop])
+        start = stop + 1
+        stop += nscen + (extra > 0)
+        stop = min(stop, length(scenarios))
+        extra -= 1
+    end
+end
+function add_scenarios!(scenarioproblems::DScenarioProblems{D,S}, scenarios::Vector{S}, w::Integer) where {D, S <: AbstractScenario}
     isempty(scenarioproblems) && error("No remote scenario problems.")
     remotecall_fetch((sp, scenarios) -> add_scenarios!(fetch(sp), scenarios),
                      w,
                      scenarioproblems[w-1],
                      scenarios)
+end
+function add_scenarios!(scenariogenerator::Function, scenarioproblems::DScenarioProblems, n::Integer)
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    (nscen, extra) = divrem(n, nworkers())
+    for w in workers()
+        remotecall_fetch((sp, gen, n) -> add_scenarios!(gen, fetch(sp), n),
+                         w,
+                         scenarioproblems[w-1],
+                         scenariogenerator,
+                         nscen + (extra > 0))
+        extra -= 1
+    end
+end
+function add_scenarios!(scenariogenerator::Function, scenarioproblems::DScenarioProblems{D,S}, n::Integer, w::Integer) where {D, S <: AbstractScenario}
+    isempty(scenarioproblems) && error("No remote scenario problems.")
+    remotecall_fetch((sp, gen) -> add_scenarios!(gen, fetch(sp), n),
+                     w,
+                     scenarioproblems[w-1],
+                     scenariogenerator,
+                     n)
 end
 function remove_scenarios!(scenarioproblems::ScenarioProblems)
     empty!(scenarioproblems.scenarios)

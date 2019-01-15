@@ -66,7 +66,7 @@ function generate_stage_two!(stochasticprogram::StochasticProgram)
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
     if nscenarios(stochasticprogram) > 0
         p = probability(stochasticprogram)
-        abs(p - 1.0) <= 1e-6 || warn("Scenario probabilities do not add up to one. The probability sum is given by $p")
+        abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
     end
     generate_stage_two!(scenarioproblems(stochasticprogram), generator(stochasticprogram,:stage_2))
     return nothing

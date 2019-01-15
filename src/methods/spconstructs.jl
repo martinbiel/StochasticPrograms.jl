@@ -120,10 +120,8 @@ function SSA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::Abstr
     ssa = copy(stochasticprogram)
     set_spsolver(ssa, solver)
     # Sample n scenarios
-    for i = 1:n
-        add_scenario!(ssa) do
-            return sample(sampler, 1/n)
-        end
+    add_scenarios!(ssa, n) do
+        return sample(sampler, 1/n)
     end
     # Return the SSA instance
     return ssa

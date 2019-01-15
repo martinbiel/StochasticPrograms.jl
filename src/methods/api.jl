@@ -379,14 +379,14 @@ function set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
     nothing
 end
 """
-    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false, w = rand(workers()))
+    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
 
 Store the second stage `scenario` in the second stage of `stochasticprogram`.
 
-If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the worker that the scenario should be loaded on can be set through `w`.
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
-function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false, w = rand(workers()))
-    add_scenario!(scenarioproblems(stochasticprogram), scenario; w = w)
+function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
+    add_scenario!(scenarioproblems(stochasticprogram), scenario)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -394,14 +394,29 @@ function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractS
     return stochasticprogram
 end
 """
-    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false, w = rand(workers()))
+    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer; defer::Bool = false)
+
+Store the second stage `scenario` in the second stage of `stochasticprogram` in worker node `w`.
+
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
+"""
+function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer; defer::Bool = false)
+    add_scenario!(scenarioproblems(stochasticprogram), scenario, w)
+    invalidate_cache!(stochasticprogram)
+    if !defer
+        generate!(stochasticprogram)
+    end
+    return stochasticprogram
+end
+"""
+    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
 
 Store the second stage scenario returned by `scenariogenerator` in the second stage of `stochasticprogram`.
 
-If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the worker that the scenario should be loaded on can be set through `w`.
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
-function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false, w = rand(workers()))
-    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram); w = w)
+function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
+    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram))
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -409,14 +424,74 @@ function add_scenario!(scenariogenerator::Function, stochasticprogram::Stochasti
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false, w = rand(workers()))
+    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
 
-Store the colllection of second stage `scenarios` in the second stage of `stochasticprogram`.
+Store the second stage scenario returned by `scenariogenerator` in the second stage of `stochasticprogram` in worker node `w`.
 
-If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the worker that the scenario should be loaded on can be set through `w`.
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false, w = rand(workers()))
-    add_scenarios!(scenarioproblems(stochasticprogram), scenarios; w = w)
+function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer; defer::Bool = false)
+    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram), w)
+    invalidate_cache!(stochasticprogram)
+    if !defer
+        generate!(stochasticprogram)
+    end
+    return stochasticprogram
+end
+"""
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
+
+Store the collection of second stage `scenarios` in the second stage of `stochasticprogram`.
+
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
+"""
+function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram), scenarios)
+    invalidate_cache!(stochasticprogram)
+    if !defer
+        generate!(stochasticprogram)
+    end
+    return stochasticprogram
+end
+"""
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
+
+Store the collection of second stage `scenarios` in the second stage of `stochasticprogram` in worker node `w`.
+
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
+"""
+function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram), scenarios, w)
+    invalidate_cache!(stochasticprogram)
+    if !defer
+        generate!(stochasticprogram)
+    end
+    return stochasticprogram
+end
+"""
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
+
+Generate `n` second-stage scenarios using `scenariogenerator`and store in the second stage of `stochasticprogram`.
+
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
+"""
+function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)
+    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram), n)
+    invalidate_cache!(stochasticprogram)
+    if !defer
+        generate!(stochasticprogram)
+    end
+    return stochasticprogram
+end
+"""
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
+
+Generate `n` second-stage scenarios using `scenariogenerator`and store in the second stage of `stochasticprogram` in worker node `w`.
+
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
+"""
+function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram), scenarios, w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -426,9 +501,9 @@ end
 """
     sample!(stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)
 
-Sample `n` scenarios from the sampler object in `stochasticprogram`, if any, and generates subproblems for each of them.
+Sample `n` scenarios using `sampler` and add to `stochasticprogram`.
 
-If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
+If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function sample!(stochasticprogram::StochasticProgram{D₁,D₂,S}, sampler::AbstractSampler{S}, n::Integer; defer::Bool = false) where {D₁, D₂, S <: AbstractScenario}
     sample!(scenarioproblems(stochasticprogram), sampler, n)
