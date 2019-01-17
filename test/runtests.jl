@@ -76,9 +76,7 @@ include("SSA.jl")
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
     end
     @testset "Sampling" begin
-        @test nscenarios(sampled_sp) == 0
-        @test nsubproblems(sampled_sp) == 0
-        sample!(sampled_sp, SimpleSampler(), 100)
+        sampled_sp = SSA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
@@ -88,7 +86,7 @@ include("SSA.jl")
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
     end
     @testset "SSA" begin
-        ssa = SSA(ssa_gen, SSASampler(2.), 100)
+        ssa = SSA(ssa_model, SSASampler(2.), 100)
         @test nscenarios(ssa) == 100
         @test nsubproblems(ssa) == 100
         @test abs(probability(ssa)-1.0) <= 1e-6

@@ -26,6 +26,7 @@ end
 include("scenario.jl")
 include("sampler.jl")
 include("stage.jl")
+include("model.jl")
 include("scenarioproblems.jl")
 include("twostage.jl")
 include("multistage.jl")

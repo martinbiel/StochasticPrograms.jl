@@ -13,17 +13,16 @@ end
     end
 end
 
-ssa_gen = StochasticProgram(SSAScenario)
-
-@first_stage ssa_gen = begin
-    @variable(model, x >= 0)
-end
-
-@second_stage ssa_gen = begin
-    @decision x
-    ξ = scenario.ξ
-    @variable(model, y)
-    @objective(model, Min, y)
-    @constraint(model, y == x)
-    @constraint(model, y >= ξ)
-end
+ssa_model = StochasticModel((sp) -> begin
+    @first_stage sp = begin
+        @variable(model, x >= 0)
+    end
+    @second_stage sp = begin
+        @decision x
+        ξ = scenario.ξ
+        @variable(model, y)
+        @objective(model, Min, y)
+        @constraint(model, y == x)
+        @constraint(model, y >= ξ)
+    end
+end)

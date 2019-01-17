@@ -1,6 +1,19 @@
 # API (Two-stage) #
 # ========================== #
 """
+    instantiate(stochasticmodel::StochasticModel,
+                scenarios::Vector{<:AbstractScenario};
+                solver = JuMP.UnsetSolver(),
+                procs = workers())
+
+Instantate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
+"""
+function instantiate(sm::StochasticModel, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
+    sp = StochasticProgram(sm.first_stage, sm.second_stage, scenarios, solver, procs)
+    sm.generator(sp)
+    return sp
+end
+"""
     optimize!(sp::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
 
 Optimize `sp` after calls to `@first_stage sp = begin ... end` and `second_stage sp = begin ... end`, assuming scenarios are available.

@@ -17,6 +17,7 @@ using MacroTools: @q, postwalk
 const MPB = MathProgBase
 
 export
+    StochasticModel,
     StochasticProgram,
     Probability,
     AbstractScenario,
@@ -70,6 +71,7 @@ export
     outcome_model,
     evaluate_decision,
     lower_bound,
+    instantiate,
     optimize!,
     optimal_decision,
     optimal_value,
@@ -79,6 +81,7 @@ export
     @first_stage,
     @second_stage,
     @stage,
+    @stochastic_model,
     @zero,
     @expectation,
     @sample,

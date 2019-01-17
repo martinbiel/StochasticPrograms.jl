@@ -127,6 +127,27 @@ function SSA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::Abstr
     return ssa
 end
 """
+    SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+
+Generate a **sample average approximation** (`SSA`) instance of size `n` using the model stored in `stochasticmodel` and the provided `sampler`.
+
+dOptionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+
+See also: [`sample!`](@ref)
+"""
+function SSA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+    # Create new stochastic program instance
+    ssa = StochasticProgram(sm.first_stage, sm.second_stage, S; solver = solver)
+    sm.generator(ssa)
+    # Sample n scenarios
+    add_scenarios!(ssa, n) do
+        return sample(sampler, 1/n)
+    end
+    # Return the SSA instance
+    return ssa
+end
+SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario} = SSA(stochasticmodel, nothing, nothing, sampler, n; solver = solver)
+"""
     DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
 
 Generate the **deterministically equivalent problem** (`DEP`) of the `stochasticprogram`.

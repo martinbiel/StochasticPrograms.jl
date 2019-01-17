@@ -335,15 +335,10 @@ function sample!(scenarioproblems::DScenarioProblems{D,S}, sampler::AbstractSamp
     isempty(scenarioproblems) && error("No remote scenario problems.")
     m = nscenarios(scenarioproblems)
     (nscen, extra) = divrem(n, nworkers())
-    if extra > 0
-        nscen += 1
-    end
     active_workers = Vector{Future}(undef, nworkers())
     for p in workers()
-        if p == nprocs()
-            nscen -= nscen*nworkers() - n
-        end
-        active_workers[p-1] = remotecall((sp,sampler,n,m,π)->_sample!(fetch(sp),sampler,n,m,π), p, scenarioproblems[p-1], sampler, nscen, m, 1/n)
+        active_workers[p-1] = remotecall((sp,sampler,n,m,π)->_sample!(fetch(sp),sampler,n,m,π), p, scenarioproblems[p-1], sampler, nscen + (extra > 0), m, 1/n)
+        extra -= 1
     end
     map(wait, active_workers)
     return scenarioproblems

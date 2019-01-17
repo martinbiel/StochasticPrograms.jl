@@ -184,7 +184,7 @@ function evaluate_decision(stochasticprogram::StochasticProgram, scenario::Abstr
     error("Outcome model could not be solved, returned status: $status")
 end
 """
-    evaluate_decision(stochasticprogram::StochasticProgram,
+    evaluate_decision(stochasticmodel::StochasticModel,
                       x::AbstractVector,
                       sampler::AbstractSampler;
                       solver = JuMP.UnsetSolver(),
@@ -195,14 +195,8 @@ Return a statistical estimate of the objective of `stochasticprogram` at `x`, an
 
 In other words, evaluate `x` on an SSA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram{D₁,D₂,S}, x::AbstractVector, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {D₁, D₂, S <: AbstractScenario}
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot evaluate decision without a solver.")
-    end
-    eval_model = SSA(stochasticprogram, sampler, N)
+function evaluate_decision(stochasticmodel::StochasticModel, x::AbstractVector, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {S <: AbstractScenario}
+    eval_model = SSA(stochasticmodel, sampler, N)
     # Condidence level
     α = (1-confidence)/2
     # Upper bound
@@ -213,7 +207,7 @@ function evaluate_decision(stochasticprogram::StochasticProgram{D₁,D₂,S}, x:
     return cᵀx + 𝔼Q, U
 end
 """
-    lower_bound(stochasticprogram::StochasticProgram,
+    lower_bound(stochasticmodel::StochasticModel,
                 x::AbstractVector,
                 sampler::AbstractSampler;
                 solver = JuMP.UnsetSolver(),
@@ -223,17 +217,11 @@ end
 
 Generate a lower bound of the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 """
-function lower_bound(stochasticprogram::StochasticProgram{D₁,D₂,S}, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer) where {D₁, D₂, S <: AbstractScenario}
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot evaluate decision without a solver.")
-    end
+function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer) where {S <: AbstractScenario}
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     for i = 1:M
-        ssa = SSA(stochasticprogram, sampler, N)
+        ssa = SSA(stochasticmodel, sampler, N)
         Qs[i] = VRP(ssa, solver = supplied_solver)
     end
     Q̂ = mean(Qs)
