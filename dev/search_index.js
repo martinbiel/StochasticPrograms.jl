@@ -665,6 +665,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s14,1} where #s14<:AbstractScenario}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.instantiate",
+    "category": "method",
+    "text": "instantiate(stochasticmodel::StochasticModel,\n            scenarios::Vector{<:AbstractScenario};\n            solver = JuMP.UnsetSolver(),\n            procs = workers())\n\nInstantate a new stochastic program using the model definition stored in stochasticmodel, and the given collection of scenarios.\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.internal_model-Tuple{StochasticProgram}",
     "page": "Public interface",
     "title": "StochasticPrograms.internal_model",
@@ -929,19 +937,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.evaluate_decision-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractArray{T,1} where T,AbstractSampler{S}}} where S<:AbstractScenario where D₂ where D₁",
+    "location": "library/public/#StochasticPrograms.evaluate_decision-Union{Tuple{S}, Tuple{StochasticModel,AbstractArray{T,1} where T,AbstractSampler{S}}} where S<:AbstractScenario",
     "page": "Public interface",
     "title": "StochasticPrograms.evaluate_decision",
     "category": "method",
-    "text": "evaluate_decision(stochasticprogram::StochasticProgram,\n                  x::AbstractVector,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  confidence = 0.9,\n                  N = 1000)\n\nReturn a statistical estimate of the objective of stochasticprogram at x, and an upper bound at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, evaluate x on an SSA model of size N. Generate an upper bound using the sample variance of the evaluation.\n\n\n\n\n\n"
+    "text": "evaluate_decision(stochasticmodel::StochasticModel,\n                  x::AbstractVector,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  confidence = 0.9,\n                  N = 1000)\n\nReturn a statistical estimate of the objective of stochasticprogram at x, and an upper bound at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, evaluate x on an SSA model of size N. Generate an upper bound using the sample variance of the evaluation.\n\n\n\n\n\n"
 },
 
 {
-    "location": "library/public/#StochasticPrograms.lower_bound-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S}}} where S<:AbstractScenario where D₂ where D₁",
+    "location": "library/public/#StochasticPrograms.lower_bound-Union{Tuple{S}, Tuple{StochasticModel,AbstractSampler{S}}} where S<:AbstractScenario",
     "page": "Public interface",
     "title": "StochasticPrograms.lower_bound",
     "category": "method",
-    "text": "lower_bound(stochasticprogram::StochasticProgram,\n            x::AbstractVector,\n            sampler::AbstractSampler;\n            solver = JuMP.UnsetSolver(),\n            confidence = 0.9,\n            N = 100,\n            M = 10)\n\nGenerate a lower bound of the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\n\n\n\n\n"
+    "text": "lower_bound(stochasticmodel::StochasticModel,\n            x::AbstractVector,\n            sampler::AbstractSampler;\n            solver = JuMP.UnsetSolver(),\n            confidence = 0.9,\n            N = 100,\n            M = 10)\n\nGenerate a lower bound of the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\n\n\n\n\n"
 },
 
 {
@@ -1022,6 +1030,14 @@ var documenterSearchIndex = {"docs": [
     "title": "StochasticPrograms.SSA",
     "category": "method",
     "text": "SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) of size n for the stochasticprogram using the sampler.\n\nIn other words, sample n scenarios, of type consistent with stochasticprogram, and return the resulting stochastic program instance. Optionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+},
+
+{
+    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{StochasticModel,Any,Any,AbstractSampler{S},Integer}} where S<:AbstractScenario",
+    "page": "Public interface",
+    "title": "StochasticPrograms.SSA",
+    "category": "method",
+    "text": "SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel and the provided sampler.\n\ndOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {
