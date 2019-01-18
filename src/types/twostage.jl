@@ -93,7 +93,7 @@ function Base.print(io::IO, stochasticprogram::StochasticProgram)
     print(io, "\nSecond-stage \n")
     print(io, "============== \n")
     for (id, subproblem) in enumerate(subproblems(stochasticprogram))
-        @printf(io, "Subproblem %d:\n", id)
+        @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(stochasticprogram, id)))
         print(io, subproblem)
         print(io, "\n")
     end
