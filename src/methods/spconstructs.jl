@@ -127,7 +127,7 @@ function SSA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::Abstr
     return ssa
 end
 """
-    SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+    SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
 
 Generate a **sample average approximation** (`SSA`) instance of size `n` using the model stored in `stochasticmodel` and the provided `sampler`.
 

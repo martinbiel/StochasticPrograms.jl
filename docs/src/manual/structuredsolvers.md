@@ -110,21 +110,14 @@ L-Shaped Gap  Time: 0:00:01 (6 iterations)
 ```
 Note, that an LP capable `AbstractMathProgSolver` is required to solve emerging subproblems. The following variants of the L-shaped algorithm are implemented:
 
-1. L-shaped with multiple cuts (default): `LShapedSolver(:ls)`
-2. L-shaped with regularized decomposition: `LShapedSolver(:rd)`
-3. L-shaped with trust region: `LShapedSolver(:tr)`
-4. L-shaped with level sets: `LShapedSolver(:lv)`
+1. L-shaped with multiple cuts (default)
+2. L-shaped with regularized decomposition: `regularization = :rd`
+3. L-shaped with trust region: `regularization = :tr`
+4. L-shaped with level sets: `regularization = :lv`
 
-Note, that `LShapedSolver(:rd)` and `LShapedSolver(:lv)` both require a QP capable `AbstractMathProgSolver` for the master problems. If not available, setting the `linearize` keyword to `true` is an alternative.
+Note, that `:rd` and `:lv` both require a QP capable `AbstractMathProgSolver` for the master problems. If not available, setting the `linearize` keyword to `true` is an alternative.
 
-In addition, there is a distributed variant of each algorithm:
-
-1. Distributed L-shaped with multiple cuts: `LShapedSolver(:dls)`
-2. Distributed L-shaped with regularized decomposition: `LShapedSolver(:drd)`
-3. Distributed L-shaped with trust region: `LShapedSolver(:dtr)`
-4. Distributed L-shaped with level sets: `LShapedSolver(:dlv)`
-
-which requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and are most efficient when run on distributed stochastic programs.
+In addition, there is a distributed variant of each algorithm, created by supplying `distributed = true` to the factory method. This requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and are most efficient when run on distributed stochastic programs.
 
 Each algorithm has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?LShaped` gives the parameter list of the default L-shaped algorithm. For a list of all solvers and their handle names, use `?LShapedSolver`.
 
@@ -147,6 +140,10 @@ Progressive Hedging Time: 0:00:06 (1315 iterations)
   δ:          9.570267362791345e-7
 :Optimal
 ```
-Note, that a QP capable `AbstractMathProgSolver` is required to solve emerging subproblems. In addition, there is a distributed variant of the algorithm: `ProgressiveHedgingSolver(:dph)`, which requires adding processes with `addprocs` prior to execution. The distributed variant is designed for StochasticPrograms, and is most efficient when run on distributed stochastic programs.
+Note, that a QP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
 
-The algorithm has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?ProgressiveHedging` gives the parameter list of the sequential progressive-hedging algorithm. For a list of all solvers and their handle names, use `?ProgressiveHedgingSolver`.
+An adaptive penalty parameter can be used by supplying `penalty = :adaptive` to the factory method.
+
+By default, the execution is `:sequential`. Supplying either `execution = :synchronous` or `execution = :asynchronous` to the factory method yields distributed variants of the algorithm. This requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and is most efficient when run on distributed stochastic programs.
+
+The algorithm variants has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?ProgressiveHedging` gives the parameter list of the sequential progressive-hedging algorithm. For a list of all solvers and their handle names, use `?ProgressiveHedgingSolver`.

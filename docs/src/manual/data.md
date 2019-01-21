@@ -292,7 +292,7 @@ Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consi
 
 ## SSA
 
-The command `SSA` is used to create sampled average approximations of a given stochastic program by supplying a sampler object.
+The command [`SSA`](@ref) is used to create sampled average approximations of a given stochastic program by supplying a sampler object.
 ```@example sampling
 ssa = SSA(sp, sampler, 10)
 ```
@@ -310,112 +310,9 @@ More complex scenario designs are probably not implementable using [`@scenario`]
  - The type implements [`probability`](@ref)
  - The type implements [`expected`](@ref), which should return an additive zero element if given an empty array
 
-The restriction on `expected` is there to support taking expectations in a distributed environment.
-
-As an example, consider the following generalized stochastic program:
-```math
-\DeclareMathOperator*{\minimize}{minimize}
-\begin{aligned}
- \minimize_{x \in \mathbb{R}} & \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
-\end{aligned}
-```
-where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:
-```@example custom
-using StochasticPrograms
-using Distributions
-
-struct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario
-    probability::Probability
-    distribution::D
-    ξ::Float64
-
-    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)
-        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))
-    end
-end
-
-function StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution
-    isempty(scenarios) && return DistributionScenario(D(), 0.0)
-    distribution = scenarios[1].distribution
-    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))
-end
-```
-The fallback [`probability`](@ref) method is viable as long as the scenario type contains a [`Probability`](@ref) field named `probability`. The implementation of [`expected`](@ref) is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.
-
-We are also free to define custom sampler objects, as long as:
+The restriction on `expected` is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:
 
  - The sampler type is a subtype of [`AbstractSampler`](@ref)
  - The sampler type implements a functor call that performs the sampling
 
-We can implement a sampler that generates exponentially distributed scenarios as follows:
-```@example custom
-struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}
-    distribution::Exponential
-
-    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))
-end
-
-function (sampler::ExponentialSampler)()
-    ξ = rand(sampler.distribution)
-    return DistributionScenario(sampler.distribution, ξ)
-end
-```
-Now, lets attempt to define the generalized stochastic program using the available modeling tools:
-```julia
-using Ipopt
-
-sp = StochasticProgram(DistributionScenario)
-
-@first_stage sp = begin
-    @variable(model, x)
-end
-
-@second_stage sp = begin
-    @decision x
-    ξ = scenario.ξ
-    @variable(model, y)
-    @constraint(model, y == (x - ξ)^2)
-    @objective(model, Min, y)
-end
-```
-```julia
-Stochastic program with:
- * 0 scenarios of type DistributionScenario
- * 1 decision variable
- * 0 recourse variables
-Solver is default solver
-```
-The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:
-```julia
-sampler = ExponentialSampler(2.) # Create a sampler
-
-ssa = SSA(sp, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA model
-```
-```julia
-Stochastic program with:
- * 1000 scenarios of type DistributionScenario
- * 1 decision variable
- * 1 recourse variable
-Solver is default solver
-```
-By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
-```julia
-optimize!(ssa, solver = IpoptSolver(print_level=0))
-
-println("Optimal decision: $(optimal_decision(ssa))")
-println("Optimal value: $(optimal_value(ssa))")
-```
-```julia
-Optimal decision: [2.07583]
-Optimal value: 4.00553678799426
-```
-Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
-```julia
-println("EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))")
-println("VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))")
-```
-```julia
-EVP decision: [2.0]
-VSS: 0.005750340653017716
-```
-Accordingly, the VSS is small.
+See the [Continuous scenario distribution](@ref) for an example of custom scenario/sampler implementations.

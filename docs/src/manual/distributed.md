@@ -81,7 +81,7 @@ Perform many subproblem independent operations in parallel. The best performance
 using LShapedSolvers
 using GLPKMathProgInterface
 
-optimize!(sp, solver = LShapedSolver(:dls, GLPKSolverLP()))
+optimize!(sp, solver = LShapedSolver(GLPKSolverLP(), distributed = true))
 ```
 ```julia
 Distributed L-Shaped Gap  Time: 0:00:03 (6 iterations)

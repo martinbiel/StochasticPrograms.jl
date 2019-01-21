@@ -26,7 +26,7 @@ simple_model = StochasticModel((sp) -> begin
 	end
 end)
 ```
-The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the [Quick start](@ref):
+The resulting model object can be used to [`instantiate`](@ref) different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the [Quick start](@ref):
 ```@example stochasticmodel
 @scenario AnotherSimple = begin
     q₁::Float64
@@ -40,7 +40,7 @@ end
 
 sp = instantiate(simple_model, [ξ₁, ξ₂])
 ```
-Moreoever, SSA models are constructed in a more straightforward way. Consider the following:
+Moreoever, [`SSA`](@ref) models are constructed in a straightforward way. Consider the following:
 ```@example stochasticmodel
 @sampler AnotherSimple = begin
     @sample begin

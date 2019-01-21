@@ -92,3 +92,114 @@ Finally, we calculate the stochastic performance of the model:
 println("EVPI: $(EVPI(farmer))")
 println("VSS: $(VSS(farmer))")
 ```
+
+## Continuous scenario distribution
+
+As an example, consider the following generalized stochastic program:
+```math
+\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}} & \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
+\end{aligned}
+```
+where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:
+```@example custom
+using StochasticPrograms
+using Distributions
+
+struct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario
+    probability::Probability
+    distribution::D
+    ξ::Float64
+
+    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)
+        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))
+    end
+end
+
+function StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution
+    isempty(scenarios) && return DistributionScenario(D(), 0.0)
+    distribution = scenarios[1].distribution
+    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))
+end
+```
+The fallback [`probability`](@ref) method is viable as long as the scenario type contains a [`Probability`](@ref) field named `probability`. The implementation of [`expected`](@ref) is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.
+
+We can implement a sampler that generates exponentially distributed scenarios as follows:
+```@example custom
+struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}
+    distribution::Exponential
+
+    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))
+end
+
+function (sampler::ExponentialSampler)()
+    ξ = rand(sampler.distribution)
+    return DistributionScenario(sampler.distribution, ξ)
+end
+```
+Now, lets attempt to define the generalized stochastic program using the available modeling tools:
+```julia
+using Ipopt
+
+model = StochasticModel((sp) -> begin
+	@first_stage sp = begin
+		@variable(model, x)
+	end
+
+	@second_stage sp = begin
+		@decision x
+		ξ = scenario.ξ
+		@variable(model, y)
+		@constraint(model, y == (x - ξ)^2)
+		@objective(model, Min, y)
+	end
+end)
+```
+```julia
+Stochastic Model
+
+minimize cᵀx + 𝔼[Q(x,ξ)]
+  x∈ℝⁿ  Ax = b
+         x ≥ 0
+
+where
+
+Q(x,ξ) = min  q(ξ)ᵀy
+        y∈ℝᵐ T(ξ)x + Wy = h(ξ)
+              y ≥ 0
+```
+The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:
+```julia
+sampler = ExponentialSampler(2.) # Create a sampler
+
+ssa = SSA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA model
+```
+```julia
+Stochastic program with:
+ * 1000 scenarios of type DistributionScenario
+ * 1 decision variable
+ * 1 recourse variable
+Solver is default solver
+```
+By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
+```julia
+optimize!(ssa, solver = IpoptSolver(print_level=0))
+
+println("Optimal decision: $(optimal_decision(ssa))")
+println("Optimal value: $(optimal_value(ssa))")
+```
+```julia
+Optimal decision: [2.07583]
+Optimal value: 4.00553678799426
+```
+Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
+```julia
+println("EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))")
+println("VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))")
+```
+```julia
+EVP decision: [2.0]
+VSS: 0.005750340653017716
+```
+Accordingly, the VSS is small.
