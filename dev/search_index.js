@@ -210,18 +210,34 @@ var documenterSearchIndex = {"docs": [
 
 {
     "location": "manual/modeldef/#",
-    "page": "Model definition",
-    "title": "Model definition",
+    "page": "Stochastic models",
+    "title": "Stochastic models",
     "category": "page",
     "text": ""
 },
 
 {
-    "location": "manual/modeldef/#Model-definition-1",
-    "page": "Model definition",
-    "title": "Model definition",
+    "location": "manual/modeldef/#Stochastic-models-1",
+    "page": "Stochastic models",
+    "title": "Stochastic models",
     "category": "section",
-    "text": "Another central idea in StochasticPrograms is deferred model instantiation. Consider again the simple problem introduced in the Quick start, but with some slight differences:using StochasticPrograms\n\n@scenario Simple = begin\n    q₁::Float64\n    q₂::Float64\n    d₁::Float64\n    d₂::Float64\nend\n\nsp = StochasticProgram(SimpleScenario)\n\n@first_stage sp = begin\n    @variable(model, x₁ >= 40)\n    @variable(model, x₂ >= 20)\n    @objective(model, Min, 100*x₁ + 150*x₂)\n    @constraint(model, x₁ + x₂ <= 120)\nend defer\n\n@second_stage sp = begin\n    @decision x₁ x₂\n    ξ = scenario\n    @variable(model, 0 <= y₁ <= ξ.d₁)\n    @variable(model, 0 <= y₂ <= ξ.d₂)\n    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\nendThere are two things to note here. First, no scenarios have been loaded yet, so no second stage models were instansiated. Moreover, the first stage was defined with the defer keyword, and the printout states that the first stage is deferred. This means that the first stage model has not yet been instansiated, but the stochastic program instance has a model recipe that can be used to generate it when required:println(has_generator(sp, :stage_1))\nprintln(has_generator(sp, :stage_2))Now, we add the simple scenarios to the stochastic program instance, also with a defer keyword:ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)\nξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)\nadd_scenarios!(sp, [ξ₁, ξ₂], defer = true)The two scenarios are loaded, but no second stage models were instansiated. Deferred stochastic programs will always be generated in full when required. For instance, this occurs when calling optimize!. Furthermore, we can explicitly instansiate the stochastic program using generate!:generate!(sp)This gives a clear separation between data design and model design, and gives flexibility when defining stochastic programs. The model recipes are also used internally to create different stochastic programming constructs, such as outcome models and wait-and-see models. Moreover, deferred model instantiation is the foundation for the distributed functionality in Stochastic Programs, to be described next."
+    "text": "Now, tools related to model definitions in StochasticPrograms are introduced in more detail."
+},
+
+{
+    "location": "manual/modeldef/#Model-objects-1",
+    "page": "Stochastic models",
+    "title": "Model objects",
+    "category": "section",
+    "text": "To further seperate model design from data design, StochasticPrograms provides a stochastic model object. This object can be used to store the optimization models before introducing scenario data. Consider the following alternative approach to the simple problem introduced in the Quick start:using StochasticPrograms\n\nsimple_model = StochasticModel((sp) -> begin\n	@first_stage sp = begin\n		@variable(model, x₁ >= 40)\n		@variable(model, x₂ >= 20)\n		@objective(model, Min, 100*x₁ + 150*x₂)\n		@constraint(model, x₁ + x₂ <= 120)\n	end\n	@second_stage sp = begin\n		@decision x₁ x₂\n		ξ = scenario\n		@variable(model, 0 <= y₁ <= ξ.d₁)\n		@variable(model, 0 <= y₂ <= ξ.d₂)\n		@objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n		@constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n		@constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\n	end\nend)The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the Quick start:@scenario AnotherSimple = begin\n    q₁::Float64\n    q₂::Float64\n    d₁::Float64\n    d₂::Float64\nend\n\nξ₁ = AnotherSimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)\nξ₂ = AnotherSimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)\n\nsp = instantiate(simple_model, [ξ₁, ξ₂])Moreoever, SSA models are constructed in a more straightforward way. Consider the following:@sampler AnotherSimple = begin\n    @sample begin\n        return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),\n									 -28.0 + (2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 probability = rand())\n    end\nend\n\nssa = SSA(simple_model, AnotherSimpleSampler(), 10)This allows the user to clearly distinguish between the often abstract base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedand look-ahead models that approximate the base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n y_s in mathbbR^m  quad c^T x + sum_s = 1^n pi_s q_s^Ty_s \n textst  quad Ax = b \n  quad T_s x + W y_s = h_s quad s = 1 dots n \n  quad x geq 0 y_s geq 0 quad s = 1 dots n\nendaligned"
+},
+
+{
+    "location": "manual/modeldef/#Deferred-models-1",
+    "page": "Stochastic models",
+    "title": "Deferred models",
+    "category": "section",
+    "text": "Another tool StochasticPrograms is deferred model instantiation. Consider again the simple problem introduced in the Quick start, but with some slight differences:using StochasticPrograms\n\n@scenario Simple = begin\n    q₁::Float64\n    q₂::Float64\n    d₁::Float64\n    d₂::Float64\nend\n\nsp = StochasticProgram(SimpleScenario)\n\n@first_stage sp = begin\n    @variable(model, x₁ >= 40)\n    @variable(model, x₂ >= 20)\n    @objective(model, Min, 100*x₁ + 150*x₂)\n    @constraint(model, x₁ + x₂ <= 120)\nend defer\n\n@second_stage sp = begin\n    @decision x₁ x₂\n    ξ = scenario\n    @variable(model, 0 <= y₁ <= ξ.d₁)\n    @variable(model, 0 <= y₂ <= ξ.d₂)\n    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\nendThere are two things to note here. First, no scenarios have been loaded yet, so no second stage models were instansiated. Moreover, the first stage was defined with the defer keyword, and the printout states that the first stage is deferred. This means that the first stage model has not yet been instansiated, but the stochastic program instance has a model recipe that can be used to generate it when required:println(has_generator(sp, :stage_1))\nprintln(has_generator(sp, :stage_2))Now, we add the simple scenarios to the stochastic program instance, also with a defer keyword:ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)\nξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)\nadd_scenarios!(sp, [ξ₁, ξ₂], defer = true)The two scenarios are loaded, but no second stage models were instansiated. Deferred stochastic programs will always be generated in full when required. For instance, this occurs when calling optimize!. Furthermore, we can explicitly instansiate the stochastic program using generate!:generate!(sp)"
 },
 
 {
@@ -577,7 +593,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s14,1} where #s14<:AbstractScenario,Integer}",
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s24,1} where #s24<:AbstractScenario,Integer}",
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenarios!",
     "category": "method",
@@ -585,7 +601,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s14,1} where #s14<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s24,1} where #s24<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenarios!",
     "category": "method",
@@ -665,7 +681,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s14,1} where #s14<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s24,1} where #s24<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.instantiate",
     "category": "method",

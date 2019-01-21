@@ -1,5 +1,72 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Model definition · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li class="current"><a class="toctext" href>Model definition</a><ul class="internal"></ul></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Model definition</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/modeldef.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Model definition</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Model-definition-1" href="#Model-definition-1">Model definition</a></h1><p>Another central idea in StochasticPrograms is deferred model instantiation. Consider again the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>, but with some slight differences:</p><div><pre><code class="language-julia">using StochasticPrograms
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Stochastic models · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li class="current"><a class="toctext" href>Stochastic models</a><ul class="internal"><li><a class="toctext" href="#Model-objects-1">Model objects</a></li><li><a class="toctext" href="#Deferred-models-1">Deferred models</a></li></ul></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Stochastic models</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/modeldef.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Stochastic models</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Stochastic-models-1" href="#Stochastic-models-1">Stochastic models</a></h1><p>Now, tools related to model definitions in StochasticPrograms are introduced in more detail.</p><h2><a class="nav-anchor" id="Model-objects-1" href="#Model-objects-1">Model objects</a></h2><p>To further seperate model design from data design, StochasticPrograms provides a stochastic model object. This object can be used to store the optimization models before introducing scenario data. Consider the following alternative approach to the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">using StochasticPrograms
+
+simple_model = StochasticModel((sp) -&gt; begin
+	@first_stage sp = begin
+		@variable(model, x₁ &gt;= 40)
+		@variable(model, x₂ &gt;= 20)
+		@objective(model, Min, 100*x₁ + 150*x₂)
+		@constraint(model, x₁ + x₂ &lt;= 120)
+	end
+	@second_stage sp = begin
+		@decision x₁ x₂
+		ξ = scenario
+		@variable(model, 0 &lt;= y₁ &lt;= ξ.d₁)
+		@variable(model, 0 &lt;= y₂ &lt;= ξ.d₂)
+		@objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
+		@constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+		@constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+	end
+end)</code></pre><pre><code class="language-none">Stochastic Model
+
+minimize cᵀx + 𝔼[Q(x,ξ)]
+  x∈ℝⁿ  Ax = b
+         x ≥ 0
+
+where
+
+Q(x,ξ) = min  q(ξ)ᵀy
+        y∈ℝᵐ T(ξ)x + Wy = h(ξ)
+              y ≥ 0</code></pre></div><p>The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">@scenario AnotherSimple = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end
+
+ξ₁ = AnotherSimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
+ξ₂ = AnotherSimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
+
+sp = instantiate(simple_model, [ξ₁, ξ₂])</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 scenarios of type AnotherSimpleScenario
+ * 2 decision variables
+ * 2 recourse variables
+Solver is default solver</code></pre></div><p>Moreoever, SSA models are constructed in a more straightforward way. Consider the following:</p><div><pre><code class="language-julia">@sampler AnotherSimple = begin
+    @sample begin
+        return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),
+									 -28.0 + (2*rand()-1),
+									 300.0 + 100*(2*rand()-1),
+									 300.0 + 100*(2*rand()-1),
+									 probability = rand())
+    end
+end
+
+ssa = SSA(simple_model, AnotherSimpleSampler(), 10)</code></pre><pre><code class="language-none">Stochastic program with:
+ * 10 scenarios of type AnotherSimpleScenario
+ * 2 decision variables
+ * 2 recourse variables
+Solver is default solver</code></pre></div><p>This allows the user to clearly distinguish between the often abstract <em>base-model</em>:</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}^n} &amp; \quad c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right] \\
+ \text{s.t.} &amp; \quad Ax = b \\
+ &amp; \quad x \geq 0
+\end{aligned}\]</div><p>and <em>look-ahead</em> models that approximate the base-model:</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}^n, y_s \in \mathbb{R}^m} &amp; \quad c^T x + \sum_{s = 1}^n \pi_s q_s^Ty_s \\
+ \text{s.t.} &amp; \quad Ax = b \\
+ &amp; \quad T_s x + W y_s = h_s, \quad &amp;s = 1, \dots, n \\
+ &amp; \quad x \geq 0, y_s \geq 0, \quad &amp;s = 1, \dots, n
+\end{aligned}\]</div><h2><a class="nav-anchor" id="Deferred-models-1" href="#Deferred-models-1">Deferred models</a></h2><p>Another tool StochasticPrograms is deferred model instantiation. Consider again the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>, but with some slight differences:</p><div><pre><code class="language-julia">using StochasticPrograms
 
 @scenario Simple = begin
     q₁::Float64
@@ -41,4 +108,4 @@ Solver is default solver</code></pre></div><p>The two scenarios are loaded, but 
  * 2 scenarios of type SimpleScenario
  * 2 decision variables
  * 2 recourse variables
-Solver is default solver</code></pre></div><p>This gives a clear separation between data design and model design, and gives flexibility when defining stochastic programs. The model recipes are also used internally to create different stochastic programming constructs, such as outcome models and wait-and-see models. Moreover, deferred model instantiation is the foundation for the distributed functionality in Stochastic Programs, to be described next.</p><footer><hr/><a class="previous" href="../data/"><span class="direction">Previous</span><span class="title">Stochastic data</span></a><a class="next" href="../distributed/"><span class="direction">Next</span><span class="title">Distributed stochastic programs</span></a></footer></article></body></html>
+Solver is default solver</code></pre></div><footer><hr/><a class="previous" href="../data/"><span class="direction">Previous</span><span class="title">Stochastic data</span></a><a class="next" href="../distributed/"><span class="direction">Next</span><span class="title">Distributed stochastic programs</span></a></footer></article></body></html>
