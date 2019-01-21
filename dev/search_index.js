@@ -689,6 +689,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Any,Any,Array{#s24,1} where #s24<:AbstractScenario}",
+    "page": "Public interface",
+    "title": "StochasticPrograms.instantiate",
+    "category": "method",
+    "text": "instantiate(stochasticmodel::StochasticModel,\n            first_stage::Any,\n            second_stage::Any,\n            scenarios::Vector{<:AbstractScenario};\n            solver = JuMP.UnsetSolver(),\n            procs = workers())\n\nInstantate a new stochastic program using the model definition stored in stochasticmodel, the stage data given by first_stage and second_stage, and the given collection of scenarios.\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s24,1} where #s24<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.instantiate",
@@ -1057,11 +1065,19 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{StochasticModel,AbstractSampler{S},Integer}} where S<:AbstractScenario",
+    "page": "Public interface",
+    "title": "StochasticPrograms.SSA",
+    "category": "method",
+    "text": "SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{StochasticModel,Any,Any,AbstractSampler{S},Integer}} where S<:AbstractScenario",
     "page": "Public interface",
     "title": "StochasticPrograms.SSA",
     "category": "method",
-    "text": "SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel and the provided sampler.\n\ndOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+    "text": "SSA(stochasticmodel::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel, the stage data given by first_stage and second_stage, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {

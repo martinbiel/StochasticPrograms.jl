@@ -27,7 +27,7 @@ where
 
 Q(x,ξ) = min  q(ξ)ᵀy
         y∈ℝᵐ T(ξ)x + Wy = h(ξ)
-              y ≥ 0</code></pre></div><p>The resulting model object can be used to <a href="../../library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s24,1} where #s24&lt;:AbstractScenario}"><code>instantiate</code></a> different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">@scenario AnotherSimple = begin
+              y ≥ 0</code></pre></div><p>The resulting model object can be used to <a href="../../library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Any,Any,Array{#s24,1} where #s24&lt;:AbstractScenario}"><code>instantiate</code></a> different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">@scenario AnotherSimple = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64
