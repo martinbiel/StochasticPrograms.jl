@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li><a class="toctext" href="../modeldef/">Stochastic models</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li class="current"><a class="toctext" href>Examples</a><ul class="internal"><li><a class="toctext" href="#Farmer-problem-1">Farmer problem</a></li></ul></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Examples</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Examples</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Examples-1" href="#Examples-1">Examples</a></h1><h2><a class="nav-anchor" id="Farmer-problem-1" href="#Farmer-problem-1">Farmer problem</a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><div><pre><code class="language-julia">using StochasticPrograms
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li><a class="toctext" href="../modeldef/">Stochastic models</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li class="current"><a class="toctext" href>Examples</a><ul class="internal"><li><a class="toctext" href="#Farmer-problem-1">Farmer problem</a></li><li><a class="toctext" href="#Continuous-scenario-distribution-1">Continuous scenario distribution</a></li></ul></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Examples</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Examples</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Examples-1" href="#Examples-1">Examples</a></h1><h2><a class="nav-anchor" id="Farmer-problem-1" href="#Farmer-problem-1">Farmer problem</a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><div><pre><code class="language-julia">using StochasticPrograms
 using GLPKMathProgInterface</code></pre></div><p>We begin by introducing some variable indices:</p><div><pre><code class="language-julia">Crops = [:wheat, :corn, :beets];
 Purchased = [:wheat, :corn];
 Sold = [:wheat,:corn,:beets_quota,:beets_extra];</code></pre></div><p>The price of beets drops after a certain quantity (6000), so we introduce an extra variable to handle the excess beets. Using the variable indices, we define the deterministic problem parameters:</p><div><pre><code class="language-julia">Cost = Dict(:wheat=&gt;150, :corn=&gt;230, :beets=&gt;260);
@@ -56,4 +56,69 @@ Corn: 80.00000000000001
 Beets: 250.0
 Profit: -108390.00000000001</code></pre></div><p>Finally, we calculate the stochastic performance of the model:</p><div><pre><code class="language-julia">println(&quot;EVPI: $(EVPI(farmer))&quot;)
 println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre><code class="language-none">EVPI: 7015.555555555533
-VSS: 1150.0000000000437</code></pre></div><footer><hr/><a class="previous" href="../structuredsolvers/"><span class="direction">Previous</span><span class="title">Structured solvers</span></a><a class="next" href="../../library/public/"><span class="direction">Next</span><span class="title">Public interface</span></a></footer></article></body></html>
+VSS: 1150.0000000000437</code></pre></div><h2><a class="nav-anchor" id="Continuous-scenario-distribution-1" href="#Continuous-scenario-distribution-1">Continuous scenario distribution</a></h2><p>As an example, consider the following generalized stochastic program:</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}} &amp; \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
+\end{aligned}\]</div><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><div><pre><code class="language-julia">using StochasticPrograms
+using Distributions
+
+struct DistributionScenario{D &lt;: UnivariateDistribution} &lt;: AbstractScenario
+    probability::Probability
+    distribution::D
+    ξ::Float64
+
+    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)
+        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))
+    end
+end
+
+function StochasticPrograms.expected(scenarios::Vector{&lt;:DistributionScenario{D}}) where D &lt;: UnivariateDistribution
+    isempty(scenarios) &amp;&amp; return DistributionScenario(D(), 0.0)
+    distribution = scenarios[1].distribution
+    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))
+end</code></pre></div><p>The fallback <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a> method is viable as long as the scenario type contains a <a href="../../library/public/#StochasticPrograms.Probability"><code>Probability</code></a> field named <code>probability</code>. The implementation of <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.</p><p>We can implement a sampler that generates exponentially distributed scenarios as follows:</p><div><pre><code class="language-julia">struct ExponentialSampler &lt;: AbstractSampler{DistributionScenario{Exponential{Float64}}}
+    distribution::Exponential
+
+    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))
+end
+
+function (sampler::ExponentialSampler)()
+    ξ = rand(sampler.distribution)
+    return DistributionScenario(sampler.distribution, ξ)
+end</code></pre></div><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-julia">using Ipopt
+
+model = StochasticModel((sp) -&gt; begin
+	@first_stage sp = begin
+		@variable(model, x)
+	end
+
+	@second_stage sp = begin
+		@decision x
+		ξ = scenario.ξ
+		@variable(model, y)
+		@constraint(model, y == (x - ξ)^2)
+		@objective(model, Min, y)
+	end
+end)</code></pre><pre><code class="language-julia">Stochastic Model
+
+minimize cᵀx + 𝔼[Q(x,ξ)]
+  x∈ℝⁿ  Ax = b
+         x ≥ 0
+
+where
+
+Q(x,ξ) = min  q(ξ)ᵀy
+        y∈ℝᵐ T(ξ)x + Wy = h(ξ)
+              y ≥ 0</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:</p><pre><code class="language-julia">sampler = ExponentialSampler(2.) # Create a sampler
+
+ssa = SSA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA model</code></pre><pre><code class="language-julia">Stochastic program with:
+ * 1000 scenarios of type DistributionScenario
+ * 1 decision variable
+ * 1 recourse variable
+Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(ssa, solver = IpoptSolver(print_level=0))
+
+println(&quot;Optimal decision: $(optimal_decision(ssa))&quot;)
+println(&quot;Optimal value: $(optimal_value(ssa))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.07583]
+Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))&quot;)
+println(&quot;VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
+VSS: 0.005750340653017716</code></pre><p>Accordingly, the VSS is small.</p><footer><hr/><a class="previous" href="../structuredsolvers/"><span class="direction">Previous</span><span class="title">Structured solvers</span></a><a class="next" href="../../library/public/"><span class="direction">Next</span><span class="title">Public interface</span></a></footer></article></body></html>

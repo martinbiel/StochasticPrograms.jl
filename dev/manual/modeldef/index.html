@@ -27,7 +27,7 @@ where
 
 Q(x,ξ) = min  q(ξ)ᵀy
         y∈ℝᵐ T(ξ)x + Wy = h(ξ)
-              y ≥ 0</code></pre></div><p>The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">@scenario AnotherSimple = begin
+              y ≥ 0</code></pre></div><p>The resulting model object can be used to <a href="../../library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s24,1} where #s24&lt;:AbstractScenario}"><code>instantiate</code></a> different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><div><pre><code class="language-julia">@scenario AnotherSimple = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64
@@ -41,7 +41,7 @@ sp = instantiate(simple_model, [ξ₁, ξ₂])</code></pre><pre><code class="lan
  * 2 scenarios of type AnotherSimpleScenario
  * 2 decision variables
  * 2 recourse variables
-Solver is default solver</code></pre></div><p>Moreoever, SSA models are constructed in a more straightforward way. Consider the following:</p><div><pre><code class="language-julia">@sampler AnotherSimple = begin
+Solver is default solver</code></pre></div><p>Moreoever, <a href="../../library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP&lt;:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S},Integer}} where S&lt;:AbstractScenario where D₂ where D₁"><code>SSA</code></a> models are constructed in a straightforward way. Consider the following:</p><div><pre><code class="language-julia">@sampler AnotherSimple = begin
     @sample begin
         return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),
 									 -28.0 + (2*rand()-1),
