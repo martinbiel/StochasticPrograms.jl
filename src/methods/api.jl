@@ -9,7 +9,22 @@
 Instantate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
 """
 function instantiate(sm::StochasticModel, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
-    sp = StochasticProgram(sm.first_stage, sm.second_stage, scenarios, solver, procs)
+    sp = StochasticProgram(sm.first_stage.data, sm.second_stage.data, scenarios, solver, procs)
+    sm.generator(sp)
+    return sp
+end
+"""
+    instantiate(stochasticmodel::StochasticModel,
+                first_stage::Any,
+                second_stage::Any,
+                scenarios::Vector{<:AbstractScenario};
+                solver = JuMP.UnsetSolver(),
+                procs = workers())
+
+Instantate a new stochastic program using the model definition stored in `stochasticmodel`, the stage data given by `first_stage` and `second_stage`, and the given collection of `scenarios`.
+"""
+function instantiate(sm::StochasticModel, first_stage::Any, second_stage::Any, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
+    sp = StochasticProgram(first_stage, second_stage, scenarios, solver, procs)
     sm.generator(sp)
     return sp
 end

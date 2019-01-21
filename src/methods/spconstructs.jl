@@ -129,15 +129,15 @@ end
 """
     SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
 
-Generate a **sample average approximation** (`SSA`) instance of size `n` using the model stored in `stochasticmodel` and the provided `sampler`.
+Generate a **sample average approximation** (`SSA`) instance of size `n` using the model stored in `stochasticmodel`, and the provided `sampler`.
 
-dOptionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
 
 See also: [`sample!`](@ref)
 """
-function SSA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+function SSA(sm::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
     # Create new stochastic program instance
-    ssa = StochasticProgram(sm.first_stage, sm.second_stage, S; solver = solver)
+    ssa = StochasticProgram(sm.first_stage.data, sm.second_stage.data, S; solver = solver)
     sm.generator(ssa)
     # Sample n scenarios
     add_scenarios!(ssa, n) do
@@ -146,7 +146,26 @@ function SSA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::
     # Return the SSA instance
     return ssa
 end
-SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario} = SSA(stochasticmodel, nothing, nothing, sampler, n; solver = solver)
+"""
+    SSA(stochasticmodel::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+
+Generate a **sample average approximation** (`SSA`) instance of size `n` using the model stored in `stochasticmodel`, the stage data given by `first_stage` and `second_stage`, and the provided `sampler`.
+
+Optionally, a capable `solver` can be supplied to `SSA`. Otherwise, any previously set solver will be used.
+
+See also: [`sample!`](@ref)
+"""
+function SSA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+    # Create new stochastic program instance
+    ssa = StochasticProgram(first_stage, second_stage, S; solver = solver)
+    sm.generator(ssa)
+    # Sample n scenarios
+    add_scenarios!(ssa, n) do
+        return sample(sampler, 1/n)
+    end
+    # Return the SSA instance
+    return ssa
+end
 """
     DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
 
