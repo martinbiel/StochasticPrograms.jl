@@ -3,7 +3,7 @@
 
 A mathematical model of a stochastic optimization problem. Every instance is linked to some given scenario type `AbstractScenario`. A StochasticProgram can be memory-distributed on multiple Julia processes.
 """
-struct StochasticProgram{D₁, D₂, S <: AbstractScenario, SP <: Union{ScenarioProblems{D₂,S}, DScenarioProblems{D₂,S}}}
+struct StochasticProgram{D₁, D₂, S <: AbstractScenario, SP <: AbstractScenarioProblems{D₂, S}}
     first_stage::Stage{D₁}
     scenarioproblems::SP
     generator::Dict{Symbol,Function}

@@ -30,6 +30,7 @@ function generate_parent!(scenarioproblems::ScenarioProblems{D,S}, generator::Fu
     return nothing
 end
 function generate_parent!(scenarioproblems::DScenarioProblems{D,S}, generator::Function, parentdata::Any) where {D, S <: AbstractScenario}
+    generator(parentmodel(scenarioproblems), parentdata)
     active_workers = Vector{Future}(undef, nworkers())
     for w in workers()
         active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata), w, scenarioproblems[w-1], generator, parentdata)

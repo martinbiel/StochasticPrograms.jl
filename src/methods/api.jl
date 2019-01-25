@@ -538,5 +538,6 @@ function sample!(stochasticprogram::StochasticProgram{D₁,D₂,S}, sampler::Abs
     if !defer
         generate!(stochasticprogram)
     end
+    return stochasticprogram
 end
 # ========================== #

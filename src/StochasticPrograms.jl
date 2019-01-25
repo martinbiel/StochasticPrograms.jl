@@ -14,6 +14,8 @@ using MathProgBase
 using MacroTools
 using MacroTools: @q, postwalk
 
+import Base.getindex
+
 const MPB = MathProgBase
 
 export

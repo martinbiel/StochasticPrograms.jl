@@ -44,6 +44,9 @@ end
 function Base.show(io::IO, scenario::S) where S <: AbstractScenario
     print(io, "$(S.name.name) with probability $(probability(scenario))")
 end
+function Base.getindex(ξ::AbstractScenario, field::Symbol)
+    return getfield(ξ, field)
+end
 """
     ExpectedScenario{S <: AbstractScenario}
 
