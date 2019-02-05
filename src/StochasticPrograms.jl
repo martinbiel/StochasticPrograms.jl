@@ -73,6 +73,7 @@ export
     outcome_model,
     evaluate_decision,
     lower_bound,
+    confidence_interval,
     instantiate,
     optimize!,
     optimal_decision,

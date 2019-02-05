@@ -185,7 +185,7 @@ Moreover, we can evaluate the result of the decision in a given scenario, i.e. s
 evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())
 ```
 
-In the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider [`evaluate_decision`](@ref) and [`lower_bound`](@ref).
+In the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider [`evaluate_decision`](@ref), [`lower_bound`](@ref) and [`confidence_interval`](@ref).
 
 ## Optimal first-stage decision
 

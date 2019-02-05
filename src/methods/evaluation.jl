@@ -47,31 +47,30 @@ function _stat_eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂
                                   x::AbstractVector,
                                   solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
     N = nscenarios(stochasticprogram)
-    active_workers = Vector{Future}(undef,nworkers())
+    active_workers = Vector{Future}(undef, nworkers())
     objectives = _second_stage_objectives(stochasticprogram, x, solver)
     for w in workers()
         active_workers[w-1] = remotecall((sp,objectives)->begin
-                                         scenarioproblems = fetch(sp)
-                                         Qs = fetch(objectives)
-                                         isempty(scenarioproblems.scenarios) && return zero(eltype(x))
-                                         return [probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarioproblems.scenarios)]
-                                         end,
-                                         w,
-                                         stochasticprogram.scenarioproblems[w-1],
-                                         objectives[w-1])
+            scenarioproblems = fetch(sp)
+            Qs = fetch(objectives)
+            isempty(scenarioproblems.scenarios) && return zero(eltype(x))
+            return sum([probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarioproblems.scenarios)])
+        end,
+        w,
+        stochasticprogram.scenarioproblems[w-1],
+        objectives[w-1])
     end
     map(wait, active_workers)
     𝔼Q = sum(fetch.(active_workers))
     for w in workers()
         active_workers[w-1] = remotecall((objectives,𝔼Q)->begin
-                                         scenarioproblems = fetch(sp)
-                                         Qs = fetch(objectives)
-                                         isempty(scenarioproblems.scenarios) && return zero(eltype(x))
-                                         return sum([(Q-𝔼Q)^2 for Q in Qs])
-                                         end,
-                                         w,
-                                         objectives[w-1],
-                                         𝔼Q)
+            Qs = fetch(objectives)
+            isempty(Qs) && return zero(eltype(x))
+            return sum([(Q-𝔼Q)^2 for Q in Qs])
+        end,
+        w,
+        objectives[w-1],
+        𝔼Q)
     end
     map(wait, active_workers)
     σ² = (1/(N*(N-1)))*sum(fetch.(active_workers))
@@ -188,45 +187,69 @@ end
                       x::AbstractVector,
                       sampler::AbstractSampler;
                       solver = JuMP.UnsetSolver(),
-                      confidence = 0.9,
+                      confidence = 0.95,
                       N = 1000)
 
 Return a statistical estimate of the objective of `stochasticprogram` at `x`, and an upper bound at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
 In other words, evaluate `x` on an SSA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
 """
-function evaluate_decision(stochasticmodel::StochasticModel, x::AbstractVector, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {S <: AbstractScenario}
+function evaluate_decision(stochasticmodel::StochasticModel, x::AbstractVector, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {S <: AbstractScenario}
     eval_model = SSA(stochasticmodel, sampler, N)
     # Condidence level
-    α = (1-confidence)/2
+    α = 1-confidence
     # Upper bound
     cᵀx = _eval_first_stage(eval_model, x)
-    𝔼Q, σ = _stat_eval_second_stages(eval_model, x, internal_solver(supplied_solver))
+    𝔼Q, σ = _stat_eval_second_stages(eval_model, x, internal_solver(solver))
     U = cᵀx + 𝔼Q + quantile(Normal(0,1), 1-α)*σ
 
     return cᵀx + 𝔼Q, U
 end
 """
     lower_bound(stochasticmodel::StochasticModel,
-                x::AbstractVector,
                 sampler::AbstractSampler;
                 solver = JuMP.UnsetSolver(),
-                confidence = 0.9,
+                confidence = 0.95,
                 N = 100,
                 M = 10)
 
 Generate a lower bound of the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+
+In other words, solve and evaluate `M` SSA models of size `N` to generate a statistic estimate.
 """
-function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer) where {S <: AbstractScenario}
+function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
+    # Condidence level
+    α = 1-confidence
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     for i = 1:M
         ssa = SSA(stochasticmodel, sampler, N)
-        Qs[i] = VRP(ssa, solver = supplied_solver)
+        Qs[i] = VRP(ssa, solver = solver)
     end
     Q̂ = mean(Qs)
     σ² = (1/(M*(M-1)))*sum([(Q-Q̂)^2 for Q in Qs])
 
     return Q̂ - quantile(TDist(M-1), 1-α)*sqrt(σ²)
+end
+"""
+    confidence_interval(stochasticmodel::StochasticModel,
+                        sampler::AbstractSampler;
+                        solver = JuMP.UnsetSolver(),
+                        confidence = 0.9,
+                        N = 100,
+                        M = 10)
+
+Generate a confidence interval around the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+
+`N` is the size of the SSA models used to generate the interval and generally governs how tight it is. `M` is the amount of samples used to compute the lower bound.
+"""
+function confidence_interval(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
+    α = (1-confidence)/2
+    L = lower_bound(stochasticmodel, sampler; solver = solver, confidence = 1-α, N = N, M = M)
+    ssa = SSA(stochasticmodel, sampler, N)
+    optimize!(ssa, solver = solver)
+    x̂ = optimal_decision(ssa)
+    Q, U = evaluate_decision(stochasticmodel, x̂, sampler; solver = solver, confidence = 1-α)
+    return L, U
 end
 # ========================== #
