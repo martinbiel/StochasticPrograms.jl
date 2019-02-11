@@ -1,19 +1,19 @@
-@scenario SSA = begin
+@scenario SAA = begin
     ξ::Float64
 end
 
-@sampler SSA = begin
+@sampler SAA = begin
     w::Float64
 
-    SSA(w::AbstractFloat) = new(w)
+    SAA(w::AbstractFloat) = new(w)
 
     @sample begin
         w = sampler.w
-        return SSAScenario(w*randn(), probability = rand())
+        return SAAScenario(w*randn(), probability = rand())
     end
 end
 
-ssa_model = StochasticModel((sp) -> begin
+saa_model = StochasticModel((sp) -> begin
     @first_stage sp = begin
         @variable(model, x >= 0)
     end

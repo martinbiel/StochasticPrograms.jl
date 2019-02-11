@@ -92,7 +92,7 @@ export
     WS,
     WS_decision,
     EWS,
-    SSA,
+    SAA,
     DEP,
     VRP,
     EVPI,

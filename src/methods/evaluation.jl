@@ -192,10 +192,10 @@ end
 
 Return a statistical estimate of the objective of `stochasticprogram` at `x`, and an upper bound at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
-In other words, evaluate `x` on an SSA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
+In other words, evaluate `x` on an SAA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
 """
 function evaluate_decision(stochasticmodel::StochasticModel, x::AbstractVector, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {S <: AbstractScenario}
-    eval_model = SSA(stochasticmodel, sampler, N)
+    eval_model = SAA(stochasticmodel, sampler, N)
     # Condidence level
     α = 1-confidence
     # Upper bound
@@ -215,7 +215,7 @@ end
 
 Generate a lower bound of the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
-In other words, solve and evaluate `M` SSA models of size `N` to generate a statistic estimate.
+In other words, solve and evaluate `M` SAA models of size `N` to generate a statistic estimate.
 """
 function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
     # Condidence level
@@ -223,8 +223,8 @@ function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     for i = 1:M
-        ssa = SSA(stochasticmodel, sampler, N)
-        Qs[i] = VRP(ssa, solver = solver)
+        saa = SAA(stochasticmodel, sampler, N)
+        Qs[i] = VRP(saa, solver = solver)
     end
     Q̂ = mean(Qs)
     σ² = (1/(M*(M-1)))*sum([(Q-Q̂)^2 for Q in Qs])
@@ -241,14 +241,14 @@ end
 
 Generate a confidence interval around the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
-`N` is the size of the SSA models used to generate the interval and generally governs how tight it is. `M` is the amount of samples used to compute the lower bound.
+`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of samples used to compute the lower bound.
 """
 function confidence_interval(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
     α = (1-confidence)/2
     L = lower_bound(stochasticmodel, sampler; solver = solver, confidence = 1-α, N = N, M = M)
-    ssa = SSA(stochasticmodel, sampler, N)
-    optimize!(ssa, solver = solver)
-    x̂ = optimal_decision(ssa)
+    saa = SAA(stochasticmodel, sampler, N)
+    optimize!(saa, solver = solver)
+    x̂ = optimal_decision(saa)
     Q, U = evaluate_decision(stochasticmodel, x̂, sampler; solver = solver, confidence = 1-α)
     return L, U
 end

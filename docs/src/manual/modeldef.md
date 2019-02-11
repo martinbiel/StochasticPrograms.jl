@@ -40,7 +40,7 @@ end
 
 sp = instantiate(simple_model, [ξ₁, ξ₂])
 ```
-Moreoever, [`SSA`](@ref) models are constructed in a straightforward way. Consider the following:
+Moreoever, [`SAA`](@ref) models are constructed in a straightforward way. Consider the following:
 ```@example stochasticmodel
 @sampler AnotherSimple = begin
     @sample begin
@@ -52,7 +52,7 @@ Moreoever, [`SSA`](@ref) models are constructed in a straightforward way. Consid
     end
 end
 
-ssa = SSA(simple_model, AnotherSimpleSampler(), 10)
+saa = SAA(simple_model, AnotherSimpleSampler(), 10)
 ```
 This allows the user to clearly distinguish between the often abstract *base-model*:
 ```math

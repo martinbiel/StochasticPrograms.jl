@@ -30,7 +30,7 @@ where
     & \quad y \geq 0
   \end{aligned}
 ```
-If the sample space ``\Omega`` is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space ``\Omega`` is infinite, sampling techniques can be used to represent the stochastic program using finite [SSA](@ref) instances.
+If the sample space ``\Omega`` is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space ``\Omega`` is infinite, sampling techniques can be used to represent the stochastic program using finite [SAA](@ref) instances.
 
 ## A simple stochastic program
 

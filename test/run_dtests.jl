@@ -79,7 +79,7 @@ include("sampling.jl")
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
     end
     @testset "Distributed Sampling" begin
-        sampled_sp = SSA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
+        sampled_sp = SAA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6

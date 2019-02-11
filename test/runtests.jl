@@ -26,8 +26,8 @@ include("deferred.jl")
 include("farmer.jl")
 @info "Preparing simple sampler..."
 include("sampling.jl")
-@info "Preparing SSA..."
-include("SSA.jl")
+@info "Preparing SAA..."
+include("SAA.jl")
 @info "Test problems loaded. Starting test sequence."
 
 @testset "Stochastic Programs" begin
@@ -76,7 +76,7 @@ include("SSA.jl")
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
     end
     @testset "Sampling" begin
-        sampled_sp = SSA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
+        sampled_sp = SAA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
@@ -85,11 +85,11 @@ include("SSA.jl")
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
     end
-    @testset "SSA" begin
-        ssa = SSA(ssa_model, SSASampler(2.), 100)
-        @test nscenarios(ssa) == 100
-        @test nsubproblems(ssa) == 100
-        @test abs(probability(ssa)-1.0) <= 1e-6
+    @testset "SAA" begin
+        saa = SAA(saa_model, SAASampler(2.), 100)
+        @test nscenarios(saa) == 100
+        @test nsubproblems(saa) == 100
+        @test abs(probability(saa)-1.0) <= 1e-6
     end
 end
 

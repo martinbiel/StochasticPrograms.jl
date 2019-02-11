@@ -290,11 +290,11 @@ println("optimal value: $(optimal_value(sp))")
 ```
 Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [Custom scenarios](@ref).
 
-## SSA
+## SAA
 
-The command [`SSA`](@ref) is used to create sampled average approximations of a given stochastic program by supplying a sampler object.
+The command [`SAA`](@ref) is used to create sampled average approximations of a given stochastic program by supplying a sampler object.
 ```@example sampling
-ssa = SSA(sp, sampler, 10)
+saa = SAA(sp, sampler, 10)
 ```
 
 ## Custom scenarios
