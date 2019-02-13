@@ -9,7 +9,7 @@ In other words, generate the first stage and the second stage of the `stochastic
 
 See also: [`DEP`](@ref), [`EVP`](@ref)
 """
-function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
+function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Check that the required generators have been defined
@@ -32,7 +32,7 @@ function _WS(stage_one_generator::Function,
     ws_model.obj = ws_obj
     return ws_model
 end
-function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
+function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver = solver)
     solve(ws_model)
@@ -52,7 +52,7 @@ In other words, calculate the expectated result of all possible wait-and-see mod
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EWS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
@@ -113,7 +113,7 @@ In other words, sample `n` scenarios, of type consistent with `stochasticprogram
 
 See also: [`sample!`](@ref)
 """
-function SAA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {D₁, D₂, S <: AbstractScenario}
+function SAA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {D₁, D₂, S <: AbstractScenario}
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Create new stochastic program instance
@@ -135,7 +135,7 @@ Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previous
 
 See also: [`sample!`](@ref)
 """
-function SAA(sm::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+function SAA(sm::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {S <: AbstractScenario}
     # Create new stochastic program instance
     saa = StochasticProgram(sm.first_stage.data, sm.second_stage.data, S; solver = solver)
     sm.generator(saa)
@@ -155,7 +155,7 @@ Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previous
 
 See also: [`sample!`](@ref)
 """
-function SAA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+function SAA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {S <: AbstractScenario}
     # Create new stochastic program instance
     saa = StochasticProgram(first_stage, second_stage, S; solver = solver)
     sm.generator(saa)
@@ -175,7 +175,7 @@ In other words, generate the extended form the `stochasticprogram` as a single J
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function DEP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
@@ -247,7 +247,7 @@ In other words, optimize the stochastic program and return the optimal value. Op
 
 See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
-function VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function VRP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve DEP
     optimize!(stochasticprogram, solver = solver)
     # Return optimal value
@@ -262,7 +262,7 @@ In other words, calculate the gap between `VRP` and `EWS`. Optionally, supply a 
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
-function EVPI(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EVPI(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
@@ -285,7 +285,7 @@ In other words, generate a wait-and-see model corresponding to the expected scen
 
 See also: [`EVP_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
 """
-function EVP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EVP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
@@ -311,7 +311,7 @@ Optionally, supply a capable `solver` to solve the expected value problem. The d
 
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
-function EVP_decision(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EVP_decision(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP
     evp = EVP(stochasticprogram, solver = solver)
     solve(evp)
@@ -331,7 +331,7 @@ Optionally, supply a capable `solver` to solve the expected value problem. The d
 
 See also: [`EVP`](@ref), [`EVP_decision`](@ref), [`EEV`](@ref)
 """
-function EV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP model
     evp = EVP(stochasticprogram; solver = solver)
     solve(evp)
@@ -347,7 +347,7 @@ In other words, evaluate the `EVP` decision. Optionally, supply a capable `solve
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
-function EEV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function EEV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP model
     evp_decision = EVP_decision(stochasticprogram; solver = solver)
     # Calculate EEV by evaluating the EVP decision
@@ -362,7 +362,7 @@ Calculate the **value of the stochastic solution** (`VSS`) of the `stochasticpro
 
 In other words, calculate the gap between `EEV` and `VRP`. Optionally, supply a capable `solver` to solve the intermediate problems. The default behaviour is to rely on any previously set solver.
 """
-function VSS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function VSS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP and determine EEV
     vss = EEV(stochasticprogram; solver = solver)
     # Calculate VSS as EEV-VRP
