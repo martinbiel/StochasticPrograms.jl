@@ -12,121 +12,88 @@ end
 function _eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
                              x::AbstractVector,
                              solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    Qs = _second_stage_objectives(stochasticprogram, x, solver)
-    return sum([probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarios(stochasticprogram))])
+    outcome_generator = scenario -> _outcome_model(stochasticprogram.generator[:stage_1_vars],
+                                                   stochasticprogram.generator[:stage_2],
+                                                   stochasticprogram.first_stage.data,
+                                                   stage_data(stochasticprogram.scenarioproblems),
+                                                   scenario,
+                                                   x,
+                                                   solver)
+   return outcome_mean(outcome_generator, scenarios(stochasticprogram))
 end
 function _eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
                              x::AbstractVector,
                              solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    active_workers = Vector{Future}(undef,nworkers())
-    objectives = _second_stage_objectives(stochasticprogram, x, solver)
-    for w in workers()
-        active_workers[w-1] = remotecall((sp,objectives)->begin
-                                         scenarioproblems = fetch(sp)
-                                         Qs = fetch(objectives)
-                                         isempty(Qs) && return zero(eltype(x))
-                                         return sum([probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarioproblems.scenarios)])
-                                         end,
-                                         w,
-                                         stochasticprogram.scenarioproblems[w-1],
-                                         objectives[w-1])
+    Qs = Vector{Float64}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async Qs[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,x,first_stage,solver)->begin
+                scenarioproblems = fetch(sp)
+                isempty(scenarioproblems.scenarios) && return zero(eltype(x))
+                outcome_generator = scenario -> _outcome_model(stage_one_generator,
+                                                               stage_two_generator,
+                                                               first_stage,
+                                                               stage_data(scenarioproblems),
+                                                               scenario,
+                                                               x,
+                                                               solver)
+                return outcome_mean(outcome_generator, scenarioproblems.scenarios)
+            end,
+            w,
+            stochasticprogram.scenarioproblems[w-1],
+            stochasticprogram.generator[:stage_1_vars],
+            stochasticprogram.generator[:stage_2],
+            x,
+            stochasticprogram.first_stage.data,
+            solver)
+        end
     end
-    map(wait, active_workers)
-    return sum(fetch.(active_workers))
+    return sum(Qs)
 end
 function _stat_eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
                                   x::AbstractVector,
                                   solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
     N = nscenarios(stochasticprogram)
-    Qs = _second_stage_objectives(stochasticprogram, x, solver)
-    𝔼Q = sum([probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarios(stochasticprogram))])
-    σ² = (1/(N*(N-1)))*sum([(Q-𝔼Q)^2 for Q in Qs])
+    outcome_generator = scenario -> _outcome_model(stochasticprogram.generator[:stage_1_vars],
+                                                   stochasticprogram.generator[:stage_2],
+                                                   stochasticprogram.first_stage.data,
+                                                   stage_data(stochasticprogram.scenarioproblems),
+                                                   scenario,
+                                                   x,
+                                                   solver)
+    𝔼Q, σ² = outcome_welford(outcome_generator, scenarios(stochasticprogram))
     return 𝔼Q, sqrt(σ²)
 end
 function _stat_eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
                                   x::AbstractVector,
                                   solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
     N = nscenarios(stochasticprogram)
-    active_workers = Vector{Future}(undef, nworkers())
-    objectives = _second_stage_objectives(stochasticprogram, x, solver)
-    for w in workers()
-        active_workers[w-1] = remotecall((sp,objectives)->begin
-            scenarioproblems = fetch(sp)
-            Qs = fetch(objectives)
-            isempty(scenarioproblems.scenarios) && return zero(eltype(x))
-            return sum([probability(scenario)*Qs[i] for (i,scenario) in enumerate(scenarioproblems.scenarios)])
-        end,
-        w,
-        stochasticprogram.scenarioproblems[w-1],
-        objectives[w-1])
+    partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,x,first_stage,solver)->begin
+                scenarioproblems = fetch(sp)
+                isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x))
+                outcome_generator = scenario -> _outcome_model(stage_one_generator,
+                                                               stage_two_generator,
+                                                               first_stage,
+                                                               stage_data(scenarioproblems),
+                                                               scenario,
+                                                               x,
+                                                               solver)
+                return (outcome_welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
+            end,
+            w,
+            stochasticprogram.scenarioproblems[w-1],
+            stochasticprogram.generator[:stage_1_vars],
+            stochasticprogram.generator[:stage_2],
+            x,
+            stochasticprogram.first_stage.data,
+            solver)
+        end
     end
-    map(wait, active_workers)
-    𝔼Q = sum(fetch.(active_workers))
-    for w in workers()
-        active_workers[w-1] = remotecall((objectives,𝔼Q)->begin
-            Qs = fetch(objectives)
-            isempty(Qs) && return zero(eltype(x))
-            return sum([(Q-𝔼Q)^2 for Q in Qs])
-        end,
-        w,
-        objectives[w-1],
-        𝔼Q)
-    end
-    map(wait, active_workers)
-    σ² = (1/(N*(N-1)))*sum(fetch.(active_workers))
+    𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
     return 𝔼Q, sqrt(σ²)
-end
-function _second_stage_objectives(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
-                                  x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    return [begin
-            outcome = _outcome_model(stochasticprogram.generator[:stage_1_vars],
-                                     stochasticprogram.generator[:stage_2],
-                                     stochasticprogram.first_stage.data,
-                                     stage_data(stochasticprogram.scenarioproblems),
-                                     scenario,
-                                     x,
-                                     solver)
-            status = solve(outcome)
-            if status != :Optimal
-            error("Outcome model could not be solved, returned status: $status")
-            end
-            getobjectivevalue(outcome)
-            end for scenario in scenarios(stochasticprogram.scenarioproblems)]
-end
-function _second_stage_objectives(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
-                                  x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    objectives = Vector{Future}(undef,nworkers())
-    for w in workers()
-        objectives[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,x,first_stage,second_stage,solver)->begin
-                                     scenarioproblems = fetch(sp)
-                                     isempty(scenarioproblems.scenarios) && return Vector{eltype(x)}()
-                                     return [begin
-                                             outcome = _outcome_model(stage_one_generator,
-                                                                      stage_two_generator,
-                                                                      first_stage,
-                                                                      second_stage,
-                                                                      scenario,
-                                                                      x,
-                                                                      solver)
-                                             status = solve(outcome)
-                                             if status != :Optimal
-                                             error("Outcome model could not be solved, returned status: $status")
-                                             end
-                                             getobjectivevalue(outcome)
-                                             end for scenario in scenarioproblems.scenarios]
-                                     end,
-                                     w,
-                                     stochasticprogram.scenarioproblems[w-1],
-                                     stochasticprogram.generator[:stage_1_vars],
-                                     stochasticprogram.generator[:stage_2],
-                                     x,
-                                     stochasticprogram.first_stage.data,
-                                     stage_data(stochasticprogram.scenarioproblems),
-                                     solver)
-    end
-    return objectives
 end
 function _eval(stochasticprogram::StochasticProgram, x::AbstractVector, solver::MPB.AbstractMathProgSolver)
     xlength = decision_length(stochasticprogram)
@@ -136,6 +103,50 @@ function _eval(stochasticprogram::StochasticProgram, x::AbstractVector, solver::
     𝔼Q = _eval_second_stages(stochasticprogram, x, solver)
     return cᵀx+𝔼Q
 end
+# Mean/variance calculations #
+# ========================== #
+function outcome_mean(outcome_generator::Function, scenarios::Vector{<:AbstractScenario})
+    Qs = zeros(length(scenarios))
+    for (i,scenario) in enumerate(scenarios)
+        outcome = outcome_generator(scenario)
+        status = solve(outcome)
+        if status != :Optimal
+            error("Outcome model could not be solved, returned status: $status")
+        end
+        Qs[i] = probability(scenario)*getobjectivevalue(outcome)
+    end
+    return sum(Qs)
+end
+function outcome_welford(outcome_generator::Function, scenarios::Vector{<:AbstractScenario})
+    Q̄ₖ = 0
+    Sₖ = 0
+    N = length(scenarios)
+    for k = 1:N
+        Q̄ₖ₋₁ = Q̄ₖ
+        outcome = outcome_generator(scenarios[k])
+        status = solve(outcome)
+        if status != :Optimal
+            error("Outcome model could not be solved, returned status: $status")
+        end
+        Q = getobjectivevalue(outcome)
+        Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
+        Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
+    end
+    return Q̄ₖ, Sₖ/(N-1)
+end
+function aggregate_welford(left::Tuple, right::Tuple)
+    x̄ₗ, σₗ², nₗ = left
+    x̄ᵣ, σᵣ², nᵣ = right
+    δ = x̄ᵣ-x̄ₗ
+    N = nₗ+nᵣ
+    x̄ = (nₗ*x̄ₗ+nᵣ*x̄ᵣ)/N
+    Sₗ = σₗ²*(nₗ-1)
+    Sᵣ = σᵣ²*(nᵣ-1)
+    S = Sₗ+Sᵣ+nₗ*nᵣ/N*δ^2
+    return (x̄, S/(N-1), N)
+end
+# Evaluation API #
+# ========================== #
 """
     evaluate_decision(stochasticprogram::StochasticProgram,
                       x::AbstractVector;

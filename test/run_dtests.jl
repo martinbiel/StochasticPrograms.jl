@@ -91,4 +91,16 @@ include("sampling.jl")
         @test nsubproblems(sampled_sp) == 200
         @test abs(probability(sampled_sp)-1.0) <= 1e-6
     end
+    @testset "Distributed confidence intervals" begin
+        sampler = SimpleSampler()
+        glpk = GLPKSolverLP()
+        L, U = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk)
+        @test L <= U
+        saa = SAA(simple_model, sampler, 1000)
+        optimize!(saa, solver = glpk)
+        x̂ = optimal_decision(saa)
+        Q,_ = evaluate_decision(simple_model, x̂, sampler, solver = glpk)
+        @test L <= Q
+        @test Q <= U
+    end
 end

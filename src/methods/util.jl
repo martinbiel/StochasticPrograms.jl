@@ -71,7 +71,7 @@ end
 function calculate_subobjectives(scenarioproblems::DScenarioProblems)
     partial_subobjectives = Vector{Float64}(undef, nworkers())
     @sync begin
-        for (i,w) in workers()
+        for (i,w) in enumerate(workers())
             @async partial_subobjectives[i] = remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
                                                                w,
                                                                scenarioproblems[w-1])
