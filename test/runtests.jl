@@ -74,6 +74,8 @@ include("SAA.jl")
         @test abs(VSS(sp_copy)-VSS(sp)) <= 1e-2
         @test abs(EV(sp_copy)-EV(sp)) <= 1e-2
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
+        add_scenario!(sp_copy, scenario(sp, 1))
+        @test nscenarios(sp_copy) == nscenarios(sp) + 1
     end
     @testset "Sampling" begin
         sampled_sp = SAA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())

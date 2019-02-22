@@ -77,32 +77,33 @@ function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{
 end
 function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
               solver::MathProgBase.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    active_workers = Vector{Future}(undef, nworkers())
-    for w in workers()
-        active_workers[w-1] = remotecall((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
-                                         scenarioproblems = fetch(sp)
-                                         isempty(scenarioproblems.scenarios) && return 0.0
-                                         return sum([begin
-                                                     ws = _WS(stage_one_generator,
-                                                              stage_two_generator,
-                                                              first_stage,
-                                                              second_stage,
-                                                              scenario,
-                                                              solver)
-                                                     solve(ws)
-                                                     probability(scenario)*getobjectivevalue(ws)
-                                                     end for scenario in scenarioproblems.scenarios])
-                                         end,
-                                         w,
-                                         stochasticprogram.scenarioproblems[w-1],
-                                         stochasticprogram.generator[:stage_1],
-                                         stochasticprogram.generator[:stage_2],
-                                         stochasticprogram.first_stage.data,
-                                         stage_data(stochasticprogram.scenarioproblems),
-                                         solver)
+    partial_ews = Vector{Float64}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async partial_ews[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
+                scenarioproblems = fetch(sp)
+                isempty(scenarioproblems.scenarios) && return 0.0
+                return sum([begin
+                            ws = _WS(stage_one_generator,
+                                     stage_two_generator,
+                                     first_stage,
+                                     second_stage,
+                                     scenario,
+                                     solver)
+                            solve(ws)
+                            probability(scenario)*getobjectivevalue(ws)
+                            end for scenario in scenarioproblems.scenarios])
+                end,
+                w,
+                stochasticprogram.scenarioproblems[w-1],
+                stochasticprogram.generator[:stage_1],
+                stochasticprogram.generator[:stage_2],
+                stochasticprogram.first_stage.data,
+                stage_data(stochasticprogram.scenarioproblems),
+                solver)
+        end
     end
-    map(wait, active_workers)
-    return sum(fetch.(active_workers))
+    return sum(partial_ews)
 end
 """
     SAA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())

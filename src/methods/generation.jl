@@ -31,11 +31,15 @@ function generate_parent!(scenarioproblems::ScenarioProblems{D,S}, generator::Fu
 end
 function generate_parent!(scenarioproblems::DScenarioProblems{D,S}, generator::Function, parentdata::Any) where {D, S <: AbstractScenario}
     generator(parentmodel(scenarioproblems), parentdata)
-    active_workers = Vector{Future}(undef, nworkers())
-    for w in workers()
-        active_workers[w-1] = remotecall((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata), w, scenarioproblems[w-1], generator, parentdata)
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch((sp,generator,parentdata)->generate_parent!(fetch(sp),generator,parentdata),
+                                    w,
+                                    scenarioproblems[w-1],
+                                    generator,
+                                    parentdata)
+        end
     end
-    map(wait, active_workers)
     return nothing
 end
 function generate_parent!(stochasticprogram::StochasticProgram)
@@ -56,11 +60,11 @@ function generate_stage_two!(scenarioproblems::ScenarioProblems{D,S}, generator:
     return nothing
 end
 function generate_stage_two!(scenarioproblems::DScenarioProblems{D,S}, generator::Function) where {D, S <: AbstractScenario}
-    active_workers = Vector{Future}(undef, nworkers())
-    for w in workers()
-        active_workers[w-1] = remotecall((sp,generator)->generate_stage_two!(fetch(sp), generator), w, scenarioproblems[w-1], generator)
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch((sp,generator)->generate_stage_two!(fetch(sp), generator), w, scenarioproblems[w-1], generator)
+        end
     end
-    map(wait, active_workers)
     return nothing
 end
 function generate_stage_two!(stochasticprogram::StochasticProgram)

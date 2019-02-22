@@ -20,7 +20,7 @@ function fill_solution!(stochasticprogram::StochasticProgram)
     first_stage.linconstrDuals = dep.linconstrDuals[1:nrows]
     # Second stages
     fill_solution!(scenarioproblems(stochasticprogram), dep.colVal[ncols+1:end], dep.redCosts[ncols+1:end], dep.linconstrDuals[nrows+1:end])
-    nothing
+    return nothing
 end
 function fill_solution!(scenarioproblems::ScenarioProblems, x::AbstractVector, μ::AbstractVector, λ::AbstractVector)
     cbegin = 0
@@ -34,25 +34,28 @@ function fill_solution!(scenarioproblems::ScenarioProblems, x::AbstractVector, �
         cbegin += sncols
         rbegin += snrows
     end
+    return nothing
 end
 function fill_solution!(scenarioproblems::DScenarioProblems, x::AbstractVector, μ::AbstractVector, λ::AbstractVector)
     cbegin = 0
     rbegin = 0
-    active_workers = Vector{Future}(undef,nworkers())
-    for w in workers()
-        wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]), w, scenarioproblems[w-1])
-        wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]), w, scenarioproblems[w-1])
-        active_workers[w-1] = remotecall((sp,x,μ,λ)->fill_solution!(fetch(sp),x,μ,λ),
-                                         w,
-                                         scenarioproblems[w-1],
-                                         x[cbegin+1:cbegin+wncols],
-                                         μ[cbegin+1:cbegin+wncols],
-                                         λ[rbegin+1:rbegin+wnrows]
-                                         )
-        cbegin += wncols
-        rbegin += wnrows
+    @sync begin
+        for w in workers()
+            wncols = remotecall_fetch((sp)->sum([s.numCols::Int for s in fetch(sp).problems]), w, scenarioproblems[w-1])
+            wnrows = remotecall_fetch((sp)->sum([length(s.linconstr)::Int for s in fetch(sp).problems]), w, scenarioproblems[w-1])
+            crange = cbegin+1:cbegin+wncols
+            rrange = rbegin+1:rbegin+wnrows
+            @async remotecall_fetch((sp,x,μ,λ)->fill_solution!(fetch(sp),x,μ,λ),
+                                    w,
+                                    scenarioproblems[w-1],
+                                    x[crange],
+                                    μ[crange],
+                                    λ[rrange])
+            cbegin += wncols
+            rbegin += wnrows
+        end
     end
-    map(wait, active_workers)
+    return nothing
 end
 
 function calculate_objective_value!(stochasticprogram::StochasticProgram)
@@ -66,9 +69,15 @@ function calculate_subobjectives(scenarioproblems::ScenarioProblems)
     return sum([(probability(scenario)*eval_objective(subprob.obj,subprob.colVal))::Float64 for (scenario,subprob) in zip(scenarios(scenarioproblems),subproblems(scenarioproblems))])
 end
 function calculate_subobjectives(scenarioproblems::DScenarioProblems)
-    return sum([remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
-                                 w,
-                                 scenarioproblems[w-1]) for w in workers()])
+    partial_subobjectives = Vector{Float64}(undef, nworkers())
+    @sync begin
+        for (i,w) in workers()
+            @async partial_subobjectives[i] = remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
+                                                               w,
+                                                               scenarioproblems[w-1])
+        end
+    end
+    return sum(partial_subobjectives)
 end
 
 function invalidate_cache!(stochasticprogram::StochasticProgram)
@@ -135,7 +144,7 @@ end
 function masterterms(scenarioproblems::DScenarioProblems, i::Integer)
     j = 0
     for w in workers()
-        n = remotecall_fetch((sp)->length(fetch(sp).problems), w, scenarioproblems[w-1])
+        n = scenarioproblems.scenario_distribution[w-1]
         if i <= n+j
             return remotecall_fetch((sp,idx) -> masterterms(fetch(sp),idx), w, scenarioproblems[w-1], i-j)
         end

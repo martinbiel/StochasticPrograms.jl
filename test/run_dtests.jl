@@ -39,7 +39,8 @@ include("sampling.jl")
         optimize!(sp_nondist,solver=GLPKSolverLP())
         @test scenariotype(sp) == scenariotype(sp_nondist)
         @test abs(probability(sp)-probability(sp_nondist)) <= 1e-6
-        @test nscenarios(sp) == nscenarios(sp)
+        @test nscenarios(sp) == nscenarios(sp_nondist)
+        @test nscenarios(sp) == length(scenarios(sp))
         @test nsubproblems(sp) == nsubproblems(sp_nondist)
         @test norm(optimal_decision(sp)-optimal_decision(sp_nondist)) <= 1e-6
         @test abs(optimal_value(sp)-optimal_value(sp_nondist)) <= 1e-6
@@ -77,6 +78,8 @@ include("sampling.jl")
         @test abs(VSS(sp_copy)-VSS(sp)) <= 1e-2
         @test abs(EV(sp_copy)-EV(sp)) <= 1e-2
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
+        add_scenario!(sp_copy, scenario(sp, 1))
+        @test nscenarios(sp_copy) == nscenarios(sp) + 1
     end
     @testset "Distributed Sampling" begin
         sampled_sp = SAA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
