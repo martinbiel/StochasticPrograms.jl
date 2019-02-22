@@ -54,13 +54,13 @@ Second-stage
 Subproblem 1 (p = 0.50):
 Max y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -1 ≤ y ≤ 1
 
 Subproblem 2 (p = 0.50):
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -1 ≤ y ≤ 1
 
 VRP = 2.0</code></pre></div><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><div><pre><code class="language-julia">l₁ = -2.
@@ -88,13 +88,13 @@ Second-stage
 Subproblem 1 (p = 0.50):
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2 (p = 0.50):
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 VRP = 2.25</code></pre></div><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that adhere to this abstraction. If the identified uncertain parameters is a collection of numerical values, this is the recommended way to define the required scenario type.</p><div><pre><code class="language-julia">using StochasticPrograms
@@ -274,13 +274,13 @@ Second-stage
 Subproblem 1 (p = 0.20):
 Min y
 Subject to
- y + x = -1.678053708777528
+ x + y = -1.678053708777528
  y
 
 Subproblem 2 (p = 0.20):
 Min y
 Subject to
- y + x = 4.590175647674621
+ x + y = 4.590175647674621
  y
 
 Subproblem 3 (p = 0.20):
