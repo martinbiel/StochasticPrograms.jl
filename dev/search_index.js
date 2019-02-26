@@ -85,7 +85,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Stochastic programs",
     "category": "section",
-    "text": "A two-stage linear stochastic program has the following mathematical representation:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedwherebeginaligned\n    Q(xxi(omega)) = min_y in mathbbR^m  quad q_omega^T y \n    textst  quad T_omegax + Wy = h_omega \n     quad y geq 0\n  endalignedIf the sample space Omega is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space Omega is infinite, sampling techniques can be used to represent the stochastic program using finite SSA instances."
+    "text": "A two-stage linear stochastic program has the following mathematical representation:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedwherebeginaligned\n    Q(xxi(omega)) = min_y in mathbbR^m  quad q_omega^T y \n    textst  quad T_omegax + Wy = h_omega \n     quad y geq 0\n  endalignedIf the sample space Omega is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space Omega is infinite, sampling techniques can be used to represent the stochastic program using finite SAA instances."
 },
 
 {
@@ -125,7 +125,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Quick start",
     "title": "Evaluate decisions",
     "category": "section",
-    "text": "With the stochastic program defined, we can evaluate the performance of different first-stage decisions. The expected value of a given first-stage decision x is given byV(x) = c^T x + operatornamemathbbE_omega leftQ(xxi(omega))rightIf the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:x = [40., 20.]The expected result of taking this decision in the simple model can be determined through:evaluate_decision(sp, x, solver = GLPKSolverLP())The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.print(outcome_model(sp, ξ₁, x))Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())In the sample space is infinite, or if the underlying random variable xi is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider evaluate_decision and lower_bound."
+    "text": "With the stochastic program defined, we can evaluate the performance of different first-stage decisions. The expected value of a given first-stage decision x is given byV(x) = c^T x + operatornamemathbbE_omega leftQ(xxi(omega))rightIf the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:x = [40., 20.]The expected result of taking this decision in the simple model can be determined through:evaluate_decision(sp, x, solver = GLPKSolverLP())The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.print(outcome_model(sp, ξ₁, x))Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:evaluate_decision(sp, ξ₁, x, solver = GLPKSolverLP())In the sample space is infinite, or if the underlying random variable xi is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider evaluate_decision, lower_bound and confidence_interval."
 },
 
 {
@@ -193,11 +193,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "manual/data/#SSA-1",
+    "location": "manual/data/#SAA-1",
     "page": "Stochastic data",
-    "title": "SSA",
+    "title": "SAA",
     "category": "section",
-    "text": "The command SSA is used to create sampled average approximations of a given stochastic program by supplying a sampler object.ssa = SSA(sp, sampler, 10)"
+    "text": "The command SAA is used to create sampled average approximations of a given stochastic program by supplying a sampler object.saa = SAA(sp, sampler, 10)"
 },
 
 {
@@ -229,7 +229,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Stochastic models",
     "title": "Model objects",
     "category": "section",
-    "text": "To further seperate model design from data design, StochasticPrograms provides a stochastic model object. This object can be used to store the optimization models before introducing scenario data. Consider the following alternative approach to the simple problem introduced in the Quick start:using StochasticPrograms\n\nsimple_model = StochasticModel((sp) -> begin\n	@first_stage sp = begin\n		@variable(model, x₁ >= 40)\n		@variable(model, x₂ >= 20)\n		@objective(model, Min, 100*x₁ + 150*x₂)\n		@constraint(model, x₁ + x₂ <= 120)\n	end\n	@second_stage sp = begin\n		@decision x₁ x₂\n		ξ = scenario\n		@variable(model, 0 <= y₁ <= ξ.d₁)\n		@variable(model, 0 <= y₂ <= ξ.d₂)\n		@objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n		@constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n		@constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\n	end\nend)The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the Quick start:@scenario AnotherSimple = begin\n    q₁::Float64\n    q₂::Float64\n    d₁::Float64\n    d₂::Float64\nend\n\nξ₁ = AnotherSimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)\nξ₂ = AnotherSimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)\n\nsp = instantiate(simple_model, [ξ₁, ξ₂])Moreoever, SSA models are constructed in a straightforward way. Consider the following:@sampler AnotherSimple = begin\n    @sample begin\n        return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),\n									 -28.0 + (2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 probability = rand())\n    end\nend\n\nssa = SSA(simple_model, AnotherSimpleSampler(), 10)This allows the user to clearly distinguish between the often abstract base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedand look-ahead models that approximate the base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n y_s in mathbbR^m  quad c^T x + sum_s = 1^n pi_s q_s^Ty_s \n textst  quad Ax = b \n  quad T_s x + W y_s = h_s quad s = 1 dots n \n  quad x geq 0 y_s geq 0 quad s = 1 dots n\nendaligned"
+    "text": "To further seperate model design from data design, StochasticPrograms provides a stochastic model object. This object can be used to store the optimization models before introducing scenario data. Consider the following alternative approach to the simple problem introduced in the Quick start:using StochasticPrograms\n\nsimple_model = StochasticModel((sp) -> begin\n	@first_stage sp = begin\n		@variable(model, x₁ >= 40)\n		@variable(model, x₂ >= 20)\n		@objective(model, Min, 100*x₁ + 150*x₂)\n		@constraint(model, x₁ + x₂ <= 120)\n	end\n	@second_stage sp = begin\n		@decision x₁ x₂\n		ξ = scenario\n		@variable(model, 0 <= y₁ <= ξ.d₁)\n		@variable(model, 0 <= y₂ <= ξ.d₂)\n		@objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)\n		@constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)\n		@constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)\n	end\nend)The resulting model object can be used to instantiate different stochastic programs as long as the corresponding scenario data conforms to the second stage model. For example, lets introduce a similar scenario type and use it to construct the same stochastic program as in the Quick start:@scenario AnotherSimple = begin\n    q₁::Float64\n    q₂::Float64\n    d₁::Float64\n    d₂::Float64\nend\n\nξ₁ = AnotherSimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)\nξ₂ = AnotherSimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)\n\nsp = instantiate(simple_model, [ξ₁, ξ₂])Moreoever, SAA models are constructed in a straightforward way. Consider the following:@sampler AnotherSimple = begin\n    @sample begin\n        return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),\n									 -28.0 + (2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 300.0 + 100*(2*rand()-1),\n									 probability = rand())\n    end\nend\n\nsaa = SAA(simple_model, AnotherSimpleSampler(), 10)This allows the user to clearly distinguish between the often abstract base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n  quad c^T x + operatornamemathbbE_omega leftQ(xxi(omega))right \n textst  quad Ax = b \n  quad x geq 0\nendalignedand look-ahead models that approximate the base-model:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR^n y_s in mathbbR^m  quad c^T x + sum_s = 1^n pi_s q_s^Ty_s \n textst  quad Ax = b \n  quad T_s x + W y_s = h_s quad s = 1 dots n \n  quad x geq 0 y_s geq 0 quad s = 1 dots n\nendaligned"
 },
 
 {
@@ -325,7 +325,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Examples",
     "title": "Continuous scenario distribution",
     "category": "section",
-    "text": "As an example, consider the following generalized stochastic program:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR  quad operatornamemathbbE_omega left(x - xi(omega))^2right \nendalignedwhere xi(omega) is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:using StochasticPrograms\nusing Distributions\n\nstruct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario\n    probability::Probability\n    distribution::D\n    ξ::Float64\n\n    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)\n        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))\n    end\nend\n\nfunction StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution\n    isempty(scenarios) && return DistributionScenario(D(), 0.0)\n    distribution = scenarios[1].distribution\n    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))\nendThe fallback probability method is viable as long as the scenario type contains a Probability field named probability. The implementation of expected is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.We can implement a sampler that generates exponentially distributed scenarios as follows:struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}\n    distribution::Exponential\n\n    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))\nend\n\nfunction (sampler::ExponentialSampler)()\n    ξ = rand(sampler.distribution)\n    return DistributionScenario(sampler.distribution, ξ)\nendNow, lets attempt to define the generalized stochastic program using the available modeling tools:using Ipopt\n\nmodel = StochasticModel((sp) -> begin\n	@first_stage sp = begin\n		@variable(model, x)\n	end\n\n	@second_stage sp = begin\n		@decision x\n		ξ = scenario.ξ\n		@variable(model, y)\n		@constraint(model, y == (x - ξ)^2)\n		@objective(model, Min, y)\n	end\nend)Stochastic Model\n\nminimize cᵀx + 𝔼[Q(x,ξ)]\n  x∈ℝⁿ  Ax = b\n         x ≥ 0\n\nwhere\n\nQ(x,ξ) = min  q(ξ)ᵀy\n        y∈ℝᵐ T(ξ)x + Wy = h(ξ)\n              y ≥ 0The mean of the given exponential distribution is 20, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:sampler = ExponentialSampler(2.) # Create a sampler\n\nssa = SSA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA modelStochastic program with:\n * 1000 scenarios of type DistributionScenario\n * 1 decision variable\n * 1 recourse variable\nSolver is default solverBy the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:optimize!(ssa, solver = IpoptSolver(print_level=0))\n\nprintln(\"Optimal decision: $(optimal_decision(ssa))\")\nprintln(\"Optimal value: $(optimal_value(ssa))\")Optimal decision: [2.07583]\nOptimal value: 4.00553678799426Now, due to the special implementation of the expected function, it actually holds that the expected value solution solves the generalized problem. Consider:println(\"EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))\")\nprintln(\"VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))\")EVP decision: [2.0]\nVSS: 0.005750340653017716Accordingly, the VSS is small."
+    "text": "As an example, consider the following generalized stochastic program:DeclareMathOperator*minimizeminimize\nbeginaligned\n minimize_x in mathbbR  quad operatornamemathbbE_omega left(x - xi(omega))^2right \nendalignedwhere xi(omega) is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:using StochasticPrograms\nusing Distributions\n\nstruct DistributionScenario{D <: UnivariateDistribution} <: AbstractScenario\n    probability::Probability\n    distribution::D\n    ξ::Float64\n\n    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)\n        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))\n    end\nend\n\nfunction StochasticPrograms.expected(scenarios::Vector{<:DistributionScenario{D}}) where D <: UnivariateDistribution\n    isempty(scenarios) && return DistributionScenario(D(), 0.0)\n    distribution = scenarios[1].distribution\n    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))\nendThe fallback probability method is viable as long as the scenario type contains a Probability field named probability. The implementation of expected is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.We can implement a sampler that generates exponentially distributed scenarios as follows:struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}\n    distribution::Exponential\n\n    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))\nend\n\nfunction (sampler::ExponentialSampler)()\n    ξ = rand(sampler.distribution)\n    return DistributionScenario(sampler.distribution, ξ)\nendNow, lets attempt to define the generalized stochastic program using the available modeling tools:using Ipopt\n\nmodel = StochasticModel((sp) -> begin\n	@first_stage sp = begin\n		@variable(model, x)\n	end\n\n	@second_stage sp = begin\n		@decision x\n		ξ = scenario.ξ\n		@variable(model, y)\n		@constraint(model, y == (x - ξ)^2)\n		@objective(model, Min, y)\n	end\nend)Stochastic Model\n\nminimize cᵀx + 𝔼[Q(x,ξ)]\n  x∈ℝⁿ  Ax = b\n         x ≥ 0\n\nwhere\n\nQ(x,ξ) = min  q(ξ)ᵀy\n        y∈ℝᵐ T(ξ)x + Wy = h(ξ)\n              y ≥ 0The mean of the given exponential distribution is 20, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:sampler = ExponentialSampler(2.) # Create a sampler\n\nsaa = SAA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA modelStochastic program with:\n * 1000 scenarios of type DistributionScenario\n * 1 decision variable\n * 1 recourse variable\nSolver is default solverBy the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:optimize!(saa, solver = IpoptSolver(print_level=0))\n\nprintln(\"Optimal decision: $(optimal_decision(saa))\")\nprintln(\"Optimal value: $(optimal_value(saa))\")Optimal decision: [2.07583]\nOptimal value: 4.00553678799426Now, due to the special implementation of the expected function, it actually holds that the expected value solution solves the generalized problem. Consider:println(\"EVP decision: $(EVP_decision(saa, solver = IpoptSolver(print_level=0)))\")\nprintln(\"VSS: $(VSS(saa, solver = IpoptSolver(print_level=0)))\")EVP decision: [2.0]\nVSS: 0.005750340653017716Accordingly, the VSS is small."
 },
 
 {
@@ -369,7 +369,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{Any,Any,Array{#s12,1} where #s12<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.StochasticProgram-Tuple{Any,Any,Array{#s13,1} where #s13<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.StochasticProgram",
     "category": "method",
@@ -601,7 +601,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s24,1} where #s24<:AbstractScenario,Integer}",
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s31,1} where #s31<:AbstractScenario,Integer}",
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenarios!",
     "category": "method",
@@ -609,7 +609,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s24,1} where #s24<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.add_scenarios!-Tuple{StochasticProgram,Array{#s31,1} where #s31<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.add_scenarios!",
     "category": "method",
@@ -689,7 +689,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Any,Any,Array{#s24,1} where #s24<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Any,Any,Array{#s31,1} where #s31<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.instantiate",
     "category": "method",
@@ -697,7 +697,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s24,1} where #s24<:AbstractScenario}",
+    "location": "library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel,Array{#s31,1} where #s31<:AbstractScenario}",
     "page": "Public interface",
     "title": "StochasticPrograms.instantiate",
     "category": "method",
@@ -825,7 +825,7 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.sample!-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
+    "location": "library/public/#StochasticPrograms.sample!-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:AbstractScenarioProblems{D₂,S},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
     "page": "Public interface",
     "title": "StochasticPrograms.sample!",
     "category": "method",
@@ -953,6 +953,14 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
+    "location": "library/public/#StochasticPrograms.confidence_interval-Union{Tuple{S}, Tuple{StochasticModel,AbstractSampler{S}}} where S<:AbstractScenario",
+    "page": "Public interface",
+    "title": "StochasticPrograms.confidence_interval",
+    "category": "method",
+    "text": "confidence_interval(stochasticmodel::StochasticModel,\n                    sampler::AbstractSampler;\n                    solver = JuMP.UnsetSolver(),\n                    confidence = 0.9,\n                    N = 100,\n                    M = 10)\n\nGenerate a confidence interval around the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nN is the size of the SAA models used to generate the interval and generally governs how tight it is. M is the amount of samples used to compute the lower bound.\n\n\n\n\n\n"
+},
+
+{
     "location": "library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticProgram,AbstractArray{T,1} where T}",
     "page": "Public interface",
     "title": "StochasticPrograms.evaluate_decision",
@@ -973,7 +981,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Public interface",
     "title": "StochasticPrograms.evaluate_decision",
     "category": "method",
-    "text": "evaluate_decision(stochasticmodel::StochasticModel,\n                  x::AbstractVector,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  confidence = 0.9,\n                  N = 1000)\n\nReturn a statistical estimate of the objective of stochasticprogram at x, and an upper bound at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, evaluate x on an SSA model of size N. Generate an upper bound using the sample variance of the evaluation.\n\n\n\n\n\n"
+    "text": "evaluate_decision(stochasticmodel::StochasticModel,\n                  x::AbstractVector,\n                  sampler::AbstractSampler;\n                  solver = JuMP.UnsetSolver(),\n                  confidence = 0.95,\n                  N = 1000)\n\nReturn a statistical estimate of the objective of stochasticprogram at x, and an upper bound at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, evaluate x on an SAA model of size N. Generate an upper bound using the sample variance of the evaluation.\n\n\n\n\n\n"
 },
 
 {
@@ -981,7 +989,7 @@ var documenterSearchIndex = {"docs": [
     "page": "Public interface",
     "title": "StochasticPrograms.lower_bound",
     "category": "method",
-    "text": "lower_bound(stochasticmodel::StochasticModel,\n            x::AbstractVector,\n            sampler::AbstractSampler;\n            solver = JuMP.UnsetSolver(),\n            confidence = 0.9,\n            N = 100,\n            M = 10)\n\nGenerate a lower bound of the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\n\n\n\n\n"
+    "text": "lower_bound(stochasticmodel::StochasticModel,\n            sampler::AbstractSampler;\n            solver = JuMP.UnsetSolver(),\n            confidence = 0.95,\n            N = 100,\n            M = 10)\n\nGenerate a lower bound of the true optimum of stochasticprogram at level confidence, when the underlying scenario distribution is inferred by sampler.\n\nIn other words, solve and evaluate M SAA models of size N to generate a statistic estimate.\n\n\n\n\n\n"
 },
 
 {
@@ -1057,27 +1065,27 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:Union{Array{RemoteChannel{Channel{ScenarioProblems{D₂,S}}},1}, ScenarioProblems{D₂,S}},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
+    "location": "library/public/#StochasticPrograms.SAA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP<:AbstractScenarioProblems{D₂,S},AbstractSampler{S},Integer}} where S<:AbstractScenario where D₂ where D₁",
     "page": "Public interface",
-    "title": "StochasticPrograms.SSA",
+    "title": "StochasticPrograms.SAA",
     "category": "method",
-    "text": "SSA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) of size n for the stochasticprogram using the sampler.\n\nIn other words, sample n scenarios, of type consistent with stochasticprogram, and return the resulting stochastic program instance. Optionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+    "text": "SAA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SAA) of size n for the stochasticprogram using the sampler.\n\nIn other words, sample n scenarios, of type consistent with stochasticprogram, and return the resulting stochastic program instance. Optionally, a capable solver can be supplied to SAA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {
-    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{StochasticModel,AbstractSampler{S},Integer}} where S<:AbstractScenario",
+    "location": "library/public/#StochasticPrograms.SAA-Union{Tuple{S}, Tuple{StochasticModel,AbstractSampler{S},Integer}} where S<:AbstractScenario",
     "page": "Public interface",
-    "title": "StochasticPrograms.SSA",
+    "title": "StochasticPrograms.SAA",
     "category": "method",
-    "text": "SSA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+    "text": "SAA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SAA) instance of size n using the model stored in stochasticmodel, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SAA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {
-    "location": "library/public/#StochasticPrograms.SSA-Union{Tuple{S}, Tuple{StochasticModel,Any,Any,AbstractSampler{S},Integer}} where S<:AbstractScenario",
+    "location": "library/public/#StochasticPrograms.SAA-Union{Tuple{S}, Tuple{StochasticModel,Any,Any,AbstractSampler{S},Integer}} where S<:AbstractScenario",
     "page": "Public interface",
-    "title": "StochasticPrograms.SSA",
+    "title": "StochasticPrograms.SAA",
     "category": "method",
-    "text": "SSA(stochasticmodel::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SSA) instance of size n using the model stored in stochasticmodel, the stage data given by first_stage and second_stage, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SSA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
+    "text": "SAA(stochasticmodel::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())\n\nGenerate a sample average approximation (SAA) instance of size n using the model stored in stochasticmodel, the stage data given by first_stage and second_stage, and the provided sampler.\n\nOptionally, a capable solver can be supplied to SAA. Otherwise, any previously set solver will be used.\n\nSee also: sample!\n\n\n\n\n\n"
 },
 
 {

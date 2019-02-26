@@ -113,16 +113,16 @@ where
 
 Q(x,ξ) = min  q(ξ)ᵀy
         y∈ℝᵐ T(ξ)x + Wy = h(ξ)
-              y ≥ 0</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite SSA model of 1000 exponentially distributed numbers:</p><pre><code class="language-julia">sampler = ExponentialSampler(2.) # Create a sampler
+              y ≥ 0</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:</p><pre><code class="language-julia">sampler = ExponentialSampler(2.) # Create a sampler
 
-ssa = SSA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SSA model</code></pre><pre><code class="language-julia">Stochastic program with:
+saa = SAA(model, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA model</code></pre><pre><code class="language-julia">Stochastic program with:
  * 1000 scenarios of type DistributionScenario
  * 1 decision variable
  * 1 recourse variable
-Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(ssa, solver = IpoptSolver(print_level=0))
+Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(saa, solver = IpoptSolver(print_level=0))
 
-println(&quot;Optimal decision: $(optimal_decision(ssa))&quot;)
-println(&quot;Optimal value: $(optimal_value(ssa))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.07583]
-Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;EVP decision: $(EVP_decision(ssa, solver = IpoptSolver(print_level=0)))&quot;)
-println(&quot;VSS: $(VSS(ssa, solver = IpoptSolver(print_level=0)))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
+println(&quot;Optimal decision: $(optimal_decision(saa))&quot;)
+println(&quot;Optimal value: $(optimal_value(saa))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.07583]
+Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;EVP decision: $(EVP_decision(saa, solver = IpoptSolver(print_level=0)))&quot;)
+println(&quot;VSS: $(VSS(saa, solver = IpoptSolver(print_level=0)))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
 VSS: 0.005750340653017716</code></pre><p>Accordingly, the VSS is small.</p><footer><hr/><a class="previous" href="../structuredsolvers/"><span class="direction">Previous</span><span class="title">Structured solvers</span></a><a class="next" href="../../library/public/"><span class="direction">Next</span><span class="title">Public interface</span></a></footer></article></body></html>
