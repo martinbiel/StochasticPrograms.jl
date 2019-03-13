@@ -14,7 +14,7 @@ addons:
   - gfortran
 
 after_success:
-    - julia -e 'using Pkg; Pkg.add("Coverage"); import StochasticPrograms; joinpath(dirname(pathof(StochasticPrograms)), "..", paths...); using Coverage; Codecov.submit(process_folder())'
+    - julia -e 'using Pkg; Pkg.add("Coverage"); import StochasticPrograms; joinpath(dirname(pathof(StochasticPrograms)), "..", paths...); using Coverage; Coveralls.submit(process_folder()); Codecov.submit(process_folder())'
 
 jobs:
   include:

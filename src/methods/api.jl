@@ -137,7 +137,7 @@ Return the optimal second stage variable `var` of `stochasticprogram` in the `i`
 """
 function optimal_decision(stochasticprogram::StochasticProgram, i::Integer, var::Symbol)
     submodel = subproblem(stochasticprogram, i)
-    return getvalue(subproblem.objDict[var])
+    return getvalue(submodel.objDict[var])
 end
 """
     optimal_value(stochasticprogram::StochasticProgram)

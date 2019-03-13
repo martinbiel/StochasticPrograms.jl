@@ -200,12 +200,25 @@ function DEP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
         generator(stochasticprogram,:stage_2)(dep_model, second_stage, scenario, dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, dep_model.objDict)
-            newkey = if (isa(obj,JuMP.Variable))
+            newkey = if isa(obj,JuMP.Variable)
                 varname = add_subscript(dep_model.colNames[obj.col], i)
                 dep_model.colNames[obj.col] = varname
                 dep_model.colNamesIJulia[obj.col] = varname
                 newkey = Symbol(varname)
+            elseif isa(obj,Array{JuMP.Variable})
+                JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
+                arrayname = add_subscript(objkey, i)
+                for var in obj
+                    splitname = split(dep_model.colNames[var.col],"[")
+                    varname = @sprintf("%s[%s", add_subscript(splitname[1],i), splitname[2])
+                    dep_model.colNames[var.col] = varname
+                    dep_model.colNamesIJulia[var.col] = varname
+                end
+                newkey = Symbol(arrayname)
             elseif isa(obj,JuMP.ConstraintRef)
+                arrayname = add_subscript(objkey, i)
+                newkey = Symbol(arrayname)
+            elseif isa(obj,Array{ConstraintRef})
                 arrayname = add_subscript(objkey, i)
                 newkey = Symbol(arrayname)
             elseif isa(obj,JuMP.JuMPArray)
