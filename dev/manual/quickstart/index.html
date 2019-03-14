@@ -71,16 +71,16 @@ Second-stage
 Subproblem 1 (p = 0.40):
 Min -24 y₁ - 28 y₂
 Subject to
- -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
- -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
  0 ≤ y₁ ≤ 500
  0 ≤ y₂ ≤ 100
 
 Subproblem 2 (p = 0.60):
 Min -28 y₁ - 32 y₂
 Subject to
- -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
- -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
  0 ≤ y₁ ≤ 300
  0 ≤ y₂ ≤ 300</code></pre></div><h2><a class="nav-anchor" id="Deterministically-equivalent-problem-1" href="#Deterministically-equivalent-problem-1">Deterministically equivalent problem</a></h2><p>Since the example problem is small it is straightforward to work out the extended form:</p><div>\[\begin{aligned}
  \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\

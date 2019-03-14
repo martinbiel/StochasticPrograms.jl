@@ -44,10 +44,10 @@ sp = instantiate(simple_model, [ξ₁, ξ₂])</code></pre><pre><code class="lan
 Solver is default solver</code></pre></div><p>Moreoever, <a href="../../library/public/#StochasticPrograms.SAA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP&lt;:AbstractScenarioProblems{D₂,S},AbstractSampler{S},Integer}} where S&lt;:AbstractScenario where D₂ where D₁"><code>SAA</code></a> models are constructed in a straightforward way. Consider the following:</p><div><pre><code class="language-julia">@sampler AnotherSimple = begin
     @sample begin
         return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),
-									 -28.0 + (2*rand()-1),
-									 300.0 + 100*(2*rand()-1),
-									 300.0 + 100*(2*rand()-1),
-									 probability = rand())
+                                     -28.0 + (2*rand()-1),
+                                     300.0 + 100*(2*rand()-1),
+                                     300.0 + 100*(2*rand()-1),
+                                     probability = rand())
     end
 end
 
