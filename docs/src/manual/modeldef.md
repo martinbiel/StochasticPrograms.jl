@@ -45,10 +45,10 @@ Moreoever, [`SAA`](@ref) models are constructed in a straightforward way. Consid
 @sampler AnotherSimple = begin
     @sample begin
         return AnotherSimpleScenario(-24.0 + 2*(2*rand()-1),
-									 -28.0 + (2*rand()-1),
-									 300.0 + 100*(2*rand()-1),
-									 300.0 + 100*(2*rand()-1),
-									 probability = rand())
+                                     -28.0 + (2*rand()-1),
+                                     300.0 + 100*(2*rand()-1),
+                                     300.0 + 100*(2*rand()-1),
+                                     probability = rand())
     end
 end
 
