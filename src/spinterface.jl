@@ -39,11 +39,11 @@ function fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::A
     throw(MethodError(fill_solution!, stochasticprogram, structuredmodel))
 end
 """
-    solverstr(solver::AbstractStructuredModel)
+    solverstr(solver::AbstractStructuredSolver)
 
-Optionally, return a string identifier of `AbstractStructuredModel`.
+Optionally, return a string identifier of `AbstractStructuredSolver`.
 """
-function solverstr(::AbstractStructuredModel)
+function solverstr(::AbstractStructuredSolver)
     return "Unnamed structured solver"
 end
 # ========================== #

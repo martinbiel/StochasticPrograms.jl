@@ -31,6 +31,8 @@ export
     fill_solution!,
     solverstr,
     internal_solver,
+    Crash,
+    CrashMethod,
     spsolver,
     distributed,
     deferred,
@@ -110,5 +112,6 @@ end
 include("types/types.jl")
 include("methods/methods.jl")
 include("spinterface.jl")
+include("crash.jl")
 
 end # module
