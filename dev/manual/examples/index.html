@@ -63,9 +63,9 @@ Second-stage
 Subproblem 1 (p = 0.33):
 Min 238 y[wheat] + 210 y[corn] - 170 w[wheat] - 150 w[corn] - 36 w[beets_quota] - 10 w[beets_extra]
 Subject to
- 3 x[wheat] + y[wheat] - w[wheat] ≥ 200
- 3.6 x[corn] + y[corn] - w[corn] ≥ 240
- 24 x[beets] - w[beets_quota] - w[beets_extra] ≥ 0
+ y[wheat] - w[wheat] + 3 x[wheat] ≥ 200
+ y[corn] - w[corn] + 3.6 x[corn] ≥ 240
+ -w[beets_quota] - w[beets_extra] + 24 x[beets] ≥ 0
  w[beets_quota] ≤ 6000
  y[p] ≥ 0 ∀ p ∈ {wheat,corn}
  w[s] ≥ 0 ∀ s ∈ {wheat,corn,beets_quota,beets_extra}
@@ -83,9 +83,9 @@ Subject to
 Subproblem 3 (p = 0.33):
 Min 238 y[wheat] + 210 y[corn] - 170 w[wheat] - 150 w[corn] - 36 w[beets_quota] - 10 w[beets_extra]
 Subject to
- 2 x[wheat] + y[wheat] - w[wheat] ≥ 200
- 2.4 x[corn] + y[corn] - w[corn] ≥ 240
- 16 x[beets] - w[beets_quota] - w[beets_extra] ≥ 0
+ y[wheat] - w[wheat] + 2 x[wheat] ≥ 200
+ y[corn] - w[corn] + 2.4 x[corn] ≥ 240
+ -w[beets_quota] - w[beets_extra] + 16 x[beets] ≥ 0
  w[beets_quota] ≤ 6000
  y[p] ≥ 0 ∀ p ∈ {wheat,corn}
  w[s] ≥ 0 ∀ s ∈ {wheat,corn,beets_quota,beets_extra}</code></pre></div><p>We can now optimize the model:</p><div><pre><code class="language-julia">optimize!(farmer, solver = GLPKSolverLP())

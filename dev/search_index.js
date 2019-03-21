@@ -1193,11 +1193,11 @@ var documenterSearchIndex = {"docs": [
 },
 
 {
-    "location": "library/solverinterface/#StochasticPrograms.solverstr-Tuple{AbstractStructuredModel}",
+    "location": "library/solverinterface/#StochasticPrograms.solverstr-Tuple{AbstractStructuredSolver}",
     "page": "Solver interface",
     "title": "StochasticPrograms.solverstr",
     "category": "method",
-    "text": "solverstr(solver::AbstractStructuredModel)\n\nOptionally, return a string identifier of AbstractStructuredModel.\n\n\n\n\n\n"
+    "text": "solverstr(solver::AbstractStructuredSolver)\n\nOptionally, return a string identifier of AbstractStructuredSolver.\n\n\n\n\n\n"
 },
 
 {
