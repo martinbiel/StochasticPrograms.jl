@@ -283,12 +283,12 @@ function EVPI(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.
     if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot determine EVPI without a solver.")
     end
-    # Solve DEP
-    evpi = VRP(stochasticprogram, solver=supplied_solver)
-    # Solve all possible WS models and calculate EVPI = VRP-EWS
-    evpi -= _EWS(stochasticprogram, internal_solver(supplied_solver))
-    # Return EVPI
-    return evpi
+    # Calculate VRP
+    vrp = VRP(stochasticprogram, solver=supplied_solver)
+    # Solve all possible WS models and calculate EWS
+    ews = _EWS(stochasticprogram, internal_solver(supplied_solver))
+    # Return EVPI = EWS-VRP
+    return abs(ews-vrp)
 end
 """
     EVP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
@@ -378,10 +378,10 @@ In other words, calculate the gap between `EEV` and `VRP`. Optionally, supply a 
 """
 function VSS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP and determine EEV
-    vss = EEV(stochasticprogram; solver = solver)
-    # Calculate VSS as EEV-VRP
-    vss -= VRP(stochasticprogram; solver = solver)
-    # Return VSS
-    return vss
+    eev = EEV(stochasticprogram; solver = solver)
+    # Calculate VRP
+    vrp = VRP(stochasticprogram; solver = solver)
+    # Return VSS = VRP-EEV
+    return abs(vrp-eev)
 end
 # ========================== #
