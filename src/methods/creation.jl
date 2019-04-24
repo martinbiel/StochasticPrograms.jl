@@ -19,7 +19,7 @@ Define a scenario type compatible with StochasticPrograms using the syntax
      end]
 end
 ```
-The generated type is referenced through [name]Scenario and a default constructor is always generated. This constructor accepts the keyword `probability` to set the probability of the scenario occuring. Otherwise, any internal variables and specialized constructors are defined in the @scenario block as they would be in any Julia struct.
+The generated type is referenced through `name` and a default constructor is always generated. This constructor accepts the keyword `probability` to set the probability of the scenario occuring. Otherwise, any internal variables and specialized constructors are defined in the @scenario block as they would be in any Julia struct.
 
 If possible, a `zero` method and an `expected` method will be generated for the defined type. Otherwise, or if the default implementation is not desired, these can be user provided through [`@zero`](@ref) and [`@expectation`](@ref).
 
@@ -30,7 +30,7 @@ The defined scenario type will be available on all Julia processes.
 The following defines a simple scenario ``ξ`` with a single value.
 
 ```jldoctest
-@scenario Example = begin
+@scenario ExampleScenario = begin
     ξ::Float64
 end
 
@@ -39,21 +39,20 @@ ExampleScenario(1.0, probability = 0.5)
 # output
 
 ExampleScenario with probability 0.5
+  ξ: 1.0
 
 ```
 
 See also: [`@zero`](@ref), [`@expectation`](@ref), [`@sampler`](@ref)
 """
 macro scenario(arg)
-    @capture(arg, name_Symbol = scenariodef_) || error("Invalid syntax. Expected: scenarioname = begin scenariodef end")
-    scenarioname = Symbol(name, :Scenario)
+    @capture(arg, scenarioname_Symbol = scenariodef_) || error("Invalid syntax. Expected: scenarioname = begin scenariodef end")
     vars = Vector{Symbol}()
     vartypes = Vector{Union{Expr,Symbol}}()
     vardefs = Vector{Expr}()
     zerodefs = Vector{Expr}()
     expectdefs = Vector{Expr}()
     def = postwalk(prettify(scenariodef)) do x
-        @capture(x, constructor_Symbol) && constructor == name && return scenarioname
         if @capture(x, var_Symbol::vartype_)
             push!(vars, var)
             push!(vartypes, vartype)
@@ -101,6 +100,12 @@ macro scenario(arg)
     for var in vars
         push!(combine.args, :(probability(s1)*s1.$var + probability(s2)*s2.$var))
     end
+    # Prepare automatic scenariotext definition
+    textdef = Expr(:block)
+    for var in vars
+        key = Meta.quot(var)
+        push!(textdef.args, :(println(io, "  $($key): $(scenario.$var)")))
+    end
     # Define scenario type
     code = @q begin
         if StochasticPrograms.supports_expected([$(vartypes...)], $provided_expectdef) || $provided_expectdef
@@ -134,11 +139,15 @@ macro scenario(arg)
                                                                    end)
                     end
                 end
+                function StochasticPrograms.scenariotext(io::IO, scenario::$scenarioname)
+                    $textdef
+                    return io
+                end
             else
-                @warn "The scenario type $(string($(Meta.quot(name)))) was not defined. A user-provided implementation \n\n    function zero(::Type{{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
+                @warn "The scenario type $(string($(Meta.quot(scenarioname)))) was not defined. A user-provided implementation \n\n    function zero(::Type{{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
             end
         else
-            @warn "The scenario type $(string($(Meta.quot(name)))) was not defined. A user-provided implementation \n\n    function expected(scenarios::Vector{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
+            @warn "The scenario type $(string($(Meta.quot(scenarioname)))) was not defined. A user-provided implementation \n\n    function expected(scenarios::Vector{$(string($(Meta.quot(scenarioname))))})\n        ...\n    end\n\nis required."
         end
     end
     code = prettify(code)
@@ -205,31 +214,31 @@ macro expectation(def) @warn "@expectation should be used inside a @scenario blo
 """
     @sampler(def)
 
-Define a sampler for some `scenario` type compatible with StochasticPrograms using the syntax
+Define a sampler type for some `scenariotype` compatible with StochasticPrograms using the syntax
 ```julia
-@sampler [samplername] scenario = begin
+@sampler samplername = begin
     ...internals...
 
-    @sample begin
+    @sample scenariotype begin
         ...
         return scenario
     end
 end
 ```
-Any internal state required by the sampler, as well as any specialized constructor, are defined in the @sampler block as they would be in any Julia struct. Define the sample operation inside the [`@sample`](@ref) block. Optionally, give a `samplername` to the sampler. Otherwise, it will be named [scenario]Sampler. The defined sampler will be available on all Julia processes.
+Any internal state required by the sampler, as well as any specialized constructor, are defined in the @sampler block as they would be in any Julia struct. Define the sample operation inside the [`@sample`](@ref) block and specify the `scenariotype` that the sampler returns. The defined sampler will be available on all Julia processes.
 
 ## Examples
 
 The following defines a simple dummy sampler, with some internal weight value, for the scenario defined in [`@scenario`](@ref), and samples one scenario.
 
-```jldoctest; setup = :(@scenario Example = ξ::Float64), filter = r".*"
-@sampler Example = begin
+```jldoctest; setup = :(@scenario ExampleScenario = ξ::Float64), filter = r".*"
+@sampler ExampleSampler = begin
     w::Float64
 
-    Example(w::AbstractFloat) = new(w)
+    ExampleSampler(w::AbstractFloat) = new(w)
 
-    @sample begin
-        w = sampler.w
+    @sample ExampleScenario begin
+        @parameters w
         return ExampleScenario(w*randn(), probability = rand())
     end
 end
@@ -238,23 +247,32 @@ s()
 
 # output
 
-ExampleScenario(Probability(0.29), 1.48)
+ExampleScenario with probability 0.29
+  ξ: 1.48
+
 
 ```
 
 See also: [`@sample`](@ref), [`@scenario`](@ref)
 """
-macro sampler(arg) esc(:(@sampler(nothing, $arg))) end
-macro sampler(name, arg)
-    @capture(prettify(arg), sname_Symbol = samplerdef_) || error("Invalid syntax. Expected: scenarioname = begin samplerdef end")
-    scenarioname = Symbol(sname, :Scenario)
-    samplername = name == :nothing ? Symbol(sname, :Sampler) : Symbol(name, :Sampler)
+macro sampler(arg)
+    @capture(prettify(arg), samplername_Symbol = samplerdef_) || error("Invalid syntax. Expected: sampler = begin samplerdef end")
+    scenarioname = :undefined
     sampledefs = Vector{Expr}()
     def = postwalk(prettify(samplerdef)) do x
-        @capture(x, constructor_Symbol) && (constructor == sname || constructor == name) && return samplername
-        @capture(x, @sample sampledef_) || return x
-        push!(sampledefs, sampledef)
-        return @q begin end
+        if @capture(x, @parameters args__)
+            code = Expr(:block)
+            for param in args
+                push!(code.args, :($param = sampler.$param))
+            end
+            return code
+        elseif @capture(x, @sample sname_ sampledef_)
+            scenarioname = sname
+            push!(sampledefs, sampledef)
+            return @q begin end
+        else
+            return x
+        end
     end
     # Handle sample definition
     length(sampledefs) == 1 || error("Must provide exactly one @sample operation.")
@@ -283,7 +301,7 @@ end
 """
     @sample(def)
 
-Define the sample operation inside a @sampler block, using the syntax
+Define the sample operaton inside a @sampler block, using the syntax
 ```julia
 @sample begin
     ...
@@ -317,62 +335,20 @@ The following defines the first stage model given by:
          x₂ ≥ 20
 ```
 
-```jldoctest; setup = :(sp = StochasticProgram(SimpleScenario))
+```julia
 @first_stage sp = begin
     @variable(model, x₁ >= 40)
     @variable(model, x₂ >= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
     @constraint(model, x₁ + x₂ <= 120)
 end
-
-# output
-
-Stochastic program with:
- * 0 scenarios of type SimpleScenario
- * 2 decision variables
- * undefined second stage
-Solver is default solver
-
 ```
 
 See also: [`@second_stage`](@ref)
 """
 macro first_stage(arg) esc(:(@first_stage $arg generate)) end
 macro first_stage(arg, defer)
-    generate = if defer == :defer
-        :false
-    elseif defer == :generate
-        :true
-    else
-        error("Unknown option $defer")
-    end
-    @capture(arg, sp_Symbol = modeldef_) || error("Invalid syntax. Expected: stochasticprogram = begin JuMPdef end")
-    vardefs = Expr(:block)
-    for line in modeldef.args
-        (@capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__))) && continue
-        push!(vardefs.args, line)
-    end
-    code = @q begin
-        isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        if haskey($(esc(sp)).problemcache, :stage_1)
-            remove_first_stage!($(esc(sp)))
-            remove_subproblems!($(esc(sp)))
-            invalidate_cache!($(esc(sp)))
-        end
-        $(esc(sp)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(vardefs))
-	    return $(esc(:model))
-        end
-        $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(modeldef))
-	    return $(esc(:model))
-        end
-        if $generate
-            generate_stage_one!($(esc(sp)))
-        end
-        $(esc(sp))
-    end
-    return prettify(code)
+    return esc(:(@stage 1 $arg $defer))
 end
 """
     @second_stage(def)
@@ -384,7 +360,7 @@ Add a second stage model generation recipe to `stochasticprogram` using the synt
     ...
 end [defer]
 ```
-where JuMP syntax is used inside the block to define the second stage model. Annotate each first stage decision that appears in the second stage model with `@decision`. During definition, the second stage model is referenced through the reserved keyword `model` and the scenario specific data is referenced through the reserved keyword `scenario`.
+where JuMP syntax is used inside the block to define the second stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
 
 Optionally, give the keyword `defer` after the  to delay generation of the first stage model.
 
@@ -400,70 +376,52 @@ The following defines the second stage model given by:
 ```
 where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables. Two scenarios are added so that two second stage models are generated.
 
-```jldoctest
+```julia
 @second_stage sp = begin
     @decision x₁ x₂
-    ξ = scenario
-    @variable(model, 0 <= y₁ <= ξ.d₁)
-    @variable(model, 0 <= y₂ <= ξ.d₂)
-    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
+    @uncertain q₁ q₂ d₁ d₂
+    @variable(model, 0 <= y₁ <= d₁)
+    @variable(model, 0 <= y₂ <= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
-
-# output
-
-Stochastic program with:
- * 2 scenarios of type SimpleScenario
- * 2 decision variables
- * 2 recourse variables
-Solver is default solver
-
 ```
 
 See also: [`@first_stage`](@ref)
 """
 macro second_stage(arg) esc(:(@second_stage $arg generate)) end
 macro second_stage(arg, defer)
-    generate = if defer == :defer
-        :false
-    elseif defer == :generate
-        :true
-    else
-        error("Unknown option $defer")
-    end
-    @capture(arg, sp_Symbol = modeldef_) || error("Invalid syntax. Expected stochasticprogram = begin JuMPdef end")
-    def = postwalk(modeldef) do x
-        @capture(x, @decision args__) || return x
-        code = Expr(:block)
-        for var in args
-            varkey = Meta.quot(var)
-            push!(code.args, :($var = parent.objDict[$varkey]))
-        end
-        return code
-    end
-
-    code = @q begin
-        isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        if has_generator($(esc(sp)), :stage_2)
-            remove_subproblems!($(esc(sp)))
-            invalidate_cache!($(esc(sp)))
-        end
-        $(esc(sp)).generator[:stage_2] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario, $(esc(:parent))::JuMP.Model) -> begin
-            $(esc(def))
-	    return $(esc(:model))
-        end
-        if $generate
-            generate_stage_two!($(esc(sp)))
-        end
-        $(esc(sp))
-    end
-    return prettify(code)
+    return esc(:(@stage 2 $arg $defer))
 end
+"""
+    @parameters(def)
+
+Define the problem parameters in a @stage block
+```julia
+@parameters param1, param2, ...
+```
+possibly with default values. Any defined parameter without a default value must be supplied as a keyword argument to [`instantiate`](@ref) or [`SAA`](@ref) when creating models.
+
+## Examples
+
+```julia
+@parameters d
+
+@parameters begin
+    Crops = [:wheat, :corn, :beets]
+    Cost = Dict(:wheat=>150, :corn=>230, :beets=>260)
+    Budget = 500
+end
+```
+
+See also [`@decision`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
+"""
+macro parameters(def) @warn "@parameters should be used inside a @stage block." end
 """
     @decision(def)
 
-Annotate each first stage variable that appears in a @second_stage block, using the syntax
+In a @stage block, annotate each decision taken in the previous stage using the syntax
 ```julia
 @decision var1, var2, ...
 ```
@@ -474,56 +432,256 @@ Annotate each first stage variable that appears in a @second_stage block, using 
 @decision x₁, x₂
 ```
 
-See also [`@second_stage`](@ref)
+See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
-macro decision(def) @warn "@decision should be used inside a @first_stage block." end
-macro stage(stage,args)
-    @capture(args, sp_Symbol = modeldef_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
+macro decision(def) @warn "@decision should be used inside a @stage block." end
+"""
+    @uncertain(def)
+
+In a @stage block, annotate each uncertain variable using the syntax
+```julia
+@uncertain var1, var2, ...
+```
+This assumes that the [`Scenario`] type is used. Alternatively, user-defined scenarios can be specified by annotating the type. Also, inside a @stochastic_model block, user-defined scenarios can be created during the @uncertain annotation, following [`@scenario`](@ref).
+
+## Examples
+
+```julia
+@uncertain q₁ q₂ d₁ d₂
+
+@scenario Simple = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end
+@uncertain ξ::SimpleScenario
+
+@stochastic_model begin
+    ...
+    @uncertain ξ::SimpleScenario = begin
+        q₁::Float64
+        q₂::Float64
+        d₁::Float64
+        d₂::Float64
+    end
+    ...
+end
+```
+
+See also [`@scenario`](@ref), [`@parameters`](@ref), [`@decision`](@ref), [`@stage`](@ref)
+"""
+macro uncertain(def) @warn "@uncertain should be used inside a @stage block." end
+"""
+    @stage(def)
+
+Add a stage model generation recipe to `stochasticprogram` using the syntax
+```julia
+@stage stage stochasticprogram::StochasticProgram = begin
+    @parameters param1 param2 ...
+    @decision var1 var2 ...
+    @uncertain ξ
+    ... JuMPdef ...
+    ...
+end [defer]
+```
+where JuMP syntax is used inside the block to define the stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
+
+Optionally, give the keyword `defer` after the  to delay generation of the stage model.
+
+## Examples
+
+The following defines the first stage model given by:
+```math
+  minimize 100x₁ + 150x₂
+    s.t  x₁ + x₂ ≤ 120
+         x₁ ≥ 40
+         x₂ ≥ 20
+```
+and the second-stage model given by:
+```math
+  minimize q₁(ξ)y₁ + q₂(ξ)y₂
+    s.t  6y₁ + 10y₂ ≤ 60x₁
+         8y₁ + 5y₂ ≤ 60x₂
+         0 ≤ y₁ ≤ d₁(ξ)
+         0 ≤ y₂ ≤ d₂(ξ)
+```
+where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables. Two scenarios are added so that two second stage models are generated.
+
+```jldoctest
+ξ₁ = Scenario(q₁ = -24.0, q₂ = -28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
+ξ₂ = Scenario(q₁ = -28.0, q₂ = -32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+
+sp = StochasticProgram([ξ₁, ξ₂])
+
+@stage 1 sp = begin
+    @variable(model, x₁ >= 40)
+    @variable(model, x₂ >= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁ + x₂ <= 120)
+end
+
+@stage 2 sp = begin
+    @decision x₁ x₂
+    @uncertain q₁ q₂ d₁ d₂
+    @variable(model, 0 <= y₁ <= d₁)
+    @variable(model, 0 <= y₂ <= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+end
+
+# output
+
+Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Solver is default solver
+
+```
+
+See also: [`@parameters`](@ref), [`@decision`](@ref), [`@uncertain`](@ref)
+"""
+macro stage(stage, arg) esc(:(@stage $stage $arg generate)) end
+macro stage(stage, args, defer)
+    generate = if defer == :defer
+        :false
+    elseif defer == :generate
+        :true
+    else
+        error("Unknown option $defer")
+    end
+    @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
     # Save variable definitions separately
     vardefs = Expr(:block)
-    for line in modeldef.args
-        (@capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__)) || @capture(line, @decision args__)) && continue
-        push!(vardefs.args, line)
-    end
-    # Handle the first stage and the second stages differently
-    code = if stage == 1
-        code = @q begin
-            isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-            $(esc(sp)).generator[:stage_1_vars] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
-                $(esc(vardefs))
-	        return $(esc(:model))
-            end
-            $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model,$(esc(:stage))) -> begin
-                $(esc(modeldef))
-	        return $(esc(:model))
-            end
-            nothing
+    for line in block(def).args
+        if @capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__)) || @capture(line, @parameters args__) || @capture(line, @decision args__) || @capture(line, @uncertain args__)
+            continue
+        else
+            push!(vardefs.args, line)
         end
-        code
-    else
-        def = postwalk(modeldef) do x
-            @capture(x, @decision args__) || return x
+    end
+    # Handle parameters
+    def = postwalk(def) do x
+        if @capture(x, @parameters arg_)
+            code = Expr(:block)
+            for paramdef in prettify(arg).args
+                if @capture(paramdef, key_Symbol = val_) || @capture(paramdef, key_Symbol)
+                    push!(code.args, :($key = stage.$key))
+                else
+                    error("Incorrect @parameters syntax. Specify parameter names, possibly with a default value.")
+                end
+            end
+            pushfirst!(vardefs.args, code)
+            return code
+        elseif @capture(x, @parameters args__)
+            code = Expr(:block)
+            for param in args
+                push!(code.args, :($param = stage.$param))
+            end
+            pushfirst!(vardefs.args, code)
+            return code
+        elseif @capture(x, @decision args__)
+            stage == 1 && error("@decision links cannot be used in the first stage.")
             code = Expr(:block)
             for var in args
                 varkey = Meta.quot(var)
-                push!(code.args, :($var = parent.objDict[$varkey]))
+                decisiondef = @q begin
+                    haskey(parent.objDict, $varkey) || error("Decision $($varkey) not present in parent model.")
+                    $var = parent.objDict[$varkey]
+                end
+                push!(code.args, decisiondef)
             end
             return code
+        elseif @capture(x, @uncertain var_Symbol::t_Symbol)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            return :($var::$t = scenario)
+        elseif @capture(x, @uncertain vars__ from scenvar_Symbol::t_Symbol)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            code = @q begin
+                $scenvar::$t = scenario
+            end
+            for var in vars
+                varkey = Meta.quot(var)
+                push!(code.args, :($var = getproperty($scenvar, $varkey)))
+            end
+            return code
+        elseif @capture(x, @uncertain vars__ from t_Symbol)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            code = @q begin
+                scenvar::$t = scenario
+            end
+            for var in vars
+                varkey = Meta.quot(var)
+                push!(code.args, :($var = getproperty(scenvar, $varkey)))
+            end
+            return code
+        elseif @capture(x, @uncertain var_Symbol::t_Symbol = scenariodef_)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            return @q begin
+                $var::$t = scenario
+            end
+        elseif @capture(x, @uncertain vars__ from scenvar_Symbol::t_Symbol = scenariodef_)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            code = @q begin
+                $scenvar::$t = scenario
+            end
+            for var in vars
+                varkey = Meta.quot(var)
+                push!(code.args, :($var = getproperty($scenvar, $varkey)))
+            end
+            return code
+        elseif @capture(x, @uncertain vars__ from t_Symbol = scenariodef_)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            code = @q begin
+                scenvar::$t = scenario
+            end
+            for var in vars
+                varkey = Meta.quot(var)
+                push!(code.args, :($var = getproperty(scenvar, $varkey)))
+            end
+            return code
+        elseif @capture(x, @uncertain args__)
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            code = Expr(:block)
+            for var in args
+                varkey = Meta.quot(var)
+                push!(code.args, :($var = scenario[$varkey]))
+            end
+            return code
+        else
+            return x
         end
-        # Create generator function
-        code = @q begin
-            isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-            $(esc(sp)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))) -> begin
-                $(esc(vardefs))
+    end
+    # The first stage is treated different from the subsequent stages
+    generatordefs = if stage == 1
+        @q begin
+            $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+                $(esc(def))
 	        return $(esc(:model))
             end
+        end
+    else
+        @q begin
             $(esc(sp)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario, $(esc(:parent))::JuMP.Model) -> begin
                 $(esc(def))
 	        return $(esc(:model))
             end
-            $(esc(sp))
         end
-        code
+    end
+    # Create definition code
+    code = @q begin
+        isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
+        $(esc(sp)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+            $(esc(vardefs))
+	    return $(esc(:model))
+        end
+        $generatordefs
+        if $generate
+            generate_stage!($(esc(sp)), $stage)
+        end
+        $(esc(sp))
     end
     # Return code
     return prettify(code)

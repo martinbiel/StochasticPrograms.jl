@@ -1,30 +1,63 @@
 # API (Two-stage) #
 # ========================== #
 """
-    instantiate(stochasticmodel::StochasticModel,
+    instantiate(stochasticmodel::StochasticModel{2},
                 scenarios::Vector{<:AbstractScenario};
                 solver = JuMP.UnsetSolver(),
-                procs = workers())
+                procs = workers(),
+                kw...)
 
-Instantate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
+Instantiate a new two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel`, and the given collection of `scenarios`.
 """
-function instantiate(sm::StochasticModel, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
-    sp = StochasticProgram(sm.first_stage.data, sm.second_stage.data, scenarios, solver, procs)
+function instantiate(sm::StochasticModel{2}, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers(), kw...)
+    sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                           parameters(sm.parameters[2]; kw...),
+                           scenarios,
+                           solver,
+                           procs)
+    sm.generator(sp)
+    return sp
+end
+"""
+    instantiate(stochasticmodel::StochasticModel{2};
+                scenariotype::Type{S} = Scenario,
+                solver = JuMP.UnsetSolver(),
+                procs = workers(),
+                kw...) where S <: AbstractScenario
+
+Instantiate a deferred two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel` over the scenario type `S`.
+"""
+function instantiate(sm::StochasticModel{2}; scenariotype::Type{S} = Scenario, solver = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: AbstractScenario
+    sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                           parameters(sm.parameters[2]; kw...),
+                           scenariotype,
+                           solver,
+                           procs)
     sm.generator(sp)
     return sp
 end
 """
     instantiate(stochasticmodel::StochasticModel,
-                first_stage::Any,
-                second_stage::Any,
                 scenarios::Vector{<:AbstractScenario};
                 solver = JuMP.UnsetSolver(),
-                procs = workers())
+                procs = workers(),
+                kw...)
 
-Instantate a new stochastic program using the model definition stored in `stochasticmodel`, the stage data given by `first_stage` and `second_stage`, and the given collection of `scenarios`.
+Instantiate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
 """
-function instantiate(sm::StochasticModel, first_stage::Any, second_stage::Any, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
-    sp = StochasticProgram(first_stage, second_stage, scenarios, solver, procs)
+function instantiate(sm::StochasticModel{N},
+                     scenarios::NTuple{M,Vector{<:AbstractScenario}};
+                     solver = JuMP.UnsetSolver(),
+                     procs = workers(),
+                     kw...) where {N,M}
+    M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
+    params = ntuple(Val(N)) do i
+        parameters(sm.parameters[i]; kw...)
+    end
+    sp = StochasticProgram(params,
+                           scenarios,
+                           solver,
+                           procs)
     sm.generator(sp)
     return sp
 end
@@ -66,7 +99,7 @@ optimize!(sp, solver = GLPKSolverLP())
 
 See also: [`VRP`](@ref)
 """
-function optimize!(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver(), kwargs...)
+function optimize!(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver(), kwargs...)
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
@@ -79,7 +112,7 @@ function optimize!(stochasticprogram::StochasticProgram; solver::SPSolverType = 
     # Switch on solver type
     return _optimize!(stochasticprogram, supplied_solver; kwargs...)
 end
-function _optimize!(stochasticprogram::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver; kwargs...)
+function _optimize!(stochasticprogram::StochasticProgram{2}, solver::MathProgBase.AbstractMathProgSolver; kwargs...)
     # Standard mathprogbase solver. Fallback to solving DEP, relying on JuMP.
     dep = DEP(stochasticprogram; solver = solver)
     status = solve(dep; kwargs...)
@@ -87,7 +120,7 @@ function _optimize!(stochasticprogram::StochasticProgram, solver::MathProgBase.A
     fill_solution!(stochasticprogram)
     return status
 end
-function _optimize!(stochasticprogram::StochasticProgram, solver::AbstractStructuredSolver; kwargs...)
+function _optimize!(stochasticprogram::StochasticProgram{2}, solver::AbstractStructuredSolver; kwargs...)
     # Use structured solver
     structuredmodel = StructuredModel(stochasticprogram, solver)
     stochasticprogram.spsolver.internal_model = structuredmodel
@@ -157,31 +190,53 @@ function optimal_value(stochasticprogram::StochasticProgram, i::Integer)
     return submodel.objVal
 end
 """
-    scenarioproblems(stochasticprogram::StochasticProgram)
+    stage_parameters(stochasticprogram::StochasticProgram, s::Integer)
+
+Return the parameters at stage `s` in `stochasticprogram`.
+"""
+function stage_parameters(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    return stochasticprogram.stages[s].parameters
+end
+"""
+    scenarioproblems(stochasticprogram::StochasticProgram, s::Integer)
+
+Return the scenario problems at stage `s` in `stochasticprogram`.
+"""
+function scenarioproblems(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 < s <= N || error("Stage $s not in range 2 to $N.")
+    return stochasticprogram.scenarioproblems[s-1]
+end
+"""
+    scenarioproblems(stochasticprogram::TwoStageStochasticProgram)
 
 Return the scenario problems in `stochasticprogram`.
 """
-function scenarioproblems(stochasticprogram::StochasticProgram)
+function scenarioproblems(stochasticprogram::StochasticProgram{2}, s::Integer = 2)
+    s == 1 && error("Stage 1 does not have scenario problems.")
+    s == 2 || error("Stage $s not available in two-stage model.")
     return stochasticprogram.scenarioproblems
 end
 """
-    first_stage_data(stochasticprogram::StochasticProgram)
+    decision_length(stochasticprogram::StochasticProgram, s::Integer)
 
-Return the first stage data structure, if any exists, in `stochasticprogram`.
+Return the length of the decision at stage `s` in the `stochasticprogram`.
 """
-function first_stage_data(stochasticprogram::StochasticProgram)
-    return stochasticprogram.first_stage.data
+function decision_length(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    if s == 1
+        haskey(stochasticprogram.problemcache, :stage_1) || return 0
+        return stochasticprogram.problemcache[:stage_1].numCols
+    end
+    nsubproblems(stochasticprogram, s) == 0 && return 0
+    return recourse_length(scenarioproblems(stochasticprogram, s))
 end
 """
-    decision_length(stochasticprogram::StochasticProgram)
+    decision_length(stochasticprogram::TwoStageStochasticProgram)
 
-Return the length of the first stage decision in `stochasticprogram`.
+Return the length of the first-stage decision of the two-stage `stochasticprogram`.
 """
-function decision_length(stochasticprogram::StochasticProgram)
-    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
-    !haskey(stochasticprogram.problemcache, :stage_1) && return 0
-    first_stage = get_stage_one(stochasticprogram)
-    return first_stage.numCols
+function decision_length(stochasticprogram::StochasticProgram{2})
+    return decision_length(stochasticprogram, 1)
 end
 """
     first_stage_nconstraints(stochasticprogram::StochasticProgram)
@@ -204,70 +259,63 @@ function first_stage_dims(stochasticprogram::StochasticProgram)
     return length(first_stage.linconstr), first_stage.numCols
 end
 """
-    second_stage_data(stochasticprogram::StochasticProgram)
+    recourse_length(stochasticprogram::TwoStageStochasticProgram)
 
-Return the second stage data structure, if any exists, in `stochasticprogram`.
+Return the length of the second-stage decision in the two-stage `stochasticprogram`.
 """
-function second_stage_data(stochasticprogram::StochasticProgram)
-    return stage_data(stochasticprogram.scenarioproblems)
-end
-"""
-    recourse_length(stochasticprogram::StochasticProgram)
-
-Return the length of the second stage decision in `stochasticprogram`.
-"""
-function recourse_length(stochasticprogram::StochasticProgram)
+function recourse_length(stochasticprogram::StochasticProgram{2})
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
     nsubproblems(stochasticprogram) == 0 && return 0
     return recourse_length(scenarioproblems(stochasticprogram))
 end
 """
-    scenario(stochasticprogram::StochasticProgram, i::Integer)
+    scenario(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
 
-Return the `i`th scenario in `stochasticprogram`.
+
+Return the `i`th scenario of stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function scenario(stochasticprogram::StochasticProgram, i::Integer)
-    return scenario(scenarioproblems(stochasticprogram), i)
+function scenario(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
+    return scenario(scenarioproblems(stochasticprogram, s), i)
 end
 """
-    scenarios(stochasticprogram::StochasticProgram)
+    scenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return an array of all scenarios in `stochasticprogram`.
+Return an array of all scenarios of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function scenarios(stochasticprogram::StochasticProgram)
-    return scenarios(scenarioproblems(stochasticprogram))
+function scenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return scenarios(scenarioproblems(stochasticprogram, s))
 end
 """
-    expected(stochasticprogram::StochasticProgram)
+    expected(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return the exected scenario of all scenarios in `stochasticprogram`.
+Return the exected scenario of all scenarios of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function expected(stochasticprogram::StochasticProgram)
-    return expected(scenarioproblems(stochasticprogram)).scenario
+function expected(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return expected(scenarioproblems(stochasticprogram, s)).scenario
 end
 """
-    scenariotype(stochasticprogram::StochasticProgram)
+    scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return the type of the scenario structure associated with `stochasticprogram`.
+Return the type of the scenario structure associated with `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function scenariotype(stochasticprogram::StochasticProgram)
-    return scenariotype(scenarioproblems(stochasticprogram))
+function scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return scenariotype(scenarioproblems(stochasticprogram, s))
 end
 """
-    probability(stochasticprogram::StochasticProgram)
+    probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
 
-Return the probability of scenario `i`th scenario in `stochasticprogram` occuring.
+Return the probability of scenario `i`th scenario in the `stochasticprogram` at stage `s` occuring. Defaults to the second stage.
 """
-function probability(stochasticprogram::StochasticProgram, i::Integer)
-    return probability(scenario(stochasticprogram, i))
+function probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
+    return probability(scenario(stochasticprogram, s, i))
 end
 """
-    probability(stochasticprogram::StochasticProgram)
+    stage_probability(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return the probability of any scenario in `stochasticprogram` occuring. A well defined model should return 1.
+Return the probability of any scenario in the `stochasticprogram` at stage `s` occuring. A well defined model should return 1. Defaults to the second stage.
 """
-function probability(stochasticprogram::StochasticProgram)
-    return probability(stochasticprogram.scenarioproblems)
+function stage_probability(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return probability(scenarioproblems(stochasticprogram, s))
 end
 """
     has_generator(stochasticprogram::StochasticProgram, key::Symbol)
@@ -286,79 +334,82 @@ function generator(stochasticprogram::StochasticProgram, key::Symbol)
     return stochasticprogram.generator[key]
 end
 """
-    subproblem(stochasticprogram::StochasticProgram, i::Integer)
+    subproblem(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
 
-Return the `i`th subproblem in `stochasticprogram`.
+Return the `i`th subproblem of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function subproblem(stochasticprogram::StochasticProgram, i::Integer)
-    return subproblem(stochasticprogram.scenarioproblems, i)
+function subproblem(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
+    return subproblem(scenarioproblems(stochasticprogram, s), i)
 end
 """
-    subproblems(stochasticprogram::StochasticProgram)
+    subproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return an array of all subproblems in `stochasticprogram`.
+Return an array of all subproblems of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function subproblems(stochasticprogram::StochasticProgram)
-    return subproblems(stochasticprogram.scenarioproblems)
+function subproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return subproblems(scenarioproblems(stochasticprogram, s))
 end
 """
-    nsubproblems(stochasticprogram::StochasticProgram)
+    nsubproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return the number of subproblems in `stochasticprogram`.
+Return the number of subproblems in the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function nsubproblems(stochasticprogram::StochasticProgram)
-    return nsubproblems(stochasticprogram.scenarioproblems)
+function nsubproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
+    s == 1 && return 0
+    return nsubproblems(scenarioproblems(stochasticprogram, s))
 end
 """
-    masterterms(stochasticprogram::StochasticProgram, i::Integer)
+    masterterms(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
 
-Return the first stage terms appearing in scenario `i` in `stochasticprogram`.
+Return the first stage terms appearing in scenario `i` in the `stochasticprogram` at stage `s`. Defaults to the second stage.
 
 The master terms are given in sparse format as an array of tuples `(row,col,coeff)` which specify the occurance of master problem variables in the second stage constraints.
 """
-function masterterms(stochasticprogram::StochasticProgram, i::Integer)
-    return masterterms(stochasticprogram.scenarioproblems, i)
+function masterterms(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
+    return masterterms(scenarioproblems(stochasticprogram, s), i)
 end
 """
-    nscenarios(stochasticprogram::StochasticProgram)
+    nscenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return the number of scenarios in `stochasticprogram`.
+Return the number of scenarios in the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function nscenarios(stochasticprogram::StochasticProgram)
-    return nscenarios(stochasticprogram.scenarioproblems)
-end
-"""
-    sampler(stochasticprogram::StochasticProgram)
-
-Return the sampler object, if any, in `stochasticprogram`.
-"""
-function sampler(stochasticprogram::StochasticProgram)
-    return sampler(stochasticprogram.scenarioproblems)
+function nscenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
+    s == 1 && return 0
+    return nscenarios(scenarioproblems(stochasticprogram, s))
 end
 """
     nstages(stochasticprogram::StochasticProgram)
 
-Return the number of stages in `stochasticprogram`. Will return 2 for two-stage problems.
+Return the number of stages in `stochasticprogram`.
 """
-nstages(stochasticprogram::StochasticProgram) = 2
+nstages(::StochasticProgram{N}) where N = N
 """
-    distributed(stochasticprogram::StochasticProgram)
+    distributed(stochasticprogram::StochasticProgram, s::Integer = 2)
 
-Return true if `stochasticprogram` is memory distributed.
-p"""
-distributed(stochasticprogram::StochasticProgram) = distributed(scenarioproblems(stochasticprogram))
+Return true if the `stochasticprogram` is memory distributed at stage `s`. Defaults to the second stage.
+"""
+distributed(stochasticprogram::StochasticProgram, s::Integer = 2) = distributed(scenarioproblems(stochasticprogram, s))
 """
     deferred(stochasticprogram::StochasticProgram)
 
 Return true if `stochasticprogram` is not fully generated.
 """
-deferred(stochasticprogram::StochasticProgram) = deferred_first_stage(stochasticprogram) || deferred_second_stage(stochasticprogram)
+deferred(stochasticprogram::StochasticProgram{N}) where N = deferred(stochasticprogram, Val(N))
+deferred(stochasticprogram::StochasticProgram, ::Val{1}) = deferred_first_stage(stochasticprogram)
+function deferred(stochasticprogram::StochasticProgram, ::Val{N}) where N
+
+    return deferred_stage(stochasticprogram, N) || deferred(stochasticprogram, Val(N-1))
+end
 deferred_first_stage(stochasticprogram::StochasticProgram) = has_generator(stochasticprogram, :stage_1) && !haskey(stochasticprogram.problemcache, :stage_1)
-deferred_second_stage(stochasticprogram::StochasticProgram) = nsubproblems(stochasticprogram) < nscenarios(stochasticprogram)
+function deferred_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    s == 1 && return deferred_first_stage(stochasticprogram)
+    nsubproblems(stochasticprogram, s) < nscenarios(stochasticprogram, s)
+end
 """
     spsolver(stochasticprogram::StochasticProgram)
 
-Return the stochastic program solver `spsolver` in `stochasticprogram`.
+Return the stochastic program solver `spsolver` of the `stochasticprogram`.
 """
 function spsolver(stochasticprogram::StochasticProgram)
     return stochasticprogram.spsolver.solver
@@ -366,9 +417,9 @@ end
 """
     internal_model(stochasticprogram::StochasticProgram)
 
-Return the internal model of the solver object in `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
+Return the internal solve model object of the `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
-function internal_model(stochasticprogram::StochasticProgram)
+function spsolver_model(stochasticprogram::StochasticProgram)
     return stochasticprogram.spsolver.internal_model
 end
 # ========================== #
@@ -378,43 +429,21 @@ end
 """
     set_spsolver(stochasticprogram::StochasticProgram, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
 
-Store the stochastic program solver `spsolver` in `stochasticprogram`.
+Store the stochastic program solver `spsolver` of the `stochasticprogram`.
 """
 function set_spsolver(stochasticprogram::StochasticProgram, spsolver::Union{MathProgBase.AbstractMathProgSolver,AbstractStructuredSolver})
     stochasticprogram.spsolver.solver = spsolver
     nothing
 end
 """
-    set_first_stage_data!(stochasticprogram::StochasticProgram, data::Any)
+    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2; defer::Bool = false)
 
-Store the first stage `data` in the first stage of `stochasticprogram`.
-"""
-function set_first_stage_data!(stochasticprogram::StochasticProgram, data::Any)
-    stochasticprogram.first_stage.data = data
-    remove_first_stage!(stochasticprogram)
-    invalidate_cache!(stochasticprogram)
-    nothing
-end
-"""
-    set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
-
-Store the second stage `data` in the second stage of `stochasticprogram`.
-"""
-function set_second_stage_data!(stochasticprogram::StochasticProgram, data::Any)
-    set_stage_data!(stochasticprogram.scenarioproblems, data)
-    remove_subproblems!(stochasticprogram)
-    invalidate_cache!(stochasticprogram)
-    nothing
-end
-"""
-    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
-
-Store the second stage `scenario` in the second stage of `stochasticprogram`.
+Store the second stage `scenario` in the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
-function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario; defer::Bool = false)
-    add_scenario!(scenarioproblems(stochasticprogram), scenario)
+function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2; defer::Bool = false)
+    add_scenario!(scenarioproblems(stochasticprogram, stage), scenario)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -422,14 +451,14 @@ function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractS
     return stochasticprogram
 end
 """
-    add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer; defer::Bool = false)
+    add_worker_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer, stage::Integer = 2; defer::Bool = false)
 
-Store the second stage `scenario` in the second stage of `stochasticprogram` in worker node `w`.
+Store the second stage `scenario` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer; defer::Bool = false)
-    add_scenario!(scenarioproblems(stochasticprogram), scenario, w)
+function add_worker_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer, stage::Integer = 2; defer::Bool = false)
+    add_scenario!(scenarioproblems(stochasticprogram, stage), scenario, w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -437,14 +466,14 @@ function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractS
     return stochasticprogram
 end
 """
-    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
+    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, stage::Integer = 2; defer::Bool = false)
 
-Store the second stage scenario returned by `scenariogenerator` in the second stage of `stochasticprogram`.
+Store the second stage scenario returned by `scenariogenerator` in the second stage of the `stochasticprogram`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
-function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
-    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram))
+function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, stage::Integer = 2; defer::Bool = false)
+    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram, stage))
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -452,14 +481,14 @@ function add_scenario!(scenariogenerator::Function, stochasticprogram::Stochasti
     return stochasticprogram
 end
 """
-    add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram; defer::Bool = false)
+    add_worker_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer, stage::Integer = 2; defer::Bool = false)
 
-Store the second stage scenario returned by `scenariogenerator` in the second stage of `stochasticprogram` in worker node `w`.
+Store the second stage scenario returned by `scenariogenerator` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer; defer::Bool = false)
-    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram), w)
+function add_worker_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer, stage::Integer = 2; defer::Bool = false)
+    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram, stage), w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -467,14 +496,14 @@ function add_scenario!(scenariogenerator::Function, stochasticprogram::Stochasti
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
+    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, stage::Integer = 2; defer::Bool = false)
 
-Store the collection of second stage `scenarios` in the second stage of `stochasticprogram`.
+Store the collection of second stage `scenarios` in the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
-function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
-    add_scenarios!(scenarioproblems(stochasticprogram), scenarios)
+function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, stage::Integer = 2; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram, stage), scenarios)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -482,14 +511,14 @@ function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
+    add_worker_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2; defer::Bool = false)
 
-Store the collection of second stage `scenarios` in the second stage of `stochasticprogram` in worker node `w`.
+Store the collection of second stage `scenarios` in in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
-    add_scenarios!(scenarioproblems(stochasticprogram), scenarios, w)
+function add_worker_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2; defer::Bool = false)
+    add_scenarios!(scenarioproblems(stochasticprogram, stage), scenarios, w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -497,14 +526,14 @@ function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}; defer::Bool = false)
+    add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, stage::Integer = 2; defer::Bool = false)
 
-Generate `n` second-stage scenarios using `scenariogenerator`and store in the second stage of `stochasticprogram`.
+Generate `n` second-stage scenarios using `scenariogenerator`and store in the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
-function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer; defer::Bool = false)
-    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram), n)
+function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, stage::Integer = 2; defer::Bool = false)
+    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram, stage), n)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -512,14 +541,14 @@ function add_scenarios!(scenariogenerator::Function, stochasticprogram::Stochast
     return stochasticprogram
 end
 """
-    add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer; defer::Bool = false)
+    add_worker_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer, stage::Integer = 2; defer::Bool = false)
 
-Generate `n` second-stage scenarios using `scenariogenerator`and store in the second stage of `stochasticprogram` in worker node `w`.
+Generate `n` second-stage scenarios using `scenariogenerator`and store them in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called.
 """
-function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer; defer::Bool = false)
-    add_scenarios!(scenarioproblems(stochasticprogram), scenarios, w)
+function add_worker_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer, stage::Integer = 2; defer::Bool = false)
+    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram, stage), n, w)
     invalidate_cache!(stochasticprogram)
     if !defer
         generate!(stochasticprogram)
@@ -527,14 +556,14 @@ function add_scenarios!(scenariogenerator::Function, stochasticprogram::Stochast
     return stochasticprogram
 end
 """
-    sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; defer::Bool = false)
+    sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer, stage::Integer = 2; defer::Bool = false)
 
-Sample `n` scenarios using `sampler` and add to `stochasticprogram`.
+Sample `n` scenarios using `sampler` and add to the `stochasticprogram` at `stage`. Defaults to the second stage.
 
 If `defer` is true, then model creation is deferred until `generate!(stochasticprogram)` is called. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
-function sample!(stochasticprogram::StochasticProgram{D₁,D₂,S}, sampler::AbstractSampler{S}, n::Integer; defer::Bool = false) where {D₁, D₂, S <: AbstractScenario}
-    sample!(scenarioproblems(stochasticprogram), sampler, n)
+function sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer, stage::Integer = 2; defer::Bool = false)
+    sample!(scenarioproblems(stochasticprogram, stage), sampler, n)
     if !defer
         generate!(stochasticprogram)
     end

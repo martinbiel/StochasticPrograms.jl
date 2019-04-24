@@ -4,98 +4,81 @@ function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVect
     first_stage = get_stage_one(stochasticprogram)
     return eval_objective(first_stage.obj, x)
 end
-function _eval_second_stage(stochasticprogram::StochasticProgram, x::AbstractVector, scenario::AbstractScenario, solver::MPB.AbstractMathProgSolver)
-    outcome = outcome_model(stochasticprogram, scenario, x, solver)
+function _eval_second_stage(stochasticprogram::TwoStageStochasticProgram, x::AbstractVector, scenario::AbstractScenario, solver::MPB.AbstractMathProgSolver)
+    outcome = outcome_model(stochasticprogram, x, scenario, solver)
     solve(outcome)
     return probability(scenario)*getobjectivevalue(outcome)
 end
-function _eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
+function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
-    outcome_generator = scenario -> _outcome_model(stochasticprogram.generator[:stage_1_vars],
-                                                   stochasticprogram.generator[:stage_2],
-                                                   stochasticprogram.first_stage.data,
-                                                   stage_data(stochasticprogram.scenarioproblems),
-                                                   scenario,
-                                                   x,
-                                                   solver)
-   return outcome_mean(outcome_generator, scenarios(stochasticprogram))
+                             solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
+    return outcome_mean(outcome_generator, scenarios(stochasticprogram))
 end
-function _eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
+function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
+                             solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
     Qs = Vector{Float64}(undef, nworkers())
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
     @sync begin
         for (i,w) in enumerate(workers())
-            @async Qs[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,x,first_stage,solver)->begin
+            @async Qs[i] = remotecall_fetch((sp,outcome_generator)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero(eltype(x))
-                outcome_generator = scenario -> _outcome_model(stage_one_generator,
-                                                               stage_two_generator,
-                                                               first_stage,
-                                                               stage_data(scenarioproblems),
-                                                               scenario,
-                                                               x,
-                                                               solver)
+                isempty(scenarioproblems.scenarios) && return 0.0
                 return outcome_mean(outcome_generator, scenarioproblems.scenarios)
             end,
             w,
             stochasticprogram.scenarioproblems[w-1],
-            stochasticprogram.generator[:stage_1_vars],
-            stochasticprogram.generator[:stage_2],
-            x,
-            stochasticprogram.first_stage.data,
-            solver)
+            outcome_generator)
         end
     end
     return sum(Qs)
 end
-function _stat_eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
+function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
+                                  solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
     N = nscenarios(stochasticprogram)
-    outcome_generator = scenario -> _outcome_model(stochasticprogram.generator[:stage_1_vars],
-                                                   stochasticprogram.generator[:stage_2],
-                                                   stochasticprogram.first_stage.data,
-                                                   stage_data(stochasticprogram.scenarioproblems),
-                                                   scenario,
-                                                   x,
-                                                   solver)
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
     𝔼Q, σ² = outcome_welford(outcome_generator, scenarios(stochasticprogram))
     return 𝔼Q, sqrt(σ²)
 end
-function _stat_eval_second_stages(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
+function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
+                                  solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
     N = nscenarios(stochasticprogram)
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
-            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,x,first_stage,solver)->begin
+            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,x,solver)->begin
                 scenarioproblems = fetch(sp)
                 isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x))
-                outcome_generator = scenario -> _outcome_model(stage_one_generator,
-                                                               stage_two_generator,
-                                                               first_stage,
-                                                               stage_data(scenarioproblems),
-                                                               scenario,
-                                                               x,
-                                                               solver)
-                return (outcome_welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
+                    outcome_generator = scenario -> begin
+                        outcome_model = Model(solver = solver)
+                        _outcome_model!(outcome_model,
+                                        stage_one_generator,
+                                        stage_two_generator,
+                                        stage_one_params,
+                                        stage_two_params,
+                                        x,
+                                        scenario)
+                        return outcome_model
+                   end
+                   return (outcome_welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
             end,
             w,
             stochasticprogram.scenarioproblems[w-1],
             stochasticprogram.generator[:stage_1_vars],
             stochasticprogram.generator[:stage_2],
+            stage_parameters(stochasticprogram, 1),
+            stage_parameters(stochasticprogram, 2),
             x,
-            stochasticprogram.first_stage.data,
             solver)
         end
     end
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
     return 𝔼Q, sqrt(σ²)
 end
-function _eval(stochasticprogram::StochasticProgram, x::AbstractVector, solver::MPB.AbstractMathProgSolver)
+function _eval(stochasticprogram::StochasticProgram{2}, x::AbstractVector, solver::MPB.AbstractMathProgSolver)
     xlength = decision_length(stochasticprogram)
     length(x) == xlength || error("Incorrect length of given decision vector, has ", length(x), " should be ", xlength)
     all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
@@ -148,87 +131,94 @@ end
 # Evaluation API #
 # ========================== #
 """
-    evaluate_decision(stochasticprogram::StochasticProgram,
-                      x::AbstractVector;
+    evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
+                      decision::AbstractVector;
                       solver = JuMP.UnsetSolver())
 
-Evaluate the first stage decision `x` in `stochasticprogram`.
+Evaluate the first-stage `decision` in `stochasticprogram`.
 
-In other words, evaluate the first stage objective at `x` and solve outcome models of `x` for every available scenario. Optionally, supply a capable `solver` to solve the outcome models. Otherwise, any previously set solver will be used.
+In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. Optionally, supply a capable `solver` to solve the outcome models. Otherwise, any previously set solver will be used.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram, x::AbstractVector; solver::SPSolverType = JuMP.UnsetSolver())
+function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::AbstractVector; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
     if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot evaluate decision without a solver.")
     end
-    return _eval(stochasticprogram, x, internal_solver(supplied_solver))
+    return _eval(stochasticprogram, decision, internal_solver(supplied_solver))
 end
 """
-    evaluate_decision(stochasticprogram::StochasticProgram,
-                      scenario::AbstractScenario,
-                      x::AbstractVector;
+    evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
+                      decision::AbstractVector,
+                      scenario::AbstractScenario;
                       solver = JuMP.UnsetSolver())
 
-Evaluate the result of taking the first stage decision `x` if `scenario` is the actual outcome in `stochasticprogram`.
+Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario, x::AbstractVector; solver::SPSolverType = JuMP.UnsetSolver())
+function evaluate_decision(stochasticprogram::StochasticProgram{2},
+                           decision::AbstractVector,
+                           scenario::AbstractScenario;
+                           solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
     if isa(supplied_solver, JuMP.UnsetSolver)
         error("Cannot evaluate decision without a solver.")
     end
-    outcome = _outcome_model(stochasticprogram.generator[:stage_1_vars],
-                             stochasticprogram.generator[:stage_2],
-                             stochasticprogram.first_stage.data,
-                             stage_data(stochasticprogram.scenarioproblems),
-                             scenario,
-                             x,
-                             solver)
+    outcome = outcome_model(stochasticprogram, decision, scenario; solver = solver)
     status = solve(outcome)
     if status == :Optimal
-        return _eval_first_stage(stochasticprogram, x) + getobjectivevalue(outcome)
+        return _eval_first_stage(stochasticprogram, decision) + getobjectivevalue(outcome)
     end
     error("Outcome model could not be solved, returned status: $status")
 end
 """
-    evaluate_decision(stochasticmodel::StochasticModel,
-                      x::AbstractVector,
+    evaluate_decision(stochasticmodel::StochasticModel{2},
+                      decision::AbstractVector,
                       sampler::AbstractSampler;
                       solver = JuMP.UnsetSolver(),
                       confidence = 0.95,
                       N = 1000)
 
-Return a statistical estimate of the objective of `stochasticprogram` at `x`, and an upper bound at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision`, and an upper bound at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
-In other words, evaluate `x` on an SAA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
+In other words, evaluate `decision` on an SAA model of size `N`. Generate an upper bound using the sample variance of the evaluation.
 """
-function evaluate_decision(stochasticmodel::StochasticModel, x::AbstractVector, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 1000) where {S <: AbstractScenario}
+function evaluate_decision(stochasticmodel::StochasticModel{2},
+                           decision::AbstractVector,
+                           sampler::AbstractSampler{S};
+                           solver::SPSolverType = JuMP.UnsetSolver(),
+                           confidence::AbstractFloat = 0.95,
+                           N::Integer = 1000) where S <: AbstractScenario
     eval_model = SAA(stochasticmodel, sampler, N)
     # Condidence level
     α = 1-confidence
     # Upper bound
-    cᵀx = _eval_first_stage(eval_model, x)
-    𝔼Q, σ = _stat_eval_second_stages(eval_model, x, internal_solver(solver))
+    cᵀx = _eval_first_stage(eval_model, decision)
+    𝔼Q, σ = _stat_eval_second_stages(eval_model, decision, internal_solver(solver))
     U = cᵀx + 𝔼Q + quantile(Normal(0,1), 1-α)*σ
 
     return cᵀx + 𝔼Q, U
 end
 """
-    lower_bound(stochasticmodel::StochasticModel,
+    lower_bound(stochasticmodel::StochasticModel{2},
                 sampler::AbstractSampler;
                 solver = JuMP.UnsetSolver(),
                 confidence = 0.95,
                 N = 100,
                 M = 10)
 
-Generate a lower bound of the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a lower bound of the true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
 In other words, solve and evaluate `M` SAA models of size `N` to generate a statistic estimate.
 """
-function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
+function lower_bound(stochasticmodel::StochasticModel{2},
+                     sampler::AbstractSampler{S};
+                     solver::SPSolverType = JuMP.UnsetSolver(),
+                     confidence::AbstractFloat = 0.95,
+                     N::Integer = 100,
+                     M::Integer = 10) where {S <: AbstractScenario}
     # Condidence level
     α = 1-confidence
     # Lower bound
@@ -243,18 +233,18 @@ function lower_bound(stochasticmodel::StochasticModel, sampler::AbstractSampler{
     return Q̂ - quantile(TDist(M-1), 1-α)*sqrt(σ²)
 end
 """
-    confidence_interval(stochasticmodel::StochasticModel,
+    confidence_interval(stochasticmodel::StochasticModel{2},
                         sampler::AbstractSampler;
                         solver = JuMP.UnsetSolver(),
                         confidence = 0.9,
                         N = 100,
                         M = 10)
 
-Generate a confidence interval around the true optimum of `stochasticprogram` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
 
 `N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of samples used to compute the lower bound.
 """
-function confidence_interval(stochasticmodel::StochasticModel, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
+function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
     α = (1-confidence)/2
     L = lower_bound(stochasticmodel, sampler; solver = solver, confidence = 1-α, N = N, M = M)
     saa = SAA(stochasticmodel, sampler, N)

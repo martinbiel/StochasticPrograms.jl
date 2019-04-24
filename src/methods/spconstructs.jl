@@ -1,38 +1,47 @@
 # SP Constructs #
 # ========================== #
 """
-    WS(stochasticprogram::StochasticProgram, scenario::AbstractScenarioaDta; solver = JuMP.UnsetSolver())
+    WS(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenarioaDta; solver = JuMP.UnsetSolver())
 
-Generate a **wait-and-see** (`WS`) model of the `stochasticprogram`, corresponding to `scenario`.
+Generate a **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
 In other words, generate the first stage and the second stage of the `stochasticprogram` as if `scenario` is known to occur. Optionally, a capable `solver` can be supplied to `WS`. Otherwise, any previously set solver will be used.
 
 See also: [`DEP`](@ref), [`EVP`](@ref)
 """
-function WS(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
+function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Check that the required generators have been defined
-    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
     # Return WS model
-    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), first_stage_data(stochasticprogram), second_stage_data(stochasticprogram), scenario, internal_solver(supplied_solver))
+    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), stage_parameters(stochasticprogram, 1), stage_parameters(stochasticprogram, 2), scenario, internal_solver(supplied_solver))
 end
 function _WS(stage_one_generator::Function,
              stage_two_generator::Function,
-             first_stage::Any,
-             second_stage::Any,
+             stage_one_params::Any,
+             stage_two_params::Any,
              scenario::AbstractScenario,
              solver::MathProgBase.AbstractMathProgSolver)
     ws_model = Model(solver = solver)
-    stage_one_generator(ws_model, first_stage)
+    stage_one_generator(ws_model, stage_one_params)
     ws_obj = copy(ws_model.obj)
-    stage_two_generator(ws_model, second_stage, scenario, ws_model)
+    stage_two_generator(ws_model, stage_two_params, scenario, ws_model)
     append!(ws_obj, ws_model.obj)
     ws_model.obj = ws_obj
     return ws_model
 end
-function WS_decision(stochasticprogram::StochasticProgram, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
+"""
+    WS_decision(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
+
+Calculate the optimizer of the **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
+
+Optionally, supply a capable `solver` to solve the wait-and-see problem. The default behaviour is to rely on any previously set solver.
+
+See also: [`WS`](@ref)
+"""
+function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver = solver)
     solve(ws_model)
@@ -52,7 +61,7 @@ In other words, calculate the expectated result of all possible wait-and-see mod
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EWS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
@@ -62,32 +71,30 @@ function EWS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
     # Solve all possible WS models and compute EWS
     return _EWS(stochasticprogram, internal_solver(supplied_solver))
 end
-function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,ScenarioProblems{D₂,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
+function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathProgBase.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
     return sum([begin
                 ws = _WS(stochasticprogram.generator[:stage_1],
                          stochasticprogram.generator[:stage_2],
-                         stochasticprogram.first_stage.data,
-                         stage_data(stochasticprogram.scenarioproblems),
+                         stage_parameters(stochasticprogram, 1),
+                         stage_parameters(stochasticprogram, 2),
                          scenario,
                          solver)
                 solve(ws)
                 probability(scenario)*getobjectivevalue(ws)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
-function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems{D₂,S}},
-              solver::MathProgBase.AbstractMathProgSolver) where {D₁, D₂, S <: AbstractScenario}
+function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathProgBase.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
     partial_ews = Vector{Float64}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
-            @async partial_ews[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,first_stage,second_stage,solver)->begin
+            @async partial_ews[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,solver)->begin
                 scenarioproblems = fetch(sp)
                 isempty(scenarioproblems.scenarios) && return 0.0
                 return sum([begin
                             ws = _WS(stage_one_generator,
                                      stage_two_generator,
-                                     first_stage,
-                                     second_stage,
+                                     stage_one_params,
+                                     stage_two_params,
                                      scenario,
                                      solver)
                             solve(ws)
@@ -98,47 +105,29 @@ function _EWS(stochasticprogram::StochasticProgram{D₁,D₂,S,DScenarioProblems
                 stochasticprogram.scenarioproblems[w-1],
                 stochasticprogram.generator[:stage_1],
                 stochasticprogram.generator[:stage_2],
-                stochasticprogram.first_stage.data,
-                stage_data(stochasticprogram.scenarioproblems),
+                stage_parameters(stochasticprogram, 1),
+                stage_parameters(stochasticprogram, 2),
                 solver)
         end
     end
     return sum(partial_ews)
 end
 """
-    SAA(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
-
-Generate a **sample average approximation** (`SAA`) of size `n` for the `stochasticprogram` using the `sampler`.
-
-In other words, sample `n` scenarios, of type consistent with `stochasticprogram`, and return the resulting stochastic program instance. Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previously set solver will be used.
-
-See also: [`sample!`](@ref)
-"""
-function SAA(stochasticprogram::StochasticProgram{D₁, D₂, S}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {D₁, D₂, S <: AbstractScenario}
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Create new stochastic program instance
-    saa = copy(stochasticprogram)
-    set_spsolver(saa, solver)
-    # Sample n scenarios
-    add_scenarios!(saa, n) do
-        return sample(sampler, 1/n)
-    end
-    # Return the SAA instance
-    return saa
-end
-"""
     SAA(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
 
-Generate a **sample average approximation** (`SAA`) instance of size `n` using the model stored in `stochasticmodel`, and the provided `sampler`.
+Generate a **sample average approximation** (`SAA`) instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
 
 Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previously set solver will be used.
 
 See also: [`sample!`](@ref)
 """
-function SAA(sm::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {S <: AbstractScenario}
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: AbstractScenario
     # Create new stochastic program instance
-    saa = StochasticProgram(sm.first_stage.data, sm.second_stage.data, S; solver = solver)
+    saa = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                            parameters(sm.parameters[2]; kw...),
+                            S,
+                            solver,
+                            procs)
     sm.generator(saa)
     # Sample n scenarios
     add_scenarios!(saa, n) do
@@ -148,35 +137,15 @@ function SAA(sm::StochasticModel, sampler::AbstractSampler{S}, n::Integer; solve
     return saa
 end
 """
-    SAA(stochasticmodel::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+    DEP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Generate a **sample average approximation** (`SAA`) instance of size `n` using the model stored in `stochasticmodel`, the stage data given by `first_stage` and `second_stage`, and the provided `sampler`.
-
-Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previously set solver will be used.
-
-See also: [`sample!`](@ref)
-"""
-function SAA(sm::StochasticModel, first_stage::Any, second_stage::Any, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver()) where {S <: AbstractScenario}
-    # Create new stochastic program instance
-    saa = StochasticProgram(first_stage, second_stage, S; solver = solver)
-    sm.generator(saa)
-    # Sample n scenarios
-    add_scenarios!(saa, n) do
-        return sample(sampler, 1/n)
-    end
-    # Return the SAA instance
-    return saa
-end
-"""
-    DEP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
-
-Generate the **deterministically equivalent problem** (`DEP`) of the `stochasticprogram`.
+Generate the **deterministically equivalent problem** (`DEP`) of the two-stage `stochasticprogram`.
 
 In other words, generate the extended form the `stochasticprogram` as a single JuMP model. Optionally, a capable `solver` can be supplied to `DEP`. Otherwise, any previously set solver will be used.
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function DEP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function DEP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
@@ -187,17 +156,17 @@ function DEP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
         return dep
     end
     # Check that the required generators have been defined
-    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @first_stage.")
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
     # Define first-stage problem
     dep_model = Model(solver = internal_solver(supplied_solver))
-    generator(stochasticprogram,:stage_1)(dep_model, first_stage_data(stochasticprogram))
+    generator(stochasticprogram,:stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
     dep_obj = copy(dep_model.obj)
     # Define second-stage problems, renaming variables according to scenario.
-    second_stage = second_stage_data(stochasticprogram)
+    stage_two_params = stage_parameters(stochasticprogram, 2)
     visited_objs = collect(keys(dep_model.objDict))
     for (i, scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:stage_2)(dep_model, second_stage, scenario, dep_model)
+        generator(stochasticprogram,:stage_2)(dep_model, stage_two_params, scenario, dep_model)
         append!(dep_obj,probability(scenario)*dep_model.obj)
         for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, dep_model.objDict)
             newkey = if isa(obj,JuMP.Variable)
@@ -268,15 +237,15 @@ function VRP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
     return optimal_value(stochasticprogram)
 end
 """
-    EVPI(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EVPI(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Calculate the **expected value of perfect information** (`EVPI`) of the `stochasticprogram`.
+Calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticprogram`.
 
 In other words, calculate the gap between `VRP` and `EWS`. Optionally, supply a capable `solver` to solve the intermediate problems. Otherwise, any previously set solver will be used.
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
-function EVPI(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EVPI(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
@@ -291,15 +260,15 @@ function EVPI(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.
     return abs(ews-vrp)
 end
 """
-    EVP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EVP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Generate the **expected value problem** (`EVP`) in `stochasticprogram`.
+Generate the **expected value problem** (`EVP`) of the two-stage `stochasticprogram`.
 
 In other words, generate a wait-and-see model corresponding to the expected scenario over all available scenarios in `stochasticprogram`. Optionally, supply a capable `solver` to `EVP`. Otherwise, any previously set solver will be used.
 
 See also: [`EVP_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
 """
-function EVP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EVP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
@@ -317,15 +286,15 @@ function EVP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
     return ev_model
 end
 """
-    EVP_decision(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EVP_decision(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Calculate the optimizer of the `EVP` in `stochasticprogram`.
+Calculate the optimizer of the `EVP` of the two-stage `stochasticprogram`.
 
 Optionally, supply a capable `solver` to solve the expected value problem. The default behaviour is to rely on any previously set solver.
 
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
-function EVP_decision(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EVP_decision(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP
     evp = EVP(stochasticprogram, solver = solver)
     solve(evp)
@@ -337,15 +306,15 @@ function EVP_decision(stochasticprogram::StochasticProgram; solver::SPSolverType
     return decision
 end
 """
-    EV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EV(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Calculate the optimal value of the `EVP` in `stochasticprogram`.
+Calculate the optimal value of the `EVP` of the two-stage `stochasticprogram`.
 
 Optionally, supply a capable `solver` to solve the expected value problem. The default behaviour is to rely on any previously set solver.
 
 See also: [`EVP`](@ref), [`EVP_decision`](@ref), [`EEV`](@ref)
 """
-function EV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP model
     evp = EVP(stochasticprogram; solver = solver)
     solve(evp)
@@ -353,15 +322,15 @@ function EV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.Un
     return getobjectivevalue(evp)
 end
 """
-    EEV(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EEV(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Calculate the **expected value of using the expected value solution** (`EEV`) in `stochasticprogram`.
+Calculate the **expected value of using the expected value solution** (`EEV`) of the two-stage `stochasticprogram`.
 
 In other words, evaluate the `EVP` decision. Optionally, supply a capable `solver` to solve the intermediate problems. The default behaviour is to rely on any previously set solver.
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
-function EEV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function EEV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP model
     evp_decision = EVP_decision(stochasticprogram; solver = solver)
     # Calculate EEV by evaluating the EVP decision
@@ -370,13 +339,13 @@ function EEV(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.U
     return eev
 end
 """
-    VSS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    VSS(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
 
-Calculate the **value of the stochastic solution** (`VSS`) of the `stochasticprogram`.
+Calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticprogram`.
 
 In other words, calculate the gap between `EEV` and `VRP`. Optionally, supply a capable `solver` to solve the intermediate problems. The default behaviour is to rely on any previously set solver.
 """
-function VSS(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function VSS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
     # Solve EVP and determine EEV
     eev = EEV(stochasticprogram; solver = solver)
     # Calculate VRP

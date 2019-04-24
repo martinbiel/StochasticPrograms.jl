@@ -12,7 +12,7 @@ using JuMP
 using Distributions
 using MathProgBase
 using MacroTools
-using MacroTools: @q, postwalk
+using MacroTools: @q, postwalk, prewalk
 
 import Base.getindex
 
@@ -23,7 +23,11 @@ export
     StochasticProgram,
     Probability,
     AbstractScenario,
+    Scenario,
+    StageParameters,
+    parameters,
     AbstractSampler,
+    Sampler,
     AbstractStructuredSolver,
     AbstractStructuredModel,
     StructuredModel,
@@ -34,6 +38,7 @@ export
     Crash,
     CrashMethod,
     spsolver,
+    spsolver_model,
     distributed,
     deferred,
     set_spsolver,
@@ -54,6 +59,7 @@ export
     scenario,
     scenarios,
     scenariotype,
+    stage_probability,
     probability,
     ExpectedScenario,
     expected,
@@ -91,6 +97,8 @@ export
     @expectation,
     @sample,
     @decision,
+    @parameters,
+    @uncertain,
     WS,
     WS_decision,
     EWS,

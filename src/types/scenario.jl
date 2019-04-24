@@ -42,7 +42,12 @@ function Base.zero(::Type{S}) where S <: AbstractScenario
     error("zero not implemented for scenario type: ", S)
 end
 function Base.show(io::IO, scenario::S) where S <: AbstractScenario
-    print(io, "$(S.name.name) with probability $(probability(scenario))")
+    println(io, "$(S.name.name) with probability $(probability(scenario))")
+    scenariotext(io, scenario)
+    return io
+end
+function scenariotext(io::IO, scenario::AbstractScenario)
+    return io
 end
 function Base.getindex(ξ::AbstractScenario, field::Symbol)
     return getfield(ξ, field)
@@ -60,7 +65,9 @@ struct ExpectedScenario{S <: AbstractScenario} <: AbstractScenario
     (::Type{ExpectedScenario})(scenario::AbstractScenario) = new{typeof(scenario)}(scenario)
 end
 function Base.show(io::IO, scenario::ExpectedScenario{S}) where S <: AbstractScenario
-    print(io, "Expected scenario of type $(S.name.name)")
+    println(io, "Expected scenario of type $(S.name.name)")
+    scenariotext(io, scenario.scenario)
+    return io
 end
 """
     expected(scenarios::Vector{<:AbstractScenario})
@@ -75,4 +82,42 @@ See also [`ExpectedScenario`](@ref)
 """
 function expected(::Vector{S}) where S <: AbstractScenario
     error("Expectation not implemented for scenario type: ", S)
+end
+"""
+    Scenario
+
+Conveniece type that adheres to the [`AbstractScenario`](@ref) abstraction. Useful when uncertain parameters are a finite set of scalar values.
+"""
+struct Scenario{NT <: NamedTuple} <: AbstractScenario
+    probability::Probability
+    data::NT
+
+    function Scenario(data::NT; probability::AbstractFloat = 1.0) where NT <: NamedTuple
+        return new{NT}(Probability(probability), data)
+    end
+
+    function Scenario(; probability::AbstractFloat = 1.0, kw...)
+        data = values(kw)
+        NT = typeof(data)
+        return new{NT}(Probability(probability), data)
+    end
+end
+function Base.getindex(ξ::Scenario, field::Symbol)
+    return getproperty(ξ.data, field)
+end
+function Base.zero(::Type{Scenario{NT}}) where NT <: NamedTuple
+    return Scenario(NamedTuple{Tuple(NT.names)}(zero.(NT.types)); probability = 1.0)
+end
+function scenariotext(io::IO, scenario::Scenario)
+    for (k,v) in pairs(scenario.data)
+        println(io, "  $k: $v")
+    end
+    return io
+end
+function expected(scenarios::Vector{Scenario{NT}}) where NT <: NamedTuple
+    isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{NT}))
+    return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s₁, s₂
+                                                   keys(s₁.data) == keys(s₂.data) || error("Iconsistent scenarios. $(keys(s₁)) and $(keys(s₂)) do not match.")
+                                                   Scenario(NamedTuple{Tuple(keys(s₁.data))}([probability(s₁)*x + probability(s₂)*y for (x,y) in zip(values(s₁.data), values(s₂.data))]); probability = 1.0)
+                                               end)
 end

@@ -17,12 +17,16 @@ const MPB = MathProgBase
 mutable struct LShapedSolver <: AbstractStructuredSolver
     lpsolver::MPB.AbstractMathProgSolver
     subsolver::MPB.AbstractMathProgSolver
-    checkfeas::Bool
+    complete_recourse::Bool
     crash::Crash.CrashMethod
     parameters::Dict{Symbol,Any}
 
-    function (::Type{LShapedSolver})(lpsolver::MPB.AbstractMathProgSolver; crash::Crash.CrashMethod = Crash.None(), subsolver::MPB.AbstractMathProgSolver = lpsolver, checkfeas::Bool = false, kwargs...)
-        return new(lpsolver, subsolver, checkfeas, crash, Dict{Symbol,Any}(kwargs))
+    function LShapedSolver(lpsolver::MPB.AbstractMathProgSolver;
+                           complete_recourse::Bool = true,
+                           regularize::AbstractRegularizer = DontRegularize(),
+                           crash::Crash.CrashMethod = Crash.None(),
+                           subsolver::MPB.AbstractMathProgSolver = lpsolver, kwargs...)
+        return new(lpsolver, subsolver, complete_recourse, regularize, crash, Dict{Symbol,Any}(kwargs))
     end
 end
 
@@ -59,6 +63,10 @@ function fill_solution!(stochasticprogram::StochasticProgram, lshaped::AbstractL
     # Second stage
     fill_submodels!(lshaped, scenarioproblems(stochasticprogram))
 end
+
+function solverstr(solver::LShapedSolver)
+    return "L-shaped solver"
+end
 ```
 
 ## LShapedSolvers.jl
@@ -69,7 +77,7 @@ pkg> add https://github.com/martinbiel/LShapedSolvers.jl
 ```
 ```@setup lshaped
 using StochasticPrograms
-@scenario Simple = begin
+@scenario SimpleScenario = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64
@@ -86,7 +94,7 @@ sp = StochasticProgram([ξ₁, ξ₂])
 end
 @second_stage sp = begin
     @decision x₁ x₂
-    ξ = scenario
+    @uncertain ξ::SimpleScenario
     @variable(model, 0 <= y₁ <= ξ.d₁)
     @variable(model, 0 <= y₂ <= ξ.d₂)
     @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
@@ -99,7 +107,7 @@ As an example, we solve the simple problem introduced in the [Quick start](@ref)
 using LShapedSolvers
 using GLPKMathProgInterface
 
-optimize!(sp, solver = LShapedSolver(:ls, GLPKSolverLP()))
+optimize!(sp, solver = LShapedSolver(GLPKSolverLP()))
 ```
 ```julia
 L-Shaped Gap  Time: 0:00:01 (6 iterations)
@@ -110,16 +118,16 @@ L-Shaped Gap  Time: 0:00:01 (6 iterations)
 ```
 Note, that an LP capable `AbstractMathProgSolver` is required to solve emerging subproblems. The following variants of the L-shaped algorithm are implemented:
 
-1. L-shaped with multiple cuts (default)
-2. L-shaped with regularized decomposition: `regularization = :rd`
-3. L-shaped with trust region: `regularization = :tr`
-4. L-shaped with level sets: `regularization = :lv`
+1. L-shaped with multiple cuts (default): `regularization = DontRegularize()`
+2. L-shaped with regularized decomposition: `regularization = RegularizedDecomposition(; kw...)/RD(; kw...)`
+3. L-shaped with trust region: `regularization = TrustRegion(; kw...)/TR(; kw...)`
+4. L-shaped with level sets: `regularization = LevelSet(; projectionsolver, kw...)/LV(; projectionsolver, kw...)`
 
-Note, that `:rd` and `:lv` both require a QP capable `AbstractMathProgSolver` for the master problems. If not available, setting the `linearize` keyword to `true` is an alternative.
+Note, that `RD` and `LV` both require a QP capable `AbstractMathProgSolver` for the master/projection problems. If not available, setting the `linearize` keyword to `true` is an alternative.
 
 In addition, there is a distributed variant of each algorithm, created by supplying `distributed = true` to the factory method. This requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and are most efficient when run on distributed stochastic programs.
 
-Each algorithm has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?LShaped` gives the parameter list of the default L-shaped algorithm. For a list of all solvers and their handle names, use `?LShapedSolver`.
+Each algorithm has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?TrustRegion` gives the parameter list of the L-shaped algorithm with trust-region regularization. For a list of all solvers and their handle names, use `?LShapedSolver`.
 
 ## ProgressiveHedgingSolvers.jl
 

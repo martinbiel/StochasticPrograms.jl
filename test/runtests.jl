@@ -20,14 +20,12 @@ problems = Vector{Tuple{StochasticProgram,SPResult,String}}()
 @info "Loading test problems..."
 @info "Loading simple..."
 include("simple.jl")
+@info "Loading instant simple..."
+include("instant_simple.jl")
 @info "Loading deferred simple..."
 include("deferred.jl")
 @info "Loading farmer..."
 include("farmer.jl")
-@info "Preparing simple sampler..."
-include("sampling.jl")
-@info "Preparing SAA..."
-include("SAA.jl")
 @info "Test problems loaded. Starting test sequence."
 
 @testset "Stochastic Programs" begin
@@ -74,27 +72,24 @@ include("SAA.jl")
         @test abs(VSS(sp_copy)-VSS(sp)) <= 1e-2
         @test abs(EV(sp_copy)-EV(sp)) <= 1e-2
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
-        add_scenario!(sp_copy, scenario(sp, 1))
-        @test nscenarios(sp_copy) == nscenarios(sp) + 1
     end
     @testset "Sampling" begin
-        sampled_sp = SAA(simple_model, SimpleSampler(), 100, solver=GLPKSolverLP())
+        sampler = Sampler() do
+            return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
+        end
+        sampled_sp = SAA(simple_model, sampler, 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
-        @test abs(probability(sampled_sp)-1.0) <= 1e-6
-        sample!(sampled_sp, SimpleSampler(), 100)
+        @test abs(stage_probability(sampled_sp)-1.0) <= 1e-6
+        sample!(sampled_sp, sampler, 100)
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
-        @test abs(probability(sampled_sp)-1.0) <= 1e-6
-    end
-    @testset "SAA" begin
-        saa = SAA(saa_model, SAASampler(2.), 100)
-        @test nscenarios(saa) == 100
-        @test nsubproblems(saa) == 100
-        @test abs(probability(saa)-1.0) <= 1e-6
+        @test abs(stage_probability(sampled_sp)-1.0) <= 1e-6
     end
     @testset "Confidence intervals" begin
-        sampler = SimpleSampler()
+        sampler = Sampler() do
+            return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
+        end
         glpk = GLPKSolverLP()
         L, U = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk)
         @test L <= U

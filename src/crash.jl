@@ -49,7 +49,7 @@ end
 struct Scenario{S <: AbstractScenario} <: CrashMethod
     scenario::S
 
-    function (::Type{Scenario})(scenario::S) where S <: AbstractScenario
+    function Scenario(scenario::S) where S <: AbstractScenario
         return new{S}(scenario)
     end
 end
@@ -64,7 +64,7 @@ end
 struct Custom{T <: AbstractFloat} <: CrashMethod
     x₀::Vector{T}
 
-    function (::Type{Custom})(x₀::Vector{T}) where T <: AbstractFloat
+    function Custom(x₀::Vector{T}) where T <: AbstractFloat
         return new{T}(x₀)
     end
 end
