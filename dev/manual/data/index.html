@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Stochastic data · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li class="current"><a class="toctext" href>Stochastic data</a><ul class="internal"><li><a class="toctext" href="#Stage-data-1">Stage data</a></li><li><a class="toctext" href="#Scenario-data-1">Scenario data</a></li><li><a class="toctext" href="#Sampling-1">Sampling</a></li><li><a class="toctext" href="#SAA-1">SAA</a></li><li><a class="toctext" href="#Custom-scenarios-1">Custom scenarios</a></li></ul></li><li><a class="toctext" href="../modeldef/">Stochastic models</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Stochastic data</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/data.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Stochastic data</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Stochastic-data-1" href="#Stochastic-data-1">Stochastic data</a></h1><p>Decoupling data design and model design is a fundamental principle in StochasticPrograms. This decoupling is achieved through data injection. By data we mean parameters in an optimization problem. In StochasticPrograms, this data is either deterministic and related to a specific stage, or uncertain and related to a specific scenario.</p><h2><a class="nav-anchor" id="Stage-data-1" href="#Stage-data-1">Stage data</a></h2><p>Stage data is related to parameters that always appear in the first or second stage of a stochastic program. These parameters are deterministic and are the same across all scenarios. Stage data must be supplied when creating a stochastic program, through specialized constructors. However, the data can later be mutated without having to construct a new stochastic program instance. Any stage related data can then be accessed through the reserved keyword <code>stage</code> in <a href="../../library/public/#StochasticPrograms.@first_stage"><code>@first_stage</code></a> and <a href="../../library/public/#StochasticPrograms.@second_stage"><code>@second_stage</code></a> blocks. To showcase, we consider a minimal stochastic program:</p><div>\[\DeclareMathOperator*{\maximize}{maximize}
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Stochastic data · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li class="current"><a class="toctext" href>Stochastic data</a><ul class="internal"><li><a class="toctext" href="#Stage-data-1">Stage data</a></li><li><a class="toctext" href="#Scenario-data-1">Scenario data</a></li><li><a class="toctext" href="#Sampling-1">Sampling</a></li><li><a class="toctext" href="#Custom-scenarios-1">Custom scenarios</a></li></ul></li><li><a class="toctext" href="../model/">Stochastic models</a></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Stochastic data</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/data.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Stochastic data</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Stochastic-data-1" href="#Stochastic-data-1">Stochastic data</a></h1><p>Decoupling data design and model design is a fundamental principle in StochasticPrograms. This decoupling is achieved through data injection. By data we mean parameters in an optimization problem. In StochasticPrograms, this data is either deterministic and related to a specific stage, or uncertain and related to a specific scenario.</p><h2><a class="nav-anchor" id="Stage-data-1" href="#Stage-data-1">Stage data</a></h2><p>Stage data is related to parameters that always appear in the first or second stage of a stochastic program. These parameters are deterministic and are the same across all scenarios. Such parameters are conviently included in stochastic models using <code>@parameters</code>. To showcase, we consider a minimal stochastic program:</p><div>\[\DeclareMathOperator*{\maximize}{maximize}
 \begin{aligned}
  \maximize_{x \in \mathbb{R}} &amp; \quad x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x, \xi(\omega))\right] \\
  \text{s.t.} &amp; \quad l_1 \leq x \leq u_1
@@ -7,39 +7,36 @@
  Q(x, \xi(\omega)) = \max_{y \in \mathbb{R}} &amp; \quad q_{\omega} y \\
  \text{s.t.} &amp; \quad y + x \leq U \\
  &amp; \quad l_2 \leq y \leq u_2
-\end{aligned}\]</div><p>and the stochastic variable</p><div>\[  \xi(\omega) = q_{\omega}\]</div><p>takes on the value <span>$1$</span> or <span>$-1$</span> with equal probability. Here, the first stage contains the two parameters: <span>$l_1$</span> and <span>$u_1$</span>. The second stage contains the three scenario-independent parameters: <span>$U$</span>, <span>$l_2$</span>, and <span>$u_2$</span>. The following defines this problem in StochasticPrograms, with some chosen parameter values:</p><pre><code class="language-julia">using StochasticPrograms
+\end{aligned}\]</div><p>and the stochastic variable</p><div>\[  \xi(\omega) = q_{\omega}\]</div><p>takes on the value <span>$1$</span> or <span>$-1$</span> with equal probability. Here, the first stage contains the two parameters: <span>$l_1$</span> and <span>$u_1$</span>. The second stage contains the three scenario-independent parameters: <span>$U$</span>, <span>$l_2$</span>, and <span>$u_2$</span>. The following defines this problem in StochasticPrograms, with some chosen deault parameter values:</p><pre><code class="language-julia">using StochasticPrograms
 using GLPKMathProgInterface
 
-@scenario Simple = begin
-    q::Float64
+sm = @stochastic_model begin
+    @stage 1 begin
+        @parameters begin
+            l₁ = -1.
+            u₁ = 1.
+        end
+        @variable(model, l₁ &lt;= x &lt;= u₁)
+        @objective(model, Max, x)
+    end
+    @stage 2 begin
+        @parameters begin
+            U = 2.
+            l₂ = -1.
+            u₂ = 1.
+        end
+        @decision x
+        @uncertain q
+        @variable(model, l₂ &lt;= y &lt;= u₂)
+        @objective(model, Max, q*y)
+        @constraint(model, y + x &lt;= U)
+    end
 end
 
-ξ₁ = SimpleScenario(1., probability = 0.5)
-ξ₂ = SimpleScenario(-1., probability = 0.5)
+ξ₁ = Scenario(q = 1., probability = 0.5)
+ξ₂ = Scenario(q = -1., probability = 0.5)
 
-l₁ = -1.
-u₁ = 1.
-
-U = 2.
-l₂ = -1.
-u₂ = 1.
-
-sp = StochasticProgram((l₁,u₁), (U,l₂,u₂), [ξ₁,ξ₂])
-
-@first_stage sp = begin
-    l₁, u₁ = stage
-    @variable(model, l₁ &lt;= x &lt;= u₁)
-    @objective(model, Max, x)
-end
-
-@second_stage sp = begin
-    @decision x
-    U, l₂, u₂ = stage
-    ξ = scenario
-    @variable(model, l₂ &lt;= y &lt;= u₂)
-    @objective(model, Max, ξ.q*y)
-    @constraint(model, y + x &lt;= U)
-end
+sp = instantiate(sm, [ξ₁,ξ₂])
 
 print(sp)
 
@@ -63,17 +60,7 @@ Subject to
  y + x ≤ 2
  -1 ≤ y ≤ 1
 
-VRP = 2.0</code></pre><p>Now, we can investigate the impact of the stage parameters by changing them slightly and regenerate the problem:</p><pre><code class="language-julia">l₁ = -2.
-u₁ = 2.
-
-U = 2.
-l₂ = -0.5
-u₂ = 0.5
-
-set_first_stage_data!(sp, (l₁,u₁))
-set_second_stage_data!(sp, (U,l₂,u₂))
-
-generate!(sp) # Regenerate problem
+VRP = 2.0</code></pre><p>Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to <code>instantiate</code>:</p><pre><code class="language-julia">sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5)
 
 print(sp)
 
@@ -94,47 +81,50 @@ Subject to
 Subproblem 2 (p = 0.50):
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -0.5 ≤ y ≤ 0.5
 
-VRP = 2.25</code></pre><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that adhere to this abstraction. If the identified uncertain parameters is a collection of numerical values, this is the recommended way to define the required scenario type.</p><pre><code class="language-julia">using StochasticPrograms
+VRP = 2.25</code></pre><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. The predefined <a href="../../library/public/#StochasticPrograms.Scenario"><code>Scenario</code></a> type adheres to this abstraction and is the recommended option when uncertain variables is a set of scalar values, as exemplified in the <a href="../quickstart/#Quick-start-1">Quick start</a>.</p><p>In addition, StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that also adhere to the scenario abstraction. The following is an alternative way to define a scenario structure for the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><pre><code class="language-julia">using StochasticPrograms
 
-@scenario Example = begin
-    X::Float64
-end
+@scenario SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><p>Now, <span>$\xi_1$</span> and <span>$\xi_2$</span> can be created through:</p><pre><code class="language-julia">ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)</code></pre><pre><code class="language-none">SimpleScenario with probability 0.4
+  q₁: -24.0
+  q₂: -28.0
+  d₁: 500.0
+  d₂: 100.0</code></pre><p>and</p><pre><code class="language-julia">ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)</code></pre><pre><code class="language-none">SimpleScenario with probability 0.6
+  q₁: -28.0
+  q₂: -32.0
+  d₁: 300.0
+  d₂: 300.0</code></pre><p>The define <code>SimpleScenario</code>s automatically have the [<code>AbstractScenario</code>] functionality. For example, we can check the discrete probability of a given scenario occuring:</p><pre><code class="language-julia">probability(ξ₁)</code></pre><pre><code class="language-none">0.4</code></pre><p>Moreover, we can form the expected scenario out of a given set:</p><pre><code class="language-julia">ξ̄ = expected([ξ₁, ξ₂])</code></pre><pre><code class="language-none">Expected scenario of type SimpleScenario
+  q₁: -26.400000000000002
+  q₂: -30.4
+  d₁: 380.0
+  d₂: 220.0</code></pre><p>There are some caveats to note. First, the autogenerated requires an additive zero element of the introduced scenario type. For simple numeric types this is autogenerated as well. However, say that we want to extend the above scenario with some vector parameter of size 2:</p><pre><code class="language-julia">using StochasticPrograms
 
-s₁ = ExampleScenario(1., probability = 0.5)
-s₂ = ExampleScenario(5., probability = 0.5)
-
-println(&quot;Probability of s₁: $(probability(s₁))&quot;)
-
-s = expected([s₁, s₂])
-
-println(&quot;Expectation over s₁ and s₂: $s&quot;)
-println(&quot;Expectated X: $(s.scenario.X)&quot;)</code></pre><pre><code class="language-none">Probability of s₁: 0.5
-Expectation over s₁ and s₂: Expected scenario of type ExampleScenario
-Expectated X: 3.0</code></pre><p>Here, all the required operations are correctly defined.</p><p>There are some caveats to note. First, the autogenerated requires an additive zero element of the introduced scenario type. For simple numeric types this is autogenerated as well. However, say that we want to extend the above scenario with some vector parameter of size 2:</p><pre><code class="language-julia">using StochasticPrograms
-
-@scenario Example = begin
+@scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
 end</code></pre><pre><code class="language-none">┌ Warning: Zero not defined for Array{Float64,1}. Cannot generate zero function.
-└ @ StochasticPrograms ~/build/martinbiel/StochasticPrograms.jl/src/methods/util.jl:176
-┌ Warning: The scenario type Example was not defined. A user-provided implementation
+└ @ StochasticPrograms ~/build/martinbiel/StochasticPrograms.jl/src/methods/util.jl:190
+┌ Warning: The scenario type ExampleScenario was not defined. A user-provided implementation
 │
 │     function zero(::Type{{ExampleScenario})
 │         ...
 │     end
 │
 │ is required.
-└ @ Main.##ex-#496 ~/build/martinbiel/StochasticPrograms.jl/src/methods/creation.jl:138</code></pre><p>In this case, we must provide an implementation of <code>zero</code> using <a href="../../library/public/#StochasticPrograms.@zero"><code>@zero</code></a>:</p><pre><code class="language-julia">using StochasticPrograms
+└ @ Main.##ex-#495 ?:0</code></pre><p>In this case, we must provide an implementation of <code>zero</code> using <a href="../../library/public/#StochasticPrograms.@zero"><code>@zero</code></a>:</p><pre><code class="language-julia">using StochasticPrograms
 
-@scenario Example = begin
+@scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
 
     @zero begin
-        return Example(0.0, [0.0, 0.0])
+        return ExampleScenario(0.0, [0.0, 0.0])
     end
 end
 
@@ -149,42 +139,44 @@ println(&quot;Expectation over s₁ and s₂: $s&quot;)
 println(&quot;Expectated X: $(s.scenario.X)&quot;)
 println(&quot;Expectated Y: $(s.scenario.Y)&quot;)</code></pre><pre><code class="language-none">Probability of s₁: 0.5
 Expectation over s₁ and s₂: Expected scenario of type ExampleScenario
+  X: 3.0
+  Y: [0.0, 0.0]
 Expectated X: 3.0
 Expectated Y: [0.0, 0.0]</code></pre><p>Another caveat is that the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function can only be auto generated for fields that support addition and scalar multiplication with <code>Float64</code>. Consider:</p><pre><code class="language-julia">using StochasticPrograms
 
-@scenario Example = begin
+@scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
     Z::Int
 
     @zero begin
-        return Example(0.0, [0.0, 0.0], 0)
+        return ExampleScenario(0.0, [0.0, 0.0], 0)
     end
 end</code></pre><pre><code class="language-none">┌ Warning: Scalar multiplication with Float64 not defined for Int64. Cannot generate expectation function.
-└ @ StochasticPrograms ~/build/martinbiel/StochasticPrograms.jl/src/methods/util.jl:190
-┌ Warning: The scenario type Example was not defined. A user-provided implementation
+└ @ StochasticPrograms ~/build/martinbiel/StochasticPrograms.jl/src/methods/util.jl:204
+┌ Warning: The scenario type ExampleScenario was not defined. A user-provided implementation
 │
 │     function expected(scenarios::Vector{ExampleScenario})
 │         ...
 │     end
 │
 │ is required.
-└ @ Main.##ex-#498 ~/build/martinbiel/StochasticPrograms.jl/src/methods/creation.jl:141</code></pre><p>Again, the solution is to provide an implementation of <code>expected</code>, this time using <a href="../../library/public/#StochasticPrograms.@expectation"><code>@expectation</code></a>:</p><pre><code class="language-julia">using StochasticPrograms
+└ @ Main.##ex-#497 ?:0</code></pre><p>Again, the solution is to provide an implementation of <code>expected</code>, this time using <a href="../../library/public/#StochasticPrograms.@expectation"><code>@expectation</code></a>:</p><pre><code class="language-julia">using StochasticPrograms
 
-@scenario Example = begin
+@scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
     Z::Int
 
     @zero begin
-        return Example(0.0, [0.0, 0.0], 0)
+        return ExampleScenario(0.0, [0.0, 0.0], 0)
     end
 
     @expectation begin
         X = sum([probability(s)*s.X for s in scenarios])
         Y = sum([probability(s)*s.Y for s in scenarios])
         Z = sum([round(Int, probability(s)*s.Z) for s in scenarios])
-        return Example(X, Y, Z)
+        return ExampleScenario(X, Y, Z)
     end
 end
 
@@ -200,70 +192,69 @@ println(&quot;Expectated X: $(s.scenario.X)&quot;)
 println(&quot;Expectated Y: $(s.scenario.Y)&quot;)
 println(&quot;Expectated Z: $(s.scenario.Z)&quot;)</code></pre><pre><code class="language-none">Probability of s₁: 0.5
 Expectation over s₁ and s₂: Expected scenario of type ExampleScenario
+  X: 3.0
+  Y: [0.0, 0.0]
+  Z: 0
 Expectated X: 3.0
 Expectated Y: [0.0, 0.0]
-Expectated Z: 0</code></pre><p>For most problems, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a> will probably be adequate. Otherwise consider defining <a href="#Custom-scenarios-1">Custom scenarios</a>.</p><h2><a class="nav-anchor" id="Sampling-1" href="#Sampling-1">Sampling</a></h2><div></div><p>Typically, we do not have exact knowledge of all possible future scenarios. However, we often have access to some model of the uncertainty. For example, scenarios could originate from:</p><ul><li>A stochastic variable with known distribution</li><li>A time series fitted to data</li><li>A nerual network prediction</li></ul><p>Even if the exact scenario distribution is unknown, or not all possible scenarios are available, we can still formulate a stochastic program that approximates the model we wish to formulate. This is achieved through a technique called <em>sampled average approximation</em>, which is based on sampling. The idea is to sample a large number <span>$n$</span> of scenarios with equal probability <span>$\frac{1}{n}$</span> and then use them to generate and solve a stochastic program. By the law of large numbers, the result will converge with probability <span>$1$</span> to the &quot;true&quot; solution with increasing <span>$n$</span>.</p><p>StochasticPrograms accepts <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> objects in place of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>. However, an <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> is always linked to some underlying <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type, which is reflected in the resulting stochastic program as well. Samplers are conviniently created using <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a>. We can define a simple scenario type and a simple sampler as follows:</p><pre><code class="language-julia">using StochasticPrograms
+Expectated Z: 0</code></pre><p>For most problems, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a> will probably be adequate. Otherwise consider defining <a href="#Custom-scenarios-1">Custom scenarios</a>.</p><h2><a class="nav-anchor" id="Sampling-1" href="#Sampling-1">Sampling</a></h2><div></div><p>Typically, we do not have exact knowledge of all possible future scenarios. However, we often have access to some model of the uncertainty. For example, scenarios could originate from:</p><ul><li>A stochastic variable with known distribution</li><li>A time series fitted to data</li><li>A nerual network prediction</li></ul><p>Even if the exact scenario distribution is unknown, or not all possible scenarios are available, we can still formulate a stochastic program that approximates the model we wish to formulate. This is achieved through a technique called <em>sampled average approximation</em>, which is based on sampling. The idea is to sample a large number <span>$n$</span> of scenarios with equal probability <span>$\frac{1}{n}$</span> and then use them to generate and solve a stochastic program. By the law of large numbers, the result will converge with probability <span>$1$</span> to the &quot;true&quot; solution with increasing <span>$n$</span>.</p><p>StochasticPrograms accepts <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> objects in place of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>. However, an <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> is always linked to some underlying <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type, which is reflected in the resulting stochastic program as well.</p><p>The most basic sampler is the included <a href="../../library/public/#StochasticPrograms.Sampler"><code>Sampler</code></a>, which is used to sample basic <a href="../../library/public/#StochasticPrograms.Scenario"><code>Scenario</code></a>s. Consider</p><pre><code class="language-julia">using StochasticPrograms
 
-@scenario Example = begin
-    ξ::Float64
+sampler = Sampler() do
+    return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
 end
 
-@sampler Example = begin
+sampler()</code></pre><pre><code class="language-none">Scenario with probability 0.4886128300795012
+  q₁: -23.702712015464538
+  q₂: -27.617604032209393
+  d₁: 499.4023655232718
+  d₂: 99.98955475536262</code></pre><p>Samplers can also be conviniently created using <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a>. We can define a simple scenario type and a simple sampler as follows:</p><pre><code class="language-julia">using StochasticPrograms
+
+@scenario ExampleScenario = begin
+    w::Float64
+end
+
+@sampler ExampleSampler = begin
     w::Float64
 
-    Example(w::AbstractFloat) = new(w)
+    ExampleSampler(w::AbstractFloat) = new(w)
 
-    @sample begin
+    @sample ExampleScenario begin
         w = sampler.w
         return ExampleScenario(w*randn(), probability = rand())
     end
 end</code></pre><p>This creates a new <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> type called <code>ExampleSampler</code>, which samples <code>ExampleScenario</code>s. Now, we can create a sampler object and sample a scenario</p><pre><code class="language-julia">sampler = ExampleSampler(2.)
 
-s = sampler()
+ξ = sampler()
 
-println(s)
-println(&quot;ξ: $(s.ξ)&quot;)</code></pre><pre><code class="language-none">ExampleScenario with probability 0.34651701419196046
-ξ: 0.5945759690709232</code></pre><p>It is possible to create other sampler objects for the <code>ExampleScenario</code>, by providing a new unique name:</p><pre><code class="language-julia">@sampler Another Example = begin
-    w::Float64
-    d::Float64
-
-    Another(w::AbstractFloat, d::AbstractFloat) = new(w, d)
-
-    @sample begin
-        w = sampler.w
-        d = sampler.d
-        return ExampleScenario(w*randn() + d, probability = rand())
+println(ξ)
+println(&quot;ξ: $(ξ.w)&quot;)</code></pre><pre><code class="language-none">ExampleScenario with probability 0.951916339835734
+  w: 0.6222226769966677
+ξ: 0.6222226769966677</code></pre><p>Now, lets create a stochastic model using the <code>ExampleScenario</code> type:</p><pre><code class="language-julia">sm = @stochastic_model begin
+    @stage 1 begin
+        @variable(model, x &gt;= 0)
+        @objective(model, Min, x)
     end
-end
+    @stage 2 begin
+        @decision x
+        @uncertain w from ExampleScenario
+        @variable(model, y)
+        @objective(model, Min, y)
+        @constraint(model, y + x == w)
+    end
+end</code></pre><pre><code class="language-none">Two-Stage Stochastic Model
 
-another = AnotherSampler(2., 6.)
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
 
-s = another()
+where
 
-println(s)
-println(&quot;ξ: $(s.ξ)&quot;)</code></pre><pre><code class="language-none">ExampleScenario with probability 0.00790928339056074
-ξ: 4.804731046543537</code></pre><p>Now, lets create a stochastic program based on the <code>ExampleScenario</code> type:</p><pre><code class="language-julia">sp = StochasticProgram(ExampleScenario)
-
-@first_stage sp = begin
-    @variable(model, x &gt;= 0)
-    @objective(model, Min, x)
-end
-
-@second_stage sp = begin
-    @decision x
-    ξ = scenario.ξ
-    @variable(model, y)
-    @objective(model, Min, y)
-    @constraint(model, y + x == ξ)
-end</code></pre><pre><code class="language-none">Stochastic program with:
- * 0 scenarios of type ExampleScenario
- * 1 decision variable
- * 0 recourse variables
-Solver is default solver</code></pre><p>Now, we can sample <span>$5$</span> scenarios using the first sampler to generate <span>$5$</span> subproblems:</p><pre><code class="language-julia">sample!(sp, sampler, 5)</code></pre><pre><code class="language-none">Stochastic program with:
- * 5 scenarios of type ExampleScenario
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)
+</code></pre><p>Now, we can sample <span>$5$</span> scenarios using the first sampler to generate <span>$5$</span> subproblems:</p><pre><code class="language-julia">saa = SAA(sm, sampler, 5)</code></pre><pre><code class="language-none">Stochastic program with:
  * 1 decision variable
  * 1 recourse variable
-Solver is default solver</code></pre><p>Printing yields:</p><pre><code class="language-julia">print(sp)</code></pre><pre><code class="language-none">First-stage
+ * 5 scenarios of type ExampleScenario
+Solver is default solver</code></pre><p>Printing yields:</p><pre><code class="language-julia">print(saa)</code></pre><pre><code class="language-none">First-stage
 ==============
 Min x
 Subject to
@@ -274,39 +265,35 @@ Second-stage
 Subproblem 1 (p = 0.20):
 Min y
 Subject to
- x + y = -1.678053708777528
+ y + x = -4.534172697601061
  y
 
 Subproblem 2 (p = 0.20):
 Min y
 Subject to
- x + y = 4.590175647674621
+ y + x = 0.8628430528458241
  y
 
 Subproblem 3 (p = 0.20):
 Min y
 Subject to
- x + y = 0.4580191098195614
+ y + x = 1.9265432100763813
  y
 
 Subproblem 4 (p = 0.20):
 Min y
 Subject to
- x + y = 1.0599311523334922
+ y + x = -1.0446735148430168
  y
 
 Subproblem 5 (p = 0.20):
 Min y
 Subject to
- x + y = 1.1674165751375571
+ y + x = -0.10090245986733057
  y</code></pre><p>Sampled stochastic programs are solved as usual:</p><pre><code class="language-julia">using GLPKMathProgInterface
 
-optimize!(sp, solver = GLPKSolverLP())
+optimize!(saa, solver = GLPKSolverLP())
 
-println(&quot;optimal decision: $(optimal_decision(sp))&quot;)
-println(&quot;optimal value: $(optimal_value(sp))&quot;)</code></pre><pre><code class="language-none">optimal decision: [1.05993]
-optimal value: 1.1194977552375405</code></pre><p>Again, if the functionality offered by <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> is not adequate, consider <a href="#Custom-scenarios-1">Custom scenarios</a>.</p><h2><a class="nav-anchor" id="SAA-1" href="#SAA-1">SAA</a></h2><p>The command <a href="../../library/public/#StochasticPrograms.SAA-Union{Tuple{S}, Tuple{D₂}, Tuple{D₁}, Tuple{StochasticProgram{D₁,D₂,S,SP} where SP&lt;:AbstractScenarioProblems{D₂,S},AbstractSampler{S},Integer}} where S&lt;:AbstractScenario where D₂ where D₁"><code>SAA</code></a> is used to create sampled average approximations of a given stochastic program by supplying a sampler object.</p><pre><code class="language-julia">saa = SAA(sp, sampler, 10)</code></pre><pre><code class="language-none">Stochastic program with:
- * 10 scenarios of type ExampleScenario
- * 1 decision variable
- * 1 recourse variable
-Solver is default solver</code></pre><h2><a class="nav-anchor" id="Custom-scenarios-1" href="#Custom-scenarios-1">Custom scenarios</a></h2><div></div><p>More complex scenario designs are probably not implementable using <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>. However, it is still possible to create a custom scenario type as long as:</p><ul><li>The type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>, which should return an additive zero element if given an empty array</li></ul><p>The restriction on <code>expected</code> is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>See the <a href="../examples/#Continuous-scenario-distribution-1">Continuous scenario distribution</a> for an example of custom scenario/sampler implementations.</p><footer><hr/><a class="previous" href="../quickstart/"><span class="direction">Previous</span><span class="title">Quick start</span></a><a class="next" href="../modeldef/"><span class="direction">Next</span><span class="title">Stochastic models</span></a></footer></article></body></html>
+println(&quot;optimal decision: $(optimal_decision(saa))&quot;)
+println(&quot;optimal value: $(optimal_value(saa))&quot;)</code></pre><pre><code class="language-none">optimal decision: [0.0]
+optimal value: -0.5780724818778408</code></pre><p>Again, if the functionality offered by <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> is not adequate, consider <a href="#Custom-scenarios-1">Custom scenarios</a>.</p><h2><a class="nav-anchor" id="Custom-scenarios-1" href="#Custom-scenarios-1">Custom scenarios</a></h2><div></div><p>More complex scenario designs are probably not implementable using <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>. However, it is still possible to create a custom scenario type as long as:</p><ul><li>The type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>, which should return an additive zero element if given an empty array</li></ul><p>The restriction on <code>expected</code> is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>See the <a href="../examples/#Continuous-scenario-distribution-1">Continuous scenario distribution</a> for an example of custom scenario/sampler implementations.</p><footer><hr/><a class="previous" href="../quickstart/"><span class="direction">Previous</span><span class="title">Quick start</span></a><a class="next" href="../model/"><span class="direction">Next</span><span class="title">Stochastic models</span></a></footer></article></body></html>
