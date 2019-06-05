@@ -75,7 +75,7 @@ Second-stage
 Subproblem 1 (p = 0.50):
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2 (p = 0.50):
@@ -271,13 +271,13 @@ Subject to
 Subproblem 2 (p = 0.20):
 Min y
 Subject to
- y + x = 0.8628430528458241
+ x + y = 0.8628430528458241
  y
 
 Subproblem 3 (p = 0.20):
 Min y
 Subject to
- y + x = 1.9265432100763813
+ x + y = 1.9265432100763813
  y
 
 Subproblem 4 (p = 0.20):
@@ -289,7 +289,7 @@ Subject to
 Subproblem 5 (p = 0.20):
 Min y
 Subject to
- y + x = -0.10090245986733057
+ x + y = -0.10090245986733057
  y</code></pre><p>Sampled stochastic programs are solved as usual:</p><pre><code class="language-julia">using GLPKMathProgInterface
 
 optimize!(saa, solver = GLPKSolverLP())
