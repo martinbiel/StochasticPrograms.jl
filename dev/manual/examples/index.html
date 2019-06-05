@@ -79,9 +79,9 @@ Second-stage
 Subproblem 1 (p = 0.33):
 Min 238 y[wheat] + 210 y[corn] - 170 w[wheat] - 150 w[corn] - 36 w[bquota] - 10 w[bextra]
 Subject to
- 3 x[wheat] + y[wheat] - w[wheat] ≥ 200
- 3.6 x[corn] + y[corn] - w[corn] ≥ 240
- 24 x[beets] - w[bquota] - w[bextra] ≥ 0
+ y[wheat] - w[wheat] + 3 x[wheat] ≥ 200
+ y[corn] - w[corn] + 3.6 x[corn] ≥ 240
+ -w[bquota] - w[bextra] + 24 x[beets] ≥ 0
  w[bquota] ≤ 6000
  y[p] ≥ 0 ∀ p ∈ {wheat,corn}
  w[s] ≥ 0 ∀ s ∈ {wheat,corn,bquota,bextra}
@@ -89,9 +89,9 @@ Subject to
 Subproblem 2 (p = 0.33):
 Min 238 y[wheat] + 210 y[corn] - 170 w[wheat] - 150 w[corn] - 36 w[bquota] - 10 w[bextra]
 Subject to
- 2.5 x[wheat] + y[wheat] - w[wheat] ≥ 200
- 3 x[corn] + y[corn] - w[corn] ≥ 240
- 20 x[beets] - w[bquota] - w[bextra] ≥ 0
+ y[wheat] - w[wheat] + 2.5 x[wheat] ≥ 200
+ y[corn] - w[corn] + 3 x[corn] ≥ 240
+ -w[bquota] - w[bextra] + 20 x[beets] ≥ 0
  w[bquota] ≤ 6000
  y[p] ≥ 0 ∀ p ∈ {wheat,corn}
  w[s] ≥ 0 ∀ s ∈ {wheat,corn,bquota,bextra}

@@ -57,7 +57,7 @@ Subject to
 Subproblem 2 (p = 0.50):
 Max -y
 Subject to
- x + y ≤ 2
+ y + x ≤ 2
  -1 ≤ y ≤ 1
 
 VRP = 2.0</code></pre><p>Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to <code>instantiate</code>:</p><pre><code class="language-julia">sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5)
@@ -75,13 +75,13 @@ Second-stage
 Subproblem 1 (p = 0.50):
 Max y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 Subproblem 2 (p = 0.50):
 Max -y
 Subject to
- y + x ≤ 2
+ x + y ≤ 2
  -0.5 ≤ y ≤ 0.5
 
 VRP = 2.25</code></pre><h2><a class="nav-anchor" id="Scenario-data-1" href="#Scenario-data-1">Scenario data</a></h2><p>Any uncertain parameter in the second stage of a stochastic program should be included in some predefined <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> occurring should be returned from <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a>. Also, the expected scenario out of a collection of given <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a>s should be returned by <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>. The predefined <a href="../../library/public/#StochasticPrograms.Scenario"><code>Scenario</code></a> type adheres to this abstraction and is the recommended option when uncertain variables is a set of scalar values, as exemplified in the <a href="../quickstart/#Quick-start-1">Quick start</a>.</p><p>In addition, StochasticPrograms provides a convenience macro, <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a>, for creating scenario types that also adhere to the scenario abstraction. The following is an alternative way to define a scenario structure for the simple problem introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><pre><code class="language-julia">using StochasticPrograms
@@ -265,13 +265,13 @@ Second-stage
 Subproblem 1 (p = 0.20):
 Min y
 Subject to
- y + x = -4.534172697601061
+ x + y = -4.534172697601061
  y
 
 Subproblem 2 (p = 0.20):
 Min y
 Subject to
- y + x = 0.8628430528458241
+ x + y = 0.8628430528458241
  y
 
 Subproblem 3 (p = 0.20):
@@ -289,7 +289,7 @@ Subject to
 Subproblem 5 (p = 0.20):
 Min y
 Subject to
- y + x = -0.10090245986733057
+ x + y = -0.10090245986733057
  y</code></pre><p>Sampled stochastic programs are solved as usual:</p><pre><code class="language-julia">using GLPKMathProgInterface
 
 optimize!(saa, solver = GLPKSolverLP())

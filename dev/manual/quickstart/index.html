@@ -84,8 +84,8 @@ Subject to
 Subproblem 2 (p = 0.60):
 Min -28 y₁ - 32 y₂
 Subject to
- -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
- -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
  0 ≤ y₁ ≤ 300
  0 ≤ y₂ ≤ 300</code></pre><h2><a class="nav-anchor" id="Deterministically-equivalent-problem-1" href="#Deterministically-equivalent-problem-1">Deterministically equivalent problem</a></h2><p>Since the example problem is small it is straightforward to work out the extended form:</p><div>\[\begin{aligned}
  \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
@@ -157,44 +157,44 @@ Subject to
 Second-stage
 ==============
 Subproblem 1 (p = 0.20):
-Min -28.350783224494055 y₁ - 32.25069373520498 y₂
+Min -27.341758208935453 y₁ - 30.987441831725356 y₂
 Subject to
- 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
- 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
- 0 ≤ y₁ ≤ 290.9225830699599
- 0 ≤ y₂ ≤ 302.422957797688
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 0 ≤ y₁ ≤ 304.86942544280134
+ 0 ≤ y₂ ≤ 298.71913905689263
 
 Subproblem 2 (p = 0.20):
-Min -26.096817707633306 y₁ - 30.50284835744471 y₂
+Min -27.42386835327567 y₁ - 30.145193821828542 y₂
 Subject to
  6 y₁ + 10 y₂ - 60 x₁ ≤ 0
  8 y₁ + 5 y₂ - 80 x₂ ≤ 0
- 0 ≤ y₁ ≤ 304.2196008382006
- 0 ≤ y₂ ≤ 306.0278623399526
+ 0 ≤ y₁ ≤ 286.01094822520514
+ 0 ≤ y₂ ≤ 286.9091862887684
 
 Subproblem 3 (p = 0.20):
-Min -27.888133315526094 y₁ - 30.581311813978232 y₂
+Min -30.18220483130387 y₁ - 31.284934433835836 y₂
 Subject to
  6 y₁ + 10 y₂ - 60 x₁ ≤ 0
  8 y₁ + 5 y₂ - 80 x₂ ≤ 0
- 0 ≤ y₁ ≤ 305.20182093747866
- 0 ≤ y₂ ≤ 300.83457518815385
+ 0 ≤ y₁ ≤ 304.0288274043392
+ 0 ≤ y₂ ≤ 298.3246215150351
 
 Subproblem 4 (p = 0.20):
-Min -29.099467996028487 y₁ - 32.37551357555682 y₂
+Min -27.875930412992755 y₁ - 30.668141996005062 y₂
 Subject to
  6 y₁ + 10 y₂ - 60 x₁ ≤ 0
  8 y₁ + 5 y₂ - 80 x₂ ≤ 0
- 0 ≤ y₁ ≤ 304.50766863078854
- 0 ≤ y₂ ≤ 303.4099121330667
+ 0 ≤ y₁ ≤ 301.53223789667686
+ 0 ≤ y₂ ≤ 303.95242041715517
 
 Subproblem 5 (p = 0.20):
-Min -29.69164061857028 y₁ - 32.83546709401589 y₂
+Min -30.36663058169644 y₁ - 33.52864260830725 y₂
 Subject to
  6 y₁ + 10 y₂ - 60 x₁ ≤ 0
  8 y₁ + 5 y₂ - 80 x₂ ≤ 0
- 0 ≤ y₁ ≤ 303.7342102853952
- 0 ≤ y₂ ≤ 295.3381209245373</code></pre><p>In the subsequent discussions, note that <code>sp</code> represents the finite simple stochastic program with known closed form, <code>simple_model</code> contains the mathematical representation of the general stochastic model, and <code>saa</code> are approximated instances of the general model.</p><h2><a class="nav-anchor" id="Evaluate-decisions-1" href="#Evaluate-decisions-1">Evaluate decisions</a></h2><p>Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision <span>$x$</span> is given by</p><div>\[V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]\]</div><p>If the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:</p><pre><code class="language-julia">x = [40., 20.]</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 0 ≤ y₁ ≤ 310.82313182837237
+ 0 ≤ y₂ ≤ 307.8241494898167</code></pre><p>In the subsequent discussions, note that <code>sp</code> represents the finite simple stochastic program with known closed form, <code>simple_model</code> contains the mathematical representation of the general stochastic model, and <code>saa</code> are approximated instances of the general model.</p><h2><a class="nav-anchor" id="Evaluate-decisions-1" href="#Evaluate-decisions-1">Evaluate decisions</a></h2><p>Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision <span>$x$</span> is given by</p><div>\[V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]\]</div><p>If the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:</p><pre><code class="language-julia">x = [40., 20.]</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
  40.0
  20.0</code></pre><p>The expected result of taking this decision in the simple finite model can be determined through:</p><pre><code class="language-julia">evaluate_decision(sp, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-470.39999999999964</code></pre><p>The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.</p><pre><code class="language-julia">print(outcome_model(sp, x, ξ₁))</code></pre><pre><code class="language-none">Min -24 y₁ - 28 y₂
 Subject to
@@ -203,14 +203,14 @@ Subject to
  x₁ = 40
  x₂ = 20
  0 ≤ y₁ ≤ 500
- 0 ≤ y₂ ≤ 100</code></pre><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><pre><code class="language-julia">evaluate_decision(sp, x, ξ₁, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">900.0</code></pre><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the SAA model created above:</p><pre><code class="language-julia">evaluate_decision(saa, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-1346.1895335221398</code></pre><p>and compare it to the result of evaluating it on another SAA model of similar size:</p><pre><code class="language-julia">another_saa = SAA(simple_model, sampler, 5)
-evaluate_decision(another_saa, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-1302.6222207132232</code></pre><p>which, if any, of these values should be a candidate for the true value of <span>$V(x)$</span>? A more precise result is obtained by evaluating the decision using a sampled-based approach. Such querys are instead made to the <code>simple_model</code> object by supplying an appropriate <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> and a desired confidence level. Consider:</p><pre><code class="language-julia">evaluate_decision(simple_model, x, sampler, solver = GLPKSolverLP(), confidence = 0.9)</code></pre><pre><code class="language-none">Confidence interval (p = 90%): [-2625.42 − -967.68]</code></pre><p>The result is a 90% confidence interval around <span>$V(x)$</span>. Consult <a href="../../library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticProgram{2,M,S,SP} where SP&lt;:Union{Tuple{Vararg{AbstractScenarioProblems,M}}, AbstractScenarioProblems} where S&lt;:Tuple{StochasticPrograms.Stage,StochasticPrograms.Stage} where M,AbstractArray{T,1} where T,AbstractScenario}"><code>evaluate_decision</code></a> for the tweakable parameters that govern the resulting confidence interval.</p><h2><a class="nav-anchor" id="Optimal-first-stage-decision-1" href="#Optimal-first-stage-decision-1">Optimal first-stage decision</a></h2><p>The optimal first-stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in <a href="../structuredsolvers/#Structured-solvers-1">Structured solvers</a>. In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve <code>sp</code> with the GLPK solver as follows:</p><pre><code class="language-julia">optimize!(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">:Optimal</code></pre><p>Internally, this generates and solves the extended form of <code>sp</code>. We can now inspect the optimal first-stage decision through:</p><pre><code class="language-julia">x_opt = optimal_decision(sp)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 0 ≤ y₂ ≤ 100</code></pre><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><pre><code class="language-julia">evaluate_decision(sp, x, ξ₁, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">900.0</code></pre><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the SAA model created above:</p><pre><code class="language-julia">evaluate_decision(saa, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-1305.0374983726251</code></pre><p>and compare it to the result of evaluating it on another SAA model of similar size:</p><pre><code class="language-julia">another_saa = SAA(simple_model, sampler, 5)
+evaluate_decision(another_saa, x, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-1441.9390389818163</code></pre><p>which, if any, of these values should be a candidate for the true value of <span>$V(x)$</span>? A more precise result is obtained by evaluating the decision using a sampled-based approach. Such querys are instead made to the <code>simple_model</code> object by supplying an appropriate <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> and a desired confidence level. Consider:</p><pre><code class="language-julia">evaluate_decision(simple_model, x, sampler, solver = GLPKSolverLP(), confidence = 0.9)</code></pre><pre><code class="language-none">Confidence interval (p = 90%): [-2640.93 − -953.72]</code></pre><p>The result is a 90% confidence interval around <span>$V(x)$</span>. Consult <a href="../../library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticProgram{2,M,S,SP} where SP&lt;:Union{Tuple{Vararg{AbstractScenarioProblems,M}}, AbstractScenarioProblems} where S&lt;:Tuple{StochasticPrograms.Stage,StochasticPrograms.Stage} where M,AbstractArray{T,1} where T,AbstractScenario}"><code>evaluate_decision</code></a> for the tweakable parameters that govern the resulting confidence interval.</p><h2><a class="nav-anchor" id="Optimal-first-stage-decision-1" href="#Optimal-first-stage-decision-1">Optimal first-stage decision</a></h2><p>The optimal first-stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in <a href="../structuredsolvers/#Structured-solvers-1">Structured solvers</a>. In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve <code>sp</code> with the GLPK solver as follows:</p><pre><code class="language-julia">optimize!(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">:Optimal</code></pre><p>Internally, this generates and solves the extended form of <code>sp</code>. We can now inspect the optimal first-stage decision through:</p><pre><code class="language-julia">x_opt = optimal_decision(sp)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
  46.66666666666667
- 36.25            </code></pre><p>Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:</p><pre><code class="language-julia">optimal_value(sp)</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>which of course coincides with the result of evaluating the optimal decision:</p><pre><code class="language-julia">evaluate_decision(sp, x_opt, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>This value is commonly referred to as the <em>value of the recourse problem</em> (VRP). We can also calculate it directly through:</p><pre><code class="language-julia">VRP(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, the value of the recourse problem can not be computed exactly. However, by supplying an <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> we can use sample-based techniques to compute a confidence interval around the true optimum:</p><pre><code class="language-julia">confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), confidence = 0.95)</code></pre><pre><code class="language-none">Confidence interval (p = 95%): [-2662.31 − -2462.04]</code></pre><p>Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running <a href="../../library/public/#StochasticPrograms.optimize-Tuple{StochasticModel,AbstractSampler}"><code>optimize</code></a> on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in <a href="../structuredsolvers/#Structured-solvers-1">Structured solvers</a>. StochasticPrograms includes the <a href="../../library/public/#StochasticPrograms.SAASolver"><code>SAASolver</code></a>, which runs a simple sequential SAA algorithm. Emerging SAA problems are solved by a supplied <a href="../../library/solverinterface/#StochasticPrograms.AbstractStructuredSolver"><code>AbstractStructuredSolver</code></a> or by a <code>MathProgBase</code> solver through the extensive form. Consider the following:</p><pre><code class="language-julia">solution = optimize(simple_model, sampler, solver = SAASolver(GLPKSolverLP()), confidence = 0.95)</code></pre><pre><code class="language-none">Stochastic solution
-Optimal value: -2507.5746539804436
-Confidence interval (p = 95%): [-2635.94 − -2449.28]</code></pre><p>The result is a <a href="../../library/public/#StochasticPrograms.StochasticSolution"><code>StochasticSolution</code></a>, which includes an optimal solution estimate as well as a confidence interval around the solution. The approximately optimal first-stage decision is obtained by</p><pre><code class="language-julia">decision(solution)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
- 75.38256911428569
- 44.61743088571431</code></pre><h2><a class="nav-anchor" id="Wait-and-see-models-1" href="#Wait-and-see-models-1">Wait-and-see models</a></h2><p>If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><pre><code class="language-julia">ws = WS(sp, ξ₁)
+ 36.25            </code></pre><p>Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:</p><pre><code class="language-julia">optimal_value(sp)</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>which of course coincides with the result of evaluating the optimal decision:</p><pre><code class="language-julia">evaluate_decision(sp, x_opt, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>This value is commonly referred to as the <em>value of the recourse problem</em> (VRP). We can also calculate it directly through:</p><pre><code class="language-julia">VRP(sp, solver = GLPKSolverLP())</code></pre><pre><code class="language-none">-855.8333333333321</code></pre><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, the value of the recourse problem can not be computed exactly. However, by supplying an <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a> we can use sample-based techniques to compute a confidence interval around the true optimum:</p><pre><code class="language-julia">confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), confidence = 0.95)</code></pre><pre><code class="language-none">Confidence interval (p = 95%): [-2652.92 − -2415.30]</code></pre><p>Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running <a href="../../library/public/#StochasticPrograms.optimize-Tuple{StochasticModel,AbstractSampler}"><code>optimize</code></a> on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in <a href="../structuredsolvers/#Structured-solvers-1">Structured solvers</a>. StochasticPrograms includes the <a href="../../library/public/#StochasticPrograms.SAASolver"><code>SAASolver</code></a>, which runs a simple sequential SAA algorithm. Emerging SAA problems are solved by a supplied <a href="../../library/solverinterface/#StochasticPrograms.AbstractStructuredSolver"><code>AbstractStructuredSolver</code></a> or by a <code>MathProgBase</code> solver through the extensive form. Consider the following:</p><pre><code class="language-julia">solution = optimize(simple_model, sampler, solver = SAASolver(GLPKSolverLP()), confidence = 0.95)</code></pre><pre><code class="language-none">Stochastic solution
+Optimal value: -2520.6831599499155
+Confidence interval (p = 95%): [-2630.86 − -2438.31]</code></pre><p>The result is a <a href="../../library/public/#StochasticPrograms.StochasticSolution"><code>StochasticSolution</code></a>, which includes an optimal solution estimate as well as a confidence interval around the solution. The approximately optimal first-stage decision is obtained by</p><pre><code class="language-julia">decision(solution)</code></pre><pre><code class="language-none">2-element Array{Float64,1}:
+ 75.43504061083
+ 44.56495938917</code></pre><h2><a class="nav-anchor" id="Wait-and-see-models-1" href="#Wait-and-see-models-1">Wait-and-see models</a></h2><p>If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><pre><code class="language-julia">ws = WS(sp, ξ₁)
 print(ws)</code></pre><pre><code class="language-none">Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
 Subject to
  x₁ + x₂ ≤ 120
