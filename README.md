@@ -20,6 +20,6 @@ StochasticPrograms models recourse problems where an initial decision is taken, 
 
 ## Project Status
 
-The package is tested against Julia `0.7`, `1.0` branch on Linux and macOS.
+The package is tested against Julia `1.0`, `1.1` branch on Linux and macOS. See [NEWS](https://github.com/martinbiel/StochasticPrograms.jl/NEWS.md) for release notes.
 
 An older version for Julia `0.6` is available on the `compat-0.6` branch, but backwards compatibility can not be promised.
