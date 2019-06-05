@@ -99,8 +99,8 @@ Subject to
 Subproblem 2 (p = 0.60):
 Min -28 y₁ - 32 y₂
 Subject to
- 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
- 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
  0 ≤ y₁ ≤ 300
  0 ≤ y₂ ≤ 300</code></pre><p>As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and reinstantiates all internal problems. For example, the following increases the lower bound on the second stage variables to 2:</p><pre><code class="language-julia">@second_stage sp = begin
     @decision x₁ x₂

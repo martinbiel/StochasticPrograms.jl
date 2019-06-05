@@ -99,9 +99,9 @@ Subject to
 Subproblem 3 (p = 0.33):
 Min 238 y[wheat] + 210 y[corn] - 170 w[wheat] - 150 w[corn] - 36 w[bquota] - 10 w[bextra]
 Subject to
- y[wheat] - w[wheat] + 2 x[wheat] ≥ 200
- y[corn] - w[corn] + 2.4 x[corn] ≥ 240
- -w[bquota] - w[bextra] + 16 x[beets] ≥ 0
+ 2 x[wheat] + y[wheat] - w[wheat] ≥ 200
+ 2.4 x[corn] + y[corn] - w[corn] ≥ 240
+ 16 x[beets] - w[bquota] - w[bextra] ≥ 0
  w[bquota] ≤ 6000
  y[p] ≥ 0 ∀ p ∈ {wheat,corn}
  w[s] ≥ 0 ∀ s ∈ {wheat,corn,bquota,bextra}</code></pre><p>We can now optimize the model:</p><pre><code class="language-julia">optimize!(farmer, solver = GLPKSolverLP())
@@ -143,7 +143,7 @@ end
 function (sampler::ExponentialSampler)()
     ξ = rand(sampler.distribution)
     return DistributionScenario(sampler.distribution, ξ)
-end</code></pre><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-">using Ipopt
+end</code></pre><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-julia">using Ipopt
 
 sm = @stochastic_model begin
     @stage 1 begin
@@ -156,9 +156,21 @@ sm = @stochastic_model begin
         @constraint(model, y == (x - ξ)^2)
         @objective(model, Min, y)
     end
-end</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:</p><pre><code class="language-">sampler = ExponentialSampler(2.) # Create a sampler
+end</code></pre><pre><code class="language-julia">Two-Stage Stochastic Model
 
-saa = SAA(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA model</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(saa, solver = IpoptSolver(print_level=0))
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:</p><pre><code class="language-julia">sampler = ExponentialSampler(2.) # Create a sampler
+
+saa = SAA(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA model</code></pre><pre><code class="language-julia">Stochastic program with:
+ * 1 decision variable
+ * 1 recourse variable
+ * 1000 scenarios of type DistributionScenario
+Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(saa, solver = IpoptSolver(print_level=0))
 
 println(&quot;Optimal decision: $(optimal_decision(saa))&quot;)
 println(&quot;Optimal value: $(optimal_value(saa))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.07583]
