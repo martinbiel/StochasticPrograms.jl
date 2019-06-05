@@ -116,7 +116,7 @@ As an example, consider the following generalized stochastic program:
 \end{aligned}
 ```
 where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:
-```@example custom
+```julia
 using StochasticPrograms
 using Distributions
 
@@ -139,7 +139,7 @@ end
 The fallback [`probability`](@ref) method is viable as long as the scenario type contains a [`Probability`](@ref) field named `probability`. The implementation of [`expected`](@ref) is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.
 
 We can implement a sampler that generates exponentially distributed scenarios as follows:
-```@example custom
+```julia
 struct ExponentialSampler <: AbstractSampler{DistributionScenario{Exponential{Float64}}}
     distribution::Exponential
 
@@ -152,7 +152,7 @@ function (sampler::ExponentialSampler)()
 end
 ```
 Now, lets attempt to define the generalized stochastic program using the available modeling tools:
-```@example custom
+```julia
 using Ipopt
 
 sm = @stochastic_model begin
@@ -168,11 +168,29 @@ sm = @stochastic_model begin
     end
 end
 ```
+```julia
+Two-Stage Stochastic Model
+
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)
+```
 The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:
-```@example custom
+```julia
 sampler = ExponentialSampler(2.) # Create a sampler
 
 saa = SAA(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA model
+```
+```julia
+Stochastic program with:
+ * 1 decision variable
+ * 1 recourse variable
+ * 1000 scenarios of type DistributionScenario
+Solver is default solver
 ```
 By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
 ```julia
