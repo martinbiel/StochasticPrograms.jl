@@ -42,10 +42,15 @@ function Base.zero(::Type{S}) where S <: AbstractScenario
     error("zero not implemented for scenario type: ", S)
 end
 function Base.show(io::IO, scenario::S) where S <: AbstractScenario
-    println(io, "$(S.name.name) with probability $(probability(scenario))")
+    print(io, "$(S.name.name) with probability $(probability(scenario))")
     scenariotext(io, scenario)
     return io
 end
+"""
+    scenariotext(io::IO, scenario::AbstractScenario)
+
+Custom printout called when printing `scenario`.
+"""
 function scenariotext(io::IO, scenario::AbstractScenario)
     return io
 end
@@ -65,7 +70,7 @@ struct ExpectedScenario{S <: AbstractScenario} <: AbstractScenario
     (::Type{ExpectedScenario})(scenario::AbstractScenario) = new{typeof(scenario)}(scenario)
 end
 function Base.show(io::IO, scenario::ExpectedScenario{S}) where S <: AbstractScenario
-    println(io, "Expected scenario of type $(S.name.name)")
+    print(io, "Expected scenario of type $(S.name.name)")
     scenariotext(io, scenario.scenario)
     return io
 end
@@ -110,7 +115,7 @@ function Base.zero(::Type{Scenario{NT}}) where NT <: NamedTuple
 end
 function scenariotext(io::IO, scenario::Scenario)
     for (k,v) in pairs(scenario.data)
-        println(io, "  $k: $v")
+        print(io, "\n  $k: $v")
     end
     return io
 end

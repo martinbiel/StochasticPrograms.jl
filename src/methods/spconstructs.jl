@@ -1,7 +1,7 @@
 # SP Constructs #
 # ========================== #
 """
-    WS(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenarioaDta; solver = JuMP.UnsetSolver())
+    WS(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenarioaData; solver = JuMP.UnsetSolver())
 
 Generate a **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
@@ -135,6 +135,33 @@ function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; so
     end
     # Return the SAA instance
     return saa
+end
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: Scenario
+    # Create new stochastic program instance
+    saa = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                            parameters(sm.parameters[2]; kw...),
+                            typeof(sample(sampler)),
+                            solver,
+                            procs)
+    sm.generator(saa)
+    # Sample n scenarios
+    add_scenarios!(saa, n) do
+        return sample(sampler, 1/n)
+    end
+    # Return the SAA instance
+    return saa
+end
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, solution::StochasticSolution; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: AbstractScenario
+    if isa(solver, JuMP.UnsetSolver)
+        error("Cannot generate SAA from stochastic solution without a solver.")
+    end
+    n = 16
+    CI = confidence_interval(solution)
+    α = 1 - confidence(CI)
+    while !(confidence_interval(sm, sampler; solver = solver, N = n, M = M, confidence = 1-α) ⊆ CI)
+        n = n * 2
+    end
+    return SAA(sm, sampler, n; solver = solver, procs = procs)
 end
 """
     DEP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())

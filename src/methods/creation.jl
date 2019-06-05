@@ -104,7 +104,7 @@ macro scenario(arg)
     textdef = Expr(:block)
     for var in vars
         key = Meta.quot(var)
-        push!(textdef.args, :(println(io, "  $($key): $(scenario.$var)")))
+        push!(textdef.args, :(print(io, "\n  $($key): $(scenario.$var)")))
     end
     # Define scenario type
     code = @q begin

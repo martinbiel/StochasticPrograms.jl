@@ -14,7 +14,7 @@ using MathProgBase
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
 
-import Base.getindex
+import Base: getindex, length, in, issubset, show
 
 const MPB = MathProgBase
 
@@ -28,11 +28,18 @@ export
     parameters,
     AbstractSampler,
     Sampler,
+    ConfidenceInterval,
+    StochasticSolution,
     AbstractStructuredSolver,
     AbstractStructuredModel,
+    AbstractSampledSolver,
+    AbstractSampledModel,
     StructuredModel,
+    SampledModel,
     optimize_structured!,
+    optimize_sampled!,
     fill_solution!,
+    stochastic_solution,
     solverstr,
     internal_solver,
     Crash,
@@ -59,6 +66,7 @@ export
     scenario,
     scenarios,
     scenariotype,
+    scenariotext,
     stage_probability,
     probability,
     ExpectedScenario,
@@ -81,9 +89,14 @@ export
     outcome_model,
     evaluate_decision,
     lower_bound,
+    lower,
+    upper,
+    confidence,
     confidence_interval,
     instantiate,
     optimize!,
+    optimize,
+    decision,
     optimal_decision,
     optimal_value,
     calculate_objective_value,
@@ -103,6 +116,7 @@ export
     WS_decision,
     EWS,
     SAA,
+    SAASolver,
     DEP,
     VRP,
     EVPI,

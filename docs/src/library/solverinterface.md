@@ -1,6 +1,6 @@
 # Solver interface
 
-Documentation for `StochasticPrograms.jl`'s interface for structured solvers.
+Documentation for `StochasticPrograms.jl`'s interface for structured solvers and sample-based solvers.
 
 ## Index
 
@@ -13,6 +13,8 @@ Pages = ["solverinterface.md"]
 ```@docs
 AbstractStructuredSolver
 AbstractStructuredModel
+AbstractSampledSolver
+AbstractSampledModel
 ```
 
 ```@autodocs

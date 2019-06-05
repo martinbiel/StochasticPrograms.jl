@@ -12,6 +12,14 @@ Sample a scenario of type `S` using `sampler`.
 function sample(sampler::AbstractSampler)
     return sampler()
 end
+function Base.show(io::IO, sampler::AbstractSampler{S}) where S <: AbstractScenario
+    print(io, "$(S.name.name) sampler")
+    return io
+end
+function Base.show(io::IO, sampler::AbstractSampler{S}) where S <: Scenario
+    print(io, "Scenario sampler")
+    return io
+end
 """
     sample(sampler::AbstractSampler{S}, π::AbstractSampler)
 

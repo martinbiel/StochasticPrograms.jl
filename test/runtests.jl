@@ -26,6 +26,8 @@ include("instant_simple.jl")
 include("deferred.jl")
 @info "Loading farmer..."
 include("farmer.jl")
+@info "Loading sampler..."
+include("sampler.jl")
 @info "Test problems loaded. Starting test sequence."
 
 @testset "Stochastic Programs" begin
@@ -74,9 +76,6 @@ include("farmer.jl")
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
     end
     @testset "Sampling" begin
-        sampler = Sampler() do
-            return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
-        end
         sampled_sp = SAA(simple_model, sampler, 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
@@ -87,18 +86,12 @@ include("farmer.jl")
         @test abs(stage_probability(sampled_sp)-1.0) <= 1e-6
     end
     @testset "Confidence intervals" begin
-        sampler = Sampler() do
-            return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
-        end
         glpk = GLPKSolverLP()
-        L, U = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk)
-        @test L <= U
-        saa = SAA(simple_model, sampler, 100)
-        optimize!(saa, solver = glpk)
-        x̂ = optimal_decision(saa)
-        Q,_ = evaluate_decision(simple_model, x̂, sampler, solver = glpk)
-        @test L <= Q
-        @test Q <= U
+        CI = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk)
+        @test lower(CI) <= upper(CI)
+        sol = optimize(simple_model, sampler, solver = glpk, confidence = 0.95)
+        @test lower(CI) <= optimal_value(sol)
+        @test optimal_value(sol) <= upper(CI)
     end
 end
 

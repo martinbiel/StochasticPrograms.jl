@@ -4,9 +4,21 @@ A stochastic program has a structure that can exploited in solver algorithms thr
 
 ## Solver interface
 
-The structured solver interface mimics that of `MathProgBase`, and it needs to be implemented by any structured solver to be compatible with StochasticPrograms. Define a new structured solver as a subtype of [`AbstractStructuredModel`](@ref). Moreoever, define a shallow object of type [`AbstractStructuredSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize!`](@ref). Next, implement [`StructuredModel`](@ref), that takes the stochastic program and the [`AbstractStructuredSolver`](@ref) object and return and instance of [`AbstractStructuredModel`](@ref) which internal state depends on the given stochastic program. Next, the solver algorithm should be run when calling [`optimize_structured!`](@ref) on the [`AbstractStructuredModel`](@ref). After successfuly optimizing the model, the solver must be able to fill in the optimal solution in the first stage and all second stages through [`fill_solution!`](@ref).
+The structured solver interface mimics that of `MathProgBase`, and it needs to be implemented by any structured solver to be compatible with StochasticPrograms. We distinguish between structure-exploiting solvers for solving finite stochastic programs and sampled-bases solvers for approximately solving stochastic models, even though they can be based on the same algorithm.
 
-Some procedures in StochasticPrograms require a `MathProgBase` solver. It is common that structured solvers rely internally on some `MathProgBase` solver. Hence, for convenience, a structured solver can implement [`internal_solver`](@ref) to return any internal `MathProgBase` solver. A stochastic program that has an loaded structured solver that implements this method can then make use of that solver for those procedures, instead of requiring an external solver to be supplied. Finally, a structured solver can optionally implement [`solverstr`](@ref) to return an informative description string for printouts.
+Some procedures in StochasticPrograms require a `MathProgBase` solver. It is common that structured solvers rely internally on some `MathProgBase` solver. Hence, for convenience, a solver can implement [`internal_solver`](@ref) to return any internal `MathProgBase` solver. A stochastic program that has an loaded structured solver that implements this method can then make use of that solver for those procedures, instead of requiring an external solver to be supplied. Finally, a structured solver can optionally implement [`solverstr`](@ref) to return an informative description string for printouts.
+
+### Stochastic programs
+
+To interface a new structure-exploiting solver, define a shallow object of type [`AbstractStructuredSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize!`](@ref). Define a new structured solver as a subtype of [`AbstractStructuredModel`](@ref). Next, implement [`StructuredModel`](@ref), that takes the stochastic program and the [`AbstractStructuredSolver`](@ref) object and return an instance of [`AbstractStructuredModel`](@ref) which internal state depends on the given stochastic program. Next, the solver algorithm should be run when calling [`optimize_structured!`](@ref) on the [`AbstractStructuredModel`](@ref). After successfuly optimizing the model, the solver must be able to fill in the optimal solution in the first stage and all second stages through [`fill_solution!`](@ref).
+
+In summary, the solver interface that a new [`AbstractStructuredModel`](@ref) and [`AbstractStructuredSolver`](@ref) pair should adhere to is given by
+
+ - [`StructuredModel`](@ref)
+ - [`optimize_structured!`](@ref)
+ - [`fill_solution!`](@ref)
+ - [`internal_solver`](@ref)
+ - [`solverstr`](@ref)
 
 As an example, a simplified version of the implementation of the structured solver interface in [LShapedSolvers.jl](@ref) is given below:
 ```julia
@@ -68,6 +80,72 @@ function solverstr(solver::LShapedSolver)
     return "L-shaped solver"
 end
 ```
+
+### Stochastic models
+
+To interface a new sampled-based solver, define a shallow object of type [`AbstractSampledSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize`](@ref).Similar to finite programs, define a new sampled-based solver as a subtype of [`AbstractSampledModel`](@ref). Next, implement [`SampledModel`](@ref), that takes a stochastic model and the [`AbstractStructuredSolver`](@ref) object and returns an instance of [`AbstractSampledModel`](@ref). Next, the solver algorithm should be run when calling [`optimize_sampled!`](@ref) on the [`AbstractSampledModel`](@ref), some [`AbstractSampler`](@ref) and a desired confidence level. After successfuly optimizing the model, a [`StochasticSolution`](@ref) should be retrivable from the [`AbstractSampledModel`](@ref) using [`stochastic_solution`](@ref)
+
+In summary, the solver interface that a new [`AbstractSampledModel`](@ref) and [`AbstractStructuredSolver`](@ref) pair should adhere to is given by
+
+ - [`SampledModel`](@ref)
+ - [`optimize_sampled!`](@ref)
+ - [`stochastic_solution`](@ref)
+ - [`internal_solver`](@ref)
+ - [`solverstr`](@ref)
+
+As an example, consider the implementation of the [`SAASolver`](@ref):
+```julia
+struct SAASolver{S <: SPSolverType} <: AbstractStructuredSolver
+    internal_solver::S
+
+    function SAASolver(solver::SPSolverType)
+        if isa(solver, JuMP.UnsetSolver)
+            error("Cannot solve emerging SAA problems without functional solver.")
+        end
+        S = typeof(solver)
+        return new{S}(solver)
+    end
+end
+function SAASolver(; solver::SPSolverType = JuMP.UnsetSolver())
+    return SAASolver(solver)
+end
+
+mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSampledModel
+    stochasticmodel::M
+    solver::S
+    solution::StochasticSolution
+end
+
+function SampledModel(stochasticmodel::StochasticModel, solver::SAASolver)
+    return SAAModel(stochasticmodel, solver.internal_solver, EmptySolution())
+end
+
+function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confidence::AbstractFloat; M::Integer = 10, tol::AbstractFloat = 1e-1, Nmax::Integer = 5000)
+    sm = saamodel.stochasticmodel
+    solver = saamodel.solver
+    n = 16
+    α = 1-confidence
+    while true
+        CI = confidence_interval(sm, sampler; solver = solver, confidence = 1-α, N = n, M = M)
+        saa = SAA(sm, sampler, n)
+        optimize!(saa, solver = solver)
+        Q = optimal_value(saa)
+        if length(CI)/abs(Q+1e-10) <= tol && Q ∈ CI
+            saamodel.solution = StochasticSolution(optimal_decision(saa), Q, CI)
+            return :Optimal
+        end
+        n = n * 2
+        if n > Nmax
+            return :LimitReached
+        end
+    end
+end
+
+function stochastic_solution(saamodel::SAAModel)
+    return saamodel.solution
+end
+```
+
 
 ## LShapedSolvers.jl
 

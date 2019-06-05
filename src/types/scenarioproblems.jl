@@ -356,6 +356,9 @@ end
 function sample!(scenarioproblems::ScenarioProblems{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
     _sample!(scenarioproblems, sampler, n, nscenarios(scenarioproblems), 1/n)
 end
+function sample!(scenarioproblems::ScenarioProblems{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: Scenario
+    _sample!(scenarioproblems, sampler, n, nscenarios(scenarioproblems), 1/n)
+end
 function sample!(scenarioproblems::DScenarioProblems{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     m = nscenarios(scenarioproblems)
@@ -370,7 +373,21 @@ function sample!(scenarioproblems::DScenarioProblems{S}, sampler::AbstractSample
     end
     return nothing
 end
-function _sample!(scenarioproblems::ScenarioProblems{S}, sampler::AbstractSampler{S}, n::Integer, m::Integer, π::AbstractFloat) where S <: AbstractScenario
+function sample!(scenarioproblems::DScenarioProblems{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: Scenario
+    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
+    m = nscenarios(scenarioproblems)
+    (nscen, extra) = divrem(n, nworkers())
+    @sync begin
+        for w in workers()
+            d = nscen + (extra > 0)
+            @async remotecall_fetch((sp,sampler,n,m,π)->_sample!(fetch(sp),sampler,n,m,π), w, scenarioproblems[w-1], sampler, d, m, 1/n)
+            scenarioproblems.scenario_distribution[w-1] += d
+            extra -= 1
+        end
+    end
+    return nothing
+end
+function _sample!(scenarioproblems::ScenarioProblems, sampler::AbstractSampler, n::Integer, m::Integer, π::AbstractFloat)
     if m > 0
         # Rescale probabilities of existing scenarios
         for scenario in scenarioproblems.scenarios

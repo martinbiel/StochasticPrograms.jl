@@ -13,7 +13,7 @@ using StochasticPrograms
 
 ## Stochastic programs
 
-A two-stage linear stochastic program has the following mathematical representation:
+Consider some probability space ``(\Omega,\mathcal{F},\pi)`` where ``\Omega`` is a sample space, ``\mathcal{F}`` is a ``\sigma``-algebra over ``\Omega`` and ``\pi: \mathcal{F} \to [0,1]`` is a probability measure. Let ``\xi(\omega): \Omega \to \mathbb{R}^{N}`` be some random variable on ``\Omega`` with finite second moments. A two-stage linear stochastic program has the following mathematical representation:
 ```math
 \DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
@@ -147,9 +147,58 @@ dep = DEP(sp)
 print(dep)
 ```
 
+## Sampled average approximation
+
+In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that ``\xi`` follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let ``\xi \sim \mathcal{N}(\mu, \Sigma)`` with
+```math
+\mu = \begin{pmatrix}
+ -28 \\
+ -32 \\
+ 300 \\
+ 300
+\end{pmatrix}, \quad \Sigma = \begin{pmatrix}
+ 2 & 0.5 & 0 & 0 \\
+ 0.5 & 1 & 0 & 0 \\
+ 0 & 0 & 50 & 20 \\
+ 0 & 0 & 20 & 30
+\end{pmatrix}
+```
+To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the [`@sampler`](@ref) macro:
+```@example simple
+using Distributions
+
+@sampler SimpleSampler = begin
+    N::MvNormal
+
+    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
+
+    @sample Scenario begin
+        x = rand(sampler.N)
+        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = pdf(sampler.N, x))
+    end
+end
+
+μ = [-28, -32, 300, 300]
+Σ = [2 0.5 0 0
+     0.5 1 0 0
+     0 0 50 20
+     0 0 20 30]
+
+sampler = SimpleSampler(μ, Σ)
+```
+Now, we can use the same stochastic model created before and the created sampler object to generate a stochastic average approximation (SAA) of the stochastic program. For now, we create a small SAA model of just 5 scenarios:
+```@example simple
+saa = SAA(simple_model, sampler, 5)
+```
+Typically, a large number of scenarios are required to accurately represent the stochastic program. We will consider this in more depth below. Let us first also print the SAA model:
+```@example simple
+print(saa)
+```
+In the subsequent discussions, note that `sp` represents the finite simple stochastic program with known closed form, `simple_model` contains the mathematical representation of the general stochastic model, and `saa` are approximated instances of the general model.
+
 ## Evaluate decisions
 
-With the stochastic program defined, we can evaluate the performance of different first-stage decisions. The expected value of a given first-stage decision ``x`` is given by
+Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision ``x`` is given by
 ```math
 V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]
 ```
@@ -157,7 +206,7 @@ If the sample space is finite, the above expressions has a closed form that is r
 ```@example simple
 x = [40., 20.]
 ```
-The expected result of taking this decision in the simple model can be determined through:
+The expected result of taking this decision in the simple finite model can be determined through:
 ```@example simple
 evaluate_decision(sp, x, solver = GLPKSolverLP())
 ```
@@ -169,7 +218,20 @@ Moreover, we can evaluate the result of the decision in a given scenario, i.e. s
 ```@example simple
 evaluate_decision(sp, x, ξ₁, solver = GLPKSolverLP())
 ```
-In the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For further reference, consider [`evaluate_decision`](@ref), [`lower_bound`](@ref) and [`confidence_interval`](@ref).
+If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the SAA model created above:
+```@example simple
+evaluate_decision(saa, x, solver = GLPKSolverLP())
+```
+and compare it to the result of evaluating it on another SAA model of similar size:
+```@example simple
+another_saa = SAA(simple_model, sampler, 5)
+evaluate_decision(another_saa, x, solver = GLPKSolverLP())
+```
+which, if any, of these values should be a candidate for the true value of ``V(x)``? A more precise result is obtained by evaluating the decision using a sampled-based approach. Such querys are instead made to the `simple_model` object by supplying an appropriate [`AbstractSampler`](@ref) and a desired confidence level. Consider:
+```@example simple
+evaluate_decision(simple_model, x, sampler, solver = GLPKSolverLP(), confidence = 0.9)
+```
+The result is a 90% confidence interval around ``V(x)``. Consult [`evaluate_decision`](@ref) for the tweakable parameters that govern the resulting confidence interval.
 
 ## Optimal first-stage decision
 
@@ -192,6 +254,19 @@ evaluate_decision(sp, x_opt, solver = GLPKSolverLP())
 This value is commonly referred to as the *value of the recourse problem* (VRP). We can also calculate it directly through:
 ```@example simple
 VRP(sp, solver = GLPKSolverLP())
+```
+
+If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, the value of the recourse problem can not be computed exactly. However, by supplying an [`AbstractSampler`](@ref) we can use sample-based techniques to compute a confidence interval around the true optimum:
+```@example simple
+confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), confidence = 0.95)
+```
+Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAASolver`](@ref), which runs a simple sequential SAA algorithm. Emerging SAA problems are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
+```@example simple
+solution = optimize(simple_model, sampler, solver = SAASolver(GLPKSolverLP()), confidence = 0.95)
+```
+The result is a [`StochasticSolution`](@ref), which includes an optimal solution estimate as well as a confidence interval around the solution. The approximately optimal first-stage decision is obtained by
+```@example simple
+decision(solution)
 ```
 
 ## Wait-and-see models

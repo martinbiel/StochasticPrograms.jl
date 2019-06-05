@@ -19,7 +19,7 @@ Order   = [:type, :macro, :function]
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["twostage.jl"]
+Pages   = ["stochasticprogram.jl"]
 ```
 
 ## Scenarios
@@ -65,7 +65,7 @@ end
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["api.jl", "generation.jl", "evaluation.jl"]
+Pages   = ["api.jl", "stochasticsolution.jl", "SAASolver.jl", "generation.jl", "evaluation.jl"]
 ```
 
 ## Stochastic programming constructs
