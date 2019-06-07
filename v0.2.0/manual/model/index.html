@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Stochastic models · StochasticPrograms.jl</title><link href="https://cdnjs.cloudflare.com/ajax/libs/normalize/4.2.0/normalize.min.css" rel="stylesheet" type="text/css"/><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/default.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.2.0/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link href="../../assets/documenter.css" rel="stylesheet" type="text/css"/></head><body><nav class="toc"><h1>StochasticPrograms.jl</h1><select id="version-selector" onChange="window.location.href=this.value" style="visibility: hidden"></select><form class="search" id="search-form" action="../../search/"><input id="search-query" name="q" type="text" placeholder="Search docs"/></form><ul><li><a class="toctext" href="../../">Home</a></li><li><span class="toctext">Manual</span><ul><li><a class="toctext" href="../quickstart/">Quick start</a></li><li><a class="toctext" href="../data/">Stochastic data</a></li><li class="current"><a class="toctext" href>Stochastic models</a><ul class="internal"><li><a class="toctext" href="#[@stage](@ref)-blocks-1"><code>@stage</code> blocks</a></li><li><a class="toctext" href="#[@parameters](@ref)-blocks-1"><code>@parameters</code> blocks</a></li><li><a class="toctext" href="#[@decision](@ref)-blocks-1"><code>@decision</code> blocks</a></li><li><a class="toctext" href="#[@uncertain](@ref)-blocks-1"><code>@uncertain</code> blocks</a></li><li><a class="toctext" href="#Model-instantiation-1">Model instantiation</a></li><li><a class="toctext" href="#Instant-models-1">Instant models</a></li></ul></li><li><a class="toctext" href="../distributed/">Distributed stochastic programs</a></li><li><a class="toctext" href="../structuredsolvers/">Structured solvers</a></li><li><a class="toctext" href="../examples/">Examples</a></li></ul></li><li><span class="toctext">Library</span><ul><li><a class="toctext" href="../../library/public/">Public interface</a></li><li><a class="toctext" href="../../library/solverinterface/">Solver interface</a></li></ul></li></ul></nav><article id="docs"><header><nav><ul><li>Manual</li><li><a href>Stochastic models</a></li></ul><a class="edit-page" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/model.md"><span class="fa"></span> Edit on GitHub</a></nav><hr/><div id="topbar"><span>Stochastic models</span><a class="fa fa-bars" href="#"></a></div></header><h1><a class="nav-anchor" id="Stochastic-models-1" href="#Stochastic-models-1">Stochastic models</a></h1><p>The <a href="../../library/public/#StochasticPrograms.@stochastic_model"><code>@stochastic_model</code></a> command is now introduced in more detail. The discussion will as before revolve around the simple example introduced in the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><pre><code class="language-julia">simple_model = @stochastic_model begin
+    @stage 1 begin
+        @variable(model, x₁ &gt;= 40)
+        @variable(model, x₂ &gt;= 20)
+        @objective(model, Min, 100*x₁ + 150*x₂)
+        @constraint(model, x₁ + x₂ &lt;= 120)
+    end
+    @stage 2 begin
+        @decision x₁ x₂
+        @uncertain q₁ q₂ d₁ d₂
+        @variable(model, 0 &lt;= y₁ &lt;= d₁)
+        @variable(model, 0 &lt;= y₂ &lt;= d₂)
+        @objective(model, Min, q₁*y₁ + q₂*y₂)
+        @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+        @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+    end
+end</code></pre><h2><a class="nav-anchor" id="[@stage](@ref)-blocks-1" href="#[@stage](@ref)-blocks-1"><a href="../../library/public/#StochasticPrograms.@stage"><code>@stage</code></a> blocks</a></h2><p>The body of a <a href="../../library/public/#StochasticPrograms.@stochastic_model"><code>@stochastic_model</code></a> definition consists of a number of <a href="../../library/public/#StochasticPrograms.@stage"><code>@stage</code></a> blocks, following the syntax:</p><pre><code class="language-julia">@stage N begin
+    ...
+end</code></pre><p>Here, <code>N</code> is the stage number and the body is made up of <a href="https://github.com/JuliaOpt/JuMP.jl">JuMP</a> syntax as well as <a href="../../library/public/#StochasticPrograms.@parameters"><code>@parameters</code></a>, <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a>, and <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> blocks. At least two stages must be defined and the stages must be defined in consecutive order starting with the first stage. The number of stage blocks included in the <a href="../../library/public/#StochasticPrograms.@stochastic_model"><code>@stochastic_model</code></a> definition determines the number of stages that a stochastic program instantiated from the resulting stochastic model will have.</p><div class="admonition note"><div class="admonition-title">Note</div><div class="admonition-text"><p>It is possible to define and instantiate stochastic models with more than two stages. However, most internal tools and solvers only support two-stage models at this point.</p></div></div><h2><a class="nav-anchor" id="[@parameters](@ref)-blocks-1" href="#[@parameters](@ref)-blocks-1"><a href="../../library/public/#StochasticPrograms.@parameters"><code>@parameters</code></a> blocks</a></h2><p>The <code>@parameters</code> blocks are used to introduce deterministic parameters to a <a href="../../library/public/#StochasticPrograms.@stage"><code>@stage</code></a> block. See for example <a href="../data/#Stage-data-1">Stage data</a>. The following:</p><pre><code class="language-julia">@parameters a b</code></pre><p>makes the constants <code>a</code> and <code>b</code> available as model parameters. This incurs a promise that those parameters will be injected when instantiating the model, and if no default values are available they must be supplied by the user. In other words, if <code>sm</code> is a stochastic model that includes the above <code>@parameters</code> annotation in one of its <code>@stage</code> blocks, then those parameters must be supplied as keyword arguments when instantiating stochastic programs using this model:</p><pre><code class="language-julia">instantiate(sm, scenarios, a = 1, b = 2)</code></pre><p>Alternatively, default values can be specified directly in the <code>@parameters</code> block:</p><pre><code class="language-julia">@parameters begin
+    a = 1
+    b = 2
+end</code></pre><p>Values supplied to <code>instantiate</code> are always used, and otherwise the default values are used. The responsibility is on the user to ensure that the supplied parameters support the operations used in the <code>@stage</code> blocks. Parameters can be reused in multiple blocks, but each occurance must be annotated by <code>@parameters</code> in each of the stages.</p><h2><a class="nav-anchor" id="[@decision](@ref)-blocks-1" href="#[@decision](@ref)-blocks-1"><a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> blocks</a></h2><p>The <code>@decision</code> blocks are used to annotate linking variables between stages. The <code>@decision</code> block in the simple example above is given by</p><pre><code class="language-julia">@decision x₁ x₂</code></pre><p>This states that the second stage of the stochastic model depends on the decisions <code>x₁</code> and <code>x₂</code> taken in the previous stage. The only restriction is that any variable annotated by <code>@decision</code> in stage <code>N</code> must have been annotated by <code>@variable</code> in stage <code>N-1</code>.</p><h2><a class="nav-anchor" id="[@uncertain](@ref)-blocks-1" href="#[@uncertain](@ref)-blocks-1"><a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> blocks</a></h2><p>The <code>@uncertain</code> blocks are used to annotate stochastic data in the stochastic model. For flexibility, there are several different ways of doing this. However, an <code>@uncertain</code> annotation is always connected to some <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a> type, as introduced in <a href="../data/#Scenario-data-1">Scenario data</a>. Note, that a <code>@stage</code> block can only include one <code>@uncertain</code> block. All stochastic information in a given stage must therefore be captured in the <code>@uncertain</code> block of that stage.</p><p>The most simple approach is to use the <a href="../../library/public/#StochasticPrograms.Scenario"><code>Scenario</code></a> type, which is based on named tuples. Consider the <code>@uncertain</code> annotation given above:</p><pre><code class="language-julia">@uncertain q₁ q₂ d₁ d₂</code></pre><p>This will ensure that <code>Scenario</code>s that are expected to have the fields <code>q₁</code>, <code>q₂</code>, <code>d₁</code> and <code>d₂</code> are injected when constructing second-stage models. Each such scenario must be supplied or sampled using a supplied sampler object. It is the responsibility of the user to ensure that each supplied or sampled <code>Scenario</code> has the correct fields. For example, the following yields a <code>Scenario</code> compatible with the above <code>@uncertain</code> line:</p><pre><code class="language-julia">Scenario(q₁ = -24.0,
+         q₂ = -28.0,
+         d₁ = 500.0,
+         d₂ = 100.0,
+         probability = 0.4)</code></pre><p>As shown in <a href="../data/#Stochastic-data-1">Stochastic data</a>, it is also possible to introduce other scenario types, either using <a href="../../library/public/#StochasticPrograms.@scenario"><code>@scenario</code></a> or manally as explained in <a href="../data/#Custom-scenarios-1">Custom scenarios</a> and demonstrated in the <a href="../examples/#Continuous-scenario-distribution-1">Continuous scenario distribution</a> example. If we instead define the necessary scenario structure as follows:</p><pre><code class="language-julia">@scenario SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><p>One can then use:</p><pre><code class="language-julia">@uncertain ξ::SimpleScenario</code></pre><p>and extract the required fields from <code>ξ</code> which will be of type <code>SimpleScenario</code> after data injection. Again, it is the responsibility of the user to supply scenarios of this type when instantiating the model. For example, the following constructs a <code>SimpleScenario</code> compatible with the above <code>@uncertain</code> line:</p><pre><code class="language-julia">SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)</code></pre><p>It is also possible to directly unpack the necessary fields using the following syntactic sugar:</p><pre><code class="language-julia">@uncertain q₁ q₂ d₁ d₂ from SimpleScenario</code></pre><p>The actual scenario instance can still be annotated and used if necessary:</p><pre><code class="language-julia">@uncertain q₁ q₂ d₁ d₂ from ξ::SimpleScenario</code></pre><p>Finally, if the <code>@uncertain</code> block is used within a <code>@stochastic_model</code> environment, it is possible to simultaneosly define the underlying scenario type. In other words,</p><pre><code class="language-julia">@uncertain ξ::SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><pre><code class="language-julia">@uncertain q₁ q₂ d₁ d₂ from SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><p>and</p><pre><code class="language-julia">@uncertain q₁ q₂ d₁ d₂ from ξ::SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end</code></pre><p>are all possible methods of defining and using the <code>SimpleScenario</code> type in a <code>@stage</code> block.</p><h2><a class="nav-anchor" id="Model-instantiation-1" href="#Model-instantiation-1">Model instantiation</a></h2><p>A model object <code>sm</code> defined using <code>@stochastic_model</code> can be used to instantiate stochastic programs over both finite/infinite sample spaces and discrete/continuous random variables.</p><p>If the scenarios are associated with a discrete random variable over a finite sample space, then the corresponding stochastic program is finite and can be instantiated by providing the full list of scenarios:</p><pre><code class="language-julia">sp = instantiate(sm, scenarios)</code></pre><p>Here, <code>scenarios</code> is a vector of scenarios consistent with the <code>@uncertain</code> annotation used in the second stage of <code>sm</code>. It is the responsibility of the user to ensure that the individual probabilities of the <code>scenarios</code> sum up to one, so that the model is consistent.</p><p>If the scenarios are instead associated with a continuous random variable, with finite second moments, over an infinite sample space, then the corresponding stochastic program is not finite and must be approximated. The only supported way of doing so in StochasticPrograms is by using sampled average approximations. A finite stochastic program that approximates the stochastic model is obtained through</p><pre><code class="language-julia">saa = SAA(sm, sampler, n)</code></pre><p>where <code>sampler</code> is an <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a>, as outlined in <a href="../data/#Sampling-1">Sampling</a>, and <code>n</code> is the number of samples to include.</p><h2><a class="nav-anchor" id="Instant-models-1" href="#Instant-models-1">Instant models</a></h2><p>It is possible to create one-off stochastic programs without needing to first define a model object. To do so, any required scenario data structure must be defined first. Consider:</p><pre><code class="language-julia">using StochasticPrograms
+
+@scenario SimpleScenario = begin
+    q₁::Float64
+    q₂::Float64
+    d₁::Float64
+    d₂::Float64
+end
+ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
+ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)</code></pre><pre><code class="language-none">SimpleScenario with probability 0.6
+  q₁: -28.0
+  q₂: -32.0
+  d₁: 300.0
+  d₂: 300.0</code></pre><p>Next, an unmodeled stochastic program can be instantiated using the two created scenarios:</p><pre><code class="language-julia">sp = StochasticProgram([ξ₁, ξ₂])</code></pre><pre><code class="language-none">Stochastic program with:
+ * undefined stage 1
+ * undefined stage 2
+Solver is default solver</code></pre><p>A slightly diferrent modeling syntax is now used to define the stage models of <code>sp</code>:</p><pre><code class="language-julia">@first_stage sp = begin
+    @variable(model, x₁ &gt;= 40)
+    @variable(model, x₂ &gt;= 20)
+    @objective(model, Min, 100*x₁ + 150*x₂)
+    @constraint(model, x₁ + x₂ &lt;= 120)
+end
+@second_stage sp = begin
+    @decision x₁ x₂
+    @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
+    @variable(model, 0 &lt;= y₁ &lt;= d₁)
+    @variable(model, 0 &lt;= y₂ &lt;= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+end</code></pre><pre><code class="language-none">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type SimpleScenario
+Solver is default solver</code></pre><p>Here, <code>@first_stage</code> and <code>@second_stage</code> are just syntactic sugar for <code>@stage 1</code> and <code>@stage 2</code>. This is is the definition syntax used internally by <code>StochasticModel</code> objects when instantiating stochastic programs. We can verify that this approach yields the same stochastic program by printing and comparing to the <a href="../quickstart/#Quick-start-1">Quick start</a>:</p><pre><code class="language-julia">print(sp)</code></pre><pre><code class="language-none">First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ + x₂ ≤ 120
+ x₁ ≥ 40
+ x₂ ≥ 20
+
+Second-stage
+==============
+Subproblem 1 (p = 0.40):
+Min -24 y₁ - 28 y₂
+Subject to
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ 0 ≤ y₁ ≤ 500
+ 0 ≤ y₂ ≤ 100
+
+Subproblem 2 (p = 0.60):
+Min -28 y₁ - 32 y₂
+Subject to
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0
+ 0 ≤ y₁ ≤ 300
+ 0 ≤ y₂ ≤ 300</code></pre><p>As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and reinstantiates all internal problems. For example, the following increases the lower bound on the second stage variables to 2:</p><pre><code class="language-julia">@second_stage sp = begin
+    @decision x₁ x₂
+    @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
+    @variable(model, 2 &lt;= y₁ &lt;= d₁)
+    @variable(model, 2 &lt;= y₂ &lt;= d₂)
+    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+    @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+end
+
+print(sp)</code></pre><pre><code class="language-none">First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ + x₂ ≤ 120
+ x₁ ≥ 40
+ x₂ ≥ 20
+
+Second-stage
+==============
+Subproblem 1 (p = 0.40):
+Min -24 y₁ - 28 y₂
+Subject to
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ 2 ≤ y₁ ≤ 500
+ 2 ≤ y₂ ≤ 100
+
+Subproblem 2 (p = 0.60):
+Min -28 y₁ - 32 y₂
+Subject to
+ 6 y₁ + 10 y₂ - 60 x₁ ≤ 0
+ 8 y₁ + 5 y₂ - 80 x₂ ≤ 0
+ 2 ≤ y₁ ≤ 300
+ 2 ≤ y₂ ≤ 300</code></pre><p>It is of course also possible to do this on programs instantiated from a <code>StochasticModel</code>.</p><footer><hr/><a class="previous" href="../data/"><span class="direction">Previous</span><span class="title">Stochastic data</span></a><a class="next" href="../distributed/"><span class="direction">Next</span><span class="title">Distributed stochastic programs</span></a></footer></article></body></html>
