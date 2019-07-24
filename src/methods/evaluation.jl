@@ -196,8 +196,9 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
                            confidence::AbstractFloat = 0.9,
                            n::Integer = 1000,
                            N::Integer = 100,
-                           M::Integer = 10) where S <: AbstractScenario
-    eval_model = SAA(stochasticmodel, sampler, n)
+                           M::Integer = 10,
+                           kw...) where S <: AbstractScenario
+    eval_model = SAA(stochasticmodel, sampler, n; kw...)
     # Condidence level
     α = (1-confidence)/2
     # Compute confidence interval around true optimum for lower bound
@@ -221,13 +222,13 @@ Generate a confidence interval around the true optimum of the two-stage `stochas
 
 `N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of SAA samples used.
 """
-function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler{S}; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10) where {S <: AbstractScenario}
+function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10, kw...)
     # Condidence level
     α = 1-confidence
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     for i = 1:M
-        saa = SAA(stochasticmodel, sampler, N)
+        saa = SAA(stochasticmodel, sampler, N; kw...)
         Qs[i] = VRP(saa, solver = solver)
     end
     Q̂ = mean(Qs)
