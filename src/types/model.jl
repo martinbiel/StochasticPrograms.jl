@@ -6,9 +6,10 @@ A mathematical model of a stochastic optimization problem.
 struct StochasticModel{N, P <: NTuple{N, StageParameters}}
     parameters::P
     generator::Function
+    spsolver::SPSolver
 
-    function StochasticModel(generator::Function, parameters::Vararg{StageParameters,N}) where N
-        return new{N,typeof(parameters)}(parameters, generator)
+    function StochasticModel(generator::Function, parameters::Vararg{StageParameters,N}; solver::SPSolverType = JuMP.UnsetSolver()) where N
+        return new{N,typeof(parameters)}(parameters, generator, SPSolver(solver))
     end
 end
 nstages(::StochasticModel{N}) where N = N

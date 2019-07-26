@@ -93,9 +93,9 @@ include("sampler.jl")
     end
     @testset "Distributed confidence intervals" begin
         glpk = GLPKSolverLP()
-        CI = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk)
+        CI = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk, log = false)
         @test lower(CI) <= upper(CI)
-        sol = optimize(simple_model, sampler, solver = glpk, confidence = 0.95)
+        sol = optimize!(simple_model, sampler, solver = glpk, confidence = 0.95, tol = 1e-1, log = false)
         @test lower(confidence_interval(sol)) <= upper(confidence_interval(sol))
     end
 end

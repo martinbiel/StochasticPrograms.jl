@@ -135,23 +135,24 @@ Approximately optimize the `stochasticmodel` using `solver` when the underlying 
 
 See also: [`StochasticSolution`](@ref)
 """
-function optimize(stochasticmodel::StochasticModel, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, kwargs...)
+function optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, kwargs...)
     # Abort if no solver was given
     if isa(solver, JuMP.UnsetSolver)
         error("Cannot optimize without a solver.")
     end
     # Switch on solver type
-    return _optimize(stochasticmodel, sampler, solver, confidence; kwargs...)
+    return _optimize!(stochasticmodel, sampler, solver, confidence; kwargs...)
 end
-function _optimize(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::MathProgBase.AbstractMathProgSolver, confidence::AbstractFloat; kwargs...)
-    return _optimize(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
+function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::MathProgBase.AbstractMathProgSolver, confidence::AbstractFloat; kwargs...)
+    return _optimize!(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
 end
-function _optimize(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractStructuredSolver, confidence::AbstractFloat; kwargs...)
-    return _optimize(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
+function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractStructuredSolver, confidence::AbstractFloat; kwargs...)
+    return _optimize!(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
 end
-function _optimize(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractSampledSolver, confidence::AbstractFloat; kwargs...)
+function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractSampledSolver, confidence::AbstractFloat; kwargs...)
     sampledmodel = SampledModel(stochasticmodel, solver)
     status = optimize_sampled!(sampledmodel, sampler, confidence; kwargs...)
+    stochasticmodel.spsolver.internal_model = sampledmodel
     if status != :Optimal
         @warn "Optimal solution not found. Returned status $status"
     end

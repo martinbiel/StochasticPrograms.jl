@@ -121,7 +121,7 @@ Optionally, a capable `solver` can be supplied to `SAA`. Otherwise, any previous
 
 See also: [`sample!`](@ref)
 """
-function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: AbstractScenario
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: AbstractScenario
     # Create new stochastic program instance
     saa = StochasticProgram(parameters(sm.parameters[1]; kw...),
                             parameters(sm.parameters[2]; kw...),
@@ -130,13 +130,13 @@ function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; so
                             procs)
     sm.generator(saa)
     # Sample n scenarios
-    add_scenarios!(saa, n) do
+    add_scenarios!(saa, n, defer = defer) do
         return sample(sampler, 1/n)
     end
     # Return the SAA instance
     return saa
 end
-function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: Scenario
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: Scenario
     # Create new stochastic program instance
     saa = StochasticProgram(parameters(sm.parameters[1]; kw...),
                             parameters(sm.parameters[2]; kw...),
@@ -145,13 +145,13 @@ function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; so
                             procs)
     sm.generator(saa)
     # Sample n scenarios
-    add_scenarios!(saa, n) do
+    add_scenarios!(saa, n, defer = defer) do
         return sample(sampler, 1/n)
     end
     # Return the SAA instance
     return saa
 end
-function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, solution::StochasticSolution; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), kw...) where S <: AbstractScenario
+function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, solution::StochasticSolution; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: AbstractScenario
     if isa(solver, JuMP.UnsetSolver)
         error("Cannot generate SAA from stochastic solution without a solver.")
     end
@@ -161,7 +161,7 @@ function SAA(sm::StochasticModel{2}, sampler::AbstractSampler{S}, solution::Stoc
     while !(confidence_interval(sm, sampler; solver = solver, N = n, M = M, confidence = 1-α) ⊆ CI)
         n = n * 2
     end
-    return SAA(sm, sampler, n; solver = solver, procs = procs)
+    return SAA(sm, sampler, n; solver = solver, procs = procs, defer = defer)
 end
 """
     DEP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())

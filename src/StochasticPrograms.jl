@@ -13,6 +13,7 @@ using Distributions
 using MathProgBase
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
+using ProgressMeter
 
 import Base: getindex, length, in, issubset, show
 
@@ -93,9 +94,11 @@ export
     upper,
     confidence,
     confidence_interval,
+    lower_bound,
+    upper_bound,
+    gap,
     instantiate,
     optimize!,
-    optimize,
     decision,
     optimal_decision,
     optimal_value,
