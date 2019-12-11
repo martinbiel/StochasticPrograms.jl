@@ -335,7 +335,7 @@ end
 Return the probability of scenario `i`th scenario in the `stochasticprogram` at stage `s` occuring. Defaults to the second stage.
 """
 function probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return probability(scenario(stochasticprogram, s, i))
+    return probability(scenario(stochasticprogram, i, s))
 end
 """
     stage_probability(stochasticprogram::StochasticProgram, s::Integer = 2)
