@@ -82,6 +82,7 @@ export
     sampler,
     sample!,
     generate!,
+    stage_one_model,
     stage_two_model,
     outcome_model,
     evaluate_decision,

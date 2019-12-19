@@ -37,15 +37,13 @@ end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
                                   solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
-    N = nscenarios(stochasticprogram)
     outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
-    𝔼Q, σ² = outcome_welford(outcome_generator, scenarios(stochasticprogram))
+    𝔼Q, σ² = welford(outcome_generator, scenarios(stochasticprogram))
     return 𝔼Q, sqrt(σ²)
 end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
                                   solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
-    N = nscenarios(stochasticprogram)
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -62,8 +60,8 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
                                         x,
                                         scenario)
                         return outcome_model
-                   end
-                   return (outcome_welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
+                    end
+                return (welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
             end,
             w,
             stochasticprogram.scenarioproblems[w-1],
@@ -101,18 +99,18 @@ function outcome_mean(outcome_generator::Function, scenarios::Vector{<:AbstractS
     end
     return sum(Qs)
 end
-function outcome_welford(outcome_generator::Function, scenarios::Vector{<:AbstractScenario})
+function welford(generator::Function, scenarios::Vector{<:AbstractScenario})
     Q̄ₖ = 0
     Sₖ = 0
     N = length(scenarios)
     for k = 1:N
         Q̄ₖ₋₁ = Q̄ₖ
-        let outcome = outcome_generator(scenarios[k])
-            status = solve(outcome)
+        let problem = generator(scenarios[k])
+            status = solve(problem)
             if status != :Optimal
                 error("Outcome model could not be solved, returned status: $status")
             end
-            Q = getobjectivevalue(outcome)
+            Q = getobjectivevalue(problem)
             Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
             Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
         end
@@ -183,9 +181,9 @@ end
                       confidence = 0.95,
                       N = 1000)
 
-Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision` in the form of a confidence interval at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision` in the form of a confidence interval at level `confidence`, over the scenario distribution induced by `sampler`.
 
-In other words, evaluate `decision` on an SAA model of size `N`. Generate an confidence interval using the sample variance of the evaluation.
+In other words, evaluate `decision` on a sampled model of size `N`. Generate an confidence interval using the sample variance of the evaluation.
 
 See also: [`confidence_interval`](@ref)
 """
@@ -196,7 +194,7 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
                            confidence::AbstractFloat = 0.95,
                            Ñ::Integer = 1000,
                            kw...)
-    CI = let eval_model = SAA(stochasticmodel, sampler, Ñ, defer = true; kw...)
+    CI = let eval_model = sample(stochasticmodel, sampler, Ñ, defer = true; kw...)
         # Condidence level
         α = 1-confidence
         cᵀx = _eval_first_stage(eval_model, decision)
@@ -217,9 +215,9 @@ end
                 N = 100,
                 M = 10)
 
-Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around a lower bound on the true optimum of the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of SAA samples used.
+`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models.
 """
 function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
@@ -230,10 +228,10 @@ function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampl
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:M
-        let saa = SAA(stochasticmodel, sampler, N; kw...)
-            Qs[i] = VRP(saa, solver = solver)
-            remove_scenarios!(saa)
-            remove_subproblems!(saa)
+        let sampled_model = sample(stochasticmodel, sampler, N; kw...)
+            Qs[i] = VRP(sampled_model, solver = solver)
+            remove_scenarios!(sampled_model)
+            remove_subproblems!(sampled_model)
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
     end
@@ -253,17 +251,17 @@ end
                 T = 10,
                 n = 1000)
 
-Generate a an upper bound around the true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around an upper of the true optimum of the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA model used to generate a candidate decision. `Ñ` is the size of the SAA model used to evalute the decision.
+`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of the sampled model used to evalute the decision.
 """
 function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
     α = 1-confidence
     # decision generation
-    saa = SAA(stochasticmodel, sampler, N; kw...)
-    optimize!(saa, solver = solver)
-    x̂ = optimal_decision(saa)
+    sampled_model = sample(stochasticmodel, sampler, N; kw...)
+    optimize!(sampled_model, solver = solver)
+    x̂ = optimal_decision(sampled_model)
     return upper_bound(stochasticmodel, x̂, sampler; solver = solver, confidence = confidence, T = T, Ñ = Ñ, log = log, keep = keep, offset = offset, indent = indent, kw...)
 end
 """
@@ -276,9 +274,9 @@ end
                 T = 10,
                 n = 1000)
 
-Generate a an upper bound around the expected result of using decision `x` in the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around an upper bound of the expected value of the decision `x` in the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA model used to generate a candidate decision. `Ñ` is the size of the SAA model used to evalute the decision.
+`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of the sampled model used to evalute the decision.
 """
 function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
@@ -288,9 +286,9 @@ function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sam
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:T
-        let eval_saa = SAA(stochasticmodel, sampler, Ñ, defer = true; kw...)
-            Qs[i] = evaluate_decision(eval_saa, x; solver = solver)
-            remove_scenarios!(eval_saa)
+        let eval_model = sample(stochasticmodel, sampler, Ñ, defer = true; kw...)
+            Qs[i] = evaluate_decision(eval_model, x; solver = solver)
+            remove_scenarios!(eval_model)
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
     end
@@ -309,9 +307,9 @@ end
                         N = 100,
                         M = 10)
 
-Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of SAA samples used.
+`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in SAA.
 """
 function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
@@ -333,9 +331,9 @@ end
         N = 100,
         M = 10)
 
-Generate a confidence interval around the gap between the result of using decison `x` and true optimum of the two-stage `stochasticmodel` at level `confidence`, when the underlying scenario distribution is inferred by `sampler`.
+Generate a confidence interval around the gap between the result of using decison `x` and true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the amount of SAA samples used.
+`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in SAA.
 """
 function gap(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level

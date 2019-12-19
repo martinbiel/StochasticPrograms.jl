@@ -1,12 +1,12 @@
 """
-    SAASolver
+    SAA
 
-Default `SampledSolver`. Generates a `StochasticSolution` through sequential SAA sampling to the desired confidence level.
+Default `SampledSolver`. Generates a `StochasticSolution` using the sample average approximation (SAA) method, to the desired confidence level.
 """
-struct SAASolver{S <: SPSolverType} <: AbstractSampledSolver
+struct SAA{S <: SPSolverType} <: AbstractSampledSolver
     internal_solver::S
 
-    function SAASolver(solver::SPSolverType)
+    function SAA(solver::SPSolverType)
         if isa(solver, JuMP.UnsetSolver)
             error("Cannot solve emerging SAA problems without functional solver.")
         end
@@ -15,12 +15,12 @@ struct SAASolver{S <: SPSolverType} <: AbstractSampledSolver
     end
 end
 """
-    SAASolver(; solver::SPSolverType = JuMP.UnsetSolver())
+    SAA(; solver::SPSolverType = JuMP.UnsetSolver())
 
-Return an SAASolver where the emerging SAA problems are solved using `solver`.
+Return an SAA where the emerging SAA problems are solved using `solver`.
 """
-function SAASolver(; solver::SPSolverType = JuMP.UnsetSolver())
-    return SAASolver(solver)
+function SAA(; solver::SPSolverType = JuMP.UnsetSolver())
+    return SAA(solver)
 end
 
 mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSampledModel
@@ -36,7 +36,7 @@ mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSamp
     end
 end
 
-function SampledModel(stochasticmodel::StochasticModel, solver::SAASolver)
+function SampledModel(stochasticmodel::StochasticModel, solver::SAA)
     return SAAModel(stochasticmodel, solver.internal_solver)
 end
 
@@ -45,7 +45,7 @@ function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confide
     solver = saamodel.solver
     N = Ninit
     α = 1-confidence
-    progress = ProgressThresh(tol, 0.0, "Sequential SAA gap")
+    progress = ProgressThresh(tol, 0.0, "SAA gap")
     log && ProgressMeter.update!(progress, Inf,
                                  showvalues = [
                                      ("Confidence interval", NaN),
@@ -65,16 +65,16 @@ function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confide
                                          ("Current sample size", 2*N)
                                      ])
         if gap <= tol
-            saa = SAA(sm, sampler, N)
-            optimize!(saa, solver = solver)
-            Q = optimal_value(saa)
+            sp = sample(sm, sampler, N)
+            optimize!(sp, solver = solver)
+            Q = optimal_value(sp)
             while !(Q ∈ CI)
-                saa = SAA(sm, sampler, N)
-                optimize!(saa, solver = solver)
-                Q = optimal_value(saa)
+                sp = sample(sm, sampler, N)
+                optimize!(sp, solver = solver)
+                Q = optimal_value(sp)
             end
-            saamodel.solution = StochasticSolution(optimal_decision(saa), Q, N, CI)
-            saamodel.saa = saa
+            saamodel.solution = StochasticSolution(optimal_decision(sp), Q, N, CI)
+            saamodel.saa = sp
             return :Optimal
         end
         N = N * 2
@@ -85,7 +85,7 @@ function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confide
     end
 end
 
-function internal_solver(solver::SAASolver)
+function internal_solver(solver::SAA)
     return internal_solver(solver.internal_solver)
 end
 

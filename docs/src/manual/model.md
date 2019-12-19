@@ -146,7 +146,7 @@ Here, `scenarios` is a vector of scenarios consistent with the `@uncertain` anno
 
 If the scenarios are instead associated with a continuous random variable, with finite second moments, over an infinite sample space, then the corresponding stochastic program is not finite and must be approximated. The only supported way of doing so in StochasticPrograms is by using sampled average approximations. A finite stochastic program that approximates the stochastic model is obtained through
 ```julia
-saa = SAA(sm, sampler, n)
+sp = sample(sm, sampler, n)
 ```
 where `sampler` is an [`AbstractSampler`](@ref), as outlined in [Sampling](@ref), and `n` is the number of samples to include.
 

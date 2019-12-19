@@ -30,7 +30,7 @@ where
     & \quad y \geq 0
   \end{aligned}
 ```
-If the sample space ``\Omega`` is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space ``\Omega`` is infinite, sampling techniques can be used to represent the stochastic program using finite [`SAA`](@ref) instances.
+If the sample space ``\Omega`` is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space ``\Omega`` is infinite, sampling techniques can be used to represent the stochastic program using finite instances generated using  [`sample`](@ref).
 
 ## A simple stochastic program
 
@@ -186,15 +186,15 @@ end
 
 sampler = SimpleSampler(μ, Σ)
 ```
-Now, we can use the same stochastic model created before and the created sampler object to generate a stochastic average approximation (SAA) of the stochastic program. For now, we create a small SAA model of just 5 scenarios:
+Now, we can use the same stochastic model created before and the created sampler object to generate a sampled approximation of the stochastic program. For now, we create a small sampled model of just 5 scenarios:
 ```@example simple
-saa = SAA(simple_model, sampler, 5)
+sampled_sp = sample(simple_model, sampler, 5)
 ```
-Typically, a large number of scenarios are required to accurately represent the stochastic program. We will consider this in more depth below. Let us first also print the SAA model:
+Typically, a large number of scenarios are required to accurately represent the stochastic program. We will consider this in more depth below. Let us first also print the sampled model:
 ```@example simple
-print(saa)
+print(sampled_sp)
 ```
-In the subsequent discussions, note that `sp` represents the finite simple stochastic program with known closed form, `simple_model` contains the mathematical representation of the general stochastic model, and `saa` are approximated instances of the general model.
+In the subsequent discussions, note that `sp` represents the finite simple stochastic program with known closed form, `simple_model` contains the mathematical representation of the general stochastic model, and `sampled_sp` are approximated instances of the general model.
 
 ## Evaluate decisions
 
@@ -218,14 +218,14 @@ Moreover, we can evaluate the result of the decision in a given scenario, i.e. s
 ```@example simple
 evaluate_decision(sp, x, ξ₁, solver = GLPKSolverLP())
 ```
-If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the SAA model created above:
+If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the sampled model created above:
 ```@example simple
-evaluate_decision(saa, x, solver = GLPKSolverLP())
+evaluate_decision(sampled_sp, x, solver = GLPKSolverLP())
 ```
 and compare it to the result of evaluating it on another SAA model of similar size:
 ```@example simple
-another_saa = SAA(simple_model, sampler, 5)
-evaluate_decision(another_saa, x, solver = GLPKSolverLP())
+another_sp = sample(simple_model, sampler, 5)
+evaluate_decision(another_sp, x, solver = GLPKSolverLP())
 ```
 which, if any, of these values should be a candidate for the true value of ``V(x)``? A more precise result is obtained by evaluating the decision using a sampled-based approach. Such querys are instead made to the `simple_model` object by supplying an appropriate [`AbstractSampler`](@ref) and a desired confidence level. Consider:
 ```@example simple
@@ -260,7 +260,7 @@ If the sample space is infinite, or if the underlying random variable ``\xi`` is
 ```@example simple
 confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), confidence = 0.95)
 ```
-Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAASolver`](@ref), which runs a simple sequential SAA algorithm. Emerging SAA problems are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
+Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAA`](@ref) solver, which approximately solves the stochastic program using sample average approximation (SAA). Emerging sampled instances are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
 ```@example simple
 solution = optimize(simple_model, sampler, solver = SAASolver(GLPKSolverLP()), confidence = 0.95)
 ```

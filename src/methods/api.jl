@@ -62,6 +62,57 @@ function instantiate(sm::StochasticModel{N},
     return sp
 end
 """
+    sample(stochasticmodel::StochasticModel, sampler::AbstractSampler, n::Integer; solver = JuMP.UnsetSolver())
+
+Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
+
+Optionally, a capable `solver` can be supplied to `sample`. Otherwise, any previously set solver will be used.
+
+See also: [`sample!`](@ref)
+"""
+function sample(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: AbstractScenario
+    # Create new stochastic program instance
+    sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                           parameters(sm.parameters[2]; kw...),
+                           S,
+                           solver,
+                           procs)
+    sm.generator(sp)
+    # Sample n scenarios
+    add_scenarios!(sp, n, defer = defer) do
+        return sample(sampler, 1/n)
+    end
+    # Return the sample instance
+    return sp
+end
+function sample(sm::StochasticModel{2}, sampler::AbstractSampler{S}, n::Integer; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: Scenario
+    # Create new stochastic program instance
+    sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
+                           parameters(sm.parameters[2]; kw...),
+                           typeof(sample(sampler)),
+                           solver,
+                           procs)
+    sm.generator(sp)
+    # Sample n scenarios
+    add_scenarios!(sp, n, defer = defer) do
+        return sample(sampler, 1/n)
+    end
+    # Return the sample instance
+    return sp
+end
+function sample(sm::StochasticModel{2}, sampler::AbstractSampler{S}, solution::StochasticSolution; solver::SPSolverType = JuMP.UnsetSolver(), procs = workers(), defer = false, kw...) where S <: AbstractScenario
+    if isa(solver, JuMP.UnsetSolver)
+        error("Cannot generate sample from stochastic solution without a solver.")
+    end
+    n = 16
+    CI = confidence_interval(solution)
+    α = 1 - confidence(CI)
+    while !(confidence_interval(sm, sampler; solver = solver, N = n, M = M, confidence = 1-α) ⊆ CI)
+        n = n * 2
+    end
+    return sample(sm, sampler, n; solver = solver, procs = procs, defer = defer)
+end
+"""
     optimize!(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
 
 Optimize the `stochasticprogram` in expectation using `solver`.
@@ -129,7 +180,7 @@ function _optimize!(stochasticprogram::StochasticProgram{2}, solver::AbstractStr
     return status
 end
 """
-    optimize(stochasticmodel::StochasticModel, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, kwargs...)
+    optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, kwargs...)
 
 Approximately optimize the `stochasticmodel` using `solver` when the underlying scenario distribution is inferred by `sampler` and return a `StochasticSolution` with the given `confidence` level.
 
@@ -143,11 +194,8 @@ function optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; s
     # Switch on solver type
     return _optimize!(stochasticmodel, sampler, solver, confidence; kwargs...)
 end
-function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::MathProgBase.AbstractMathProgSolver, confidence::AbstractFloat; kwargs...)
-    return _optimize!(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
-end
-function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractStructuredSolver, confidence::AbstractFloat; kwargs...)
-    return _optimize!(stochasticmodel, sampler, SAASolver(solver), confidence; kwargs...)
+function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::SPSolverType, confidence::AbstractFloat; kwargs...)
+    return _optimize!(stochasticmodel, sampler, SAA(solver), confidence; kwargs...)
 end
 function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractSampledSolver, confidence::AbstractFloat; kwargs...)
     sampledmodel = SampledModel(stochasticmodel, solver)

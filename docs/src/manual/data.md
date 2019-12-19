@@ -256,20 +256,20 @@ end
 ```
 Now, we can sample ``5`` scenarios using the first sampler to generate ``5`` subproblems:
 ```@example sampling
-saa = SAA(sm, sampler, 5)
+sp = sample(sm, sampler, 5)
 ```
 Printing yields:
 ```@example sampling
-print(saa)
+print(sp)
 ```
 Sampled stochastic programs are solved as usual:
 ```@example sampling
 using GLPKMathProgInterface
 
-optimize!(saa, solver = GLPKSolverLP())
+optimize!(sp, solver = GLPKSolverLP())
 
-println("optimal decision: $(optimal_decision(saa))")
-println("optimal value: $(optimal_value(saa))")
+println("optimal decision: $(optimal_decision(sp))")
+println("optimal value: $(optimal_value(sp))")
 ```
 Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [Custom scenarios](@ref).
 

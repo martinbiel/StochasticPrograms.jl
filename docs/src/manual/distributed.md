@@ -47,9 +47,9 @@ simple_model = @stochastic_model begin
     end
 end
 ```
-and instantiate an SSA model with 10 sceanarios:
+and instantiate a sampled model with 10 sceanarios:
 ```julia
-saa = SAA(simple_model, SimpleSampler(), 10)
+sp = sample(simple_model, SimpleSampler(), 10)
 ```
 the lightweight model recipes are passed to all worker nodes. The worker nodes then use the recipes and lightweight sampler object to instansiate second stage models in parallel. This is one of the intended outcomes of the design choices made in StochasticPrograms. The separation between data design and model design allows us to minimize data passing in a natural way.
 

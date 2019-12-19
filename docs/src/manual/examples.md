@@ -179,11 +179,11 @@ where
 f(x,ξ) = min  f(y; x, ξ)
               y ∈ 𝒴 (x, ξ)
 ```
-The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite SAA model of 1000 exponentially distributed numbers:
+The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite sampled model of 1000 exponentially distributed numbers:
 ```julia
 sampler = ExponentialSampler(2.) # Create a sampler
 
-saa = SAA(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create an SAA model
+sp = sample(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create a sampled model
 ```
 ```julia
 Stochastic program with:
@@ -194,10 +194,10 @@ Solver is default solver
 ```
 By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
 ```julia
-optimize!(saa, solver = IpoptSolver(print_level=0))
+optimize!(sp, solver = IpoptSolver(print_level=0))
 
-println("Optimal decision: $(optimal_decision(saa))")
-println("Optimal value: $(optimal_value(saa))")
+println("Optimal decision: $(optimal_decision(sp))")
+println("Optimal value: $(optimal_value(sp))")
 ```
 ```julia
 Optimal decision: [2.07583]
@@ -205,8 +205,8 @@ Optimal value: 4.00553678799426
 ```
 Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
 ```julia
-println("EVP decision: $(EVP_decision(saa, solver = IpoptSolver(print_level=0)))")
-println("VSS: $(VSS(saa, solver = IpoptSolver(print_level=0)))")
+println("EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))")
+println("VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))")
 ```
 ```julia
 EVP decision: [2.0]

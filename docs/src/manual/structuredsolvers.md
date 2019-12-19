@@ -93,12 +93,12 @@ In summary, the solver interface that a new [`AbstractSampledModel`](@ref) and [
  - [`internal_solver`](@ref)
  - [`solverstr`](@ref)
 
-As an example, consider the implementation of the [`SAASolver`](@ref):
+As an example, consider the implementation of the [`SAA`](@ref):
 ```julia
-struct SAASolver{S <: SPSolverType} <: AbstractStructuredSolver
+struct SAA{S <: SPSolverType} <: AbstractStructuredSolver
     internal_solver::S
 
-    function SAASolver(solver::SPSolverType)
+    function SAA(solver::SPSolverType)
         if isa(solver, JuMP.UnsetSolver)
             error("Cannot solve emerging SAA problems without functional solver.")
         end
@@ -106,8 +106,8 @@ struct SAASolver{S <: SPSolverType} <: AbstractStructuredSolver
         return new{S}(solver)
     end
 end
-function SAASolver(; solver::SPSolverType = JuMP.UnsetSolver())
-    return SAASolver(solver)
+function SAA(; solver::SPSolverType = JuMP.UnsetSolver())
+    return SAA(solver)
 end
 
 mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSampledModel
@@ -116,7 +116,7 @@ mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSamp
     solution::StochasticSolution
 end
 
-function SampledModel(stochasticmodel::StochasticModel, solver::SAASolver)
+function SampledModel(stochasticmodel::StochasticModel, solver::SAA)
     return SAAModel(stochasticmodel, solver.internal_solver, EmptySolution())
 end
 
@@ -126,18 +126,27 @@ function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confide
     n = 16
     α = 1-confidence
     while true
-        CI = confidence_interval(sm, sampler; solver = solver, confidence = 1-α, N = n, M = M)
-        saa = SAA(sm, sampler, n)
-        optimize!(saa, solver = solver)
-        Q = optimal_value(saa)
-        if length(CI)/abs(Q+1e-10) <= tol && Q ∈ CI
-            saamodel.solution = StochasticSolution(optimal_decision(saa), Q, CI)
+        CI = confidence_interval(sm, sampler; solver = solver, confidence = 1-α, N = N, M = M, Ñ = max(N, Ñ), T = T)
+        Q = (upper(CI) + lower(CI))/2
+        gap = length(CI)/abs(Q+1e-10)
+        if gap <= tol
+            sp = sample(sm, sampler, N)
+            optimize!(sp, solver = solver)
+            Q = optimal_value(sp)
+            while !(Q ∈ CI)
+                sp = sample(sm, sampler, N)
+                optimize!(sp, solver = solver)
+                Q = optimal_value(sp)
+            end
+            saamodel.solution = StochasticSolution(optimal_decision(saa), Q, N, CI)
+            saamodel.saa = saa
             return :Optimal
         end
-        n = n * 2
-        if n > Nmax
+        N = N * 2
+        if N > Nmax
             return :LimitReached
         end
+        solver_config(solver, N)
     end
 end
 
