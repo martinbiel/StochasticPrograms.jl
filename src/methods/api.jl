@@ -166,7 +166,9 @@ function _optimize!(stochasticprogram::StochasticProgram{2}, solver::MathProgBas
     dep = DEP(stochasticprogram; solver = solver)
     status = solve(dep; kwargs...)
     stochasticprogram.spsolver.internal_model = dep.internalModel
-    fill_solution!(stochasticprogram)
+    if status ∈ [:Optimal, :Infeasible, :Unbounded]
+        fill_solution!(stochasticprogram)
+    end
     return status
 end
 function _optimize!(stochasticprogram::StochasticProgram{2}, solver::AbstractStructuredSolver; kwargs...)
@@ -174,7 +176,9 @@ function _optimize!(stochasticprogram::StochasticProgram{2}, solver::AbstractStr
     structuredmodel = StructuredModel(stochasticprogram, solver)
     stochasticprogram.spsolver.internal_model = structuredmodel
     status = optimize_structured!(structuredmodel)
-    fill_solution!(stochasticprogram, structuredmodel)
+    if status ∈ [:Optimal, :Infeasible, :Unbounded]
+        fill_solution!(stochasticprogram, structuredmodel)
+    end
     # Now safe to generate the objective value of the stochastic program
     calculate_objective_value!(stochasticprogram)
     return status
