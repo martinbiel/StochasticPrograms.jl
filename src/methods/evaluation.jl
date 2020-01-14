@@ -253,7 +253,7 @@ end
 
 Generate a confidence interval around an upper of the true optimum of the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of the sampled model used to evalute the decision.
+`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of each sampled model and `T` is the number of sampled models.
 """
 function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
@@ -270,15 +270,14 @@ end
                 sampler::AbstractSampler;
                 solver = JuMP.UnsetSolver(),
                 confidence = 0.95,
-                N = 100,
                 T = 10,
-                n = 1000)
+                Ñ = 1000)
 
 Generate a confidence interval around an upper bound of the expected value of the decision `x` in the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of the sampled model used to evalute the decision.
+`Ñ` is the size of each sampled model and `T` is the number of sampled models.
 """
-function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
     α = 1-confidence
     Qs = Vector{Float64}(undef, T)
@@ -305,11 +304,12 @@ end
                         solver = JuMP.UnsetSolver(),
                         confidence = 0.9,
                         N = 100,
-                        M = 10)
+                        M = 10,
+                        T = 10)
 
 Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in SAA.
+`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
 """
 function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level
@@ -329,11 +329,12 @@ end
         solver = JuMP.UnsetSolver(),
         confidence = 0.9,
         N = 100,
-        M = 10)
+        M = 10,
+        T = 10)
 
 Generate a confidence interval around the gap between the result of using decison `x` and true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in SAA.
+`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
 """
 function gap(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
     # Condidence level

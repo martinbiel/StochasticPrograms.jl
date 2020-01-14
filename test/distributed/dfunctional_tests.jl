@@ -1,38 +1,3 @@
-using Test
-using Distributed
-include(joinpath(Sys.BINDIR, "..", "share", "julia", "test", "testenv.jl"))
-addprocs_with_testenv(3)
-@test nworkers() == 3
-
-@everywhere using StochasticPrograms
-using JuMP
-using LinearAlgebra
-using GLPKMathProgInterface
-
-@everywhere import StochasticPrograms: probability, expected
-
-struct SPResult
-    x̄::Vector{Float64}
-    VRP::Float64
-    EWS::Float64
-    EVPI::Float64
-    VSS::Float64
-    EV::Float64
-    EEV::Float64
-end
-
-problems = Vector{Tuple{StochasticProgram,SPResult,String}}()
-@info "Loading test problems..."
-@info "Loading simple..."
-include("simple.jl")
-@info "Loading instant simple..."
-include("instant_simple.jl")
-@info "Loading farmer..."
-include("farmer.jl")
-@info "Loading sampler..."
-include("sampler.jl")
-@info "Test problems loaded. Starting test sequence."
-
 @testset "Distributed Stochastic Programs" begin
     @testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
         optimize!(sp)
@@ -82,7 +47,7 @@ include("sampler.jl")
         @test abs(EEV(sp_copy)-EEV(sp)) <= 1e-2
     end
     @testset "Distributed Sampling" begin
-        sampled_sp = SAA(simple_model, sampler, 100, solver=GLPKSolverLP())
+        sampled_sp = sample(simple_model, sampler, 100, solver=GLPKSolverLP())
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test abs(stage_probability(sampled_sp)-1.0) <= 1e-6
@@ -93,7 +58,7 @@ include("sampler.jl")
     end
     @testset "Distributed confidence intervals" begin
         glpk = GLPKSolverLP()
-        CI = confidence_interval(simple_model, sampler, N = 100, M = 10, confidence = 0.95, solver = glpk, log = false)
+        CI = confidence_interval(simple_model, sampler, N = 200, solver = glpk, log = false)
         @test lower(CI) <= upper(CI)
         sol = optimize!(simple_model, sampler, solver = glpk, confidence = 0.95, tol = 1e-1, log = false)
         @test lower(confidence_interval(sol)) <= upper(confidence_interval(sol))
