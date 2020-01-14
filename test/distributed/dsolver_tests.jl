@@ -35,8 +35,8 @@ executors = [Serial(),
                 x̄ = optimal_decision(sp)
                 Q̄ = optimal_value(sp)
                 optimize!(sp, solver=ls)
-                @test abs(optimal_value(sp) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
             end
             @testset "Data on single remote node" begin
                 tol = 1e-5
@@ -46,8 +46,8 @@ executors = [Serial(),
                 x̄ = optimal_decision(sp_onenode)
                 Q̄ = optimal_value(sp_onenode)
                 optimize!(sp, solver=ls)
-                @test abs(optimal_value(sp_onenode) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp_onenode) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp_onenode), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp_onenode), x̄, rtol = sqrt(tol))
             end
             @testset "Local data" begin
                 tol = 1e-5
@@ -57,8 +57,8 @@ executors = [Serial(),
                 x̄ = optimal_decision(sp_nondist)
                 Q̄ = optimal_value(sp_nondist)
                 optimize!(sp_nondist, solver=ls)
-                @test abs(optimal_value(sp_nondist) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp_nondist) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp_nondist), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp_nondist), x̄, rtol = sqrt(tol))
             end
         end
         @testset "$(solverstr(ls)) on distributed data: $name" for ls in [LShapedSolver(reference_solver,
@@ -74,17 +74,16 @@ executors = [Serial(),
             with_logger(NullLogger()) do
                 optimize!(sp, solver=ls)
             end
-            @test abs(optimal_value(sp) - Q̄)/(1e-10+abs(Q̄)) <= tol
-            @test norm(optimal_decision(sp) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+            @test isapprox(optimal_value(sp), Q̄, rtol = tol)
+            @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
         end
     end
     @testset "Progressive-hedging: simple problems" begin
         @testset "$(solverstr(ph)): $name" for ph in [ProgressiveHedgingSolver(osqp,
                                                                                execution = executor,
-                                                                               penalty = penalty,
                                                                                τ = 1e-3,
                                                                                log = false)
-                                                      for executor in executors, penalty in penalties], (sp,name) in problems
+                                                      for executor in executors], (sp,name) in problems
             @testset "Distributed data" begin
                 tol = 1e-2
                 optimize!(sp, solver=reference_solver)
@@ -93,8 +92,8 @@ executors = [Serial(),
                 with_logger(NullLogger()) do
                     optimize!(sp, solver=ph)
                 end
-                @test abs(optimal_value(sp) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
             end
             @testset "Data on single remote node" begin
                 tol = 1e-2
@@ -106,8 +105,8 @@ executors = [Serial(),
                 with_logger(NullLogger()) do
                     optimize!(sp, solver=ph)
                 end
-                @test abs(optimal_value(sp_onenode) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp_onenode) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp_onenode), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp_onenode), x̄, rtol = sqrt(tol))
             end
             @testset "Local data" begin
                 tol = 1e-2
@@ -119,8 +118,8 @@ executors = [Serial(),
                 with_logger(NullLogger()) do
                     optimize!(sp, solver=ph)
                 end
-                @test abs(optimal_value(sp_nondist) - Q̄)/(1e-10+abs(Q̄)) <= tol
-                @test norm(optimal_decision(sp_nondist) - x̄)/(1e-10+norm(x̄)) <= sqrt(tol)
+                @test isapprox(optimal_value(sp_nondist), Q̄, rtol = tol)
+                @test isapprox(optimal_decision(sp_nondist), x̄, rtol = sqrt(tol))
             end
         end
     end
