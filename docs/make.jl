@@ -14,7 +14,10 @@ makedocs(sitename = "StochasticPrograms.jl",
              ],
              "Library" =>  Any[
                  "Public interface" => "library/public.md",
-                 "Solver interface" => "library/solverinterface.md"
+                 "Solver interface" => "library/solverinterface.md",
+                 "Crash" => "library/crash.md",
+                 "L-shaped solvers" => "library/lshaped.md",
+                 "Progressive-hedging solvers" => "library/progressivehedging.md"
              ]
          ])
 

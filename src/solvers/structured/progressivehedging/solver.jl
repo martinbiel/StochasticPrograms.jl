@@ -17,10 +17,10 @@ end
 """
     ProgressiveHedging
 
-Functor object for the progressive-hedging algorithm. Create by supplying `:ph` to the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for the progressive-hedging algorithm. Create using the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 ...
-# Algorithm parameters
+# Parameters
 - `τ::AbstractFloat = 1e-6`: Relative tolerance for convergence checks.
 - `log::Bool = true`: Specifices if progressive-hedging procedure should be logged on standard output or not.
 ...
@@ -59,6 +59,12 @@ struct ProgressiveHedging{T <: AbstractFloat,
                                 penalizer::AbstractPenalizer; kw...)
         if nworkers() > 1 && executer isa Serial
             @warn "There are worker processes, consider using distributed version of algorithm"
+        end
+        executer = if nworkers() == 1 && !(executer isa Serial)
+            @warn "There are no worker processes, defaulting to serial version of algorithm"
+            Serial()
+        else
+            executer
         end
         first_stage = StochasticPrograms.get_stage_one(stochasticprogram)
         length(x₀) != first_stage.numCols && error("Incorrect length of starting guess, has ", length(x₀), " should be ", first_stage.numCols)
@@ -105,8 +111,8 @@ ProgressiveHedging(stochasticprogram::StochasticProgram,
 function (ph::ProgressiveHedging)()
     # Reset timer
     ph.progress.tfirst = ph.progress.tlast = time()
-    # Start workers
-    init_workers!(ph)
+    # Start workers (if any)
+    start_workers!(ph)
     # Start procedure
     while true
         status = iterate!(ph)

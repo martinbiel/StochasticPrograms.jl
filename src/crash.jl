@@ -4,23 +4,24 @@
 Collection of crash methods used to generate initial decisions in structured algorithms.
 
 ...
-# Crash methods
-- `Crash.None()`: Randomize the initial decision (default).
-- `Crash.EVP()`: Solve the expected value problem corresponding to the stochastic program and use the expected value solution as initial decision.
-- `Crash.Scenario(scenario::AbstractScenario)`: Solve the wait-and-see problem corresponding a supplied scenario and use the optimal solution as initial decision.
-- `Crash.Custom(x₀)`: Use the user-supplied `x₀` as initial decision.
+# Available crash methods
+- [`None`](@ref)
+- [`EVP`](@ref)
+- [`Scenario`](@ref)
+- [`Custom`](@ref)
 ...
 
 ## Examples
 
-The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using the trust-region L-shaped algorithm with Clp as an `lpsolver` and by generating an initial decision with the `EVP` crash.
+The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using an L-shaped algorithm with trust-region and Clp as an `lpsolver` and by generating an initial decision with the `EVP` crash.
 
 ```jldoctest
-julia> solve(sp, solver=LShapedSolver(ClpSolver(), crash=Crash.EVP(), regularizer = TrustRegion()))
-TR L-Shaped Gap  Time: 0:00:00 (8 iterations)
-  Objective:       -855.8333333333321
+julia> optimize!(sp, solver = LShapedSolver(GLPKSolverLP(), crash=Crash.EVP(), regularize = TrustRegion()))
+L-Shaped Gap  Time: 0:00:00 (8 iterations)
+  Objective:       -855.8333333333339
   Gap:             0.0
   Number of cuts:  4
+  Iterations:      8
 :Optimal
 ```
 """
@@ -31,12 +32,24 @@ using MathProgBase
 
 abstract type CrashMethod end
 
+"""
+    None
+
+Randomize the initial decision (default).
+
+"""
 struct None <: CrashMethod end
 
 function (::None)(stochasticprogram::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
     return rand(decision_length(stochasticprogram))
 end
 
+"""
+    EVP
+
+Solve the expected value problem corresponding to the stochastic program and use the expected value solution as initial decision.
+
+"""
 struct EVP <: CrashMethod end
 
 function (::EVP)(sp::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
@@ -46,6 +59,12 @@ function (::EVP)(sp::StochasticProgram, solver::MathProgBase.AbstractMathProgSol
     return evp.colVal[1:decision_length(sp)]
 end
 
+"""
+    Scenario
+
+Solve the wait-and-see problem corresponding a supplied scenario and use the optimal solution as initial decision.
+
+"""
 struct Scenario{S <: AbstractScenario} <: CrashMethod
     scenario::S
 
@@ -61,6 +80,12 @@ function (crash::Scenario)(so::StochasticProgram, solver::MathProgBase.AbstractM
     return ws.colVal[1:decision_length(sp)]
 end
 
+"""
+    Custom(x₀)
+
+Use the user-supplied `x₀` as initial decision.
+
+"""
 struct Custom{T <: AbstractFloat} <: CrashMethod
     x₀::Vector{T}
 

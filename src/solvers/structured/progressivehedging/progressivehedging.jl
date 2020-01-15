@@ -31,9 +31,7 @@ export
     StructuredModel,
     optimsolver,
     optimize_structured!,
-    fill_solution!,
-    get_decision,
-    get_objective_value
+    fill_solution!
 
 # Include files
 include("types/types.jl")

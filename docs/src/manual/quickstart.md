@@ -165,16 +165,14 @@ In the above, the probability space consists of only two scenarios and the stoch
 ```
 To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the [`@sampler`](@ref) macro:
 ```@example simple
-using Distributions
-
 @sampler SimpleSampler = begin
-    N::MvNormal
+    N::StochasticPrograms.MvNormal
 
-    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
+    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
 
     @sample Scenario begin
         x = rand(sampler.N)
-        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = pdf(sampler.N, x))
+        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = StochasticPrograms.pdf(sampler.N, x))
     end
 end
 
@@ -258,11 +256,11 @@ VRP(sp, solver = GLPKSolverLP())
 
 If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, the value of the recourse problem can not be computed exactly. However, by supplying an [`AbstractSampler`](@ref) we can use sample-based techniques to compute a confidence interval around the true optimum:
 ```@example simple
-confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), confidence = 0.95)
+confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), N = 200)
 ```
-Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAA`](@ref) solver, which approximately solves the stochastic program using sample average approximation (SAA). Emerging sampled instances are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
+Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize!`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAA`](@ref) solver, which approximately solves the stochastic program using sample average approximation (SAA). Emerging sampled instances are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
 ```@example simple
-solution = optimize(simple_model, sampler, solver = SAASolver(GLPKSolverLP()), confidence = 0.95)
+solution = optimize!(simple_model, sampler, solver = SAA(GLPKSolverLP()), confidence = 0.9)
 ```
 The result is a [`StochasticSolution`](@ref), which includes an optimal solution estimate as well as a confidence interval around the solution. The approximately optimal first-stage decision is obtained by
 ```@example simple

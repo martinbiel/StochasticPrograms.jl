@@ -1,3 +1,13 @@
+"""
+    AsynchronousExecution
+
+Functor object for using asynchronous execution in a progressive-hedging algorithm (assuming multiple Julia cores are available). Create by supplying an [`Asynchronous`](@ref) object through `execution` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Parameters
+- `κ::T = 0.5`: Relative amount of finished subproblems required to start a new iterate. Governs the amount of asynchronicity.
+...
+"""
 struct AsynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
                             S <: LQSolver} <: AbstractExecution
@@ -188,11 +198,8 @@ end
 """
     Asynchronous
 
-...
-# Parameters
-- `κ::Real = 0.5`: Amount of subproblems, relative to the total number of scenarios, required to generate a new iterate in master procedure.
+Factory object for [`AsynchronousExecution`](@ref). Pass to `execution` in the `ProgressiveHedgingSolver` factory function. See ?AsynchronousExecution for parameter descriptions.
 
-...
 """
 struct Asynchronous <: Execution
     κ::Float64

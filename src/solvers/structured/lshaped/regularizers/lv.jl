@@ -17,10 +17,10 @@ end
 """
     LevelSet
 
-Functor object for the level-set L-shaped algorithm. Create by supplying an `LV` object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using level-set regularization in an L-shaped algorithm. Create by supplying an [`LV`](@ref) object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 ...
-# Algorithm parameters
+# Parameters
 - `λ::Real = 0.5`: Controls the level position L = (1-λ)*θ + λ*Q̃, a convex combination of the current lower and upper bound.
 - `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
 ...
@@ -158,6 +158,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    LV
+
+Factory object for [`LevelSet`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `LV`, `WithLV`, `LevelSet`, `WithLevelSets`. See ?LevelSet for parameter descriptions.
+
+"""
 struct LV <: AbstractRegularizer
     projectionsolver::MPB.AbstractMathProgSolver
     parameters::Dict{Symbol,Any}

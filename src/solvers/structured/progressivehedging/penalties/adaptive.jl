@@ -17,6 +17,25 @@ end
     η::T = 1.25
 end
 
+"""
+    AdaptivePenalization
+
+Functor object for using adaptive penalty in a progressive-hedging algorithm. Create by supplying an [`Adaptive`](@ref) object through `penalty` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Parameters
+- `ζ::T = 0.1`: Used to calculate the initial penalty. Non-anticipativity in the initial decision is enforced more as ζ increase.
+- `γ₁::T = 1e-5`: Tolerance for primal changes being significant
+- `γ₂::T = 0.01`: Tolerance for primal changes dominating dual changes
+- `γ₃::T = 0.25`: Tolerance for dual changes dominating primal changes
+- `σ::T = 1e-5`: Tolerance for the quadratic penalty dominating the Lagrangian
+- `α::T = 0.95`: Penalty decrease after primal changes dominating dual changes
+- `θ::T = 1.1`: Penalty increase after dual changes dominating primal changes
+- `ν::T = 0.1`: Tolerance for significant non-anticipativity violation
+- `β::T = 1.1`: Penalty increase after increased non-anticipativity violation
+- `η::T = 1.25`: Default penalty increase in the default case
+...
+"""
 struct AdaptivePenalization{T <: AbstractFloat} <: AbstractPenalization
     data::AdaptiveData{T}
     parameters::AdaptiveParameters{T}
@@ -67,10 +86,8 @@ end
 """
     Adaptive
 
-...
-# Parameters
+Factory object for [`AdaptivePenalization`](@ref). Pass to `penalty` in the `ProgressiveHedgingSolver` factory function. See ?AdaptivePenalization for parameter descriptions.
 
-...
 """
 struct Adaptive{T <: AbstractFloat} <: AbstractPenalizer
     r::T

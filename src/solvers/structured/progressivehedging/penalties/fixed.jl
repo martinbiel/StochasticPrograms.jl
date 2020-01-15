@@ -1,5 +1,15 @@
 # FixedPenalization penalty
 # ------------------------------------------------------------
+"""
+    FixedPenalization
+
+Functor object for using fixed penalty in a progressive-hedging algorithm. Create by supplying a [`Fixed`](@ref) object through `penalty` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Parameters
+- `r::T = 1.00`: Fixed penalty
+...
+"""
 struct FixedPenalization{T <: AbstractFloat} <: AbstractPenalization
     r::T
 
@@ -23,10 +33,8 @@ end
 """
     Fixed
 
-...
-# Parameters
-- `r::AbstractFloat = 1.0`: Penalty parameter
-...
+Factory object for [`FixedPenalization`](@ref). Pass to `penalty` in the `ProgressiveHedgingSolver` factory function. See ?FixedPenalization for parameter descriptions.
+
 """
 struct Fixed{T <: AbstractFloat} <: AbstractPenalizer
     r::T

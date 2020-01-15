@@ -4,6 +4,12 @@ function reset!(::SelectionRule)
     return nothing
 end
 
+"""
+    SelectUniform(n::Integer)
+
+Incoming cuts are placed into aggregates uniformly, so that each aggregate has at most `n` cuts. Behaves as [`PartialAggregation`](@ref).
+
+"""
 mutable struct SelectUniform <: SelectionRule
     n::Integer
 
@@ -23,6 +29,12 @@ function str(::SelectUniform)
     return "balanced selection"
 end
 
+"""
+    SelectDecaying(T₀::Integer, T̲::Integer = 1, γ::T)
+
+Behaves like [`SelectUniform`](@ref), but the uniform aggregate size decays by `γ` each iteration, starting from `T₀`. `T̲` is an optional lower bound on the aggregate size.
+
+"""
 mutable struct SelectDecaying <: SelectionRule
     n::Int
     T̲::Int
@@ -55,6 +67,12 @@ function str(::SelectDecaying)
     return "decaying aggregation level selection"
 end
 
+"""
+    SelectRandom(max = Inf)
+
+Incoming cuts are placed into aggregates randomly. An optional maximum number of cuts `max` can be specified.
+
+"""
 struct SelectRandom <: SelectionRule
     max::Float64
 end
@@ -76,6 +94,17 @@ function str(rule::SelectRandom)
     return "random selection"
 end
 
+"""
+    SelectClosest(τ::AbstractFloat; distance::Function = absolute_distance)
+
+Incoming cuts are placed into the closest aggregate, according the supplied `distance` function. An empty aggregate is chosen if no aggregate is within the tolerance `τ`
+
+The following distance measures are available
+- [`absolute_distance`](@ref)
+- [`angular_distance`](@ref)
+- [`spatioangular_distance`](@ref
+
+"""
 struct SelectClosest <: SelectionRule
     τ::Float64
     distance::Function
@@ -102,6 +131,17 @@ function str(::SelectClosest)
     return "distance based selection"
 end
 
+"""
+    SelectClosestToReference(τ::AbstractFloat; distance::Function = absolute_distance)
+
+Incoming cuts are placed into an aggregate based on the distance to a reference cut, according the supplied `distance` function. Behaves as [`SelectClosest`](@ref) if not withing the tolerance `τ` to the reference cut.
+
+The following distance measures are available
+- [`absolute_distance`](@ref)
+- [`angular_distance`](@ref)
+- [`spatioangular_distance`](@ref
+
+"""
 mutable struct SelectClosestToReference{T <: AbstractFloat} <: SelectionRule
     τ::T
     distance::Function

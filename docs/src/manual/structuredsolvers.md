@@ -83,7 +83,7 @@ end
 
 ### Stochastic models
 
-To interface a new sampled-based solver, define a shallow object of type [`AbstractSampledSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize`](@ref).Similar to finite programs, define a new sampled-based solver as a subtype of [`AbstractSampledModel`](@ref). Next, implement [`SampledModel`](@ref), that takes a stochastic model and the [`AbstractStructuredSolver`](@ref) object and returns an instance of [`AbstractSampledModel`](@ref). Next, the solver algorithm should be run when calling [`optimize_sampled!`](@ref) on the [`AbstractSampledModel`](@ref), some [`AbstractSampler`](@ref) and a desired confidence level. After successfuly optimizing the model, a [`StochasticSolution`](@ref) should be retrivable from the [`AbstractSampledModel`](@ref) using [`stochastic_solution`](@ref)
+To interface a new sampled-based solver, define a shallow object of type [`AbstractSampledSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize!`](@ref).Similar to finite programs, define a new sampled-based solver as a subtype of [`AbstractSampledModel`](@ref). Next, implement [`SampledModel`](@ref), that takes a stochastic model and the [`AbstractStructuredSolver`](@ref) object and returns an instance of [`AbstractSampledModel`](@ref). Next, the solver algorithm should be run when calling [`optimize_sampled!`](@ref) on the [`AbstractSampledModel`](@ref), some [`AbstractSampler`](@ref) and a desired confidence level. After successfuly optimizing the model, a [`StochasticSolution`](@ref) should be retrivable from the [`AbstractSampledModel`](@ref) using [`stochastic_solution`](@ref)
 
 In summary, the solver interface that a new [`AbstractSampledModel`](@ref) and [`AbstractStructuredSolver`](@ref) pair should adhere to is given by
 
@@ -93,7 +93,7 @@ In summary, the solver interface that a new [`AbstractSampledModel`](@ref) and [
  - [`internal_solver`](@ref)
  - [`solverstr`](@ref)
 
-As an example, consider the implementation of the [`SAA`](@ref):
+As an example, consider the implementation of [`SAA`](@ref):
 ```julia
 struct SAA{S <: SPSolverType} <: AbstractStructuredSolver
     internal_solver::S

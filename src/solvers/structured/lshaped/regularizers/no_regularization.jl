@@ -1,5 +1,11 @@
 # No regularization
 # ------------------------------------------------------------
+"""
+    NoRegularization
+
+Empty functor object for running an L-shaped algorithm without regularization.
+
+"""
 struct NoRegularization <: AbstractRegularization end
 
 function init_regularization!(::AbstractLShapedSolver, ::NoRegularization)
@@ -37,6 +43,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    DontRegularize
+
+Factory object for [`NoRegularization`](@ref). Passed by default to `regularize ` in the `LShapedSolver` factory function.
+
+"""
 struct DontRegularize <: AbstractRegularizer end
 
 function (::DontRegularize)(::AbstractVector)

@@ -18,11 +18,11 @@ end
 """
     TrustRegion
 
-Functor object for the trust-region L-shaped algorithm. Create by supplying a `TR` object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using trust-region regularization in an L-shaped algorithm. Create by supplying a [`TR`](@ref) object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 ...
-# Algorithm parameters
-- `γ::T` = 1e-4: Relative tolerance for deciding if a minor iterate should be accepted as a new major iterate.
+# Parameters
+- `γ::T = 1e-4`: Relative tolerance for deciding if a minor iterate should be accepted as a new major iterate.
 - `Δ::Real = 1.0`: Initial size of ∞-norm trust-region.
 - `Δ̅::Real = 1000.0`: Maximum size of ∞-norm trust-region.
 ...
@@ -152,6 +152,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    TR
+
+Factory object for [`TrustRegion`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `TR`, `WithTR`, `TrustRegion`, `WithTrustRegion`. See ?TrustRegion for parameter descriptions.
+
+"""
 struct TR <: AbstractRegularizer
     parameters::Dict{Symbol,Any}
 end

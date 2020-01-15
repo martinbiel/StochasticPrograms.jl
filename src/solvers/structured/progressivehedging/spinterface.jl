@@ -4,13 +4,13 @@
 Return a progressive-hedging algorithm object specified. Supply `qpsolver`, a MathProgBase solver capable of solving quadratic problems.
 
 The following penalty parameter update procedures are available
-- `Fixed`:  Fixed penalty (default) ?Fixed for parameter descriptions.
-- `adaptive`: Adaptive penalty update ?Adaptive for parameter descriptions.
+- [`Fixed`](@ref):  Fixed penalty (default) ?Fixed for parameter descriptions.
+- [`Adaptive`](@ref): Adaptive penalty update ?Adaptive for parameter descriptions.
 
 The following execution policies are available
-- `Serial`:  Classical progressive-hedging (default)
-- `Synchronous`: Classical progressive-hedging run in parallel ?Synchronous for parameter descriptions.
-- `Asynchronous`: Asynchronous progressive-hedging ?Asynchronous for parameter descriptions.
+- [`Serial`](@ref):  Classical progressive-hedging (default)
+- [`Synchronous`](@ref): Classical progressive-hedging run in parallel ?Synchronous for parameter descriptions.
+- [`Asynchronous`](@ref): Asynchronous progressive-hedging ?Asynchronous for parameter descriptions.
 
 ...
 # Arguments

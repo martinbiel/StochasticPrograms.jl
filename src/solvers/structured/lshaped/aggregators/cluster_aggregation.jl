@@ -1,3 +1,20 @@
+"""
+    ClusterAggregation
+
+Functor object for using cluster aggregation in an L-shaped algorithm. Create by supplying a [`ClusterAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+The following cluster rules are available
+- [`StaticCluster`](@ref)
+- [`ClusterByReference`](@ref)
+- [`Kmedoids`](@ref
+- [`Hierarchical`](@ref)
+
+...
+# Parameters
+- `rule::ClusterRule`: Rule that determines how cuts should be sorted into clusters
+- `lock_after::Function = (τ,n)->false`: Function that determines if the current aggregation scheme should be fixed, based on the current optimality gap `τ` and the number of iterations `n`
+...
+"""
 struct ClusterAggregation{T <: AbstractFloat, C <: ClusterRule} <: AbstractAggregation
     buffer::Vector{SparseOptimalityCut{T}}
     rule::C
@@ -110,6 +127,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    ClusterAggregate(rule::ClusterRule; lock_after::Function = (τ,n)->false)
+
+Factory object for [`ClusterAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?ClusterAggregation for parameter descriptions.
+
+"""
 struct ClusterAggregate{C <: ClusterRule} <: AbstractAggregator
     rule::C
     lock::Function

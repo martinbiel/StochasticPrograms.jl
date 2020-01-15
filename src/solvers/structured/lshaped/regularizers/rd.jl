@@ -21,10 +21,10 @@ end
 """
     RegularizedDecomposition
 
-Functor object for the regularized decomposition L-shaped algorithm. Create by supplying an `RD` object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using regularized decomposition regularization in an L-shaped algorithm. Create by supplying an [`RD`](@ref) object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 ...
-# Algorithm parameters
+# Parameters
 - `σ::Real = 1.0`: Initial value of regularization parameter. Controls the relative penalty of the deviation from the current major iterate.
 - `σ̅::real = 4.0`: Maximum value of the regularization parameter.
 - `σ̲::real = 0.5`: Minimum value of the regularization parameter.
@@ -128,6 +128,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    RD
+
+Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `RD`, `WithRD`, `RegularizedDecomposition`, `WithRegularizedDecomposition`. See ?RegularizedDecomposition for parameter descriptions.
+
+"""
 struct RD <: AbstractRegularizer
     parameters::Dict{Symbol,Any}
 end

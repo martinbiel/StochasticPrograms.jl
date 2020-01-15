@@ -1,3 +1,13 @@
+"""
+    PartialAggregation
+
+Functor object for using partial aggregation in an L-shaped algorithm. Create by supplying a [`PartialAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Parameters
+- `size::Int`: Number of cuts in each aggregate
+...
+"""
 struct PartialAggregation{T <: AbstractFloat} <: AbstractAggregation
     size::Int
     nscenarios::Int
@@ -8,6 +18,12 @@ struct PartialAggregation{T <: AbstractFloat} <: AbstractAggregation
         return new{T}(min(size, nscenarios), nscenarios, start_id, CutCollection(T, start_id))
     end
 end
+"""
+    FullAggregation
+
+Functor object for using complete aggregation in an L-shaped algorithm. Create by supplying an [`Aggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+"""
 FullAggregation(start_id::Integer, nscenarios::Integer, ::Type{T}) where T <: AbstractFloat = PartialAggregation(nscenarios, start_id, nscenarios, T)
 
 function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation, cut::HyperPlane)
@@ -94,6 +110,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    PartialAggregate
+
+Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.  See ?PartialAggregation for parameter descriptions.
+
+"""
 struct PartialAggregate <: AbstractAggregator
     size::Int
     start_id::Int
@@ -134,6 +156,12 @@ function str(aggregator::PartialAggregate)
     return "partial cut aggregation of size $(aggregator.size)"
 end
 
+"""
+    Aggregate
+
+Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.
+
+"""
 struct Aggregate <: AbstractAggregator end
 
 function (::Aggregate)(nscenarios::Integer, ::Type{T}) where T

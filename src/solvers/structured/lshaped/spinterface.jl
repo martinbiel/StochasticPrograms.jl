@@ -1,13 +1,24 @@
 """
     LShapedSolver(lpsolver::AbstractMathProgSolver; <keyword arguments>)
 
-Return an L-shaped algorithm object. Supply `lpsolver`, a MathProgBase solver capable of solving linear-quadratic problems.
+Return an L-shaped algorithm object that can optimize a two-stage `StochasticPrograms`. Supply `lpsolver`, a MathProgBase solver capable of solving linear-quadratic problems.
 
 The following L-shaped regularizations are available
-- `NoRegularization`:  L-shaped algorithm (default)
-- `RegularizedDecomposition`:  Regularized decomposition ?RegularizedDecomposition for parameter descriptions.
-- `TrustRegion`:  Trust-region ?TrustRegion for parameter descriptions.
-- `LevelSet`:  Level-set ?LevelSet for parameter descriptions.
+- [`NoRegularization`](@ref):  L-shaped algorithm (default)
+- [`RegularizedDecomposition`](@ref):  Regularized decomposition ?RegularizedDecomposition for parameter descriptions.
+- [`TrustRegion`](@ref):  Trust-region ?TrustRegion for parameter descriptions.
+- [`LevelSet`](@ref):  Level-set ?LevelSet for parameter descriptions.
+
+The following aggregation schemes are available
+- [`NoRegularization`](@ref):  Multi-cut L-shaped algorithm (default)
+- [`PartialAggregation`](@ref):  ?PartialAggregation for parameter descriptions.
+- [`DynamicAggregation`](@ref):  ?DynamicAggregation for parameter descriptions.
+- [`ClusterAggregation`](@ref):  ?ClusterAggregation for parameter descriptions.
+- [`HybridAggregation`](@ref):  ?HybridAggregation for parameter descriptions.
+
+The following consolidation schemes are available
+- [`NoConsolidation`](@ref)
+- [`Consolidation`](@ref)
 
 ...
 # Arguments
@@ -15,6 +26,7 @@ The following L-shaped regularizations are available
 - `subsolver::AbstractMathProgSolver = lpsolver`: Optionally specify a different solver for the subproblems.
 - `regularize::AbstractRegularizer = DontRegularize()`: Specify regularization procedure (DontRegularize, RegularizedDecomposition/RD/WithRegularizedDecomposition, TrustRegion/TR/WithTrustRegion, LevelSet/LV/WithLevelSets).
 - `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate)
+- `consolidate::AbstractConsolidator = DontConsolidate()`: Specify consolidation procedure (DontConsolidate, Consolidate)
 - `distributed::Bool = false`: Specify if distributed variant of algorithm should be run (requires worker cores). See `?DistributedLShaped` for parameter descriptions.
 - `crash::CrashMethod = Crash.None`: Crash method used to generate an initial decision. See ?Crash for alternatives.
 - <keyword arguments>: Algorithm specific parameters, See `?LShaped` for list of possible arguments and default values.
@@ -25,11 +37,12 @@ The following L-shaped regularizations are available
 The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using the L-shaped algorithm with GLPK as an `lpsolver`.
 
 ```jldoctest
-julia> solve(sp,solver=LShapedSolver(GLPKSolverLP()))
-L-Shaped Gap  Time: 0:00:01 (4 iterations)
+julia> optimize!(sp, solver = LShapedSolver(GLPKSolverLP()))
+L-Shaped Gap  Time: 0:00:00 (6 iterations)
   Objective:       -855.8333333333339
   Gap:             0.0
-  Number of cuts:  7
+  Number of cuts:  8
+  Iterations:      6
 :Optimal
 ```
 """

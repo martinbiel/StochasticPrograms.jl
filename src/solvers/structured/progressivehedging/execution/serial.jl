@@ -1,3 +1,9 @@
+"""
+    SerialExecution
+
+Functor object for using serial execution in a progressive-hedging algorithm. Create by supplying a [`Serial`](@ref) object through `execution` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+"""
 struct SerialExecution{T <: AbstractFloat,
                        A <: AbstractVector,
                        S <: LQSolver} <: AbstractExecution
@@ -18,18 +24,6 @@ function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSo
     end
     update_iterate!(ph)
     return ph
-end
-
-function iterate!(ph::AbstractProgressiveHedgingSolver, ::SerialExecution)
-    return iterate_nominal!(ph)
-end
-
-function init_workers!(::AbstractProgressiveHedgingSolver, ::SerialExecution)
-    return nothing
-end
-
-function close_workers!(::AbstractProgressiveHedgingSolver, ::SerialExecution)
-    return nothing
 end
 
 function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SerialExecution{T,A}) where {T <: AbstractFloat, A <: AbstractVector}
@@ -94,6 +88,12 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems:
 end
 # API
 # ------------------------------------------------------------
+"""
+    Serial
+
+Factory object for [`SerialExecution`](@ref). Passed by default to `execution ` in the `ProgressiveHedgingSolver` factory function.
+
+"""
 struct Serial <: Execution end
 
 function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}

@@ -1,5 +1,11 @@
 abstract type ClusterRule end
 
+"""
+    StaticCluster(clusters::Vector{Float64})
+
+Buffered cuts are sorting according to the supplied weights `clusters`
+
+"""
 struct StaticCluster <: ClusterRule
     clusters::Vector{Float64}
 
@@ -37,6 +43,17 @@ struct ClusterByReference <: ClusterRule
     distance::Function
 end
 
+"""
+    ClusterByReference(τ::AbstractFloat; distance::Function = absolute_distance)
+
+Buffered cuts are aggregated if within the tolerance `τ` to a reference cut, according the supplied `distance` function. Behaves as multi-cut otherwise.
+
+The following distance measures are available
+- [`absolute_distance`](@ref)
+- [`angular_distance`](@ref)
+- [`spatioangular_distance`](@ref
+
+"""
 function ClusterByReference(τ::AbstractFloat; distance::Function = absolute_distance)
     return ClusterByReference(τ, distance)
 end
@@ -65,6 +82,18 @@ function str(::ClusterByReference)
     return "distance to reference based clustering"
 end
 
+
+"""
+    Kmedoids(nclusters::Int; distance::Function = absolute_distance)
+
+Buffered cuts are sorted into `nclusters` clusters, using a K-medoids algorithm over a generalized `distance` matrix.
+
+The following distance measures are available
+- [`absolute_distance`](@ref)
+- [`angular_distance`](@ref)
+- [`spatioangular_distance`](@ref
+
+"""
 struct Kmedoids <: ClusterRule
     nclusters::Int
     distance::Function
@@ -108,6 +137,17 @@ function str(::Kmedoids)
     return "K-medoids clustering"
 end
 
+"""
+    Hierarchical(nclusters::Int; distance::Function = absolute_distance, linkage::Symbol = :single)
+
+Buffered cuts are sorted into `nclusters` clusters, using a Hierarchical algorithm, with the given `linkage`, over a generalized `distance` matrix.
+
+The following distance measures are available
+- [`absolute_distance`](@ref)
+- [`angular_distance`](@ref)
+- [`spatioangular_distance`](@ref
+
+"""
 struct Hierarchical <: ClusterRule
     nclusters::Int
     distance::Function

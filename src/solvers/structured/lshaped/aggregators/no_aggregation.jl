@@ -1,5 +1,11 @@
 # No aggregation
 # ------------------------------------------------------------
+"""
+    NoAggregation
+
+Empty functor object for running an L-shaped algorithm without aggregation (multi-cut L-shaped).
+
+"""
 struct NoAggregation <: AbstractAggregation end
 
 function aggregate_cut!(lshaped::AbstractLShapedSolver, ::NoAggregation, cut::HyperPlane)
@@ -29,6 +35,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    DontAggregate
+
+Factory object for [`NoAggregation`](@ref). Passed by default to `aggregate` in the `LShapedSolver` factory function.
+
+"""
 struct DontAggregate <: AbstractAggregator end
 
 function (::DontAggregate)(::Integer, ::Type{<:AbstractFloat})

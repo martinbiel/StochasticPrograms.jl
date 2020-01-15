@@ -1,5 +1,9 @@
 abstract type AbstractAggregation end
 abstract type AbstractAggregator end
+# Aggregation API #
+# ------------------------------------------------------------
+nthetas(lshaped::AbstractLShapedSolver) = nthetas(lshaped, lshaped.aggregation)
+# ------------------------------------------------------------
 include("cut_collection.jl")
 include("distance_measures.jl")
 include("selection_rules.jl")

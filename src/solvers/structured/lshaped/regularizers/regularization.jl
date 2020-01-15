@@ -14,7 +14,7 @@ process_cut!(lshaped::AbstractLShapedSolver, cut::AbstractHyperPlane) = process_
 project!(lshaped::AbstractLShapedSolver) = project!(lshaped, lshaped.regularizer)
 # ------------------------------------------------------------
 include("common.jl")
-include("noregularization.jl")
+include("no_regularization.jl")
 include("rd.jl")
 include("tr.jl")
 include("lv.jl")

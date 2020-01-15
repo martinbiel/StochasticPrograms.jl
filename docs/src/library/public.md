@@ -65,7 +65,7 @@ end
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["api.jl", "stochasticsolution.jl", "SAASolver.jl", "generation.jl", "evaluation.jl"]
+Pages   = ["api.jl", "stochasticsolution.jl", "SAA.jl", "generation.jl", "evaluation.jl"]
 ```
 
 ## Stochastic programming constructs

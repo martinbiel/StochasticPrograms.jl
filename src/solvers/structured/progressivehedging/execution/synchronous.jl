@@ -1,3 +1,9 @@
+"""
+    SynchronousExecution
+
+Functor object for using synchronous execution in a progressive-hedging algorithm (assuming multiple Julia cores are available). Create by supplying a [`Synchronous`](@ref) object through `execution` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+"""
 struct SynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
                             S <: LQSolver} <: AbstractExecution
@@ -10,18 +16,6 @@ end
 
 function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, execution::SynchronousExecution)
     return init_subproblems!(ph, subsolver, execution.subworkers)
-end
-
-function iterate!(ph::AbstractProgressiveHedgingSolver, ::SynchronousExecution)
-    return iterate_nominal!(ph)
-end
-
-function init_workers!(::AbstractProgressiveHedgingSolver, ::SynchronousExecution)
-    return nothing
-end
-
-function close_workers!(::AbstractProgressiveHedgingSolver, ::SynchronousExecution)
-    return nothing
 end
 
 function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution{T}) where T <: AbstractFloat
@@ -79,6 +73,12 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems,
 end
 # API
 # ------------------------------------------------------------
+"""
+    Synchronous
+
+Factory object for [`SynchronousExecution`](@ref). Pass to `execution` in the `ProgressiveHedgingSolver` factory function.
+
+"""
 struct Synchronous <: Execution end
 
 function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}

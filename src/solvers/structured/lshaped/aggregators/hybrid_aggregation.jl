@@ -12,6 +12,18 @@ function shift(gap::AbstractFloat, τ::AbstractFloat)
     return gap <= τ
 end
 
+"""
+    HybridAggregation
+
+Functor object for using hybrid aggregation in an L-shaped algorithm. Create by supplying a [`HybridAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Parameters
+- `initial::AbstractAggregator`: Initial aggregation scheme
+- `final::AbstractAggregator`: Final aggregation scheme
+- `τ::T`: The active aggregation scheme is switched from `initial` to `final` when the optimality gap decreases below `τ`
+...
+"""
 struct HybridAggregation{T <: AbstractFloat, Agg1 <: AbstractAggregation, Agg2 <: AbstractAggregation} <: AbstractAggregation
     initial::Agg1
     final::Agg2
@@ -72,6 +84,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    HybridAggregate(initial::AbstractAggregator, final::AbstractAggregator, τ::AbstractFloat)
+
+Factory object for [`HybridAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?HybridAggregation for parameter descriptions.
+
+"""
 struct HybridAggregate{T <: AbstractFloat, Agg1 <: AbstractAggregator, Agg2 <: AbstractAggregator} <: AbstractAggregator
     initial::Agg1
     final::Agg2

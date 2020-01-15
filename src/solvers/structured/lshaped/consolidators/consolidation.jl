@@ -3,6 +3,12 @@ abstract type AbstractConsolidator end
 
 # No consolidation
 # ------------------------------------------------------------
+"""
+    NoRegularization
+
+Empty functor object for running the L-shaped algorithm without consolidation.
+
+"""
 struct NoConsolidation <: AbstractConsolidation end
 
 function consolidate!(::AbstractLShapedSolver, ::NoConsolidation)
@@ -18,6 +24,18 @@ function add_cut!(::AbstractLShapedSolver, ::NoConsolidation, ::Integer, ::Abstr
 end
 # Consolidation
 # ------------------------------------------------------------
+"""
+    Consolidation
+
+Functor object for using consolidation in an L-shaped algorithm. Create by supplying a [`Consolidate`](@ref) object through `consolidate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+
+...
+# Algorithm parameters
+- `tresh::T` = 0.95: Relative amount of redundant cuts in a former iteration required to consider the iteration redundant
+- `at::Int = 5.0`: Number of times an iteration can be redundant before consolidation is triggered
+- `rebuild::Function = at_tolerance()`: Function deciding when the master model should be rebuilt according to performed consolidations
+...
+"""
 struct Consolidation{T <: AbstractFloat} <: AbstractConsolidation
     cuts::Vector{Vector{AnySparseOptimalityCut{T}}}
     feasibility_cuts::Vector{Vector{SparseFeasibilityCut{T}}}
@@ -168,7 +186,12 @@ function minimum_requirements(lshaped::AbstractLShapedSolver, consolidation::Con
         (nfeasibilitycuts(consolidation) > 0 &&
          nfeasibilitycuts(consolidation)/ncutconstraints(lshaped) <= 0.1)
 end
+"""
+    at_tolerance(τ = 0.4, miniter = 0)
 
+Rebuild master when at least nconsolidations*`miniter` iterations has passed and the ratio of number of cuts in the consolidated collection and the number of cuts in the master model has decreased below `τ`.
+
+"""
 at_tolerance() = at_tolerance(0.4, 0)
 function at_tolerance(τ, miniter)
     return (lshaped, consolidation) -> begin
@@ -176,20 +199,26 @@ function at_tolerance(τ, miniter)
     end
 end
 
-for_loadbalance() = for_loadbalance(1.0, 0)
-function for_loadbalance(τ, miniter)
-    return (lshaped, consolidation) -> begin
-        return for_loadbalance(lshaped, τ, miniter)
-    end
-end
 # API
 # ------------------------------------------------------------
+"""
+    DontConsolidate
+
+Factory object for [`NoConsolidation`](@ref). Passed by default to `consolidate` in the `LShapedSolver` factory function.
+
+"""
 struct DontConsolidate <: AbstractConsolidator end
 
 function (::DontConsolidate)(::Type{T} where T <: AbstractFloat)
     return NoConsolidation()
 end
 
+"""
+    Consolidate
+
+Factory object for [`Consolidation`](@ref). Pass to `consolidate` in the `LShapedSolver` factory function. See ?Consolidation for parameter descriptions.
+
+"""
 struct Consolidate <: AbstractConsolidator
     redundance_treshold::Float64
     consolidation_trigger::Int
