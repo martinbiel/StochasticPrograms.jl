@@ -200,5 +200,5 @@ function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: 
 end
 
 function str(::Asynchronous)
-    return "asynchronous execution"
+    return "Asynchronous "
 end

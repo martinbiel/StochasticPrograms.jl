@@ -79,5 +79,5 @@ function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: A
 end
 
 function str(::Synchronous)
-    return "synchronous execution"
+    return "Synchronous "
 end
