@@ -14,6 +14,14 @@ Pages = ["lshaped.md"]
 LShapedSolver
 ```
 
+## Execution
+
+```@docs
+LShapedSolvers.SerialExecution
+LShapedSolvers.SynchronousExecution
+LShapedSolvers.AsynchronousExecution
+```
+
 ## Regularization
 
 ```@docs

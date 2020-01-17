@@ -1,4 +1,4 @@
-function iterate_nominal!(ph::AbstractProgressiveHedgingSolver, ::AbstractExecution)
+function iterate!(ph::AbstractProgressiveHedgingSolver, ::AbstractExecution)
     # Resolve all subproblems at the current optimal solution
     Q = resolve_subproblems!(ph)
     if Q == Inf

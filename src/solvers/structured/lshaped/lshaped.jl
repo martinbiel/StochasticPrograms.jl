@@ -12,6 +12,7 @@ using JuMP
 using StochasticPrograms
 using StochasticPrograms: AbstractScenarioProblems, ScenarioProblems, DScenarioProblems
 using StochasticPrograms: LQSolver, getsolution, getobjval, getredcosts, getduals, status, loadLP
+using StochasticPrograms: Execution, Serial, Synchronous, Asynchronous
 using MathProgBase
 using ProgressMeter
 using Clustering
@@ -32,10 +33,10 @@ export
     hyperoptimal_lshaped,
     optimize_structured!,
     fill_solution!,
-    get_decision,
-    get_objective_value,
     LShaped,
-    DistributedLShaped,
+    Serial,
+    Synchronous,
+    Asynchronous,
     DontRegularize,
     RegularizedDecomposition,
     WithRegularizedDecomposition,
@@ -52,7 +53,6 @@ export
     DontConsolidate,
     Consolidate,
     at_tolerance,
-    for_loadbalance,
     niters,
     tolerance_reached,
     DontAggregate,
@@ -63,7 +63,6 @@ export
     SelectUniform,
     SelectDecaying,
     SelectRandom,
-    SelectRandomMax,
     SelectClosest,
     SelectClosestToReference,
     StaticCluster,
@@ -80,8 +79,8 @@ include("types/types.jl")
 include("consolidators/consolidation.jl")
 include("aggregators/aggregation.jl")
 include("regularizers/regularization.jl")
-include("distributed/distributed.jl")
-include("solvers/solvers.jl")
+include("execution/execution.jl")
+include("solver.jl")
 include("spinterface.jl")
 
 end # module

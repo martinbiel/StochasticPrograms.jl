@@ -43,7 +43,7 @@ function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::ClusterAggr
 end
 
 function aggregate_cut!(cutqueue::CutQueue, aggregation::ClusterAggregation, ::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
-    put!(cutqueue, (t, cut(x), cut))
+    put!(cutqueue, (t, cut))
     return nothing
 end
 
@@ -100,7 +100,7 @@ function flush!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata
     if aggregation.lock(gap, t) && !isempty(aggregation.partitioning)
         for (idx,aggregate) in enumerate(aggregation.aggregates)
             if !iszero(aggregate)
-                put!(cutqueue, (t, aggregate(x), aggregate))
+                put!(cutqueue, (t, aggregate))
                 aggregation.aggregates[idx] = zero(AggregatedOptimalityCut{T})
             end
         end
@@ -113,7 +113,7 @@ function flush!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata
             for id in aggregate.ids
                 aggregation.partitioning[id] = idx
             end
-            put!(cutqueue, (t, aggregate(x), aggregate))
+            put!(cutqueue, (t, aggregate))
         end
         n = maximum(values(aggregation.partitioning))
         resize!(aggregation.aggregates, n)

@@ -3,16 +3,13 @@
 
 Functor object for using asynchronous execution in a progressive-hedging algorithm (assuming multiple Julia cores are available). Create by supplying an [`Asynchronous`](@ref) object through `execution` in the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
-...
-# Parameters
-- `κ::T = 0.5`: Relative amount of finished subproblems required to start a new iterate. Governs the amount of asynchronicity.
-...
 """
 struct AsynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
                             S <: LQSolver} <: AbstractExecution
     subworkers::Vector{SubWorker{T,A,S}}
     work::Vector{Work}
+    finalize::Vector{Work}
     progressqueue::ProgressQueue{T}
     x̄::Vector{RunningAverage{A}}
     δ::Vector{RunningAverage{T}}
@@ -27,6 +24,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
 
     function AsynchronousExecution(κ::T, ::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
         return new{T,A,S}(Vector{SubWorker{T,A,S}}(undef, nworkers()),
+                          Vector{Work}(undef,nworkers()),
                           Vector{Work}(undef,nworkers()),
                           RemoteChannel(() -> Channel{Progress{T}}(4*nworkers())),
                           Vector{RunningAverage{A}}(undef,nworkers()),
@@ -53,6 +51,7 @@ function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSo
         # Continue preparation
         for w in workers()
             execution.work[w-1] = RemoteChannel(() -> Channel{Int}(round(Int,10/execution.κ)), w)
+            execution.finalize[w-1] = RemoteChannel(() -> Channel{Int}(1), w)
             @async execution.x̄[w-1] = remotecall_fetch((sw, xdim)->begin
                 subproblems = fetch(sw)
                 if length(subproblems) > 0
@@ -116,10 +115,7 @@ function iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousE
         ph.data.δ = sqrt(δ₁ + δ₂)/(1e-10+norm(ph.ξ,2))
         # Check if optimal
         if check_optimality(ph)
-            # Optimal, tell workers to stop
-            map((w,aw)->!isready(aw) && put!(w,t), execution.work, execution.active_workers)
-            map((w,aw)->!isready(aw) && put!(w,-1), execution.work, execution.active_workers)
-            # Final log
+            # Optimal, final log
             log!(ph)
             return :Optimal
         end
@@ -141,7 +137,7 @@ function iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousE
     return :Valid
 end
 
-function init_workers!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function start_workers!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
     # Load initial decision
     put!(execution.decisions, 1, ph.ξ)
     put!(execution.r, 1, penalty(ph))
@@ -150,6 +146,7 @@ function init_workers!(ph::AbstractProgressiveHedgingSolver, execution::Asynchro
                                                    w,
                                                    execution.subworkers[w-1],
                                                    execution.work[w-1],
+                                                   execution.finalize[w-1],
                                                    execution.progressqueue,
                                                    execution.x̄[w-1],
                                                    execution.δ[w-1],
@@ -160,6 +157,9 @@ function init_workers!(ph::AbstractProgressiveHedgingSolver, execution::Asynchro
 end
 
 function close_workers!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+    t = ph.data.iterations-1
+    map((w,aw)->!isready(aw) && put!(w,t), execution.finalize, execution.active_workers)
+    map((w,aw)->!isready(aw) && put!(w,-1), execution.work, execution.active_workers)
     map(wait, execution.active_workers)
 end
 
@@ -169,7 +169,7 @@ end
 
 function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
     ξ_prev = copy(ph.ξ)
-    ph.ξ[:] = sum(fetch.(execution.x̄))
+    ph.ξ .= sum(fetch.(execution.x̄))
     # Update δ₁
     ph.data.δ₁ = norm(ph.ξ-ξ_prev, 2)^2
     return nothing
@@ -195,20 +195,6 @@ end
 
 # API
 # ------------------------------------------------------------
-"""
-    Asynchronous
-
-Factory object for [`AsynchronousExecution`](@ref). Pass to `execution` in the `ProgressiveHedgingSolver` factory function. See ?AsynchronousExecution for parameter descriptions.
-
-"""
-struct Asynchronous <: Execution
-    κ::Float64
-
-    function Asynchronous(; κ::AbstractFloat = 0.5)
-        return new(κ)
-    end
-end
-
 function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
     return AsynchronousExecution(execution.κ, T, A, S)
 end

@@ -14,18 +14,15 @@ Pages = ["progressivehedging.md"]
 ProgressiveHedgingSolver
 ```
 
-### Execution
+## Execution
 
 ```@docs
 ProgressiveHedgingSolvers.SerialExecution
-ProgressiveHedgingSolvers.Serial
 ProgressiveHedgingSolvers.SynchronousExecution
-ProgressiveHedgingSolvers.Synchronous
 ProgressiveHedgingSolvers.AsynchronousExecution
-ProgressiveHedgingSolvers.Asynchronous
 ```
 
-### Penalties
+## Penalties
 
 ```@docs
 ProgressiveHedgingSolvers.FixedPenalization

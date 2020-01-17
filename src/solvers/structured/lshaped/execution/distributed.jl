@@ -2,6 +2,22 @@ SubWorker{F,T,A,S} = RemoteChannel{Channel{Vector{SubProblem{F,T,A,S}}}}
 ScenarioProblemChannel{S} = RemoteChannel{Channel{StochasticPrograms.ScenarioProblems{S}}}
 Work = RemoteChannel{Channel{Int}}
 
+function load_subproblems!(subworkers::Vector{SubWorker{F,T,A,S}},
+                           scenarioproblems::AbstractScenarioProblems,
+                           x::AbstractVector,
+                           subsolver::SubSolver) where {F <: AbstractFeasibility,
+                                                        T <: AbstractFloat,
+                                                        A <: AbstractVector,
+                                                        S <: LQSolver}
+    # Create subproblems on worker processes
+    @sync begin
+        for w in workers()
+            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{F,T,A,S}}}(1), w)
+            @async load_worker!(scenarioproblems, w, subworkers[w-1], x, subsolver)
+        end
+    end
+end
+
 function load_worker!(sp::ScenarioProblems,
                       w::Integer,
                       worker::SubWorker,
@@ -76,8 +92,28 @@ function init_subworker!(subworker::SubWorker{F,T,A,S},
     return nothing
 end
 
+function resolve_subproblems!(subworker::SubWorker{F,T,A,S}, x::AbstractVector, cutqueue::CutQueue{T}, aggregator::AbstractAggregator, t::Integer, metadata::MetaData) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
+    # Fetch all subproblems stored in worker
+    subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
+    if isempty(subproblems)
+        # Workers has nothing do to, return.
+        return nothing
+    end
+    # Aggregation policy
+    aggregation::AbstractAggregation = aggregator(length(subproblems), T)
+    # Solve subproblems
+    for subproblem ∈ subproblems
+        update_subproblem!(subproblem, x)
+        cut = subproblem()
+        aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
+    end
+    flush!(cutqueue, aggregation, metadata, t, x)
+    return nothing
+end
+
 function work_on_subproblems!(subworker::SubWorker{F,T,A,S},
                               work::Work,
+                              finalize::Work,
                               cutqueue::CutQueue{T},
                               decisions::Decisions{A},
                               metadata::MetaData,
@@ -85,31 +121,48 @@ function work_on_subproblems!(subworker::SubWorker{F,T,A,S},
     subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.
-       return
+       return nothing
     end
     aggregation::AbstractAggregation = aggregator(length(subproblems), T)
+    quit = false
     while true
         t::Int = try
-            wait(work)
-            take!(work)
+            if isready(finalize)
+                quit = true
+                take!(finalize)
+            else
+                wait(work)
+                take!(work)
+            end
         catch err
             if err isa InvalidStateException
-                # Master closed the work channel. Worker finished
+                # Master closed the work/finalize channel. Worker finished
                 return nothing
             end
         end
-        if t == -1
-            # Worker finished
-            return nothing
-        end
+        t == -1 && continue
         x::A = fetch(decisions,t)
         for subproblem in subproblems
             update_subproblem!(subproblem, x)
             cut = subproblem()
-            aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
+            !quit && aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
         end
-        flush!(cutqueue, aggregation, metadata, t, x)
+        !quit && flush!(cutqueue, aggregation, metadata, t, x)
+        if quit
+            # Worker finished
+            return nothing
+        end
     end
+end
+
+function eval_second_stage(subworkers::Vector{<:SubWorker}, x::AbstractVector)
+    partial_objectives = Vector{Float64}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async partial_objectives[i] = remotecall_fetch(calculate_subobjective, w, subworkers[w-1], x)
+        end
+    end
+    return sum(partial_objectives)
 end
 
 function calculate_subobjective(subworker::SubWorker{F,T,A,S}, x::A) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
@@ -121,9 +174,45 @@ function calculate_subobjective(subworker::SubWorker{F,T,A,S}, x::A) where {F, T
     end
 end
 
+function fill_submodels!(subworkers::Vector{<:SubWorker}, x::AbstractVector, scenarioproblems::ScenarioProblems)
+    j = 0
+    @sync begin
+        for w in workers()
+            n = remotecall_fetch((sw)->length(fetch(sw)), w, subworkers[w-1])
+            for i = 1:n
+                k = i+j
+                @async fill_submodel!(scenarioproblems.problems[k],remotecall_fetch((sw,i,x)->begin
+                    sp = fetch(sw)[i]
+                    sp(x)
+                    get_solution(sp)
+                end,
+                w,
+                subworkers[w-1],
+                i,
+                x)...)
+            end
+            j += n
+        end
+    end
+    return nothing
+end
+
+function fill_submodels!(subworkers::Vector{<:SubWorker}, x::AbstractVector, scenarioproblems::DScenarioProblems)
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(fill_submodels!,
+                                    w,
+                                    subworkers[w-1],
+                                    x,
+                                    scenarioproblems[w-1])
+        end
+    end
+    return nothing
+end
+
 function fill_submodels!(subworker::SubWorker{F,T,A,S},
                          x::A,
-                         scenarioproblems::ScenarioProblemChannel) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
+                         scenarioproblems::ScenarioProblemChannel) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
     sp = fetch(scenarioproblems)
     subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
     for (i, submodel) in enumerate(sp.problems)

@@ -1,5 +1,5 @@
 SubWorker{T,A,S} = RemoteChannel{Channel{Vector{SubProblem{T,A,S}}}}
-ScenarioProblemChannel{S} = RemoteChannel{Channel{StochasticPrograms.ScenarioProblems{S}}}
+ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
 
 Work = RemoteChannel{Channel{Int}}
 Progress{T <: AbstractFloat} = Tuple{Int,Int,T}
@@ -65,7 +65,7 @@ function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, subwork
 end
 
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.ScenarioProblems, subworkers::Vector{<:SubWorker})
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::ScenarioProblems, subworkers::Vector{<:SubWorker})
     j = 0
     @sync begin
         for w in workers()
@@ -86,7 +86,7 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems:
     end
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.DScenarioProblems, subworkers::Vector{<:SubWorker})
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::DScenarioProblems, subworkers::Vector{<:SubWorker})
     @sync begin
         for w in workers()
             @async remotecall(fill_submodels!,
@@ -109,7 +109,7 @@ function load_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::MPB.
     return ph
 end
 
-function load_worker!(scenarioproblems::StochasticPrograms.ScenarioProblems,
+function load_worker!(scenarioproblems::ScenarioProblems,
                       sp::StochasticProgram,
                       w::Integer,
                       worker::SubWorker,
@@ -132,7 +132,7 @@ function load_worker!(scenarioproblems::StochasticPrograms.ScenarioProblems,
                             start)
 end
 
-function load_worker!(scenarioproblems::StochasticPrograms.DScenarioProblems,
+function load_worker!(scenarioproblems::DScenarioProblems,
                       sp::StochasticProgram,
                       w::Integer,
                       worker::SubWorker,

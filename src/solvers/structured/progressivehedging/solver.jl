@@ -7,7 +7,7 @@
 end
 
 @with_kw mutable struct ProgressiveHedgingParameters{T <: AbstractFloat}
-    τ::T = 1e-6
+    τ::T = 1e-5
     log::Bool = true
     keep::Bool = true
     offset::Int = 0

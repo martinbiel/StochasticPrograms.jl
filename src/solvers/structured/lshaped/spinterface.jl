@@ -46,54 +46,51 @@ L-Shaped Gap  Time: 0:00:00 (6 iterations)
 :Optimal
 ```
 """
-mutable struct LShapedSolver{S <: SubSolver, R <: AbstractRegularizer, A <: AbstractAggregator, C <: AbstractConsolidator} <: AbstractStructuredSolver
+mutable struct LShapedSolver{S <: SubSolver, E <: Execution, R <: AbstractRegularizer, A <: AbstractAggregator, C <: AbstractConsolidator} <: AbstractStructuredSolver
     lpsolver::MPB.AbstractMathProgSolver
     subsolver::S
     complete_recourse::Bool
+    execution::E
     regularize::R
     aggregate::A
     consolidate::C
-    distributed::Bool
     crash::CrashMethod
     parameters::Dict{Symbol,Any}
 
     function LShapedSolver(lpsolver::MPB.AbstractMathProgSolver;
+                           execution::Execution = Serial(),
                            complete_recourse::Bool = true,
                            regularize::AbstractRegularizer = DontRegularize(),
                            aggregate::AbstractAggregator = DontAggregate(),
                            consolidate::AbstractConsolidator = DontConsolidate(),
-                           distributed = false,
                            crash::CrashMethod = Crash.None(),
                            subsolver::SubSolver = lpsolver, kwargs...)
         S = typeof(subsolver)
+        E = typeof(execution)
         R = typeof(regularize)
         A = typeof(aggregate)
         C = typeof(consolidate)
-        return new{S, R, A, C}(lpsolver,
-                               subsolver,
-                               complete_recourse,
-                               regularize,
-                               aggregate,
-                               consolidate,
-                               distributed,
-                               crash,
-                               Dict{Symbol,Any}(kwargs))
+        return new{S, E, R, A, C}(lpsolver,
+                                  subsolver,
+                                  complete_recourse,
+                                  execution,
+                                  regularize,
+                                  aggregate,
+                                  consolidate,
+                                  crash,
+                                  Dict{Symbol,Any}(kwargs))
     end
 end
 
 function StructuredModel(stochasticprogram::StochasticProgram, solver::LShapedSolver)
     x₀ = solver.crash(stochasticprogram, solver.lpsolver)
-    if solver.distributed
-        return DistributedLShaped(stochasticprogram, x₀, solver.lpsolver, solver.subsolver, solver.complete_recourse, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
-    else
-        return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.complete_recourse, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
-    end
+    return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.complete_recourse, solver.execution, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
 end
 
 function add_params!(solver::LShapedSolver; kwargs...)
     push!(solver.parameters, kwargs...)
     for (k,v) in kwargs
-        if k ∈ [:variant, :lpsolver, :subsolver, :complete_recourse, :regularize, :aggregate, :crash]
+        if k ∈ [:variant, :lpsolver, :subsolver, :complete_recourse, :execution, :regularize, :aggregate, :crash]
             setfield!(solver, k, v)
             delete!(solver.parameters, k)
         end
@@ -136,7 +133,7 @@ function fill_solution!(stochasticprogram::StochasticProgram, lshaped::AbstractL
 end
 
 function solverstr(solver::LShapedSolver)
-    solver_str = solver.distributed ? "Distributed $(str(solver.regularize))" : "$(str(solver.regularize))"
+    solver_str = "$(str(solver.execution))$(str(solver.regularize))"
     aggregate_str = str(solver.aggregate)
     if aggregate_str != ""
         return string(solver_str, " with ", aggregate_str)

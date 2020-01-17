@@ -43,7 +43,7 @@ SparseOptimalityCut{T <: AbstractFloat} = HyperPlane{OptimalityCut, T, SparseVec
 SparseAggregatedOptimalityCut{T <: AbstractFloat} = AggregatedOptimalityCut{T, SparseVector{T,Int64}}
 AnySparseOptimalityCut{T <: AbstractFloat} = Union{SparseOptimalityCut, SparseAggregatedOptimalityCut{T}}
 SparseHyperPlane{T <: AbstractFloat} = Union{HyperPlane{<:HyperPlaneType, T, SparseVector{T,Int64}}, SparseAggregatedOptimalityCut{T}}
-QCut{T} = Tuple{Int,T,SparseHyperPlane{T}}
+QCut{T} = Tuple{Int,SparseHyperPlane{T}}
 CutQueue{T} = RemoteChannel{Channel{QCut{T}}}
 
 function (hyperplane::HyperPlane{FeasibilityCut})(x::AbstractVector)

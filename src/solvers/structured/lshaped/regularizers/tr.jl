@@ -71,11 +71,13 @@ function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
     @unpack Q̃ = tr.data
     @unpack γ = tr.parameters
     need_update = false
-    if Q <= Q̃ - γ*abs(Q̃-θ)
+    t = timestamp(lshaped)
+    Q̃t = incumbent_objective(lshaped, t, tr)
+    if Q < Q̃ && (tr.data.major_iterations == 1 || Q <= Q̃t - γ*abs(Q̃t-θ))
         need_update = true
         enlarge_trustregion!(lshaped, tr)
         tr.data.cΔ = 0
-        tr.ξ[:] = lshaped.x[:]
+        tr.ξ .= lshaped.x
         tr.data.Q̃ = Q
         tr.data.incumbent = timestamp(lshaped)
         tr.data.major_iterations += 1
@@ -95,7 +97,7 @@ function process_cut!(lshaped::AbstractLShapedSolver, cut::HyperPlane{Feasibilit
         A = [I cut.δQ; cut.δQ' 0*I]
         b = [zeros(length(tr.ξ)); -gap(cut, tr.ξ)]
         t = A\b
-        tr.ξ[:] = tr.ξ + t[1:length(tr.ξ)]
+        tr.ξ .= tr.ξ + t[1:length(tr.ξ)]
     end
     return nothing
 end

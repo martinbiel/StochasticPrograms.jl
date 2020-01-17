@@ -117,7 +117,6 @@ export
     WS_decision,
     EWS,
     SAA,
-    SAASolver,
     DEP,
     VRP,
     EVPI,

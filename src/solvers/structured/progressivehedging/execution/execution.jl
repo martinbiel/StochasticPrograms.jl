@@ -1,5 +1,4 @@
 abstract type AbstractExecution end
-abstract type Execution end
 # Execution API #
 # ------------------------------------------------------------
 init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver) = init_subproblems!(ph, subsolver, ph.execution)

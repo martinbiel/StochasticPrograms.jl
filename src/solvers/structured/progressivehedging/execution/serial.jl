@@ -88,14 +88,6 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems:
 end
 # API
 # ------------------------------------------------------------
-"""
-    Serial
-
-Factory object for [`SerialExecution`](@ref). Passed by default to `execution ` in the `ProgressiveHedgingSolver` factory function.
-
-"""
-struct Serial <: Execution end
-
 function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
     return SerialExecution(T,A,S)
 end

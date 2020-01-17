@@ -56,7 +56,7 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::PartialAggregation, ::M
     if considered(aggregation.collection) == aggregation.size
         if collection_size(aggregation.collection) == aggregation.size
             aggregated_cut = aggregate(aggregation.collection)
-            put!(cutqueue, (t, aggregated_cut(x), aggregated_cut))
+            put!(cutqueue, (t, aggregated_cut))
         end
         new_id = aggregation.start_id + (aggregation.collection.id - aggregation.start_id + 1) % ceil(Int, aggregation.nscenarios/aggregation.size)
         renew!(aggregation.collection, new_id)
@@ -65,7 +65,7 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::PartialAggregation, ::M
 end
 
 function passthrough!(cutqueue::CutQueue, aggregation::PartialAggregation, cut::HyperPlane{H}, t::Integer, x::AbstractVector) where H <: HyperPlaneType
-    put!(cutqueue, (t, cut(x), HyperPlane(cut.δQ, cut.q, aggregation.collection.id, H)))
+    put!(cutqueue, (t, HyperPlane(cut.δQ, cut.q, aggregation.collection.id, H)))
     return nothing
 end
 
@@ -102,7 +102,7 @@ end
 function flush!(cutqueue::CutQueue, aggregation::PartialAggregation, ::MetaData, t::Integer, x::AbstractArray)
     if collection_size(aggregation.collection) > 0 && collection_size(aggregation.collection) == considered(aggregation.collection)
         aggregated_cut = aggregate(aggregation.collection)
-        put!(cutqueue, (t, aggregated_cut(x), aggregated_cut))
+        put!(cutqueue, (t, aggregated_cut))
     end
     renew!(aggregation.collection, aggregation.start_id)
     return nothing

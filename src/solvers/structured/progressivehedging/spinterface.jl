@@ -100,5 +100,5 @@ function fill_solution!(stochasticprogram::StochasticProgram, ph::AbstractProgre
 end
 
 function solverstr(solver::ProgressiveHedgingSolver)
-    return "Progressive-hedging solver under $(str(solver.execution)) and $(str(solver.penalty))"
+    return "$(str(solver.execution))Progressive-hedging solver and $(str(solver.penalty))"
 end

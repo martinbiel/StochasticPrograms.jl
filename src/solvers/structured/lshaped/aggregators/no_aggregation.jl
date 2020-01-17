@@ -13,7 +13,7 @@ function aggregate_cut!(lshaped::AbstractLShapedSolver, ::NoAggregation, cut::Hy
 end
 
 function aggregate_cut!(cutqueue::CutQueue, ::NoAggregation, ::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
-    put!(cutqueue, (t, cut(x), cut))
+    put!(cutqueue, (t, cut))
     return nothing
 end
 

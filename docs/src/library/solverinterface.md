@@ -21,3 +21,11 @@ AbstractSampledModel
 Modules = [StochasticPrograms]
 Pages   = ["spinterface.jl"]
 ```
+
+## Execution
+
+```@docs
+Serial
+Synchronous
+Asynchronous
+```

@@ -36,9 +36,10 @@ function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::Synchr
         end
     end
     ξ_prev = copy(ph.ξ)
-    ph.ξ[:] = sum(partial_primals)
+    ph.ξ .= sum(partial_primals)
     # Update δ₁
     ph.data.δ₁ = norm(ph.ξ-ξ_prev, 2)^2
+    return nothing
 end
 
 function update_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution)
@@ -73,14 +74,6 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems,
 end
 # API
 # ------------------------------------------------------------
-"""
-    Synchronous
-
-Factory object for [`SynchronousExecution`](@ref). Pass to `execution` in the `ProgressiveHedgingSolver` factory function.
-
-"""
-struct Synchronous <: Execution end
-
 function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
     return SynchronousExecution(T,A,S)
 end

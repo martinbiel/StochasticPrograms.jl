@@ -51,7 +51,7 @@ function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::DynamicAggr
 end
 
 function aggregate_cut!(cutqueue::CutQueue, aggregation::DynamicAggregation, ::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
-    put!(cutqueue, (t, cut(x), cut))
+    put!(cutqueue, (t, cut))
     return nothing
 end
 
@@ -66,7 +66,7 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::DynamicAggregation{T}, 
     aggregation.aggregates[idx] += cut
     if full
         aggregate = aggregation.aggregates[idx]
-        put!(cutqueue, (t, aggregate(x), aggregate))
+        put!(cutqueue, (t, aggregate))
         aggregation.aggregates[idx] = zero(AggregatedOptimalityCut{T})
     end
     return nothing
@@ -95,7 +95,7 @@ end
 function flush!(cutqueue::CutQueue, aggregation::DynamicAggregation{T}, ::MetaData, t::Integer, x::AbstractArray) where T <: AbstractFloat
     for (i,aggregate) in enumerate(aggregation.aggregates)
         if !iszero(aggregate)
-            put!(cutqueue, (t, aggregate(x), aggregate))
+            put!(cutqueue, (t, aggregate))
             aggregation.aggregates[i] = zero(AggregatedOptimalityCut{T})
         end
     end

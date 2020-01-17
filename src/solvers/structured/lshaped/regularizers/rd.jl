@@ -85,19 +85,20 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     @unpack τ = lshaped.parameters
     @unpack σ = rd.data
     @unpack γ,σ̅,σ̲ = rd.parameters
-    need_update = false
     t = timestamp(lshaped)
-    if abs(θ-Q) <= τ*(1+abs(θ)) || rd.data.major_iterations == 0
-        rd.ξ[:] = lshaped.x[:]
-        rd.data.Q̃ = Q
+    σ̃ = incumbent_trustregion(lshaped, t, rd)
+    Q̃ = incumbent_objective(lshaped, t, rd)
+    need_update = false
+    λ = rd.data.major_iterations == 0 ? zeros(1) : getduals(lshaped.mastersolver)
+    if abs(θ-Q) <= τ*(1+abs(θ)) || (Q < Q̃ && count(λ .!= 0.) == length(lshaped.mastervector)) || rd.data.major_iterations == 0
+        rd.ξ .= lshaped.x
+        rd.data.Q̃ = copy(Q)
         need_update = true
         rd.data.incumbent = t
         rd.data.major_iterations += 1
     else
         rd.data.minor_iterations += 1
     end
-    σ̃ = incumbent_trustregion(lshaped, t, rd)
-    Q̃ = incumbent_objective(lshaped, t, rd)
     new_σ = if Q + τ <= (1-γ)*Q̃ + γ*θ
         max(σ, min(σ̅, 2*σ))
     elseif Q - τ >= γ*Q̃ + (1-γ)*θ

@@ -1,10 +1,15 @@
 # Common
 # ------------------------------------------------------------
-function decision(lshaped::AbstractLShapedSolver, regularizer::AbstractRegularization)
+function add_regularization_params!(regularizer::AbstractRegularizer; kwargs...)
+    push!(regularizer.parameters, kwargs...)
+    return nothing
+end
+
+function decision(::AbstractLShapedSolver, regularizer::AbstractRegularization)
     return regularizer.ξ
 end
 
-function objective(lshaped::AbstractLShapedSolver, regularizer::AbstractRegularization)
+function objective(::AbstractLShapedSolver, regularizer::AbstractRegularization)
     return regularizer.data.Q̃
 end
 

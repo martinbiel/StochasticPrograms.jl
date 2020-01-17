@@ -16,19 +16,17 @@ consolidators = [Consolidate(), DontConsolidate()]
 penalties = [Fixed(),
              Adaptive(θ = 1.01)]
 
-executors = [Serial(),
-             Synchronous()]
+executors = [Synchronous(), Asynchronous()]
 
 @testset "Structured Solvers" begin
     @testset "L-shaped: simple problems" begin
         @testset "$(solverstr(ls)): $name" for ls in [LShapedSolver(reference_solver,
                                                                     crash = Crash.EVP(),
+                                                                    execution = executor,
                                                                     regularize = regularizer,
                                                                     aggregate = aggregator,
-                                                                    distributed = true,
-                                                                    κ = 1.0,
                                                                     log = false)
-                                                      for regularizer in regularizers, aggregator in aggregators], (sp,name) in problems
+                                                      for executor in executors, regularizer in regularizers, aggregator in aggregators], (sp,res,name) in problems
             @testset "Distributed data" begin
                 tol = 1e-5
                 optimize!(sp, solver=reference_solver)
@@ -66,7 +64,7 @@ executors = [Serial(),
                                                                                         regularize = regularizer,
                                                                                         aggregate = aggregator,
                                                                                         log = false)
-                                                                          for regularizer in regularizers, aggregator in aggregators], (sp,name) in problems
+                                                                          for regularizer in regularizers, aggregator in aggregators], (sp,res,name) in problems
             tol = 1e-5
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
@@ -83,15 +81,13 @@ executors = [Serial(),
                                                                                execution = executor,
                                                                                τ = 1e-3,
                                                                                log = false)
-                                                      for executor in executors], (sp,name) in problems
+                                                      for executor in executors], (sp,res,name) in problems
             @testset "Distributed data" begin
                 tol = 1e-2
                 optimize!(sp, solver=reference_solver)
                 x̄ = optimal_decision(sp)
                 Q̄ = optimal_value(sp)
-                with_logger(NullLogger()) do
-                    optimize!(sp, solver=ph)
-                end
+                optimize!(sp, solver=ph)
                 @test isapprox(optimal_value(sp), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
             end
@@ -102,9 +98,7 @@ executors = [Serial(),
                 optimize!(sp_onenode, solver=reference_solver)
                 x̄ = optimal_decision(sp_onenode)
                 Q̄ = optimal_value(sp_onenode)
-                with_logger(NullLogger()) do
-                    optimize!(sp, solver=ph)
-                end
+                optimize!(sp, solver=ph)
                 @test isapprox(optimal_value(sp_onenode), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_onenode), x̄, rtol = sqrt(tol))
             end
@@ -115,12 +109,22 @@ executors = [Serial(),
                 optimize!(sp_nondist, solver=reference_solver)
                 x̄ = optimal_decision(sp_nondist)
                 Q̄ = optimal_value(sp_nondist)
-                with_logger(NullLogger()) do
-                    optimize!(sp, solver=ph)
-                end
+                optimize!(sp, solver=ph)
                 @test isapprox(optimal_value(sp_nondist), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_nondist), x̄, rtol = sqrt(tol))
             end
+        end
+        @testset "Progressive-hedging on distributed data: $name" for (sp,res,name) in problems
+            ph = ProgressiveHedgingSolver(osqp, τ = 1e-3, log = false)
+            tol = 1e-2
+            optimize!(sp, solver=reference_solver)
+            x̄ = optimal_decision(sp)
+            Q̄ = optimal_value(sp)
+            with_logger(NullLogger()) do
+                optimize!(sp, solver=ph)
+            end
+            @test isapprox(optimal_value(sp), Q̄, rtol = tol)
+            @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
         end
     end
 end
