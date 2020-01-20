@@ -13,12 +13,10 @@ aggregators = [DontAggregate(),
 
 consolidators = [Consolidate(), DontConsolidate()]
 
-penalties = [Fixed(),
-             Adaptive(θ = 1.01)]
-
 executors = [Synchronous(), Asynchronous()]
 
 @testset "Structured Solvers" begin
+    @info "Running L-shaped tests..."
     @testset "L-shaped: simple problems" begin
         @testset "$(solverstr(ls)): $name" for ls in [LShapedSolver(reference_solver,
                                                                     crash = Crash.EVP(),
@@ -77,9 +75,10 @@ executors = [Synchronous(), Asynchronous()]
         end
     end
     @testset "Progressive-hedging: simple problems" begin
+        @info "Running progressive-hedging tests..."
         @testset "$(solverstr(ph)): $name" for ph in [ProgressiveHedgingSolver(osqp,
                                                                                execution = executor,
-                                                                               τ = 1e-3,
+                                                                               τ = 1e-4,
                                                                                log = false)
                                                       for executor in executors], (sp,res,name) in problems
             @testset "Distributed data" begin
@@ -115,8 +114,8 @@ executors = [Synchronous(), Asynchronous()]
             end
         end
         @testset "Progressive-hedging on distributed data: $name" for (sp,res,name) in problems
-            ph = ProgressiveHedgingSolver(osqp, τ = 1e-3, log = false)
             tol = 1e-2
+            ph = ProgressiveHedgingSolver(osqp, τ = 1e-4, log = false)
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)

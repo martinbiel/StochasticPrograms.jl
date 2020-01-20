@@ -1,3 +1,4 @@
+@info "Running functionality tests..."
 @testset "Distributed Stochastic Programs" begin
     @testset "Distributed Sanity Check: $name" for (sp,res,name) in problems
         optimize!(sp)

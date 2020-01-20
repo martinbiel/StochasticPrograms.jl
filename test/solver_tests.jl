@@ -17,6 +17,7 @@ penalties = [Fixed(),
              Adaptive(θ = 1.01)]
 
 @testset "Structured Solvers" begin
+    @info "Running L-shaped tests..."
     @testset "L-shaped: simple problems" begin
         @testset "$(solverstr(ls)): $name" for ls in [LShapedSolver(reference_solver,
                                                                     crash = Crash.EVP(),
@@ -34,10 +35,11 @@ penalties = [Fixed(),
             @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
         end
     end
+    @info "Running progressive-hedging tests..."
     @testset "Progressive-hedging: simple problems" begin
         @testset "Progressive-hedging: $name" for (sp,res,name) in problems
-            ph = ProgressiveHedgingSolver(osqp, log = false, τ = 1e-3)
             tol = 1e-2
+            ph = ProgressiveHedgingSolver(osqp, log = false)
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)

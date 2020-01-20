@@ -1,3 +1,4 @@
+@info "Running functionality tests..."
 @testset "Stochastic Programs: Functionality" begin
     @testset "SP Constructs: $name" for (sp,res,name) in problems
         tol = 1e-2
