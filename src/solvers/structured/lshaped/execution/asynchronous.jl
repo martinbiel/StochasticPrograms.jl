@@ -162,7 +162,7 @@ function set_subobjectives(lshaped::AbstractLShapedSolver, Qs::AbstractVector, e
 end
 
 function model_objectives(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution)
-    t = timestamp(lshaped)
+    t = niterations(lshaped)
     θs = t > 1 ? execution.model_objectives[t-1] : fill(-1e10, nthetas(lshaped))
     return θs
 end
