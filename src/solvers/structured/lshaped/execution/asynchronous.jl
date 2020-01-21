@@ -61,8 +61,8 @@ function finish_initilization!(lshaped::AbstractLShapedSolver, execution::Asynch
     # Load initial decision
     put!(execution.decisions, 1, copy(lshaped.x))
     # Prepare memory
-    push!(execution.subobjectives, zeros(nthetas(lshaped)))
-    push!(execution.model_objectives, zeros(nthetas(lshaped)))
+    push!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
+    push!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
     push!(execution.finished, 0)
     push!(execution.triggered, false)
     push!(execution.added, false)
@@ -162,7 +162,7 @@ function set_subobjectives(lshaped::AbstractLShapedSolver, Qs::AbstractVector, e
 end
 
 function model_objectives(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution)
-    t = niterations(lshaped)
+    t = timestamp(lshaped)
     θs = t > 1 ? execution.model_objectives[t-1] : fill(-1e10, nthetas(lshaped))
     return θs
 end
@@ -203,7 +203,7 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
             lshaped.data.Q = lshaped.Q_history[t]
             lshaped.data.θ = t > 1 ? lshaped.θ_history[t-1] : -1e10
             # Update incumbent (if applicable)
-            lshaped.x .= fetch(execution.decisions, t)
+            # lshaped.x .= fetch(execution.decisions, t)
             take_step!(lshaped)
             # Optimal if not using regularization and no cuts were added
             if lshaped.regularizer isa NoRegularization && !execution.added[t]
@@ -258,8 +258,8 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
             # New active iteration
             execution.data.active += 1
             # Prepare memory for next iteration
-            push!(execution.subobjectives, zeros(nthetas(lshaped)))
-            push!(execution.model_objectives, zeros(nthetas(lshaped)))
+            push!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
+            push!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
             push!(execution.finished, 0)
             push!(execution.triggered, false)
             push!(execution.added, false)

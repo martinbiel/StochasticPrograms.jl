@@ -1,4 +1,4 @@
-reference_solver = GLPKSolverLP(presolve=true)
+reference_solver = GLPKSolverLP()
 osqp = OSQP.OSQPMathProgBaseInterface.OSQPSolver(verbose=0)
 
 regularizers = [DontRegularize(),

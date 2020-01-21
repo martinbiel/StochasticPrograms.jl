@@ -26,7 +26,7 @@ function select(rule::SelectUniform, aggregates::Vector{<:AggregatedOptimalityCu
 end
 
 function str(::SelectUniform)
-    return "balanced selection"
+    return "uniform selection"
 end
 
 """

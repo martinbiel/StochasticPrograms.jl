@@ -32,8 +32,8 @@ function initialize_subproblems!(execution::SynchronousExecution,
 end
 
 function finish_initilization!(lshaped::AbstractLShapedSolver, execution::SynchronousExecution)
-    append!(execution.subobjectives, zeros(nthetas(lshaped)))
-    append!(execution.model_objectives, zeros(nthetas(lshaped)))
+    append!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
+    append!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
     for w in workers()
         execution.metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
     end

@@ -66,8 +66,8 @@ function initialize_subproblems!(execution::SerialExecution{F,T,A,S},
 end
 
 function finish_initilization!(lshaped::AbstractLShapedSolver, execution::SerialExecution)
-    append!(execution.subobjectives, zeros(nthetas(lshaped)))
-    append!(execution.model_objectives, zeros(nthetas(lshaped)))
+    append!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
+    append!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
     return nothing
 end
 

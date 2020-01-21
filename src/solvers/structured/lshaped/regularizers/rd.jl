@@ -90,8 +90,8 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     Q̃ = incumbent_objective(lshaped, t, rd)
     need_update = false
     λ = rd.data.major_iterations == 0 ? zeros(1) : getduals(lshaped.mastersolver)
-    if abs(θ-Q) <= τ*(1+abs(θ)) || (Q < Q̃ && count(λ .!= 0.) == length(lshaped.mastervector)) || rd.data.major_iterations == 0
-        rd.ξ .= lshaped.x
+    if abs(θ-Q) <= τ*(1+abs(θ)) || (Q <= Q̃ + τ && count(λ .!= 0.) == length(lshaped.mastervector)) || rd.data.major_iterations == 0
+        rd.ξ .= current_decision(lshaped)
         rd.data.Q̃ = copy(Q)
         need_update = true
         rd.data.incumbent = t

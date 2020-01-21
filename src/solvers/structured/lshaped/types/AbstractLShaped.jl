@@ -161,7 +161,7 @@ function add_cut!(lshaped::AbstractLShapedSolver, cut::HyperPlane{OptimalityCut}
     # Update objective
     subobjectives[cut.id] = Q
     # Check if cut gives new information
-    if check && θ > -Inf && θ >= Q
+    if check && θ > -Inf && (θ + τ >= Q || θ + τ >= cut(lshaped.x))
         # Optimal with respect to this subproblem
         return false
     end
@@ -181,7 +181,7 @@ function add_cut!(lshaped::AbstractLShapedSolver, cut::AggregatedOptimalityCut, 
     # Update objective
     subobjectives[cut.ids] .= Q/length(cut.ids)
     # Check if cut gives new information
-    if check && θ > -Inf && abs(θ-Q) <= τ*(1+abs(Q))
+    if check && θ > -Inf && (θ + τ >= Q || θ + τ >= cut(lshaped.x))
         # Optimal with respect to these subproblems
         return false
     end

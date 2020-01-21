@@ -77,7 +77,7 @@ function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
         need_update = true
         enlarge_trustregion!(lshaped, tr)
         tr.data.cΔ = 0
-        tr.ξ .= lshaped.x
+        tr.ξ .= current_decision(lshaped)
         tr.data.Q̃ = Q
         tr.data.incumbent = timestamp(lshaped)
         tr.data.major_iterations += 1

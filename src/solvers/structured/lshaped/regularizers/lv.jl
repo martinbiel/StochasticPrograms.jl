@@ -78,9 +78,9 @@ function take_step!(lshaped::AbstractLShapedSolver, lv::LevelSet)
     @unpack Q = lshaped.data
     @unpack τ = lshaped.parameters
     @unpack Q̃ = lv.data
-    if Q < Q̃
+    if Q <= Q̃ - τ
         lv.data.Q̃ = Q
-        lv.ξ .= lshaped.x
+        lv.ξ .= current_decision(lshaped)
         lv.data.incumbent = timestamp(lshaped)
         lv.data.major_iterations += 1
     else
