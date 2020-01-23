@@ -90,11 +90,18 @@ function outcome_mean(outcome_generator::Function, scenarios::Vector{<:AbstractS
     Qs = zeros(length(scenarios))
     for (i,scenario) in enumerate(scenarios)
         let outcome = outcome_generator(scenario)
-            status = solve(outcome)
+            status = solve(outcome, suppress_warnings = true)
             if status != :Optimal
-                error("Outcome model could not be solved, returned status: $status")
+                if status == :Infeasible
+                    Qs[i] = outcome.objSense == :Max ? -Inf : Inf
+                elseif status == :Unbounded
+                    Qs[i] = outcome.objSense == :Max ? Inf : -Inf
+                else
+                    error("Outcome model could not be solved, returned status: $status")
+                end
+            else
+                Qs[i] = probability(scenario)*getobjectivevalue(outcome)
             end
-            Qs[i] = probability(scenario)*getobjectivevalue(outcome)
         end
     end
     return sum(Qs)
@@ -106,11 +113,18 @@ function welford(generator::Function, scenarios::Vector{<:AbstractScenario})
     for k = 1:N
         Q̄ₖ₋₁ = Q̄ₖ
         let problem = generator(scenarios[k])
-            status = solve(problem)
-            if status != :Optimal
-                error("Outcome model could not be solved, returned status: $status")
+            status = solve(problem, suppress_warnings = true)
+            Q = if status != :Optimal
+                Q = if status == :Infeasible
+                    problem.objSense == :Max ? -Inf : Inf
+                elseif status == :Unbounded
+                    problem.objSense == :Max ? Inf : -Inf
+                else
+                    error("Outcome model could not be solved, returned status: $status")
+                end
+            else
+                Q = getobjectivevalue(problem)
             end
-            Q = getobjectivevalue(problem)
             Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
             Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
         end

@@ -1,7 +1,7 @@
 s₁ = Scenario(ξ₁ = 6., ξ₂ = 8., probability = 0.5)
 s₂ = Scenario(ξ₁ = 4., ξ₂ = 4., probability = 0.5)
 
-infeasible = StochasticProgram([s₁,s₂])
+infeasible = StochasticProgram([s₁,s₂], solver=GLPKSolverLP())
 
 @first_stage infeasible = begin
     @variable(model, x₁ >= 0)
@@ -19,5 +19,5 @@ end
     @constraint(model, 2*y₁ + 5*y₂ <= x₂)
 end
 
-infeasible_res = SPResult([27.2,41.6], 36.4, 9.2, 27.2, 286.92, -1445.92, 9.2)
+infeasible_res = SPResult([27.2,41.6], 36.4, 9.2, 27.2, Inf, 9.2, Inf)
 push!(problems, (infeasible, infeasible_res, "Infeasible"))

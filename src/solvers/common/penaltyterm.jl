@@ -15,7 +15,7 @@ struct Linearized <: PenaltyTerm
 end
 
 struct InfNorm <: PenaltyTerm
-
+    nthetas::Int
 
 end
 
@@ -24,11 +24,11 @@ struct 1Norm <: PenaltyTerm
 
 end
 
-function add_penalty!(lshaped::AbstractLShapedSolver, model::MPB.AbstractLinearQuadraticModel, c::AbstractVector, α::Real, ξ::AbstractVector, ::Val{true})
-    nt = nthetas(lshaped)
-    ncols = decision_length(lshaped.stochasticprogram)
-    tidx = ncols+nt+1
-    j = lshaped.regularization.data.regularizerindex
+function add_penalty!(penalty::InfNorm, model::MPB.AbstractLinearQuadraticModel, c::AbstractVector, α::Real, ξ::AbstractVector)
+    ncols = length(ξ)
+    c = MPB.getobj(model)
+    tidx = length(c)
+    j = penalty.data.index
     if j != -1
         MPB.delconstrs!(model, collect(j:j+2*ncols-1))
     end

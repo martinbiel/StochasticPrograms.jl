@@ -345,7 +345,7 @@ function EVP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuM
         return evp
     end
     # Create EVP as a wait-and-see model of the expected scenario
-    ev_model = WS(stochasticprogram, expected(stochasticprogram), solver = solver)
+    ev_model = WS(stochasticprogram, expected(stochasticprogram), solver = supplied_solver)
     # Cache EVP
     cache[:evp] = ev_model
     # Return EVP
@@ -361,6 +361,12 @@ Optionally, supply a capable `solver` to solve the expected value problem. The d
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
 function EVP_decision(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+    # Use cached solver if available
+    supplied_solver = pick_solver(stochasticprogram, solver)
+    # Abort if no solver was given
+    if isa(supplied_solver, JuMP.UnsetSolver)
+        error("Cannot determine EWS without a solver.")
+    end
     # Solve EVP
     evp = EVP(stochasticprogram, solver = solver)
     solve(evp)
