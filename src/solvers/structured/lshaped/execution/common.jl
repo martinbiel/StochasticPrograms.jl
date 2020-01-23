@@ -78,7 +78,7 @@ function iterate!(lshaped::AbstractLShapedSolver, ::AbstractExecution)
     lshaped.data.Q = Q
     # Update incumbent (if applicable)
     take_step!(lshaped)
-    # Resolve master
+    # Solve master problem
     status = solve_master!(lshaped)
     if status != :Optimal
         return status

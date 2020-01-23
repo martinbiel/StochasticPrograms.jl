@@ -68,12 +68,13 @@ end
 
 function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
     @unpack Q,θ = lshaped.data
+    @unpack τ = lshaped.parameters
     @unpack Q̃ = tr.data
     @unpack γ = tr.parameters
     need_update = false
     t = timestamp(lshaped)
     Q̃t = incumbent_objective(lshaped, t, tr)
-    if Q < Q̃ && (tr.data.major_iterations == 1 || Q <= Q̃t - γ*abs(Q̃t-θ))
+    if Q + τ <= Q̃ && (tr.data.major_iterations == 1 || Q <= Q̃t - γ*abs(Q̃t-θ))
         need_update = true
         enlarge_trustregion!(lshaped, tr)
         tr.data.cΔ = 0

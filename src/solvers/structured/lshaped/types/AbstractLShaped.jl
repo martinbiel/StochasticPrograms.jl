@@ -62,7 +62,7 @@ end
 
 function solve_master!(lshaped::AbstractLShapedSolver)
     try
-        solve_problem!(lshaped, lshaped.mastersolver)
+        solve_regularized_master!(lshaped, lshaped.regularization)
     catch
         # Master problem could not be solved for some reason.
         @unpack Q,θ = lshaped.data

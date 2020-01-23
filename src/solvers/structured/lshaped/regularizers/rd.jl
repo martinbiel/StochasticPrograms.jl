@@ -6,7 +6,6 @@
     incumbent::Int = 1
     major_iterations::Int = 0
     minor_iterations::Int = 0
-    regularizerindex::Int = -1
 end
 
 @with_kw mutable struct RDParameters{T <: AbstractFloat}
@@ -15,7 +14,6 @@ end
     σ::T = 1.0
     σ̅::T = 4.0
     σ̲::T = 0.5
-    linearize::Bool = false
 end
 
 """
@@ -32,7 +30,7 @@ Functor object for using regularized decomposition regularization in an L-shaped
 - `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
 ...
 """
-struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegularization
+struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: PenaltyTerm} <: AbstractRegularization
     data::RDData{T}
     parameters::RDParameters{T}
 
@@ -41,26 +39,23 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector} <: Abst
     σ_history::A
     incumbents::Vector{Int}
 
-    function RegularizedDecomposition(ξ₀::AbstractVector; kw...)
+    penalty::PT
+
+    function RegularizedDecomposition(ξ₀::AbstractVector, penalty::PenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         ξ₀_ = convert(AbstractVector{T}, copy(ξ₀))
         A = typeof(ξ₀_)
-        return new{T, A}(RDData{T}(), RDParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}())
+        PT = typeof(penalty)
+        return new{T, A, PT}(RDData{T}(), RDParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), penalty)
     end
 end
 
 function initialize_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)
-    # Add ∞-norm auxilliary variable
-    if rd.parameters.linearize
-        # t
-        MPB.addvar!(lshaped.mastersolver.lqmodel, -Inf, Inf, 1.0)
-    end
-    # Add quadratic penalty
-    c = copy(lshaped.c)
-    append!(c, MPB.getobj(lshaped.mastersolver.lqmodel)[end-nthetas(lshaped)+1:end])
-    add_penalty!(lshaped, lshaped.mastersolver.lqmodel, c, 1/rd.data.σ, rd.ξ, Val{rd.parameters.linearize}())
+    # Initialize and update penalty
+    initialize_penalty!(rd.penalty, lshaped.mastersolver, lshaped.c)
+    update_penalty!(rd.penalty, lshaped.mastersolver, 1/rd.data.σ, rd.ξ)
     return nothing
 end
 
@@ -89,8 +84,7 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     σ̃ = incumbent_trustregion(lshaped, t, rd)
     Q̃ = incumbent_objective(lshaped, t, rd)
     need_update = false
-    λ = rd.data.major_iterations == 0 ? zeros(1) : getduals(lshaped.mastersolver)
-    if abs(θ-Q) <= τ*(1+abs(θ)) || (Q <= Q̃ + τ && count(λ .!= 0.) == length(lshaped.mastervector)) || rd.data.major_iterations == 0
+    if abs(θ-Q) <= τ*(1+abs(θ)) || Q <= Q̃ + τ || rd.data.major_iterations == 0
         rd.ξ .= current_decision(lshaped)
         rd.data.Q̃ = copy(Q)
         need_update = true
@@ -111,19 +105,13 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     end
     rd.data.σ = new_σ
     if need_update
-        c = copy(lshaped.c)
-	    append!(c, MPB.getobj(lshaped.mastersolver.lqmodel)[end-nthetas(lshaped)+1:end])
-        add_penalty!(lshaped, lshaped.mastersolver.lqmodel, c, 1/rd.data.σ, rd.ξ, Val{rd.parameters.linearize}())
+        update_penalty!(rd.penalty, lshaped.mastersolver, 1/rd.data.σ, rd.ξ)
     end
     return nothing
 end
 
-function solve_problem!(lshaped::AbstractLShapedSolver, solver::LQSolver, rd::RegularizedDecomposition)
-    if rd.parameters.linearize
-        solve_linearized_problem!(lshaped, solver, rd)
-    else
-        solver(lshaped.mastervector)
-    end
+function solve_regularized_master!(lshaped::AbstractLShapedSolver, solver::LQSolver, rd::RegularizedDecomposition)
+    solve!(rd.penalty, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
     return nothing
 end
 
@@ -136,15 +124,16 @@ Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize ` in 
 
 """
 struct RD <: AbstractRegularizer
+    penalty::PenaltyTerm
     parameters::Dict{Symbol,Any}
 end
-RD(; kw...) = RD(Dict{Symbol,Any}(kw))
-WithRD(; kw...) = RD(Dict{Symbol,Any}(kw))
-RegularizedDecomposition(; kw...) = RD(Dict{Symbol,Any}(kw))
-WithRegularizedDecomposition(; kw...) = RD(Dict{Symbol,Any}(kw))
+RD(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
+WithRD(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
+RegularizedDecomposition(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
+WithRegularizedDecomposition(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
 
 function (rd::RD)(x::AbstractVector)
-    return RegularizedDecomposition(x; rd.parameters...)
+    return RegularizedDecomposition(x, rd.penalty; rd.parameters...)
 end
 
 function str(::RD)

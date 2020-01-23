@@ -149,7 +149,14 @@ function rebuild_master!(lshaped::AbstractLShapedSolver, consolidation::Consolid
         cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lv.projectionsolver.lqmodel)
         MPB.delconstrs!(lv.projectionsolver.lqmodel, collect(cut_indices))
         lv.data.levelindex = -1
-        lv.data.regularizerindex = -1
+        if :index ∈ fieldnames(typeof(lv.penalty))
+            lv.penalty.index = -1
+        end
+    elseif lshaped.regularization isa RegularizedDecomposition
+        rd = lshaped.regularization
+        if :index ∈ fieldnames(typeof(rd.penalty))
+            rd.penalty.index = -1
+        end
     end
     lshaped.data.ncuts -= ncuts
     readd_cuts!(lshaped, consolidation)

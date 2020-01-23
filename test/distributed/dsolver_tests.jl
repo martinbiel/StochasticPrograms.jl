@@ -2,9 +2,9 @@ reference_solver = GLPKSolverLP()
 osqp = OSQP.OSQPMathProgBaseInterface.OSQPSolver(verbose=0)
 
 regularizers = [DontRegularize(),
-                RegularizedDecomposition(linearize = true),
+                RegularizedDecomposition(penalty = Linearized(nbreakpoints = 10)),
                 TrustRegion(),
-                LevelSet(linearize = true, projectionsolver = reference_solver)]
+                LevelSet(penalty = InfNorm(), projectionsolver = reference_solver)]
 
 aggregators = [DontAggregate(),
                PartialAggregate(2),

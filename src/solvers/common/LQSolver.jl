@@ -23,7 +23,7 @@ function (solver::LQSolver)(x₀::AbstractVector)
     MPB.optimize!(solver.lqmodel)
 
     optimstatus = MPB.status(solver.lqmodel)
-    !(optimstatus ∈ [:Optimal,:Infeasible,:Unbounded]) && error("LP could not be solved, returned status: ", optimstatus)
+    !(optimstatus ∈ [:Optimal,:Infeasible,:Unbounded]) && @warn "LP could not be solved, returned status: $optimstatus"
 
     return nothing
 end

@@ -13,8 +13,8 @@ function objective(::AbstractLShapedSolver, regularization::AbstractRegularizati
     return regularization.data.Q̃
 end
 
-function solve_problem!(lshaped::AbstractLShapedSolver, solver::LQSolver, ::AbstractRegularization)
-    solver(lshaped.mastervector)
+function solve_regularized_master!(lshaped::AbstractLShapedSolver, ::AbstractRegularization)
+    lshaped.mastersolver(lshaped.mastervector)
     return nothing
 end
 
