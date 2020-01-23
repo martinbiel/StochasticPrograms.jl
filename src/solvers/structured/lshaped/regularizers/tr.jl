@@ -1,6 +1,6 @@
 # Trust-region
 # ------------------------------------------------------------
-@with_kw mutable struct TRData{T <: Real}
+@with_kw mutable struct TRData{T <: AbstractFloat}
     Q̃::T = 1e10
     Δ::T = 1.0
     cΔ::Int = 0
@@ -9,7 +9,7 @@
     minor_iterations::Int = 0
 end
 
-@with_kw mutable struct TRParameters{T <: Real}
+@with_kw mutable struct TRParameters{T <: AbstractFloat}
     γ::T = 1e-4
     Δ::T = 1.0
     Δ̅::T = 1000.0
@@ -23,8 +23,8 @@ Functor object for using trust-region regularization in an L-shaped algorithm. C
 ...
 # Parameters
 - `γ::T = 1e-4`: Relative tolerance for deciding if a minor iterate should be accepted as a new major iterate.
-- `Δ::Real = 1.0`: Initial size of ∞-norm trust-region.
-- `Δ̅::Real = 1000.0`: Maximum size of ∞-norm trust-region.
+- `Δ::AbstractFloat = 1.0`: Initial size of ∞-norm trust-region.
+- `Δ̅::AbstractFloat = 1000.0`: Maximum size of ∞-norm trust-region.
 ...
 """
 struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegularization
@@ -44,7 +44,7 @@ struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegulariz
     end
 end
 
-function init_regularization!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
+function initialize_regularization!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
     tr.data.Δ = tr.parameters.Δ
     set_trustregion!(lshaped, tr)
     return nothing
@@ -98,6 +98,7 @@ function process_cut!(lshaped::AbstractLShapedSolver, cut::HyperPlane{Feasibilit
         b = [zeros(length(tr.ξ)); -gap(cut, tr.ξ)]
         t = A\b
         tr.ξ .= tr.ξ + t[1:length(tr.ξ)]
+        set_trustregion!(lshaped, tr)
     end
     return nothing
 end

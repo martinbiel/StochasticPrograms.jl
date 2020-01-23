@@ -13,9 +13,6 @@ aggregators = [DontAggregate(),
 
 consolidators = [Consolidate(), DontConsolidate()]
 
-penalties = [Fixed(),
-             Adaptive(θ = 1.01)]
-
 @testset "Structured Solvers" begin
     @info "Running L-shaped tests..."
     @testset "L-shaped: simple problems" begin
@@ -30,7 +27,13 @@ penalties = [Fixed(),
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)
-            optimize!(sp, solver=ls)
+            if name == "Infeasible"
+                with_logger(NullLogger()) do
+                    @test optimize!(infeasible, solver=ls) == :Infeasible
+                    add_params!(ls, feasibility_cuts = true)
+                end
+            end
+            @test optimize!(sp, solver=ls) == :Optimal
             @test isapprox(optimal_value(sp), Q̄, rtol = tol)
             @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
         end
@@ -43,7 +46,7 @@ penalties = [Fixed(),
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)
-            optimize!(sp, solver=ph)
+            @test optimize!(sp, solver=ph) == :Optimal
             @test isapprox(optimal_value(sp), Q̄, rtol = tol)
             @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
         end

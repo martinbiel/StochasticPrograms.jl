@@ -12,7 +12,7 @@ using JuMP
 using StochasticPrograms
 using StochasticPrograms: _WS
 using StochasticPrograms: AbstractScenarioProblems, ScenarioProblems, DScenarioProblems
-using StochasticPrograms: LQSolver, getsolution, getobjval, getredcosts, getduals, status, loadLP
+using StochasticPrograms: LQSolver, getsolution, getobjval, getredcosts, getduals, status, QPSolver, get_solver, loadLP
 using StochasticPrograms: Execution, Serial, Synchronous, Asynchronous
 using MathProgBase
 using ProgressMeter

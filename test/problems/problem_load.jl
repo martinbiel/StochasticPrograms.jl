@@ -14,6 +14,8 @@ problems = Vector{Tuple{StochasticProgram,SPResult,String}}()
 include("simple.jl")
 @info "Loading instant simple..."
 include("instant_simple.jl")
+@info "Loading infeasible..."
+include("infeasible.jl")
 @info "Loading deferred simple..."
 include("deferred.jl")
 @info "Loading farmer..."

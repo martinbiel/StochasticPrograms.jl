@@ -10,12 +10,12 @@ function current_decision(lshaped::AbstractLShapedSolver, ::AbstractExecution)
     return lshaped.x
 end
 
-function incumbent_decision(::AbstractLShapedSolver, ::Integer, regularizer::AbstractRegularization, ::AbstractExecution)
-    return regularizer.ξ
+function incumbent_decision(::AbstractLShapedSolver, ::Integer, regularization::AbstractRegularization, ::AbstractExecution)
+    return regularization.ξ
 end
 
-function incumbent_objective(::AbstractLShapedSolver, ::Integer, regularizer::AbstractRegularization, ::AbstractExecution)
-    return regularizer.data.Q̃
+function incumbent_objective(::AbstractLShapedSolver, ::Integer, regularization::AbstractRegularization, ::AbstractExecution)
+    return regularization.data.Q̃
 end
 
 function incumbent_trustregion(::AbstractLShapedSolver, ::Integer, rd::RegularizedDecomposition, ::AbstractExecution)
@@ -60,7 +60,8 @@ function model_objectives(lshaped::AbstractLShapedSolver, execution::AbstractExe
 end
 
 function set_model_objectives(lshaped::AbstractLShapedSolver, θs::AbstractVector, execution::AbstractExecution)
-    execution.model_objectives .= θs
+    ids = active_model_objectives(lshaped)
+    execution.model_objectives[ids] .= θs[ids]
     return nothing
 end
 
@@ -68,7 +69,7 @@ function iterate!(lshaped::AbstractLShapedSolver, ::AbstractExecution)
     # Resolve all subproblems at the current optimal solution
     Q, added = resolve_subproblems!(lshaped)
     if Q == Inf && !handle_feasibility(lshaped.feasibility)
-        @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with complete_recourse = false to use feasibility cuts."
+        @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with feasibility_cuts = true to use feasibility cuts."
         return :Infeasible
     end
     if Q == -Inf
@@ -88,10 +89,9 @@ function iterate!(lshaped::AbstractLShapedSolver, ::AbstractExecution)
     # Log progress
     log!(lshaped)
     # Check optimality
-    if check_optimality(lshaped) || (lshaped.regularizer isa NoRegularization && !added)
+    if check_optimality(lshaped) || (lshaped.regularization isa NoRegularization && !added)
         # Optimal
         lshaped.data.Q = calculate_objective_value(lshaped)
-        push!(lshaped.Q_history,lshaped.data.Q)
         # Final log
         log!(lshaped; optimal = true)
         return :Optimal

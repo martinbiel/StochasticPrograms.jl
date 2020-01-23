@@ -61,10 +61,6 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
     end
 end
 
-QPSolver = Union{MPB.AbstractMathProgSolver, Function}
-get_solver(subsolver::MPB.AbstractMathProgSolver) = subsolver
-get_solver(generator::Function)::MPB.AbstractMathProgSolver = generator()
-
 function update_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::AbstractFloat)
     subproblem.ρ[:] = subproblem.ρ + r*(subproblem.x - ξ)
 end

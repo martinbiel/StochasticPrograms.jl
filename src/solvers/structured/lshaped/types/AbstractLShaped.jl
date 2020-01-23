@@ -15,7 +15,9 @@ function initialize!(lshaped::AbstractLShapedSolver, subsolver::SubSolver)
     # Prepare the master optimization problem
     prepare_master!(lshaped)
     # Initialize regularization policy
-    init_regularization!(lshaped)
+    initialize_regularization!(lshaped)
+    # Initialize feasibility handler
+    initialize_feasibility!(lshaped)
     # Finish initialization
     finish_initilization!(lshaped)
     return nothing
@@ -34,8 +36,8 @@ end
 function prepare_master!(lshaped::AbstractLShapedSolver)
     # θs
     for i = 1:nthetas(lshaped)
-        MPB.addvar!(lshaped.mastersolver.lqmodel,-1e10,Inf,initial_theta_coefficient(lshaped.feasibility))
-        push!(lshaped.mastervector,-1e10)
+        MPB.addvar!(lshaped.mastersolver.lqmodel ,-1e10, Inf, initial_theta_coefficient(lshaped.feasibility))
+        push!(lshaped.mastervector, -1e10)
     end
     return nothing
 end
@@ -87,7 +89,6 @@ function log!(lshaped::AbstractLShapedSolver; optimal = false)
     lshaped.data.iterations += 1
 
     log_regularization!(lshaped)
-
     if lshaped.parameters.log
         current_gap = optimal ? 0.0 : gap(lshaped)
         ProgressMeter.update!(lshaped.progress,current_gap,
@@ -148,7 +149,7 @@ gap(lshaped::AbstractLShapedSolver, cut::AggregatedOptimalityCut) = gap(cut, dec
 
 function add_cut!(lshaped::AbstractLShapedSolver, cut::AbstractHyperPlane; consider_consolidation = true, check = true)
     added = add_cut!(lshaped, cut, model_objectives(lshaped), subobjectives(lshaped), check = check)
-    update_objective!(lshaped, cut)
+    added && update_objective!(lshaped, cut)
     if consider_consolidation
         added && add_cut!(lshaped, lshaped.consolidation, cut)
     end
@@ -219,26 +220,4 @@ end
 function add_cut!(lshaped::AbstractLShapedSolver, cut::HyperPlane{Unbounded}, ::AbstractVector, subobjectives::AbstractVector; check = true)
     subobjectives[cut.id] = -Inf
     return true
-end
-
-update_objective!(lshaped::AbstractLShapedSolver, cut::AbstractHyperPlane) = update_objective!(lshaped, cut, lshaped.feasibility)
-update_objective!(lshaped::AbstractLShapedSolver, cut::AbstractHyperPlane, ::AbstractFeasibility) = nothing
-function update_objective!(lshaped::AbstractLShapedSolver, cut::HyperPlane{OptimalityCut}, ::HandleFeasibility)
-    # Ensure that θi is included in minimization if feasibility cuts are used
-    c = MPB.getobj(lshaped.mastersolver.lqmodel)
-    if c[length(lshaped.x) + cut.id] == 0.0
-        c[length(lshaped.x) + cut.id] = 1.0
-        MPB.setobj!(lshaped.mastersolver.lqmodel,c)
-    end
-    return nothing
-end
-function update_objective!(lshaped::AbstractLShapedSolver, cut::AggregatedOptimalityCut, ::HandleFeasibility)
-    # Ensure that θis are included in minimization if feasibility cuts are used
-    c = MPB.getobj(lshaped.mastersolver.lqmodel)
-    ids = filter(i->c[length(lshaped.x)+i] == 0.0, cut.ids)
-    if !isempty(ids)
-        c[length(lshaped.x) .+ ids] .= 1.0
-        MPB.setobj!(lshaped.mastersolver.lqmodel,c)
-    end
-    return nothing
 end

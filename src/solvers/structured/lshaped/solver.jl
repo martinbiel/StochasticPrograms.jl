@@ -23,7 +23,7 @@ Functor object for the L-shaped algorithm. Create using the `LShapedSolver` fact
 
 ...
 # Algorithm parameters
-- `τ::Real = 1e-6`: Relative tolerance for convergence checks.
+- `τ::AbstractFloat = 1e-6`: Relative tolerance for convergence checks.
 - `debug::Bool = false`: Specifies if extra information should be saved for debugging purposes. Defaults to false for memory efficiency.
 - `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
 ...
@@ -59,7 +59,7 @@ struct LShaped{T <: AbstractFloat,
     feasibility::F
 
     # Regularization
-    regularizer::R
+    regularization::R
 
     # Cuts
     θs::A
@@ -74,7 +74,7 @@ struct LShaped{T <: AbstractFloat,
                      x₀::AbstractVector,
                      mastersolver::MPB.AbstractMathProgSolver,
                      subsolver::MPB.AbstractMathProgSolver,
-                     complete_recourse::Bool,
+                     feasibility_cuts::Bool,
                      executer::Execution,
                      regularizer::AbstractRegularizer,
                      aggregator::AbstractAggregator,
@@ -103,7 +103,7 @@ struct LShaped{T <: AbstractFloat,
         S = LQSolver{typeof(MPB.LinearQuadraticModel(subsolver)),typeof(subsolver)}
         n = StochasticPrograms.nscenarios(stochasticprogram)
         # Feasibility
-        feasibility = complete_recourse ? IgnoreFeasibility() : HandleFeasibility(T)
+        feasibility = feasibility_cuts ? HandleFeasibility(T) : IgnoreFeasibility()
         F = typeof(feasibility)
         # Execution policy
         execution = executer(n,F,T,A,S)
@@ -146,7 +146,7 @@ end
 LShaped(stochasticprogram::StochasticProgram,
         mastersolver::MPB.AbstractMathProgSolver,
         subsolver::MPB.AbstractMathProgSolver,
-        complete_recourse::Bool,
+        feasibility_cuts::Bool,
         executer::Execution,
         regularizer::AbstractRegularizer,
         aggregator::AbstractAggregator,
@@ -154,7 +154,7 @@ LShaped(stochasticprogram::StochasticProgram,
                                                              rand(decision_length(stochasticprogram)),
                                                              mastersolver,
                                                              subsolver,
-                                                             complete_recourse,
+                                                             feasibility_cuts,
                                                              executer,
                                                              regularizer,
                                                              aggregator,

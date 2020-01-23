@@ -1,6 +1,6 @@
 # Regularized decomposition
 # ------------------------------------------------------------
-@with_kw mutable struct RDData{T <: Real}
+@with_kw mutable struct RDData{T <: AbstractFloat}
     Q̃::T = 1e10
     σ::T = 1.0
     incumbent::Int = 1
@@ -9,7 +9,7 @@
     regularizerindex::Int = -1
 end
 
-@with_kw mutable struct RDParameters{T <: Real}
+@with_kw mutable struct RDParameters{T <: AbstractFloat}
     τ::T = 1e-6
     γ::T = 0.9
     σ::T = 1.0
@@ -25,9 +25,9 @@ Functor object for using regularized decomposition regularization in an L-shaped
 
 ...
 # Parameters
-- `σ::Real = 1.0`: Initial value of regularization parameter. Controls the relative penalty of the deviation from the current major iterate.
-- `σ̅::real = 4.0`: Maximum value of the regularization parameter.
-- `σ̲::real = 0.5`: Minimum value of the regularization parameter.
+- `σ::AbstractFloat = 1.0`: Initial value of regularization parameter. Controls the relative penalty of the deviation from the current major iterate.
+- `σ̅::AbstractFloat = 4.0`: Maximum value of the regularization parameter.
+- `σ̲::AbstractFloat = 0.5`: Minimum value of the regularization parameter.
 - `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
 - `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
 ...
@@ -49,7 +49,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector} <: Abst
     end
 end
 
-function init_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
+function initialize_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)
     # Add ∞-norm auxilliary variable
@@ -112,7 +112,7 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     rd.data.σ = new_σ
     if need_update
         c = copy(lshaped.c)
-	append!(c, MPB.getobj(lshaped.mastersolver.lqmodel)[end-nthetas(lshaped)+1:end])
+	    append!(c, MPB.getobj(lshaped.mastersolver.lqmodel)[end-nthetas(lshaped)+1:end])
         add_penalty!(lshaped, lshaped.mastersolver.lqmodel, c, 1/rd.data.σ, rd.ξ, Val{rd.parameters.linearize}())
     end
     return nothing

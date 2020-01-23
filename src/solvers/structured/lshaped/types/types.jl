@@ -1,5 +1,5 @@
 include("hyperplane.jl")
-include("feasibility.jl")
 include("channels.jl")
-include("subproblem.jl")
 include("AbstractLShaped.jl")
+include("feasibility.jl")
+include("subproblem.jl")

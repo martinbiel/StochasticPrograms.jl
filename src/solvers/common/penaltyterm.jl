@@ -1,5 +1,29 @@
-# Utility
-# ------------------------------------------------------------
+abstract type PenaltyTerm end
+
+@with_kw mutable struct PenaltyTermData{T <: AbstractFloat}
+    index::Int = -1
+end
+
+struct Quadratic <: PenaltyTerm
+
+
+end
+
+struct Linearized <: PenaltyTerm
+
+
+end
+
+struct InfNorm <: PenaltyTerm
+
+
+end
+
+struct 1Norm <: PenaltyTerm
+
+
+end
+
 function add_penalty!(lshaped::AbstractLShapedSolver, model::MPB.AbstractLinearQuadraticModel, c::AbstractVector, α::Real, ξ::AbstractVector, ::Val{true})
     nt = nthetas(lshaped)
     ncols = decision_length(lshaped.stochasticprogram)

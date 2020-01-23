@@ -142,9 +142,9 @@ function rebuild_master!(lshaped::AbstractLShapedSolver, consolidation::Consolid
     ncuts = ncutconstraints(lshaped)
     cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lshaped.mastersolver.lqmodel)
     MPB.delconstrs!(lshaped.mastersolver.lqmodel, collect(cut_indices))
-    if lshaped.regularizer isa LevelSet
+    if lshaped.regularization isa LevelSet
         # Reset projection problem if using level sets
-        lv = lshaped.regularizer
+        lv = lshaped.regularization
         MPB.delconstrs!(lv.projectionsolver.lqmodel, [lv.data.levelindex])
         cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lv.projectionsolver.lqmodel)
         MPB.delconstrs!(lv.projectionsolver.lqmodel, collect(cut_indices))

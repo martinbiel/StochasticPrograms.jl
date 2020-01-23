@@ -5,7 +5,7 @@ function work_on_subproblems!(subworker::SubWorker{T,A,S},
                               x̄::RunningAverage{A},
                               δ::RunningAverage{T},
                               decisions::Decisions{A},
-                              r::IteratedValue{T}) where {T <: Real, A <: AbstractArray, S <: LQSolver}
+                              r::IteratedValue{T}) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
     subproblems::Vector{SubProblem{T,A,S}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.

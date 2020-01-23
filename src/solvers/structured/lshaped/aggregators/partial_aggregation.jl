@@ -27,10 +27,7 @@ Functor object for using complete aggregation in an L-shaped algorithm. Create b
 FullAggregation(start_id::Integer, nscenarios::Integer, ::Type{T}) where T <: AbstractFloat = PartialAggregation(nscenarios, start_id, nscenarios, T)
 
 function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation, cut::HyperPlane)
-    if passthrough!(lshaped, aggregation, cut)
-        return true
-    end
-    added = false
+    added = passthrough!(lshaped, aggregation, cut)
     add_to_collection!(aggregation.collection, cut, lshaped.x)
     if considered(aggregation.collection) == aggregation.size
         if collection_size(aggregation.collection) == aggregation.size

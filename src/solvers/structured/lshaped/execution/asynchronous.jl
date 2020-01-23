@@ -122,12 +122,12 @@ function timestamp(::AbstractLShapedSolver, execution::AsynchronousExecution)
     return execution.data.timestamp
 end
 
-function incumbent_decision(::AbstractLShapedSolver, t::Integer, regularizer::AbstractRegularization, execution::AsynchronousExecution)
-    return t > 1 ? fetch(execution.decisions, regularizer.incumbents[t]) : regularizer.ξ
+function incumbent_decision(::AbstractLShapedSolver, t::Integer, regularization::AbstractRegularization, execution::AsynchronousExecution)
+    return t > 1 ? fetch(execution.decisions, regularization.incumbents[t]) : regularization.ξ
 end
 
-function incumbent_objective(::AbstractLShapedSolver, t::Integer, regularizer::AbstractRegularization, ::AsynchronousExecution)
-    return t > 1 ? regularizer.Q̃_history[regularizer.incumbents[t]] : regularizer.data.Q̃
+function incumbent_objective(::AbstractLShapedSolver, t::Integer, regularization::AbstractRegularization, ::AsynchronousExecution)
+    return t > 1 ? regularization.Q̃_history[regularization.incumbents[t]] : regularization.data.Q̃
 end
 
 function incumbent_trustregion(::AbstractLShapedSolver, t::Integer, rd::RegularizedDecomposition, ::AsynchronousExecution)
@@ -169,7 +169,8 @@ end
 
 function set_model_objectives(lshaped::AbstractLShapedSolver, θs::AbstractVector, execution::AsynchronousExecution)
     t = timestamp(lshaped)
-    execution.model_objectives[t] .= θs
+    ids = active_model_objectives(lshaped)
+    execution.model_objectives[t][ids] .= θs[ids]
     return nothing
 end
 
@@ -186,7 +187,7 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
         execution.data.timestamp = t
         # Break if any subproblem is infeasible or unbounded
         if infeasible(cut)
-            @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with complete_recourse = false to use feasibility cuts."
+            @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with feasibility_cuts = true to use feasibility cuts."
             return :Infeasible
         end
         if !bounded(cut)
@@ -206,7 +207,7 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
             # lshaped.x .= fetch(execution.decisions, t)
             take_step!(lshaped)
             # Optimal if not using regularization and no cuts were added
-            if lshaped.regularizer isa NoRegularization && !execution.added[t]
+            if lshaped.regularization isa NoRegularization && !execution.added[t]
                 # Optimal, final log
                 log!(lshaped, t; optimal = true)
                 return :Optimal
@@ -215,7 +216,7 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
             consolidate!(lshaped, lshaped.consolidation)
             # Decrease number of active iterations
             execution.data.active = max(0, execution.data.active-1)
-            newiterate |= !(lshaped.regularizer isa NoRegularization && execution.triggered[t])
+            newiterate |= !(lshaped.regularization isa NoRegularization && execution.triggered[t])
             newiterate |= t == 1
         elseif execution.finished[t] >= κ*nthetas(lshaped) && !execution.triggered[t] && execution.data.active < execution.max_active && execution.added[t]
             execution.triggered[t] = true

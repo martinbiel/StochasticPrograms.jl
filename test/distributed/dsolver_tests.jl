@@ -30,7 +30,13 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp, solver=reference_solver)
                 x̄ = optimal_decision(sp)
                 Q̄ = optimal_value(sp)
-                optimize!(sp, solver=ls)
+                if name == "Infeasible"
+                    with_logger(NullLogger()) do
+                        @test optimize!(infeasible, solver=ls) == :Infeasible
+                        add_params!(ls, feasibility_cuts = true)
+                    end
+                end
+                @test optimize!(sp, solver=ls) == :Optimal
                 @test isapprox(optimal_value(sp), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
             end
@@ -41,7 +47,14 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp_onenode, solver=reference_solver)
                 x̄ = optimal_decision(sp_onenode)
                 Q̄ = optimal_value(sp_onenode)
-                optimize!(sp, solver=ls)
+                if name == "Infeasible"
+                    with_logger(NullLogger()) do
+                        add_params!(ls, feasibility_cuts = false)
+                        @test optimize!(infeasible, solver=ls) == :Infeasible
+                        add_params!(ls, feasibility_cuts = true)
+                    end
+                end
+                @test optimize!(sp, solver=ls) == :Optimal
                 @test isapprox(optimal_value(sp_onenode), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_onenode), x̄, rtol = sqrt(tol))
             end
@@ -52,7 +65,14 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp_nondist, solver=reference_solver)
                 x̄ = optimal_decision(sp_nondist)
                 Q̄ = optimal_value(sp_nondist)
-                optimize!(sp_nondist, solver=ls)
+                if name == "Infeasible"
+                    with_logger(NullLogger()) do
+                        add_params!(ls, feasibility_cuts = false)
+                        @test optimize!(infeasible, solver=ls) == :Infeasible
+                        add_params!(ls, feasibility_cuts = true)
+                    end
+                end
+                @test optimize!(sp_nondist, solver=ls) == :Optimal
                 @test isapprox(optimal_value(sp_nondist), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_nondist), x̄, rtol = sqrt(tol))
             end
@@ -68,6 +88,11 @@ executors = [Synchronous(), Asynchronous()]
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)
             with_logger(NullLogger()) do
+                if name == "Infeasible"
+                    add_params!(ls, feasibility_cuts = false)
+                    @test optimize!(infeasible, solver=ls) == :Infeasible
+                    add_params!(ls, feasibility_cuts = true)
+                end
                 optimize!(sp, solver=ls)
             end
             @test isapprox(optimal_value(sp), Q̄, rtol = tol)
@@ -86,7 +111,7 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp, solver=reference_solver)
                 x̄ = optimal_decision(sp)
                 Q̄ = optimal_value(sp)
-                optimize!(sp, solver=ph)
+                @test optimize!(sp, solver=ph) == :Optimal
                 @test isapprox(optimal_value(sp), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
             end
@@ -97,7 +122,7 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp_onenode, solver=reference_solver)
                 x̄ = optimal_decision(sp_onenode)
                 Q̄ = optimal_value(sp_onenode)
-                optimize!(sp, solver=ph)
+                @test optimize!(sp, solver=ph) == :Optimal
                 @test isapprox(optimal_value(sp_onenode), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_onenode), x̄, rtol = sqrt(tol))
             end
@@ -108,7 +133,7 @@ executors = [Synchronous(), Asynchronous()]
                 optimize!(sp_nondist, solver=reference_solver)
                 x̄ = optimal_decision(sp_nondist)
                 Q̄ = optimal_value(sp_nondist)
-                optimize!(sp, solver=ph)
+                @test optimize!(sp, solver=ph) == :Optimal
                 @test isapprox(optimal_value(sp_nondist), Q̄, rtol = tol)
                 @test isapprox(optimal_decision(sp_nondist), x̄, rtol = sqrt(tol))
             end
@@ -120,7 +145,7 @@ executors = [Synchronous(), Asynchronous()]
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)
             with_logger(NullLogger()) do
-                optimize!(sp, solver=ph)
+                @test optimize!(sp, solver=ph) == :Optimal
             end
             @test isapprox(optimal_value(sp), Q̄, rtol = tol)
             @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))

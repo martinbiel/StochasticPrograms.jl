@@ -65,10 +65,6 @@ struct SubProblem{F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVec
     end
 end
 
-SubSolver = Union{MPB.AbstractMathProgSolver, Function}
-get_solver(subsolver::MPB.AbstractMathProgSolver) = subsolver
-get_solver(generator::Function)::MPB.AbstractMathProgSolver = generator()
-
 function FeasibilitySolver(model::JuMP.Model, optimsolver::MPB.AbstractMathProgSolver, ::Type{IgnoreFeasibility})
     return LQSolver(model, optimsolver; load = false)
 end
@@ -200,7 +196,7 @@ function fill_submodel!(submodel::JuMP.Model, subproblem::SubProblem)
     return nothing
 end
 
-function fill_submodel!(submodel::JuMP.Model, x::AbstractVector, μ::AbstractVector, λ::AbstractVector, C::Real)
+function fill_submodel!(submodel::JuMP.Model, x::AbstractVector, μ::AbstractVector, λ::AbstractVector, C::AbstractFloat)
     submodel.colVal = x
     submodel.redCosts = μ
     submodel.linconstrDuals = λ

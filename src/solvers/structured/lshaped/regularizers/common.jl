@@ -1,16 +1,16 @@
 # Common
 # ------------------------------------------------------------
-function add_regularization_params!(regularizer::AbstractRegularizer; kwargs...)
-    push!(regularizer.parameters, kwargs...)
+function add_regularization_params!(regularization::AbstractRegularizer; kwargs...)
+    push!(regularization.parameters, kwargs...)
     return nothing
 end
 
-function decision(::AbstractLShapedSolver, regularizer::AbstractRegularization)
-    return regularizer.ξ
+function decision(::AbstractLShapedSolver, regularization::AbstractRegularization)
+    return regularization.ξ
 end
 
-function objective(::AbstractLShapedSolver, regularizer::AbstractRegularization)
-    return regularizer.data.Q̃
+function objective(::AbstractLShapedSolver, regularization::AbstractRegularization)
+    return regularization.data.Q̃
 end
 
 function solve_problem!(lshaped::AbstractLShapedSolver, solver::LQSolver, ::AbstractRegularization)
@@ -18,9 +18,9 @@ function solve_problem!(lshaped::AbstractLShapedSolver, solver::LQSolver, ::Abst
     return nothing
 end
 
-function gap(lshaped::AbstractLShapedSolver, regularizer::AbstractRegularization)
+function gap(lshaped::AbstractLShapedSolver, regularization::AbstractRegularization)
     @unpack θ = lshaped.data
-    @unpack Q̃ = regularizer.data
+    @unpack Q̃ = regularization.data
     return abs(θ-Q̃)/(abs(Q̃)+1e-10)
 end
 
@@ -32,7 +32,7 @@ function project!(lshaped::AbstractLShapedSolver, ::AbstractRegularization)
     return nothing
 end
 
-function add_regularization_params!(regularizer::AbstractRegularization; kwargs...)
-    push!(regularizer.params, kwargs...)
+function add_regularization_params!(regularization::AbstractRegularization; kwargs...)
+    push!(regularization.params, kwargs...)
     return nothing
 end

@@ -8,7 +8,7 @@ Empty functor object for running an L-shaped algorithm without regularization.
 """
 struct NoRegularization <: AbstractRegularization end
 
-function init_regularization!(::AbstractLShapedSolver, ::NoRegularization)
+function initialize_regularization!(::AbstractLShapedSolver, ::NoRegularization)
     return nothing
 end
 

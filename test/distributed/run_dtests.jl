@@ -19,5 +19,5 @@ using OSQP
 @everywhere import StochasticPrograms: probability, expected
 
 include("../problems/problem_load.jl")
-include("dfunctional_tests.jl")
+#include("dfunctional_tests.jl")
 include("dsolver_tests.jl")

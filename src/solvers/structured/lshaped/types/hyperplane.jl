@@ -12,15 +12,15 @@ struct HyperPlane{H <: HyperPlaneType, T <: AbstractFloat, A <: AbstractVector} 
     q::T
     id::Int
 
-    function HyperPlane(δQ::AbstractVector, q::Real, id::Int, ::Type{H}) where H <: HyperPlaneType
+    function HyperPlane(δQ::AbstractVector, q::AbstractFloat, id::Int, ::Type{H}) where H <: HyperPlaneType
         T = promote_type(eltype(δQ), Float32)
         δQ_ = convert(AbstractVector{T}, δQ)
         new{H, T, typeof(δQ_)}(δQ_, q, id)
     end
 end
-OptimalityCut(δQ::AbstractVector, q::Real, id::Int) = HyperPlane(δQ, q, id, OptimalityCut)
-FeasibilityCut(δQ::AbstractVector, q::Real, id::Int) = HyperPlane(δQ, q, id, FeasibilityCut)
-LinearConstraint(δQ::AbstractVector, q::Real, id::Int) = HyperPlane(δQ, q, id, LinearConstraint)
+OptimalityCut(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, OptimalityCut)
+FeasibilityCut(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, FeasibilityCut)
+LinearConstraint(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, LinearConstraint)
 Infeasible(id::Int) = HyperPlane(sparsevec(Float64[]), 1e10, id, Infeasible)
 Unbounded(id::Int) = HyperPlane(sparsevec(Float64[]), 1e10, id, Unbounded)
 
@@ -29,7 +29,7 @@ struct AggregatedOptimalityCut{T <: AbstractFloat, A <: AbstractVector} <: Abstr
     q::T
     ids::Vector{Int}
 
-    function AggregatedOptimalityCut(δQ::AbstractVector, q::Real, ids::Vector{Int})
+    function AggregatedOptimalityCut(δQ::AbstractVector, q::AbstractFloat, ids::Vector{Int})
         T = promote_type(eltype(δQ), Float32)
         δQ_ = convert(AbstractVector{T}, δQ)
         new{T, typeof(δQ_)}(δQ_, q, ids)
@@ -72,17 +72,17 @@ infeasible(hyperplane::AbstractHyperPlane) = false
 infeasible(hyperplane::HyperPlane{Infeasible}) = true
 bounded(hyperplane::AbstractHyperPlane) = true
 bounded(hyperplane::HyperPlane{Unbounded}) = false
-function optimal(cut::AnyOptimalityCut, x::AbstractVector, θ::Real, τ::Real)
+function optimal(cut::AnyOptimalityCut, x::AbstractVector, θ::AbstractFloat, τ::AbstractFloat)
     Q = cut(x)
     return θ > -Inf && abs(θ-Q) <= τ*(1+abs(Q))
 end
-function active(hyperplane::AbstractHyperPlane, x::AbstractVector, τ::Real)
+function active(hyperplane::AbstractHyperPlane, x::AbstractVector, τ::AbstractFloat)
     return abs(gap(hyperplane,x)) <= τ
 end
-function satisfied(hyperplane::AbstractHyperPlane, x::AbstractVector, τ::Real)
+function satisfied(hyperplane::AbstractHyperPlane, x::AbstractVector, τ::AbstractFloat)
     return gap(hyperplane,x) >= -τ
 end
-function satisfied(cut::HyperPlane{OptimalityCut}, x::AbstractVector, θ::Real, τ::Real)
+function satisfied(cut::HyperPlane{OptimalityCut}, x::AbstractVector, θ::AbstractFloat, τ::AbstractFloat)
     Q = cut(x)
     return θ > -Inf && θ >= Q - τ
 end
@@ -92,7 +92,7 @@ function gap(hyperplane::AbstractHyperPlane,x::AbstractVector)
     end
     return hyperplane.δQ⋅x-hyperplane.q
 end
-function gap(cut::AnyOptimalityCut, x::AbstractVector, θ::Real)
+function gap(cut::AnyOptimalityCut, x::AbstractVector, θ::AbstractFloat)
     if θ > -Inf
         return θ-cut(x)
     else
@@ -124,7 +124,7 @@ function lowlevel(cut::SparseAggregatedOptimalityCut, scaling::T) where T <: Abs
     return nzind, nzval, scaling*cut.q, Inf
 end
 
-ArtificialCut(val::Real, dim::Int, id::Int) = OptimalityCut(sparsevec(zeros(dim)), val, id)
+ArtificialCut(val::AbstractFloat, dim::Int, id::Int) = OptimalityCut(sparsevec(zeros(dim)), val, id)
 
 function LinearConstraint(constraint::JuMP.LinearConstraint, i::Integer)
     sense = JuMP.sense(constraint)

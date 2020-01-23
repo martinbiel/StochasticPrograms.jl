@@ -1,6 +1,6 @@
 # Level-set
 # ------------------------------------------------------------
-@with_kw mutable struct LVData{T <: Real}
+@with_kw mutable struct LVData{T <: AbstractFloat}
     Q̃::T = 1e10
     incumbent::Int = 1
     major_iterations::Int = 0
@@ -9,7 +9,7 @@
     regularizerindex::Int = -1
 end
 
-@with_kw mutable struct LVParameters{T <: Real}
+@with_kw mutable struct LVParameters{T <: AbstractFloat}
     λ::T = 0.5
     linearize::Bool = false
 end
@@ -21,7 +21,7 @@ Functor object for using level-set regularization in an L-shaped algorithm. Crea
 
 ...
 # Parameters
-- `λ::Real = 0.5`: Controls the level position L = (1-λ)*θ + λ*Q̃, a convex combination of the current lower and upper bound.
+- `λ::AbstractFloat = 0.5`: Controls the level position L = (1-λ)*θ + λ*Q̃, a convex combination of the current lower and upper bound.
 - `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
 ...
 """
@@ -46,7 +46,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, P <: LQSolver} <: Abstr
     end
 end
 
-function init_regularization!(lshaped::AbstractLShapedSolver, lv::LevelSet)
+function initialize_regularization!(lshaped::AbstractLShapedSolver, lv::LevelSet)
     MPB.loadproblem!(lv.projectionsolver.lqmodel, loadLP(StochasticPrograms.get_stage_one(lshaped.stochasticprogram))...)
     MPB.setobj!(lv.projectionsolver.lqmodel, zeros(decision_length(lshaped.stochasticprogram)))
     # θs
@@ -105,7 +105,7 @@ end
 
 function project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
     @unpack Q = lshaped.data
-    if !handle_feasibility(lshaped.feasibility) || Q < Inf
+    if count(active_model_objectives(lshaped)) == nthetas(lshaped)
         _project!(lshaped, lv)
     end
     return nothing
@@ -115,7 +115,6 @@ function _project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
     @unpack θ = lshaped.data
     @unpack Q̃ = lv.data
     @unpack λ = lv.parameters
-    # Update level (TODO: Rewrite with MathOptInterface)
     nt = nthetas(lshaped)
     c = sparse(MPB.getobj(lshaped.mastersolver.lqmodel))
     L = (1-λ)*θ + λ*Q̃
@@ -124,16 +123,12 @@ function _project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
         MPB.addconstr!(lv.projectionsolver.lqmodel, c.nzind, c.nzval, -Inf, L)
         lv.data.levelindex = first_stage_nconstraints(lshaped.stochasticprogram)+ncuts(lshaped)+1
     else
-        MPB.delconstrs!(lv.projectionsolver.lqmodel, [lv.data.levelindex])
-        MPB.addconstr!(lv.projectionsolver.lqmodel, c.nzind, c.nzval, -Inf, L)
-        lv.data.levelindex = first_stage_nconstraints(lshaped.stochasticprogram)+ncuts(lshaped)+1
-        if lv.parameters.linearize
-            lv.data.regularizerindex -= 1
-        end
+        ub = MPB.getconstrUB(lv.projectionsolver.lqmodel)
+        ub[lv.data.levelindex] = L
+        MPB.setconstrUB!(lv.projectionsolver.lqmodel, ub)
     end
     # Update regularizer
     add_penalty!(lshaped, lv.projectionsolver.lqmodel, zeros(length(lshaped.x)+nt), 1.0, lshaped.x, Val{lv.parameters.linearize}())
-    lv.data.regularizerindex += 1
     # Solve projection problem
     solve_problem!(lshaped, lv.projectionsolver)
     if status(lv.projectionsolver) == :Infeasible

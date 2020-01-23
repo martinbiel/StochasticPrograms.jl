@@ -23,6 +23,7 @@ The following consolidation schemes are available
 ...
 # Arguments
 - `lpsolver::AbstractMathProgSolver`: MathProgBase solver capable of solving linear (and possibly quadratic) programs.
+- `feasibility_cuts::Bool = false`: Specify if feasibility cuts should be used
 - `subsolver::AbstractMathProgSolver = lpsolver`: Optionally specify a different solver for the subproblems.
 - `regularize::AbstractRegularizer = DontRegularize()`: Specify regularization procedure (DontRegularize, RegularizedDecomposition/RD/WithRegularizedDecomposition, TrustRegion/TR/WithTrustRegion, LevelSet/LV/WithLevelSets).
 - `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate)
@@ -49,7 +50,7 @@ L-Shaped Gap  Time: 0:00:00 (6 iterations)
 mutable struct LShapedSolver{S <: SubSolver, E <: Execution, R <: AbstractRegularizer, A <: AbstractAggregator, C <: AbstractConsolidator} <: AbstractStructuredSolver
     lpsolver::MPB.AbstractMathProgSolver
     subsolver::S
-    complete_recourse::Bool
+    feasibility_cuts::Bool
     execution::E
     regularize::R
     aggregate::A
@@ -59,7 +60,7 @@ mutable struct LShapedSolver{S <: SubSolver, E <: Execution, R <: AbstractRegula
 
     function LShapedSolver(lpsolver::MPB.AbstractMathProgSolver;
                            execution::Execution = Serial(),
-                           complete_recourse::Bool = true,
+                           feasibility_cuts::Bool = false,
                            regularize::AbstractRegularizer = DontRegularize(),
                            aggregate::AbstractAggregator = DontAggregate(),
                            consolidate::AbstractConsolidator = DontConsolidate(),
@@ -72,7 +73,7 @@ mutable struct LShapedSolver{S <: SubSolver, E <: Execution, R <: AbstractRegula
         C = typeof(consolidate)
         return new{S, E, R, A, C}(lpsolver,
                                   subsolver,
-                                  complete_recourse,
+                                  feasibility_cuts,
                                   execution,
                                   regularize,
                                   aggregate,
@@ -84,13 +85,13 @@ end
 
 function StructuredModel(stochasticprogram::StochasticProgram, solver::LShapedSolver)
     x₀ = solver.crash(stochasticprogram, solver.lpsolver)
-    return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.complete_recourse, solver.execution, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
+    return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.feasibility_cuts, solver.execution, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
 end
 
 function add_params!(solver::LShapedSolver; kwargs...)
     push!(solver.parameters, kwargs...)
     for (k,v) in kwargs
-        if k ∈ [:variant, :lpsolver, :subsolver, :complete_recourse, :execution, :regularize, :aggregate, :crash]
+        if k ∈ [:variant, :lpsolver, :subsolver, :feasibility_cuts, :execution, :regularize, :aggregate, :crash]
             setfield!(solver, k, v)
             delete!(solver.parameters, k)
         end
