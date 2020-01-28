@@ -110,7 +110,7 @@ function resolve_subproblems!(::AbstractLShapedSolver, ::AsynchronousExecution)
 end
 
 function calculate_objective_value(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution)
-    return lshaped.c⋅decision(lshaped) + eval_second_stage(execution.subworkers, decision(lshaped))
+    return get_obj(lshaped)⋅decision(lshaped) + eval_second_stage(execution.subworkers, decision(lshaped))
 end
 
 function current_decision(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution)
@@ -235,7 +235,7 @@ function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecuti
             end
             # Update master solution
             update_solution!(lshaped, lshaped.mastersolver)
-            θ = lshaped.c⋅lshaped.x + sum(execution.model_objectives[t])
+            θ = get_obj(lshaped)⋅lshaped.x + sum(execution.model_objectives[t])
             lshaped.data.θ = θ
             lshaped.θ_history[t] = θ
             # Check if optimal

@@ -48,7 +48,7 @@ end
 function penalty(::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
     return penalty.data.r
 end
-function init_penalty!(ph::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
+function initialize_penalty!(ph::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
     update_dual_gap!(ph)
     @unpack δ₂ = ph.data
     @unpack ζ = penalty.parameters

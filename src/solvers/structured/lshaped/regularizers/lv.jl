@@ -53,7 +53,7 @@ function initialize_regularization!(lshaped::AbstractLShapedSolver, lv::LevelSet
     for i = 1:nthetas(lshaped)
         MPB.addvar!(lv.projectionsolver.lqmodel, -Inf, Inf, 0.0)
     end
-    initialize_penalty!(lv.penalty, lv.projectionsolver, lshaped.c)
+    initialize_penaltyterm!(lv.penalty, lv.projectionsolver, lshaped.x)
     return nothing
 end
 
@@ -116,9 +116,10 @@ function _project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
         MPB.setconstrUB!(lv.projectionsolver.lqmodel, ub)
     end
     # Update regularizer
-    update_penalty!(lv.penalty, lv.projectionsolver, 1.0, lshaped.x)
+    c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
+    update_penaltyterm!(lv.penalty, lv.projectionsolver, c, 1.0, lshaped.x)
     # Solve projection problem
-    solve!(lv.penalty, lv.projectionsolver, lshaped.mastervector, lshaped.x, lshaped.x)
+    solve_penalized!(lv.penalty, lv.projectionsolver, lshaped.mastervector, lshaped.x, lshaped.x)
     if status(lv.projectionsolver) == :Infeasible
         @warn "Projection problem is infeasible, unprojected solution will be used"
         if Q̃ <= θ

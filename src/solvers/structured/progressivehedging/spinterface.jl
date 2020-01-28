@@ -34,37 +34,42 @@ Progressive Hedging Time: 0:00:06 (1315 iterations)
 """
 mutable struct ProgressiveHedgingSolver{S <: QPSolver,
                                         E <: Execution,
-                                        P <: AbstractPenalizer} <: AbstractStructuredSolver
+                                        P <: AbstractPenalizer,
+                                        PT <: PenaltyTerm} <: AbstractStructuredSolver
     qpsolver::S
     execution::E
     penalty::P
+    penaltyterm::PT
     crash::CrashMethod
     parameters::Dict{Symbol,Any}
 
     function ProgressiveHedgingSolver(qpsolver::QPSolver;
                                       execution::Execution = Serial(),
                                       penalty::AbstractPenalizer = Fixed(),
+                                      penaltyterm::PenaltyTerm = Quadratic(),
                                       crash::CrashMethod = Crash.None(), kwargs...)
         S = typeof(qpsolver)
         E = typeof(execution)
         P = typeof(penalty)
-        return new{S, E, P}(qpsolver,
-                            execution,
-                            penalty,
-                            crash,
-                            Dict{Symbol,Any}(kwargs))
+        PT = typeof(penaltyterm)
+        return new{S, E, P, PT}(qpsolver,
+                                execution,
+                                penalty,
+                                penaltyterm,
+                                crash,
+                                Dict{Symbol,Any}(kwargs))
     end
 end
 
 function StructuredModel(stochasticprogram::StochasticProgram, solver::ProgressiveHedgingSolver)
     x₀ = solver.crash(stochasticprogram, solver.qpsolver)
-    return ProgressiveHedging(stochasticprogram, solver.qpsolver, solver.execution, solver.penalty; solver.parameters...)
+    return ProgressiveHedging(stochasticprogram, solver.qpsolver, solver.execution, solver.penalty, solver.penaltyterm; solver.parameters...)
 end
 
 function add_params!(solver::ProgressiveHedgingSolver; kwargs...)
     push!(solver.parameters, kwargs...)
     for (k,v) in kwargs
-        if k ∈ [:qpsolver, :execution, :penalty, :crash]
+        if k ∈ [:qpsolver, :execution, :penalty, :penaltyterms, :crash]
             setfield!(solver, k, v)
             delete!(solver.parameters, k)
         end

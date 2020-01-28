@@ -54,8 +54,9 @@ function initialize_regularization!(lshaped::AbstractLShapedSolver, rd::Regulari
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)
     # Initialize and update penalty
-    initialize_penalty!(rd.penalty, lshaped.mastersolver, lshaped.c)
-    update_penalty!(rd.penalty, lshaped.mastersolver, 1/rd.data.σ, rd.ξ)
+    initialize_penaltyterm!(rd.penalty, lshaped.mastersolver, lshaped.x)
+    c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
+    update_penaltyterm!(rd.penalty, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
     return nothing
 end
 
@@ -105,13 +106,14 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     end
     rd.data.σ = new_σ
     if need_update
-        update_penalty!(rd.penalty, lshaped.mastersolver, 1/rd.data.σ, rd.ξ)
+        c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
+        update_penaltyterm!(rd.penalty, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
     end
     return nothing
 end
 
 function solve_regularized_master!(lshaped::AbstractLShapedSolver, solver::LQSolver, rd::RegularizedDecomposition)
-    solve!(rd.penalty, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
+    solve_penalized!(rd.penalty, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
     return nothing
 end
 

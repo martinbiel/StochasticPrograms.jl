@@ -6,16 +6,17 @@ Functor object for using synchronous execution in a progressive-hedging algorith
 """
 struct SynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
-                            S <: LQSolver} <: AbstractExecution
-    subworkers::Vector{SubWorker{T,A,S}}
+                            S <: LQSolver,
+                            PT <: PenaltyTerm} <: AbstractExecution
+    subworkers::Vector{SubWorker{T,A,S,PT}}
 
-    function SynchronousExecution(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-        return new{T,A,S}(Vector{SubWorker{T,A,S}}(undef, nworkers()))
+    function SynchronousExecution(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+        return new{T,A,S,PT}(Vector{SubWorker{T,A,S,PT}}(undef, nworkers()))
     end
 end
 
-function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, execution::SynchronousExecution)
-    return init_subproblems!(ph, subsolver, execution.subworkers)
+function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::SynchronousExecution)
+    return initialize_subproblems!(ph, subsolver, penaltyterm, execution.subworkers)
 end
 
 function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution{T}) where T <: AbstractFloat
@@ -74,8 +75,8 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems,
 end
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-    return SynchronousExecution(T,A,S)
+function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+    return SynchronousExecution(T,A,S,PT)
 end
 
 function str(::Synchronous)

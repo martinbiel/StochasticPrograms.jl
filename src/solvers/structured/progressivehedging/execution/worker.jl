@@ -37,7 +37,7 @@ function work_on_subproblems!(subworker::SubWorker{T,A,S},
             !quit && take!(x̄, i)
             !quit && put!(δ, i, norm(subproblem.x - ξ, 2)^2, subproblem.π)
             reformulate_subproblem!(subproblem, ξ, fetch(r,t))
-            Q::T = subproblem()
+            Q::T = subproblem(ξ)
             !quit && put!(x̄, i, subproblem.π)
             !quit && put!(progress, (t,subproblem.id,Q))
         end

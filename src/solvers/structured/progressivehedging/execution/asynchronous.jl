@@ -5,9 +5,10 @@ Functor object for using asynchronous execution in a progressive-hedging algorit
 
 """
 struct AsynchronousExecution{T <: AbstractFloat,
-                            A <: AbstractVector,
-                            S <: LQSolver} <: AbstractExecution
-    subworkers::Vector{SubWorker{T,A,S}}
+                             A <: AbstractVector,
+                             S <: LQSolver,
+                             PT <: PenaltyTerm} <: AbstractExecution
+    subworkers::Vector{SubWorker{T,A,S,PT}}
     work::Vector{Work}
     finalize::Vector{Work}
     progressqueue::ProgressQueue{T}
@@ -22,29 +23,29 @@ struct AsynchronousExecution{T <: AbstractFloat,
     # Parameters
     κ::T
 
-    function AsynchronousExecution(κ::T, ::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-        return new{T,A,S}(Vector{SubWorker{T,A,S}}(undef, nworkers()),
-                          Vector{Work}(undef,nworkers()),
-                          Vector{Work}(undef,nworkers()),
-                          RemoteChannel(() -> Channel{Progress{T}}(4*nworkers())),
-                          Vector{RunningAverage{A}}(undef,nworkers()),
-                          Vector{RunningAverage{T}}(undef,nworkers()),
-                          RemoteChannel(() -> IterationChannel(Dict{Int,A}())),
-                          RemoteChannel(() -> IterationChannel(Dict{Int,T}())),
-                          Vector{Future}(undef,nworkers()),
-                          Vector{A}(),
-                          Vector{Int}(),
-                          κ)
+    function AsynchronousExecution(κ::T, ::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+        return new{T,A,S,PT}(Vector{SubWorker{T,A,S,PT}}(undef, nworkers()),
+                             Vector{Work}(undef,nworkers()),
+                             Vector{Work}(undef,nworkers()),
+                             RemoteChannel(() -> Channel{Progress{T}}(4*nworkers())),
+                             Vector{RunningAverage{A}}(undef,nworkers()),
+                             Vector{RunningAverage{T}}(undef,nworkers()),
+                             RemoteChannel(() -> IterationChannel(Dict{Int,A}())),
+                             RemoteChannel(() -> IterationChannel(Dict{Int,T}())),
+                             Vector{Future}(undef,nworkers()),
+                             Vector{A}(),
+                             Vector{Int}(),
+                             κ)
     end
 end
 
-function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, execution::AsynchronousExecution{T,A,S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
+function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::AsynchronousExecution{T,A,S,PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
     # Create subproblems on worker processes
     m = ph.stochasticprogram
     @sync begin
         for w in workers()
-            execution.subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,A,S}}}(1), w)
-            @async load_worker!(scenarioproblems(m), m, w, execution.subworkers[w-1], subsolver)
+            execution.subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,A,S,PT}}}(1), w)
+            @async load_worker!(scenarioproblems(m), m, w, execution.subworkers[w-1], subsolver, penaltyterm)
         end
     end
     @sync begin
@@ -195,8 +196,8 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-    return AsynchronousExecution(execution.κ, T, A, S)
+function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+    return AsynchronousExecution(execution.κ, T, A, S, PT)
 end
 
 function str(::Asynchronous)

@@ -1,8 +1,7 @@
 reference_solver = GLPKSolverLP()
-osqp = OSQP.OSQPMathProgBaseInterface.OSQPSolver(verbose=0)
 
 regularizers = [DontRegularize(),
-                RegularizedDecomposition(penalty = Linearized(nbreakpoints = 10)),
+                RegularizedDecomposition(penalty = Linearized()),
                 TrustRegion(),
                 LevelSet(penalty = InfNorm(), projectionsolver = reference_solver)]
 
@@ -101,7 +100,8 @@ executors = [Synchronous(), Asynchronous()]
     end
     @testset "Progressive-hedging: simple problems" begin
         @info "Running progressive-hedging tests..."
-        @testset "$(solverstr(ph)): $name" for ph in [ProgressiveHedgingSolver(osqp,
+        @testset "$(solverstr(ph)): $name" for ph in [ProgressiveHedgingSolver(reference_solver,
+                                                                               penaltyterm = Linearized(nbreakpoints = 30),
                                                                                execution = executor,
                                                                                τ = 1e-4,
                                                                                log = false)
@@ -140,7 +140,7 @@ executors = [Synchronous(), Asynchronous()]
         end
         @testset "Progressive-hedging on distributed data: $name" for (sp,res,name) in problems
             tol = 1e-2
-            ph = ProgressiveHedgingSolver(osqp, τ = 1e-4, log = false)
+            ph = ProgressiveHedgingSolver(reference_solver, penaltyterm = Linearized(nbreakpoints = 30), τ = 1e-4, log = false)
             optimize!(sp, solver=reference_solver)
             x̄ = optimal_decision(sp)
             Q̄ = optimal_value(sp)

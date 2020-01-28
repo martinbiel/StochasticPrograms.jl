@@ -13,7 +13,7 @@ using StochasticPrograms
 using StochasticPrograms: AbstractScenarioProblems, ScenarioProblems, DScenarioProblems
 using StochasticPrograms: LQSolver, getsolution, getobjval, getredcosts, getduals, status, SubSolver, get_solver, loadLP, feasibility_problem!
 using StochasticPrograms: Execution, Serial, Synchronous, Asynchronous
-using StochasticPrograms: PenaltyTerm, Quadratic, Linearized, InfNorm, ManhattanNorm, initialize_penalty!, update_penalty!, solve!
+using StochasticPrograms: PenaltyTerm, Quadratic, Linearized, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, solve_penalized!
 using MathProgBase
 using ProgressMeter
 using Clustering

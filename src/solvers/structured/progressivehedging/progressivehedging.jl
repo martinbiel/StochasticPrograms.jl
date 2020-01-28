@@ -14,6 +14,7 @@ using StochasticPrograms: _WS
 using StochasticPrograms: AbstractScenarioProblems, ScenarioProblems, DScenarioProblems
 using StochasticPrograms: LQSolver, getsolution, getobjval, getredcosts, getduals, status, QPSolver, get_solver, loadLP
 using StochasticPrograms: Execution, Serial, Synchronous, Asynchronous
+using StochasticPrograms: PenaltyTerm, Quadratic, Linearized, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, solve_penalized!
 using MathProgBase
 using ProgressMeter
 
@@ -29,6 +30,10 @@ export
     Serial,
     Synchronous,
     Asynchronous,
+    Quadratic,
+    Linearized,
+    InfNorm,
+    ManhattanNorm,
     Crash,
     StructuredModel,
     optimsolver,

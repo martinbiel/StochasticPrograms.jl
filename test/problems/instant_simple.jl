@@ -27,5 +27,5 @@ end
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 
-simple_res = SPResult([46.67,36.25], -855.83, -1518.75, 662.92, 286.92, -1445.92, -568.92)
-push!(problems, (simple, simple_res, "Instant simple"))
+#simple_res = SPResult([46.67,36.25], -855.83, -1518.75, 662.92, 286.92, -1445.92, -568.92)
+#push!(problems, (simple, simple_res, "Instant simple"))

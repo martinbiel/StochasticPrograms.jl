@@ -6,21 +6,23 @@ Functor object for using serial execution in a progressive-hedging algorithm. Cr
 """
 struct SerialExecution{T <: AbstractFloat,
                        A <: AbstractVector,
-                       S <: LQSolver} <: AbstractExecution
-    subproblems::Vector{SubProblem{T,A,S}}
+                       S <: LQSolver,
+                       PT <: PenaltyTerm} <: AbstractExecution
+    subproblems::Vector{SubProblem{T,A,S,PT}}
 
-    function SerialExecution(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-        return new{T,A,S}(Vector{SubProblem{T,A,S}}())
+    function SerialExecution(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+        return new{T,A,S,PT}(Vector{SubProblem{T,A,S,PT}}())
     end
 end
 
-function init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, execution::SerialExecution)
+function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::SerialExecution)
     for i = 1:ph.nscenarios
         push!(execution.subproblems,SubProblem(WS(ph.stochasticprogram, scenario(ph.stochasticprogram,i); solver = subsolver),
                                                i,
                                                probability(ph.stochasticprogram,i),
                                                decision_length(ph.stochasticprogram),
-                                               subsolver))
+                                               subsolver,
+                                               copy(penaltyterm)))
     end
     update_iterate!(ph)
     return ph
@@ -32,7 +34,7 @@ function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::S
     reformulate_subproblems!(execution.subproblems, ph.ξ, penalty(ph))
     # Solve sub problems
     for (i, subproblem) ∈ enumerate(execution.subproblems)
-        Qs[i] = subproblem()
+        Qs[i] = subproblem(ph.ξ)
     end
     # Return current objective value
     return sum(Qs)
@@ -88,8 +90,8 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems:
 end
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-    return SerialExecution(T,A,S)
+function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+    return SerialExecution(T,A,S,PT)
 end
 
 function str(::Serial)

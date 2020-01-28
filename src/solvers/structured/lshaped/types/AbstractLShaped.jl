@@ -14,10 +14,10 @@ function initialize!(lshaped::AbstractLShapedSolver, subsolver::SubSolver)
     initialize_subproblems!(lshaped, scenarioproblems(lshaped.stochasticprogram), decision(lshaped), subsolver)
     # Prepare the master optimization problem
     prepare_master!(lshaped)
-    # Initialize regularization policy
-    initialize_regularization!(lshaped)
     # Initialize feasibility handler
     initialize_feasibility!(lshaped)
+    # Initialize regularization policy
+    initialize_regularization!(lshaped)
     # Finish initialization
     finish_initilization!(lshaped)
     return nothing
@@ -52,12 +52,18 @@ function update_solution!(lshaped::AbstractLShapedSolver, solver::LQSolver)
     return nothing
 end
 
+function get_obj(lshaped::AbstractLShapedSolver)
+    first_stage = StochasticPrograms.get_stage_one(lshaped.stochasticprogram)
+    c = JuMP.prepAffObjective(first_stage)
+    return first_stage.objSense == :Min ? c : -c
+end
+
 function current_objective_value(lshaped::AbstractLShapedSolver)
-    return lshaped.c⋅current_decision(lshaped) + sum(subobjectives(lshaped))
+    return get_obj(lshaped)⋅current_decision(lshaped) + sum(subobjectives(lshaped))
 end
 
 function calculate_estimate(lshaped::AbstractLShapedSolver)
-    return lshaped.c⋅lshaped.x + sum(model_objectives(lshaped))
+    return get_obj(lshaped)⋅lshaped.x + sum(model_objectives(lshaped))
 end
 
 function solve_master!(lshaped::AbstractLShapedSolver)

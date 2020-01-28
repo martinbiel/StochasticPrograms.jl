@@ -21,7 +21,7 @@ end
 function penalty(::AbstractProgressiveHedgingSolver, penalty::FixedPenalization)
     return penalty.r
 end
-function init_penalty!(::AbstractProgressiveHedgingSolver, ::FixedPenalization)
+function initialize_penalty!(::AbstractProgressiveHedgingSolver, ::FixedPenalization)
     nothing
 end
 function update_penalty!(::AbstractProgressiveHedgingSolver, ::FixedPenalization)

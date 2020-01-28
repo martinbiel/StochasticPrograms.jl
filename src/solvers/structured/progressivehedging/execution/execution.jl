@@ -1,7 +1,7 @@
 abstract type AbstractExecution end
 # Execution API #
 # ------------------------------------------------------------
-init_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver) = init_subproblems!(ph, subsolver, ph.execution)
+initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm) = initialize_subproblems!(ph, subsolver, penaltyterm, ph.execution)
 iterate!(ph::AbstractProgressiveHedgingSolver) = iterate!(ph, ph.execution)
 start_workers!(ph::AbstractProgressiveHedgingSolver) = start_workers!(ph, ph.execution)
 close_workers!(ph::AbstractProgressiveHedgingSolver) = close_workers!(ph, ph.execution)

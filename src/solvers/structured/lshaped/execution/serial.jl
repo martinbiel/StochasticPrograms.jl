@@ -87,7 +87,7 @@ function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::SerialE
 end
 
 function calculate_objective_value(lshaped::AbstractLShapedSolver, execution::SerialExecution)
-    return lshaped.c⋅decision(lshaped) + sum([subproblem.π*subproblem(decision(lshaped)) for subproblem in execution.subproblems])
+    return get_obj(lshaped)⋅decision(lshaped) + sum([subproblem.π*subproblem(decision(lshaped)) for subproblem in execution.subproblems])
 end
 
 function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems::ScenarioProblems, execution::SerialExecution)

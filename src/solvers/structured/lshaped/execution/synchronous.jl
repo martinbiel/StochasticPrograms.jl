@@ -63,7 +63,7 @@ function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::Synchro
 end
 
 function calculate_objective_value(lshaped::AbstractLShapedSolver, execution::SynchronousExecution)
-    return lshaped.c⋅decision(lshaped) + eval_second_stage(execution.subworkers, decision(lshaped))
+    return get_obj(lshaped)⋅decision(lshaped) + eval_second_stage(execution.subworkers, decision(lshaped))
 end
 
 function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems, execution::SynchronousExecution)

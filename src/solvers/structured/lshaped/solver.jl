@@ -45,7 +45,6 @@ struct LShaped{T <: AbstractFloat,
     # Master
     mastersolver::M
     mastervector::A
-    c::A
     x::A
     Q_history::A
 
@@ -92,8 +91,6 @@ struct LShaped{T <: AbstractFloat,
         length(x₀) != first_stage.numCols && error("Incorrect length of starting guess, has ", length(x₀), " should be ", first_stage.numCols)
 
         T = promote_type(eltype(x₀), Float32)
-        c_ = convert(AbstractVector{T}, JuMP.prepAffObjective(first_stage))
-        c_ *= first_stage.objSense == :Min ? 1 : -1
         x₀_ = convert(AbstractVector{T}, copy(x₀))
         mastervector = convert(AbstractVector{T}, copy(x₀))
         A = typeof(x₀_)
@@ -125,7 +122,6 @@ struct LShaped{T <: AbstractFloat,
                                               params,
                                               msolver,
                                               mastervector,
-                                              c_,
                                               x₀_,
                                               A(),
                                               n,

@@ -4,14 +4,14 @@ nscenarios(ph::AbstractProgressiveHedgingSolver) = ph.nscenarios
 
 # Initialization #
 # ======================================================================== #
-function init!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver)
+function initialize!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm)
     # Initialize progress meter
     ph.progress.thresh = ph.parameters.τ
     # Initialize subproblems
-    init_subproblems!(ph, subsolver)
+    initialize_subproblems!(ph, subsolver, penaltyterm)
     # Initialize penalty parameter (if applicable)
     ph.data.δ₁ = 1.0
-    init_penalty!(ph)
+    initialize_penalty!(ph)
 end
 # ======================================================================== #
 
@@ -21,6 +21,12 @@ function set_params!(ph::AbstractProgressiveHedgingSolver; kwargs...)
     for (k,v) in kwargs
         setfield!(ph.parameters, k, v)
     end
+end
+
+function get_obj(ph::AbstractProgressiveHedgingSolver)
+    first_stage = StochasticPrograms.get_stage_one(ph.stochasticprogram)
+    c = JuMP.prepAffObjective(first_stage)
+    return first_stage.objSense == :Min ? c : -c
 end
 
 function current_objective_value(ph::AbstractProgressiveHedgingSolver, Qs::AbstractVector)
