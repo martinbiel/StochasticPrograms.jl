@@ -1,6 +1,15 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.3.0 (January 28, 2020)
+-----------------------------
+
+- [LShapedSolvers.jl](https://github.com/martinbiel/LShapedSolvers.jl) and [ProgressiveHedgingSolvers](https://github.com/martinbiel/ProgressiveHedgingSolvers.jl) have been integrated into `StochasticPrograms`. The solver repositories will stay up for future development, but the aim is to keep stable versions in `StochasticPrograms`
+- Both `LShapedSolvers` and `ProgressiveHedgingSolvers` have seen major rework. This includes both changes to the software design (A policy-base design has succeeded the use of `TraitDispatch`) as well as feature additions (Executors, Cut aggregation, Penalty approximations, ...). See the documentation for further details.
+- Added functionality for calculating confidence intervals around EVPI and VSS for continuous models.
+- Documentation has been extended to cover all new features. In addition, terminology clarifications have been made for sampled models and SAA.
+- Bugfixes
+
 Version 0.2.0 (June 5, 2019)
 -----------------------------
 
