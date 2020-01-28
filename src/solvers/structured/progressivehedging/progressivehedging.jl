@@ -25,6 +25,7 @@ const MPB = MathProgBase
 
 export
     ProgressiveHedgingSolver,
+    ProgressiveHedging,
     Fixed,
     Adaptive,
     Serial,

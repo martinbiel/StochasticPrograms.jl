@@ -12,6 +12,7 @@ Pages = ["lshaped.md"]
 
 ```@docs
 LShapedSolver
+LShaped
 ```
 
 ## Execution

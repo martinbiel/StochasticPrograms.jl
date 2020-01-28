@@ -57,12 +57,12 @@ Many operations in StochasticPrograms are embarassingly parallel which is exploi
  - [`evaluate_decision`](@ref)
  - [`EVPI`](@ref)
  - [`VSS`](@ref)
-Perform many subproblem independent operations in parallel. The best performance is achieved if the optimization of the recourse problem is performed by an algorithm that can operate in parallel on the distributed stochastic programs. The solver suites [LShapedSolvers.jl](@ref) and [ProgressiveHedgingSolvers.jl](@ref) are examples of this. For example, we can optimize the distributed version of the simple stochastic program with a parallelized L-shaped algorithm as follows:
+Perform many subproblem independent operations in parallel. The best performance is achieved if the optimization of the recourse problem is performed by an algorithm that can operate in parallel on the distributed stochastic programs. The solver suites `LShapedSolvers` and `ProgressiveHedgingSolvers` are examples of this. For example, we can optimize the distributed version of the simple stochastic program with a parallelized L-shaped algorithm as follows:
 ```julia
 using LShapedSolvers
 using GLPKMathProgInterface
 
-optimize!(sp, solver = LShapedSolver(GLPKSolverLP(), distributed = true))
+optimize!(sp, solver = LShapedSolver(GLPKSolverLP(), execution = Synchronous()))
 ```
 ```julia
 Distributed L-Shaped Gap  Time: 0:00:03 (6 iterations)
@@ -72,4 +72,4 @@ Distributed L-Shaped Gap  Time: 0:00:03 (6 iterations)
 :Optimal
 ```
 
-A quick note should also be made about the API calls that become less efficient in a distributed setting. This includes all calls that collect data that reside on remote processes. The functions in this category that involve the most data passing is [`scenarios`](@ref), which fetches all scenarios in the stochastic program, and [`subproblems`](@ref), which fetches all second stage models in the stochastic program. If these collections are required frequently it is recommended to not distribute the stochastic program. This can be ensured by supplying `procs = [1]` to the constructor call. Individual queries `scenario(stochasticprogram, i)` and `subproblem(stochasticprogram, i)` are viable depending on the size of the scenarios/models. If a `MathProgBase` solver is supplied to a distributed stochastic program it will fetch all scenarios to the master node and attempt to build the extensive form. Long computation times are expected for large-scale models, assuming they fit in memory. If so, it is again recommended to avoid distributing the stochastic program through `procs = [1]`. The best approach is to use a structured solver that can operate on distributed stochastic programs, such as [LShapedSolvers.jl](@ref) or [ProgressiveHedgingSolvers.jl](@ref).
+A quick note should also be made about the API calls that become less efficient in a distributed setting. This includes all calls that collect data that reside on remote processes. The functions in this category that involve the most data passing is [`scenarios`](@ref), which fetches all scenarios in the stochastic program, and [`subproblems`](@ref), which fetches all second stage models in the stochastic program. If these collections are required frequently it is recommended to not distribute the stochastic program. This can be ensured by supplying `procs = [1]` to the constructor call. Individual queries `scenario(stochasticprogram, i)` and `subproblem(stochasticprogram, i)` are viable depending on the size of the scenarios/models. If a `MathProgBase` solver is supplied to a distributed stochastic program it will fetch all scenarios to the master node and attempt to build the extensive form. Long computation times are expected for large-scale models, assuming they fit in memory. If so, it is again recommended to avoid distributing the stochastic program through `procs = [1]`. The best approach is to use a structured solver that can operate on distributed stochastic programs, such as `LShapedSolvers` or `ProgressiveHedgingSolvers`.

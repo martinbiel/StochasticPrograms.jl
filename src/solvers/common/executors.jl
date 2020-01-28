@@ -2,7 +2,7 @@ abstract type Execution end
 """
     Serial
 
-Factory object for [`SerialExecution`](@ref). Passed by default to `execution ` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions.
+Factory object for [`LShapedSolvers.SerialExecution`](@ref)/[`ProgressiveHedgingSolvers.SerialExecution`](@ref). Passed by default to `execution ` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions.
 
 """
 struct Serial <: Execution end
@@ -14,7 +14,7 @@ end
 """
     Synchronous
 
-Factory object for [`SynchronousExecution`](@ref). Pass to `execution` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions.
+Factory object for [`LShapedSolvers.SynchronousExecution`](@ref)/[`ProgressiveHedgingSolvers.SynchronousExecution`](@ref). Pass to `execution` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions.
 
 """
 struct Synchronous <: Execution end
@@ -26,7 +26,7 @@ end
 """
     Asynchronous
 
-Factory object for [`AsynchronousExecution`](@ref). Pass to `execution` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions
+Factory object for [`LShapedSolvers.AsynchronousExecution`](@ref)/[`ProgressiveHedgingSolvers.AsynchronousExecution`](@ref). Pass to `execution` in the `LShapedSolver` and `ProgressiveHedgingSolver` factory functions
 
 ...
 # Parameters

@@ -1,6 +1,6 @@
 # Structured solvers
 
-A stochastic program has a structure that can exploited in solver algorithms through decomposition. This can heavily reduce the computation time required to optimize the stochastic program, compared to solving the extensive form directly. Moreover, a distributed stochastic program is by definition decomposed and a structured solver that can operate in parallel will be much more efficient.
+A stochastic program has a structure that can be exploited in solver algorithms through decomposition. This can heavily reduce the computation time required to optimize the stochastic program, compared to solving the extensive form directly. Moreover, a distributed stochastic program is by definition decomposed and a structured solver that can operate in parallel will be much more efficient.
 
 ## Solver interface
 
@@ -20,7 +20,7 @@ In summary, the solver interface that a new [`AbstractStructuredModel`](@ref) an
  - [`internal_solver`](@ref)
  - [`solverstr`](@ref)
 
-As an example, a simplified version of the implementation of the structured solver interface in [LShapedSolvers.jl](@ref) is given below:
+As an example, a simplified version of the implementation of the structured solver interface for [`LShaped`](@ref) is given below:
 ```julia
 abstract AbstractLShapedSolver <: AbstractStructuredModel end
 
@@ -28,23 +28,30 @@ const MPB = MathProgBase
 
 mutable struct LShapedSolver <: AbstractStructuredSolver
     lpsolver::MPB.AbstractMathProgSolver
-    subsolver::MPB.AbstractMathProgSolver
-    complete_recourse::Bool
-    crash::Crash.CrashMethod
+    subsolver::S
+    feasibility_cuts::Bool
+    execution::E
+    regularize::R
+    aggregate::A
+    consolidate::C
+    crash::CrashMethod
     parameters::Dict{Symbol,Any}
 
     function LShapedSolver(lpsolver::MPB.AbstractMathProgSolver;
-                           complete_recourse::Bool = true,
+                           execution::Execution = Serial(),
+                           feasibility_cuts::Bool = true,
                            regularize::AbstractRegularizer = DontRegularize(),
-                           crash::Crash.CrashMethod = Crash.None(),
-                           subsolver::MPB.AbstractMathProgSolver = lpsolver, kwargs...)
-        return new(lpsolver, subsolver, complete_recourse, regularize, crash, Dict{Symbol,Any}(kwargs))
+                           aggregate::AbstractAggregator = DontAggregate(),
+                           consolidate::AbstractConsolidator = DontConsolidate(),
+                           crash::CrashMethod = Crash.None(),
+                           subsolver::SubSolver = lpsolver, kwargs...)
+        return new(lpsolver, subsolver, feasibility_cuts, execution, regularize, aggregate, consolidate, crash, Dict{Symbol,Any}(kwargs))
     end
 end
 
 function StructuredModel(stochasticprogram::StochasticProgram, solver::LShapedSolver)
     x₀ = solver.crash(stochasticprogram, solver.lpsolver)
-    return LShaped(stochasticprogram, x₀, solver.lpsolver, solver.subsolver, solver.checkfeas; solver.parameters...)
+    return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.feasibility_cuts, solver.execution, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
 end
 
 function internal_solver(solver::LShapedSolver)
@@ -155,40 +162,10 @@ function stochastic_solution(saamodel::SAAModel)
 end
 ```
 
+## L-shaped solvers
 
-## LShapedSolvers.jl
+StochasticPrograms includes a collection of L-shaped algorithms in the submodule `LShapedSolvers`. All algorithm variants are based on the L-shaped method by Van Slyke and Wets. `LShapedSolvers` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`LShaped`](@ref), and are instanced using the factory object [`LShapedSolver`](@ref).
 
-LShapedSolvers is a collection of structured optimization algorithms for two-stage (L-shaped) stochastic recourse problems. All algorithm variants are based on the L-shaped method by Van Slyke and Wets. LShapedSolvers interfaces with StochasticPrograms through the structured solver interface. It is available as an unregistered package on Github, ans can be installed as follows:
-```julia
-pkg> add https://github.com/martinbiel/LShapedSolvers.jl
-```
-```@setup lshaped
-using StochasticPrograms
-@scenario SimpleScenario = begin
-    q₁::Float64
-    q₂::Float64
-    d₁::Float64
-    d₂::Float64
-end
-ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
-ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
-sp = StochasticProgram([ξ₁, ξ₂])
-@first_stage sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
-    @objective(model, Min, 100*x₁ + 150*x₂)
-    @constraint(model, x₁ + x₂ <= 120)
-end
-@second_stage sp = begin
-    @decision x₁ x₂
-    @uncertain ξ::SimpleScenario
-    @variable(model, 0 <= y₁ <= ξ.d₁)
-    @variable(model, 0 <= y₂ <= ξ.d₂)
-    @objective(model, Min, ξ.q₁*y₁ + ξ.q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
-end
-```
 As an example, we solve the simple problem introduced in the [Quick start](@ref):
 ```julia
 using LShapedSolvers
@@ -203,42 +180,129 @@ L-Shaped Gap  Time: 0:00:01 (6 iterations)
   Number of cuts:  8
 :Optimal
 ```
-Note, that an LP capable `AbstractMathProgSolver` is required to solve emerging subproblems. The following variants of the L-shaped algorithm are implemented:
+Note, that an LP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
 
-1. L-shaped with multiple cuts (default): `regularization = DontRegularize()`
-2. L-shaped with regularized decomposition: `regularization = RegularizedDecomposition(; kw...)/RD(; kw...)`
-3. L-shaped with trust region: `regularization = TrustRegion(; kw...)/TR(; kw...)`
-4. L-shaped with level sets: `regularization = LevelSet(; projectionsolver, kw...)/LV(; projectionsolver, kw...)`
+`LShapedSolvers` uses a policy-based design. This allows combinatorially many variants of the original algorithm to be instanced by supplying linearly many policies to the factory function [`LShapedSolver`](@ref). We briefly describe the various policies in the following.
 
-Note, that `RD` and `LV` both require a QP capable `AbstractMathProgSolver` for the master/projection problems. If not available, setting the `linearize` keyword to `true` is an alternative.
+### Feasibility cuts
 
-In addition, there is a distributed variant of each algorithm, created by supplying `distributed = true` to the factory method. This requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and are most efficient when run on distributed stochastic programs.
+If the stochastic program does not have complete, or relatively complete, recourse then subproblems may be infeasible for some master iterates. Convergence can be maintained through the use of feasibility cuts. To reduce overhead and memory usage, feasibility issues are ignored by default. If you know that your problem does not have complete recourse, or if the algorithm terminates due to infeasibility, supply `feasibility_cuts = true` to the factory function to turn on this feature.
 
-Each algorithm has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?TrustRegion` gives the parameter list of the L-shaped algorithm with trust-region regularization. For a list of all solvers and their handle names, use `?LShapedSolver`.
+### Regularization
+
+A Regularization procedure can improve algorithm performance. The idea is to limit the candidate search to a neighborhood of the current best iterate in the master problem. This can result in more effective cutting planes. Moreover, regularization enables warm-starting the L-shaped procedure with [`Crash`](@ref) decisions. Regularization is enabled by supplying a factory object through `regularize` to [`LShapedSolver`](@ref).
+
+The following L-shaped regularizations are available:
+- [`NoRegularization`](@ref) (default)
+- [`RegularizedDecomposition`](@ref)
+- [`TrustRegion`](@ref)
+- [`LevelSet`](@ref)
+
+Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractMathProgSolver` capable of solving QP problems. Alternatively, the 2-norm penalty term in the objective can be approximated through various linear terms. This is achieved by supplying a `PenaltyTerm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
+
+- [`Quadratic`](@ref) (default)
+- [`Linearized`](@ref)
+- [`InfNorm`](@ref)
+- [`ManhattanNorm`](@ref)
+
+### Aggregation
+
+Cut aggregation can be applied to reduce communication latency and load imbalance. This can yield major performance improvements in distributed settings. Aggregation is enabled by supplying a factory object through `aggregate` to the factory function.
+
+The following aggregation schemes are available:
+- [`NoAggregation`](@ref) (default)
+- [`PartialAggregation`](@ref)
+- [`DynamicAggregation`](@ref)
+- [`ClusterAggregation`](@ref)
+- [`HybridAggregation`](@ref)
+
+### Consolidation
+
+If cut consolidation is enabled, cuts from previous iterations that are no longer active are aggregated to reduce the size of the master. Consolidation is enabled by supplying `consolidate = Consolidate()` to the factory function. See [`Consolidation`](@ref) for further details.
+
+### Crash
+
+The L-shaped algorithm can be crash started in various way. A good initial guess in combination with a regularization procedure can improve convergence.
+
+The following [`Crash`](@ref) methods can be used through the `crash` option in the factory function.
+- [`Crash.None`](@ref) (default)
+- [`Crash.EVP`](@ref)
+- [`Crash.Scenario`](@ref)
+- [`Crash.Custom`](@ref)
+
+### Execution
+
+There are three available modes of execution:
+
+- [`Serial`](@ref) (default)
+- [`Synchronous`](@ref)
+- [`Asynchronous`](@ref)
+
+Running a distributed L-shaped algorithm, either synchronously or asynchronously, required adding Julia worker cores with [`addprocs`].
+
+### References
+
+1. Van Slyke, R. and Wets, R. (1969), [L-Shaped Linear Programs with Applications to Optimal Control and Stochastic Programming](https://epubs.siam.org/doi/abs/10.1137/0117061), SIAM Journal on Applied Mathematics, vol. 17, no. 4, pp. 638-663.
+
+2. Ruszczyński, A (1986), [A regularized decomposition method for minimizing a sum of polyhedral functions](https://link.springer.com/article/10.1007/BF01580883), Mathematical Programming, vol. 35, no. 3, pp. 309-333.
+
+3. Linderoth, J. and Wright, S. (2003), [Decomposition Algorithms for Stochastic Programming on a Computational Grid](https://link.springer.com/article/10.1023/A:1021858008222), Computational Optimization and Applications, vol. 24, no. 2-3, pp. 207-250.
+
+4. Fábián, C. and Szőke, Z. (2006), [Solving two-stage stochastic programming problems with level decomposition](https://link.springer.com/article/10.1007%2Fs10287-006-0026-8), Computational Management Science, vol. 4, no. 4, pp. 313-353.
+
+5. Wolf, C. and Koberstein, A. (2013), [Dynamic sequencing and cut con-solidation for the parallel hybrid-cut nested l-shaped method](https://www.sciencedirect.com/science/article/pii/S0377221713003159), European Journal of Operational Research, vol. 230, no. 1, pp. 143-156.
+
+6. Biel, M. and Johansson, M. (2018), [Distributed L-shaped Algorithms in Julia](https://ieeexplore.ieee.org/document/8639173), 2018 IEEE/ACM Parallel Applications Workshop, Alternatives To MPI (PAW-ATM).
+
+7. Biel, M. and Johansson, M. (2019), [Dynamic cut aggregation in L-shaped algorithms](https://arxiv.org/abs/1910.13752), arXiv preprint arXiv:1910.13752.
 
 ## ProgressiveHedgingSolvers.jl
 
-ProgressiveHedgingSolvers includes implementations of the progressive-hedging algorithm for two-stage stochastic recourse problems. All algorithm variants are based on the original progressive-hedging algorithm by Rockafellar and Wets. ProgressiveHedgingSolvers interfaces with StochasticPrograms through the structured solver interface. It is available as an unregistered package on Github, ans can be installed as follows:
-```julia
-pkg> add https://github.com/martinbiel/LShapedSolvers.jl
-```
+StochasticPrograms also includes a collection of progressive-hedging algorithms in the submodule `ProgressiveHedgingSolvers`. All algorithm variants are based on the original progressive-hedging algorithm by Rockafellar and Wets. `ProgressiveHedgingSolvers` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`ProgressiveHedging`](@ref), and are instanced using the factory object [`ProgressiveHedgingSolver`](@ref).
+
 As an example, we solve the simple problem introduced in the [Quick start](@ref):
 ```julia
 using ProgressiveHedgingSolvers
-using Ipopt
+using GLPKMathProgInterface
 
-optimize!(sp, solver = ProgressiveHedgingSolver(:ph, IpoptSolver(print_level=0)))
+optimize!(sp, solver = ProgressiveHedgingSolver(GLPKSolverLP, penaltyterm = Linearized(nbreakpoints=30))
 ```
 ```julia
-Progressive Hedging Time: 0:00:06 (1315 iterations)
-  Objective:  -855.8332803469448
-  δ:          9.570267362791345e-7
+Progressive Hedging Time: 0:00:00 (91 iterations)
+  Objective:  -855.8017375415484
+  δ:          9.700002687897287e-6
 :Optimal
 ```
-Note, that a QP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
+Note, that an QP/LP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
 
-An adaptive penalty parameter can be used by supplying `penalty = :adaptive` to the factory method.
+`ProgressiveHedgingSolvers` also uses a policy-based design. See [`ProgressiveHedgingSolver`](@ref) for options. We briefly describe the various policies in the following.
 
-By default, the execution is `:sequential`. Supplying either `execution = :synchronous` or `execution = :asynchronous` to the factory method yields distributed variants of the algorithm. This requires adding processes with `addprocs` prior to execution. The distributed variants are designed for StochasticPrograms, and is most efficient when run on distributed stochastic programs.
+### Penalty
 
-The algorithm variants has a set of parameters that can be tuned prior to execution. For a list of these parameters and their default values, use `?` in combination with the solver object. For example, `?ProgressiveHedging` gives the parameter list of the sequential progressive-hedging algorithm. For a list of all solvers and their handle names, use `?ProgressiveHedgingSolver`.
+There are two options for the penalty parameter used in the progressive-hedging algorithm. The alternatives are
+
+- [`Fixed`](@ref) (default)
+- [`Adaptive`](@ref)
+
+### Execution
+
+The same execution policies as for `LShapedSolvers` are available in `ProgressiveHedgingSolvers`, i.e.
+
+- [`Serial`](@ref) (default)
+- [`Synchronous`](@ref)
+- [`Asynchronous`](@ref)
+
+### Penalty term
+
+As with the L-shaped variants with quadratic 2-norm terms, the 2-norm term in progressive-hedging subproblems can be approximated. This enables the use of `AbstractMathProgSolver` that only solve linear problems. The alternatives are as before:
+
+- [`Quadratic`](@ref) (default)
+- [`Linearized`](@ref)
+- [`InfNorm`](@ref)
+- [`ManhattanNorm`](@ref)
+
+### References
+
+1. R. T. Rockafellar and Roger J.-B. Wets (1991), [Scenarios and Policy Aggregation in Optimization Under Uncertainty](https://pubsonline.informs.org/doi/10.1287/moor.16.1.119), Mathematics of Operations Research, vol. 16, no. 1, pp. 119-147.
+
+2. Zehtabian. S and Bastin. F (2016), [Penalty parameter update strategies in progressive hedging algorithm](http://www.cirrelt.ca/DocumentsTravail/CIRRELT-2016-12.pdf)

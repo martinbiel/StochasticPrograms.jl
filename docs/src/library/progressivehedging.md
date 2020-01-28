@@ -12,6 +12,7 @@ Pages = ["progressivehedging.md"]
 
 ```@docs
 ProgressiveHedgingSolver
+ProgressiveHedging
 ```
 
 ## Execution

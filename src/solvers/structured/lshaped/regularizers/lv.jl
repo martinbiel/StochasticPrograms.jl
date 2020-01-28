@@ -169,7 +169,7 @@ function add_regularization_params!(regularizer::LV; kwargs...)
 end
 
 function (lv::LV)(x::AbstractVector)
-    return LevelSet(x, lv.projectionsolver, lv.penalty; lv.parameters...)
+    return LevelSet(x, lv.projectionsolver, lv.penaltyterm; lv.parameters...)
 end
 
 function str(::LV)

@@ -29,3 +29,12 @@ Serial
 Synchronous
 Asynchronous
 ```
+
+## Penalty terms
+
+```@docs
+Quadratic
+Linearized
+InfNorm
+ManhattanNorm
+```
