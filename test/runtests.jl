@@ -1,7 +1,6 @@
 using StochasticPrograms
 using JuMP
 using GLPKMathProgInterface
-using OSQP
 using LinearAlgebra
 using Logging
 using Test

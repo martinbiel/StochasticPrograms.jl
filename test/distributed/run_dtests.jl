@@ -14,7 +14,6 @@ end
 using JuMP
 using LinearAlgebra
 using GLPKMathProgInterface
-using OSQP
 
 @everywhere import StochasticPrograms: probability, expected
 
