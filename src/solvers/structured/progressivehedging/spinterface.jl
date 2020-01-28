@@ -91,18 +91,9 @@ function fill_solution!(stochasticprogram::StochasticProgram, ph::AbstractProgre
     first_stage = StochasticPrograms.get_stage_one(stochasticprogram)
     nrows, ncols = first_stage_dims(stochasticprogram)
     StochasticPrograms.set_decision!(stochasticprogram, ph.ξ)
-    # stochasticprogram.redCosts = try
-    #     getreducedcosts(ph.mastersolver.lqmodel)[1:ncols]
-    # catch
-    #     fill(NaN, ncols)
-    # end
-    # stochasticprogram.linconstrDuals = try
-    #     getconstrduals(ph.mastersolver.lqmodel)[1:nrows]
-    # catch
-    #     fill(NaN, nrows)
-    # end
+    fill_first_stage!(ph, stochasticprogram, nrows, ncols)
     # Second stage
-    fill_submodels!(ph, scenarioproblems(stochasticprogram))
+    fill_submodels!(ph, scenarioproblems(stochasticprogram), nrows, ncols)
 end
 
 function solverstr(solver::ProgressiveHedgingSolver)

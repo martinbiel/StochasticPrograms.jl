@@ -65,28 +65,49 @@ function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, executi
     return sum([get_objective_value(s) for s in execution.subproblems])
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.ScenarioProblems, execution::SerialExecution)
-    for (i, submodel) in enumerate(scenarioproblems.problems)
-        fill_submodel!(submodel, execution.subproblems[i])
+function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::SerialExecution)
+    subproblem = execution.subproblems[1]
+    μ = try
+        MPB.getreducedcosts(subproblem.solver.lqmodel)[1:ncols]
+    catch
+        fill(NaN, ncols)
     end
+    StochasticPrograms.set_first_stage_redcosts!(stochasticprogram, μ)
+    λ = try
+        MPB.getconstrduals(subproblem.solver.lqmodel)[1:nrows]
+    catch
+        fill(NaN, nrows)
+    end
+    StochasticPrograms.set_first_stage_duals!(stochasticprogram, λ)
+    return nothing
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.DScenarioProblems, execution::SerialExecution)
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.ScenarioProblems, nrows::Integer, ncols::Integer, execution::SerialExecution)
+    for (i, submodel) in enumerate(scenarioproblems.problems)
+        fill_submodel!(submodel, execution.subproblems[i], nrows, ncols)
+    end
+    return nothing
+end
+
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::StochasticPrograms.DScenarioProblems, nrows::Integer, ncols::Integer, execution::SerialExecution)
     j = 0
     @sync begin
         for w in workers()
             n = remotecall_fetch((sp)->length(fetch(sp).problems), w, scenarioproblems[w-1])
             for i in 1:n
                 k = i+j
-                @async remotecall_fetch((sp,i,x,μ,λ) -> fill_submodel!(fetch(sp).problems[i],x,μ,λ),
+                @async remotecall_fetch((sp,i,x,μ,λ,nrows,ncols) -> fill_submodel!(fetch(sp).problems[i],x,μ,λ,nrows,ncols),
                                         w,
                                         scenarioproblems[w-1],
                                         i,
-                                        get_solution(execution.subproblems[k])...)
+                                        get_solution(execution.subproblems[k])...,
+                                        nrows,
+                                        ncols)
             end
             j += n
         end
     end
+    return nothing
 end
 # API
 # ------------------------------------------------------------

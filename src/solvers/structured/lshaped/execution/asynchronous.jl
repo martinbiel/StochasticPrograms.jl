@@ -178,7 +178,7 @@ function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems, execu
     return fill_submodels!(execution.subworkers, decision(lshaped), scenarioproblems)
 end
 
-function solve_master!(lshaped::AbstractLShapedSolver, ::AsynchronousExecution)
+function solve_master!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution)
     try
         solve_regularized_master!(lshaped, lshaped.regularization)
     catch

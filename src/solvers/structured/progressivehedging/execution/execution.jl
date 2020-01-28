@@ -10,7 +10,8 @@ update_iterate!(ph::AbstractProgressiveHedgingSolver) = update_iterate!(ph, ph.e
 update_subproblems!(ph::AbstractProgressiveHedgingSolver) = update_subproblems!(ph, ph.execution)
 update_dual_gap!(ph::AbstractProgressiveHedgingSolver) = update_dual_gap!(ph, ph.execution)
 calculate_objective_value(ph::AbstractProgressiveHedgingSolver) = calculate_objective_value(ph, ph.execution)
-fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::AbstractScenarioProblems) = fill_submodels!(ph, scenarioproblems, ph.execution)
+fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer) = fill_first_stage!(ph, stochasticprogram, nrows, ncols, ph.execution)
+fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::AbstractScenarioProblems, nrows::Integer, ncols::Integer) = fill_submodels!(ph, scenarioproblems, nrows, ncols, ph.execution)
 # ------------------------------------------------------------
 include("common.jl")
 include("serial.jl")

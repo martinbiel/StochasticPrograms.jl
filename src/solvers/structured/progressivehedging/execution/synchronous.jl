@@ -70,8 +70,12 @@ function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, executi
     return calculate_objective_value(ph, execution.subworkers)
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems, execution::SynchronousExecution)
-    return fill_submodels!(ph, scenarioproblems, execution.subworkers)
+function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
+    return fill_first_stage!(ph, stochasticprogram, execution.subworkers, nrows, ncols)
+end
+
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
+    return fill_submodels!(ph, scenarioproblems, execution.subworkers, nrows, ncols)
 end
 # API
 # ------------------------------------------------------------

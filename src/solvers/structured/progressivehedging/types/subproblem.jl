@@ -94,7 +94,18 @@ function get_objective_value(subproblem::SubProblem)
 end
 
 function get_solution(subproblem::SubProblem)
-    return copy(subproblem.y), getredcosts(subproblem.solver)[length(subproblem.x)+1:end], getduals(subproblem.solver)
+    return copy(subproblem.y), getredcosts(subproblem.solver), getduals(subproblem.solver)
+end
+
+function fill_submodel!(submodel::JuMP.Model, subproblem::SubProblem, nrows::Integer, ncols::Integer)
+    fill_submodel!(submodel, get_solution(subproblem)..., nrows, ncols)
+end
+
+function fill_submodel!(submodel::JuMP.Model, x::AbstractVector, μ::AbstractVector, λ::AbstractVector, nrows::Integer, ncols::Integer)
+    submodel.colVal = x[1:length(submodel.colVal)]
+    submodel.redCosts = μ[ncols+1:ncols+length(submodel.colVal)]
+    submodel.linconstrDuals = λ[nrows+1:nrows+length(submodel.linconstr)]
+    submodel.objVal = JuMP.prepAffObjective(submodel)⋅x[1:length(submodel.colVal)]
 end
 
 function (subproblem::SubProblem)(ξ::AbstractVector)

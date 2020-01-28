@@ -65,7 +65,7 @@ function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, subwork
 end
 
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::ScenarioProblems, subworkers::Vector{<:SubWorker})
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::ScenarioProblems, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
     j = 0
     @sync begin
         for w in workers()
@@ -79,21 +79,47 @@ function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems:
                 w,
                 subworkers[w-1],
                 i,
-                ph.ξ)...)
+                ph.ξ)..., nrows, ncols)
             end
             j += n
         end
     end
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::DScenarioProblems, subworkers::Vector{<:SubWorker})
+function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
+    μ, λ = remotecall_fetch((sw,nrows,ncols) -> begin
+        subproblem = fetch(sw)[1]
+        μ = try
+            MPB.getreducedcosts(subproblem.solver.lqmodel)[1:ncols]
+        catch
+            fill(NaN, ncols)
+        end
+        λ = try
+            MPB.getconstrduals(subproblem.solver.lqmodel)[1:nrows]
+        catch
+            fill(NaN, nrows)
+        end
+        μ, λ
+    end,
+    2,
+    subworkers[1],
+    nrows,
+    ncols)
+    StochasticPrograms.set_first_stage_redcosts!(stochasticprogram, μ)
+    StochasticPrograms.set_first_stage_duals!(stochasticprogram, λ)
+    return nothing
+end
+
+function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::DScenarioProblems, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
     @sync begin
         for w in workers()
             @async remotecall(fill_submodels!,
                               w,
                               subworkers[w-1],
                               ph.ξ,
-                              scenarioproblems[w-1])
+                              scenarioproblems[w-1],
+                              nrows,
+                              ncols)
         end
     end
 end
@@ -198,23 +224,14 @@ end
 
 function fill_submodels!(subworker::SubWorker{T,A,S,PT},
                          x::A,
-                         scenarioproblems::ScenarioProblemChannel) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
+                         scenarioproblems::ScenarioProblemChannel,
+                         nrows::Integer,
+                         ncols::Integer) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
     sp = fetch(scenarioproblems)
     subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
     for (i, submodel) in enumerate(sp.problems)
-        fill_submodel!(submodel, subproblems[i])
+        fill_submodel!(submodel, subproblems[i], nrows, ncols)
     end
-end
-
-function fill_submodel!(submodel::JuMP.Model, subproblem::SubProblem)
-    fill_submodel!(submodel, get_solution(subproblem)...)
-end
-
-function fill_submodel!(submodel::JuMP.Model, x::AbstractVector, μ::AbstractVector, λ::AbstractVector)
-    submodel.colVal = x
-    submodel.redCosts = μ
-    submodel.linconstrDuals = λ
-    submodel.objVal = JuMP.prepAffObjective(submodel)⋅x
 end
 
 function resolve_subproblems!(subworker::SubWorker{T,A,S,PT}, ξ::AbstractVector, r::AbstractFloat) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
