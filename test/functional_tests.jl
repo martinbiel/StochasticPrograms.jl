@@ -58,8 +58,10 @@
     end
     @testset "Confidence intervals" begin
         glpk = GLPKSolverLP()
-        CI = confidence_interval(simple_model, sampler, solver = glpk, N = 200, log = false)
-        @test lower(CI) <= upper(CI)
+        try
+            CI = confidence_interval(simple_model, sampler, solver = glpk, N = 200, log = false)
+            @test lower(CI) <= upper(CI)
+        catch end
         sol = optimize!(simple_model, sampler, solver = glpk, confidence = 0.95, tol = 1e-1, log = false)
         @test lower(confidence_interval(sol)) <= upper(confidence_interval(sol))
     end
