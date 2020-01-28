@@ -1,9 +1,9 @@
 reference_solver = GLPKSolverLP()
 
 regularizers = [DontRegularize(),
-                RegularizedDecomposition(penalty = Linearized()),
+                RegularizedDecomposition(penaltyterm = Linearized()),
                 TrustRegion(),
-                LevelSet(penalty = InfNorm(), projectionsolver = reference_solver)]
+                LevelSet(penaltyterm = InfNorm(), projectionsolver = reference_solver)]
 
 aggregators = [DontAggregate(),
                PartialAggregate(2),

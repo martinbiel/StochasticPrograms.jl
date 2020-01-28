@@ -66,27 +66,6 @@ function calculate_estimate(lshaped::AbstractLShapedSolver)
     return get_obj(lshaped)⋅lshaped.x + sum(model_objectives(lshaped))
 end
 
-function solve_master!(lshaped::AbstractLShapedSolver)
-    try
-        solve_regularized_master!(lshaped, lshaped.regularization)
-    catch
-        # Master problem could not be solved for some reason.
-        @unpack Q,θ = lshaped.data
-        gap = abs(θ-Q)/(abs(Q)+1e-10)
-        @warn "Master problem could not be solved, solver returned status $(status(lshaped.mastersolver)). The following relative tolerance was reached: $(@sprintf("%.1e",gap)). Aborting procedure."
-        return :StoppedPrematurely
-    end
-    if status(lshaped.mastersolver) == :Infeasible
-        @warn "Master is infeasible. Aborting procedure."
-        return :Infeasible
-    end
-    if status(lshaped.mastersolver) == :Unbounded
-        @warn "Master is unbounded. Aborting procedure."
-        return :Unbounded
-    end
-    return :Optimal
-end
-
 function log!(lshaped::AbstractLShapedSolver; optimal = false)
     @unpack Q,θ,iterations = lshaped.data
     @unpack keep, offset, indent = lshaped.parameters

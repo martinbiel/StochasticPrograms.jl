@@ -112,32 +112,6 @@ function add_cut!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T
     return nothing
 end
 
-# function add_cut!(::AbstractLShapedSolver, ::Consolidation, ::Integer, ::AbstractHyperPlane)
-#     return nothing
-# end
-
-# function add_cut!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T}, t::Integer, cut::HyperPlane{FeasibilityCut}) where T <: AbstractFloat
-#     if t > length(consolidation.cuts)
-#         push!(consolidation.cuts, Vector{AnySparseOptimalityCut{T}}())
-#         push!(consolidation.feasibility_cuts, Vector{SparseFeasibilityCut{T}}())
-#         push!(consolidation.consolidated, false)
-#         push!(consolidation.redundance_count, 0)
-#     end
-#     push!(consolidation.feasibility_cuts[t], cut)
-#     return nothing
-# end
-
-# function add_cut!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T}, t::Integer, cut::AnySparseOptimalityCut) where T <: AbstractFloat
-#     if t > length(consolidation.cuts)
-#         push!(consolidation.cuts, Vector{AnySparseOptimalityCut{T}}())
-#         push!(consolidation.feasibility_cuts, Vector{SparseFeasibilityCut{T}}())
-#         push!(consolidation.consolidated, false)
-#         push!(consolidation.redundance_count, 0)
-#     end
-#     push!(consolidation.cuts[t], cut)
-#     return nothing
-# end
-
 function rebuild_master!(lshaped::AbstractLShapedSolver, consolidation::Consolidation)
     ncuts = ncutconstraints(lshaped)
     cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lshaped.mastersolver.lqmodel)

@@ -9,7 +9,7 @@ The following penalty parameter update procedures are available
 
 The following execution policies are available
 - [`Serial`](@ref):  Classical progressive-hedging (default)
-- [`Synchronous`](@ref): Classical progressive-hedging run in parallel ?Synchronous for parameter descriptions.
+- [`Synchronous`](@ref): Classical progressive-hedging run in parallel
 - [`Asynchronous`](@ref): Asynchronous progressive-hedging ?Asynchronous for parameter descriptions.
 
 ...
@@ -17,6 +17,7 @@ The following execution policies are available
 - `qpsolver::AbstractMathProgSolver`: MathProgBase solver capable of solving quadratic programs.
 - `penalty::AbstractPenalizer = Fixed()`: Specify penalty update procedure (Fixed, Adaptive)
 - `execution::AbstractExecuter = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 - <keyword arguments>: Algorithm specific parameters, consult individual docstrings (see above list) for list of possible arguments and default values.
 ...
 

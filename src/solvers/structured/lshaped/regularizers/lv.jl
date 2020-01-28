@@ -20,7 +20,7 @@ Functor object for using level-set regularization in an L-shaped algorithm. Crea
 ...
 # Parameters
 - `λ::AbstractFloat = 0.5`: Controls the level position L = (1-λ)*θ + λ*Q̃, a convex combination of the current lower and upper bound.
-- `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
 struct LevelSet{T <: AbstractFloat, A <: AbstractVector, P <: LQSolver, PT <: PenaltyTerm} <: AbstractRegularization
@@ -33,16 +33,16 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, P <: LQSolver, PT <: Pe
     incumbents::Vector{Int}
 
     projectionsolver::P
-    penalty::PT
+    penaltyterm::PT
 
-    function LevelSet(ξ₀::AbstractVector, projectionsolver::MPB.AbstractMathProgSolver, penalty::PenaltyTerm; kw...)
+    function LevelSet(ξ₀::AbstractVector, projectionsolver::MPB.AbstractMathProgSolver, penaltyterm::PenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         ξ₀_ = convert(AbstractVector{T}, copy(ξ₀))
         A = typeof(ξ₀_)
         psolver = LQSolver(Model(), projectionsolver)
         P = typeof(psolver)
-        PT = typeof(penalty)
-        return new{T, A, P, PT}(LVData{T}(), LVParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), psolver, penalty)
+        PT = typeof(penaltyterm)
+        return new{T, A, P, PT}(LVData{T}(), LVParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), psolver, penaltyterm)
     end
 end
 
@@ -53,7 +53,7 @@ function initialize_regularization!(lshaped::AbstractLShapedSolver, lv::LevelSet
     for i = 1:nthetas(lshaped)
         MPB.addvar!(lv.projectionsolver.lqmodel, -Inf, Inf, 0.0)
     end
-    initialize_penaltyterm!(lv.penalty, lv.projectionsolver, lshaped.x)
+    initialize_penaltyterm!(lv.penaltyterm, lv.projectionsolver, lshaped.x)
     return nothing
 end
 
@@ -117,9 +117,9 @@ function _project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
     end
     # Update regularizer
     c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
-    update_penaltyterm!(lv.penalty, lv.projectionsolver, c, 1.0, lshaped.x)
+    update_penaltyterm!(lv.penaltyterm, lv.projectionsolver, c, 1.0, lshaped.x)
     # Solve projection problem
-    solve_penalized!(lv.penalty, lv.projectionsolver, lshaped.mastervector, lshaped.x, lshaped.x)
+    solve_penalized!(lv.penaltyterm, lv.projectionsolver, lshaped.mastervector, lshaped.x, lshaped.x)
     if status(lv.projectionsolver) == :Infeasible
         @warn "Projection problem is infeasible, unprojected solution will be used"
         if Q̃ <= θ
@@ -149,18 +149,18 @@ Factory object for [`LevelSet`](@ref). Pass to `regularize ` in the `LShapedSolv
 """
 struct LV <: AbstractRegularizer
     projectionsolver::MPB.AbstractMathProgSolver
-    penalty::PenaltyTerm
+    penaltyterm::PenaltyTerm
     parameters::Dict{Symbol,Any}
 end
-LV(; projectionsolver::MPB.AbstractMathProgSolver, penalty = Quadratic(), kw...) = LV(projectionsolver, penalty, Dict{Symbol,Any}(kw))
-WithLV(; projectionsolver::MPB.AbstractMathProgSolver, penalty = Quadratic(), kw...) = LV(projectionsolver, penalty, Dict{Symbol,Any}(kw))
-LevelSet(; projectionsolver::MPB.AbstractMathProgSolver, penalty = Quadratic(), kw...) = LV(projectionsolver, penalty, Dict{Symbol,Any}(kw))
-WithLevelSets(; projectionsolver::MPB.AbstractMathProgSolver, penalty = Quadratic(), kw...) = LV(projectionsolver, penalty, Dict{Symbol,Any}(kw))
+LV(; projectionsolver::MPB.AbstractMathProgSolver, penaltyterm = Quadratic(), kw...) = LV(projectionsolver, penaltyterm, Dict{Symbol,Any}(kw))
+WithLV(; projectionsolver::MPB.AbstractMathProgSolver, penaltyterm = Quadratic(), kw...) = LV(projectionsolver, penaltyterm, Dict{Symbol,Any}(kw))
+LevelSet(; projectionsolver::MPB.AbstractMathProgSolver, penaltyterm = Quadratic(), kw...) = LV(projectionsolver, penaltyterm, Dict{Symbol,Any}(kw))
+WithLevelSets(; projectionsolver::MPB.AbstractMathProgSolver, penaltyterm = Quadratic(), kw...) = LV(projectionsolver, penaltyterm, Dict{Symbol,Any}(kw))
 
 function add_regularization_params!(regularizer::LV; kwargs...)
     push!(regularizer.parameters, kwargs...)
     for (k,v) in kwargs
-        if k == :projectionsolver
+        if k ∈ [:projectionsolver, :penaltyterm]
             setfield!(regularizer, k, v)
             delete!(regularizer.parameters, k)
         end

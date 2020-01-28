@@ -178,6 +178,36 @@ function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems, execu
     return fill_submodels!(execution.subworkers, decision(lshaped), scenarioproblems)
 end
 
+function solve_master!(lshaped::AbstractLShapedSolver, ::AsynchronousExecution)
+    try
+        solve_regularized_master!(lshaped, lshaped.regularization)
+    catch
+        # Master problem could not be solved for some reason.
+        @unpack Q,θ = lshaped.data
+        gap = abs(θ-Q)/(abs(Q)+1e-10)
+        # Always print this warning
+        @warn "Master problem could not be solved, solver returned status $(status(lshaped.mastersolver)). The following relative tolerance was reached: $(@sprintf("%.1e",gap)). Aborting procedure."
+        return :StoppedPrematurely
+    end
+    if status(lshaped.mastersolver) == :Infeasible
+        # Asynchronicity can sometimes yield an infeasible master. If so, try to continue
+        if execution.max_active > 1 || execution.κ < 1.0
+            # Ensure that there are still cuts to consider
+            if isready(execution.cutqueue)
+                return :Valid
+            end
+        end
+        # Otherwise, abort
+        @warn "Master is infeasible. Aborting procedure."
+        return :Infeasible
+    end
+    if status(lshaped.mastersolver) == :Unbounded
+        @warn "Master is unbounded. Aborting procedure."
+        return :Unbounded
+    end
+    return :Optimal
+end
+
 function iterate!(lshaped::AbstractLShapedSolver, execution::AsynchronousExecution{F,T}) where {F <: AbstractFeasibility, T <: AbstractFloat}
     wait(execution.cutqueue)
     while isready(execution.cutqueue)

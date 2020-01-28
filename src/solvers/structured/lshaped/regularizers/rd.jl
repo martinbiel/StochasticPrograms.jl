@@ -27,7 +27,7 @@ Functor object for using regularized decomposition regularization in an L-shaped
 - `σ̅::AbstractFloat = 4.0`: Maximum value of the regularization parameter.
 - `σ̲::AbstractFloat = 0.5`: Minimum value of the regularization parameter.
 - `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
-- `linearize::Bool = false`: If `true`, the quadratic terms in the master problem objective are linearized through a ∞-norm approximation.
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
 struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: PenaltyTerm} <: AbstractRegularization
@@ -39,14 +39,14 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: P
     σ_history::A
     incumbents::Vector{Int}
 
-    penalty::PT
+    penaltyterm::PT
 
-    function RegularizedDecomposition(ξ₀::AbstractVector, penalty::PenaltyTerm; kw...)
+    function RegularizedDecomposition(ξ₀::AbstractVector, penaltyterm::PenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         ξ₀_ = convert(AbstractVector{T}, copy(ξ₀))
         A = typeof(ξ₀_)
-        PT = typeof(penalty)
-        return new{T, A, PT}(RDData{T}(), RDParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), penalty)
+        PT = typeof(penaltyterm)
+        return new{T, A, PT}(RDData{T}(), RDParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), penaltyterm)
     end
 end
 
@@ -54,9 +54,9 @@ function initialize_regularization!(lshaped::AbstractLShapedSolver, rd::Regulari
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)
     # Initialize and update penalty
-    initialize_penaltyterm!(rd.penalty, lshaped.mastersolver, lshaped.x)
+    initialize_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, lshaped.x)
     c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
-    update_penaltyterm!(rd.penalty, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
+    update_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
     return nothing
 end
 
@@ -107,13 +107,13 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     rd.data.σ = new_σ
     if need_update
         c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
-        update_penaltyterm!(rd.penalty, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
+        update_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
     end
     return nothing
 end
 
 function solve_regularized_master!(lshaped::AbstractLShapedSolver, solver::LQSolver, rd::RegularizedDecomposition)
-    solve_penalized!(rd.penalty, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
+    solve_penalized!(rd.penaltyterm, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
     return nothing
 end
 
@@ -126,16 +126,27 @@ Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize ` in 
 
 """
 struct RD <: AbstractRegularizer
-    penalty::PenaltyTerm
+    penaltyterm::PenaltyTerm
     parameters::Dict{Symbol,Any}
 end
-RD(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
-WithRD(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
-RegularizedDecomposition(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
-WithRegularizedDecomposition(; penalty = Quadratic(), kw...) = RD(penalty, Dict{Symbol,Any}(kw))
+RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
+WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
+RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
+WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
+
+function add_regularization_params!(regularizer::RD; kwargs...)
+    push!(regularizer.parameters, kwargs...)
+    for (k,v) in kwargs
+        if k == :penaltyterm
+            setfield!(regularizer, k, v)
+            delete!(regularizer.parameters, k)
+        end
+    end
+    return nothing
+end
 
 function (rd::RD)(x::AbstractVector)
-    return RegularizedDecomposition(x, rd.penalty; rd.parameters...)
+    return RegularizedDecomposition(x, rd.penaltyterm; rd.parameters...)
 end
 
 function str(::RD)

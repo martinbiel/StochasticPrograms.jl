@@ -2,6 +2,12 @@ abstract type PenaltyTerm end
 
 Base.copy(::PT) where PT <: PenaltyTerm = PT()
 
+"""
+    Quadratic
+
+Functor object for using a quadratic 2-norm penalty term. Requires an `AbstractMathProgSolver` capable of solving QP problems. Passed by default through `penalty` where applicable.
+
+"""
 mutable struct Quadratic <: PenaltyTerm end
 
 function initialize_penaltyterm!(penalty::Quadratic, solver::LQSolver, ::AbstractVector)
@@ -39,11 +45,24 @@ function solve_penalized!(::Quadratic, solver::LQSolver, X::AbstractVector, ::Ab
     return nothing
 end
 
+"""
+    Linearized
+
+Functor object for using an approximately quadratic penalty term, through linearization. Pass through `penalty` where applicable.
+
+...
+# Parameters
+- `nbreakpoints::Int`: Number of cutting planes used to approximate quadratic term
+...
+"""
 mutable struct Linearized <: PenaltyTerm
     index::Int
     nbreakpoints::Int
 
-    Linearized(index::Integer, nbreakpoints::Integer) = new(index, nbreakpoints)
+    function Linearized(index::Integer, nbreakpoints::Integer)
+        n = nbreakpoints >= 3 ? nbreakpoints : 3
+        new(index, n)
+    end
 end
 Linearized(; nbreakpoints = 3) = Linearized(-1, nbreakpoints)
 Base.copy(linearized::Linearized) = Linearized(-1, linearized.nbreakpoints)
@@ -101,6 +120,12 @@ function solve_penalized!(penalty::Linearized, solver::LQSolver, X::AbstractVect
     return nothing
 end
 
+"""
+    InfNorm
+
+Functor object for using a linear ∞-norm penalty term. Pass through `penalty` where applicable.
+
+"""
 mutable struct InfNorm <: PenaltyTerm
     index::Int
 
@@ -149,6 +174,12 @@ function solve_penalized!(penalty::InfNorm, solver::LQSolver, X::AbstractVector,
     return nothing
 end
 
+"""
+    ManhattanNorm
+
+Functor object for using a linear 1-norm penalty term. Pass through `penalty` where applicable.
+
+"""
 mutable struct ManhattanNorm <: PenaltyTerm
     index::Int
 

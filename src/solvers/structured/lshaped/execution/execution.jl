@@ -4,6 +4,7 @@ abstract type AbstractExecution end
 nthetas(lshaped::AbstractLShapedSolver) = nthetas(lshaped, lshaped.execution)
 initialize_subproblems!(lshaped::AbstractLShapedSolver, scenarioproblems::AbstractScenarioProblems, x::AbstractVector, subsolver::MPB.AbstractMathProgSolver) = initialize_subproblems!(lshaped.execution, scenarioproblems, x, subsolver)
 finish_initilization!(lshaped::AbstractLShapedSolver) = finish_initilization!(lshaped, lshaped.execution)
+solve_master!(lshaped::AbstractLShapedSolver) = solve_master!(lshaped, lshaped.execution)
 iterate!(lshaped::AbstractLShapedSolver) = iterate!(lshaped, lshaped.execution)
 start_workers!(lshaped::AbstractLShapedSolver) = start_workers!(lshaped, lshaped.execution)
 close_workers!(lshaped::AbstractLShapedSolver) = close_workers!(lshaped, lshaped.execution)

@@ -10,7 +10,7 @@ The following L-shaped regularizations are available
 - [`LevelSet`](@ref):  Level-set ?LevelSet for parameter descriptions.
 
 The following aggregation schemes are available
-- [`NoRegularization`](@ref):  Multi-cut L-shaped algorithm (default)
+- [`NoAggregation`](@ref):  Multi-cut L-shaped algorithm (default)
 - [`PartialAggregation`](@ref):  ?PartialAggregation for parameter descriptions.
 - [`FullAggregation`](@ref):  ?FullAggregation for parameter descriptions.
 - [`DynamicAggregation`](@ref):  ?DynamicAggregation for parameter descriptions.
@@ -21,6 +21,11 @@ The following consolidation schemes are available
 - [`NoConsolidation`](@ref)
 - [`Consolidation`](@ref)
 
+The following execution policies are available
+- [`Serial`](@ref):  Classical L-shaped (default)
+- [`Synchronous`](@ref): Classical L-shaped run in parallel
+- [`Asynchronous`](@ref): Asynchronous L-shaped ?Asynchronous for parameter descriptions.
+
 ...
 # Arguments
 - `lpsolver::AbstractMathProgSolver`: MathProgBase solver capable of solving linear (and possibly quadratic) programs.
@@ -29,7 +34,7 @@ The following consolidation schemes are available
 - `regularize::AbstractRegularizer = DontRegularize()`: Specify regularization procedure (DontRegularize, RegularizedDecomposition/RD/WithRegularizedDecomposition, TrustRegion/TR/WithTrustRegion, LevelSet/LV/WithLevelSets).
 - `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate)
 - `consolidate::AbstractConsolidator = DontConsolidate()`: Specify consolidation procedure (DontConsolidate, Consolidate)
-- `distributed::Bool = false`: Specify if distributed variant of algorithm should be run (requires worker cores). See `?DistributedLShaped` for parameter descriptions.
+- `execution::Execution = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
 - `crash::CrashMethod = Crash.None`: Crash method used to generate an initial decision. See ?Crash for alternatives.
 - <keyword arguments>: Algorithm specific parameters, See `?LShaped` for list of possible arguments and default values.
 ...
