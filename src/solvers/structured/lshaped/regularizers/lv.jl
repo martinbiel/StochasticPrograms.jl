@@ -116,7 +116,7 @@ function _project!(lshaped::AbstractLShapedSolver, lv::LevelSet)
         MPB.setconstrUB!(lv.projectionsolver.lqmodel, ub)
     end
     # Update regularizer
-    c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
+    c = zeros(length(lshaped.x)+nthetas(lshaped))
     update_penaltyterm!(lv.penaltyterm, lv.projectionsolver, c, 1.0, lshaped.x)
     # Solve projection problem
     solve_penalized!(lv.penaltyterm, lv.projectionsolver, lshaped.mastervector, lshaped.x, lshaped.x)
