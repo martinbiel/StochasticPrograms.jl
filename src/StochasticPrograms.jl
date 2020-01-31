@@ -10,7 +10,7 @@ using Printf
 # External libraries
 using JuMP
 using Distributions
-using MathProgBase
+using MathOptInterface
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
 using Reexport
@@ -18,7 +18,7 @@ using ProgressMeter
 
 import Base: getindex, length, in, issubset, show
 
-const MPB = MathProgBase
+const MOI = MathOptInterface
 
 export
     StochasticModel,
@@ -134,7 +134,7 @@ end
 include("types/types.jl")
 include("methods/methods.jl")
 include("spinterface.jl")
-include("crash.jl")
-include("solvers/solvers.jl")
+#include("crash.jl")
+#include("solvers/solvers.jl")
 
 end # module
