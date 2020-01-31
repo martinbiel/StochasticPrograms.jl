@@ -3,24 +3,43 @@ struct StochasticProgram{N, M, S <: NTuple{N, Stage}, SP <: Union{AbstractScenar
     scenarioproblems::SP
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
-    spsolver::SPSolver
+    sp_optimizer::SPOptimizer
 
-    function StochasticProgram(first_stage_params::Any, second_stage_params::Any, ::Type{S}, solver::SPSolverType, procs::Vector{Int}) where S <: AbstractScenario
+    function StochasticProgram(first_stage_params::Any,
+                               second_stage_params::Any,
+                               ::Type{S},
+                               procs::Vector{Int},
+                               optimizer_factory::Union{Nothing, OptimizerFactory}) where S <: AbstractScenario
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
         scenarioproblems = ScenarioProblems(S, procs)
         SP = typeof(scenarioproblems)
-        return new{2, 1, typeof(stages), SP}(stages, scenarioproblems, Dict{Symbol, Function}(), Dict{Symbol, JuMP.Model}(), SPSolver(solver))
+        return new{2, 1, typeof(stages), SP}(stages,
+                                             scenarioproblems,
+                                             Dict{Symbol, Function}(),
+                                             Dict{Symbol, JuMP.Model}(),
+                                             SPOptimizer(optimizer_factory))
     end
 
-    function StochasticProgram(first_stage_params::Any, second_stage_params::Any, scenarios::Vector{<:AbstractScenario}, solver::SPSolverType, procs::Vector{Int})
+    function StochasticProgram(first_stage_params::Any,
+                               second_stage_params::Any,
+                               scenarios::Vector{<:AbstractScenario},
+                               procs::Vector{Int},
+                               optimizer_factory::Union{Nothing, OptimizerFactory})
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
         S = typeof(stages)
         scenarioproblems = ScenarioProblems(scenarios, procs)
         SP = typeof(scenarioproblems)
-        return new{2, 1, S, SP}(stages, scenarioproblems, Dict{Symbol, Function}(), Dict{Symbol, JuMP.Model}(), SPSolver(solver))
+        return new{2, 1, S, SP}(stages,
+                                scenarioproblems,
+                                Dict{Symbol, Function}(),
+                                Dict{Symbol, JuMP.Model}(),
+                                SPOptimizer(optimizer_factory))
     end
 
-    function StochasticProgram(stage_params::NTuple{N, Any}, scenario_types::NTuple{M, DataType}, solver::SPSolverType, procs::Vector{Int}) where {N, M}
+    function StochasticProgram(stage_params::NTuple{N, Any},
+                               scenario_types::NTuple{M, DataType},
+                               solver::SPSolverType, procs::Vector{Int},
+                               optimizer_factory::Union{Nothing, OptimizerFactory}) where {N, M}
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         stages = ntuple(Val(N)) do i
@@ -31,10 +50,17 @@ struct StochasticProgram{N, M, S <: NTuple{N, Stage}, SP <: Union{AbstractScenar
             ScenarioProblems(scenarios[i], procs)
         end
         SP = typeof(scenarioproblems)
-        return new{N, M, S, SP}(stages, scenarioproblems, Dict{Symbol, Function}(), Dict{Symbol, JuMP.Model}(), SPSolver(solver))
+        return new{N, M, S, SP}(stages,
+                                scenarioproblems,
+                                Dict{Symbol, Function}(),
+                                Dict{Symbol, JuMP.Model}(),
+                                SPOptimizer(optimizer_factory))
     end
 
-    function StochasticProgram(stage_params::NTuple{N, Any}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, solver::SPSolverType, procs::Vector{Int}) where {N, M}
+    function StochasticProgram(stage_params::NTuple{N, Any},
+                               scenarios::NTuple{M, Vector{<:AbstractScenario}},
+                               procs::Vector{Int},
+                               optimizer_factory::Union{Nothing, OptimizerFactory}) where {N, M}
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         stages = ntuple(Val(N)) do i
@@ -45,7 +71,11 @@ struct StochasticProgram{N, M, S <: NTuple{N, Stage}, SP <: Union{AbstractScenar
             ScenarioProblems(scenarios[i], procs)
         end
         SP = typeof(scenarioproblems)
-        return new{N, M, S, SP}(stages, scenarioproblems, Dict{Symbol, Function}(), Dict{Symbol, JuMP.Model}(), SPSolver(solver))
+        return new{N, M, S, SP}(stages,
+                                scenarioproblems,
+                                Dict{Symbol, Function}(),
+                                Dict{Symbol, JuMP.Model}(),
+                                SPOptimizer(optimizer_factory))
     end
 end
 TwoStageStochasticProgram{S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProblems} = StochasticProgram{2, 1, S, SP}
@@ -57,61 +87,83 @@ TwoStageStochasticProgram{S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProble
 """
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
-                      solver = JuMP.UnsetSolver(),
+                      optimizer_factory::Union{Nothing, OptimizerFactory}=nothing;
                       procs = workers())
 
-Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `Scenario` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
+Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `Scenario` can be added through `add_scenario!`. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
-function StochasticProgram(first_stage_params::Any, second_stage_params::Any; solver = JuMP.UnsetSolver(), procs = workers()) where S <: AbstractScenario
-    return StochasticProgram(first_stage_params, second_stage_params, Scenario, solver, procs)
+function StochasticProgram(first_stage_params::Any,
+                           second_stage_params::Any,
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers()) where S <: AbstractScenario
+    return StochasticProgram(first_stage_params, second_stage_params, Scenario, procs, optimizer_factory)
 end
 """
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
-                      ::Type{S};
-                      solver = JuMP.UnsetSolver(),
+                      ::Type{S},
+                      optimizer_factory::Union{Nothing, OptimizerFactory}=nothing;
                       procs = workers()) where S <: AbstractScenario
 
-Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `S` can be added through `add_scenario!`. Optionally, a capable `solver` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
+Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `S` can be added through `add_scenario!`. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
-function StochasticProgram(first_stage_params::Any, second_stage_params::Any, ::Type{S}; solver = JuMP.UnsetSolver(), procs = workers()) where S <: AbstractScenario
-    return StochasticProgram(first_stage_params, second_stage_params, S, solver, procs)
+function StochasticProgram(first_stage_params::Any,
+                           second_stage_params::Any,
+                           ::Type{S},
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers()) where S <: AbstractScenario
+    return StochasticProgram(first_stage_params, second_stage_params, S, procs, optimizer_factory)
 end
 """
-    StochasticProgram(; solver = JuMP.UnsetSolver(),
+    StochasticProgram(optimizer_factory::Union{Nothing, OptimizerFactory}=nothing;
                       procs = workers())
 
-Create a new two-stage stochastic program with scenarios of type `S` and no stage data.
+Create a new two-stage stochastic program with scenarios of type `S` and no stage data. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program.
 """
-StochasticProgram(; solver = JuMP.UnsetSolver(), procs = workers()) where S <: AbstractScenario = StochasticProgram(nothing, nothing, Scenario; solver = solver, procs = procs)
+function StochasticProgram(optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers()) where S <: AbstractScenario
+    return StochasticProgram(nothing, nothing, Scenario, optimizer_factory; procs = procs)
+end
 """
-    StochasticProgram(::Type{S};
-                      solver = JuMP.UnsetSolver(),
+    StochasticProgram(::Type{S},
+                      optimizer_factory::Union{Nothing, OptimizerFactory}=nothing;
                       procs = workers()) where S <: AbstractScenario
 
-Create a new two-stage stochastic program with scenarios of type `S` and no stage data.
+Create a new two-stage stochastic program with scenarios of type `S` and no stage data. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program.
 """
-StochasticProgram(::Type{S}; solver = JuMP.UnsetSolver(), procs = workers()) where S <: AbstractScenario = StochasticProgram(nothing, nothing, S; solver = solver, procs = procs)
+function StochasticProgram(::Type{S},
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers()) where S <: AbstractScenario
+    return StochasticProgram(nothing, nothing, S, optimizer_factory; procs = procs)
+end
 """
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
-                      scenarios::Vector{<:AbstractScenario};
-                      solver = JuMP.UnsetSolver(),
+                      scenarios::Vector{<:AbstractScenario},
+                      optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                       procs = workers())
 
-Create a new two-stage stochastic program with a given collection of `scenarios`
+Create a new two-stage stochastic program with a given collection of `scenarios`. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
-function StochasticProgram(first_stage_params::Any, second_stage_params::Any, scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers())
-    return StochasticProgram(first_stage_params, second_stage_params, scenarios, solver, procs)
+function StochasticProgram(first_stage_params::Any,
+                           second_stage_params::Any,
+                           scenarios::Vector{<:AbstractScenario},
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers())
+    return StochasticProgram(first_stage_params, second_stage_params, scenarios, procs, optimizer_factory)
 end
 """
-    StochasticProgram(scenarios::Vector{<:AbstractScenario};
-                      solver = JuMP.UnsetSolver(),
+    StochasticProgram(scenarios::Vector{<:AbstractScenario},
+                      optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                       procs = workers()) where {SD <: AbstractScenario}
 
-Create a new two-stage stochastic program with a given collection of `scenarios` and no stage data.
+Create a new two-stage stochastic program with a given collection of `scenarios` and no stage data. Optionally, a capable `optimizer_factory` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
-StochasticProgram(scenarios::Vector{<:AbstractScenario}; solver = JuMP.UnsetSolver(), procs = workers()) = StochasticProgram(nothing, nothing, scenarios; solver = solver, procs = procs)
+function StochasticProgram(scenarios::Vector{<:AbstractScenario},
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                           procs = workers())
+    return StochasticProgram(nothing, nothing, scenarios, optimizer_factory; procs = procs)
+end
 
 # Printing #
 # ========================== #
@@ -159,11 +211,11 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
     for s = 2:N
         println(io, stage(stochasticprogram, s))
     end
-    print(io, "Solver is ")
-    if isa(spsolver(stochasticprogram), JuMP.UnsetSolver)
-        print(io, "default solver")
+    print(io, "Solver name: ")
+    if sp_optimizer_factory(stochasticprogram) == nothing
+        print(io, "No optimizer attached.")
     else
-        print(io, solverstr(spsolver(stochasticprogram)))
+        print(io, optimizerstr(optimizer(stochasticprogram)))
     end
 end
 function Base.print(io::IO, stochasticprogram::StochasticProgram{N}) where N

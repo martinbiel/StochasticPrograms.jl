@@ -4,22 +4,22 @@ function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVect
     first_stage = get_stage_one(stochasticprogram)
     return eval_objective(first_stage.obj, x)
 end
-function _eval_second_stage(stochasticprogram::TwoStageStochasticProgram, x::AbstractVector, scenario::AbstractScenario, solver::MPB.AbstractMathProgSolver)
-    outcome = outcome_model(stochasticprogram, x, scenario, solver)
+function _eval_second_stage(stochasticprogram::TwoStageStochasticProgram, x::AbstractVector, scenario::AbstractScenario, optimizer::MOI.AbstractOptimizer)
+    outcome = outcome_model(stochasticprogram, x, scenario, optimizer)
     solve(outcome)
     return probability(scenario)*getobjectivevalue(outcome)
 end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
+                             optimizer_factory::OptimizerFactory) where {S, SP <: ScenarioProblems}
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
     return outcome_mean(outcome_generator, scenarios(stochasticprogram))
 end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
-                             solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
+                             optimizer_factory::OptimizerFactory) where {S, SP <: DScenarioProblems}
     Qs = Vector{Float64}(undef, nworkers())
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
     @sync begin
         for (i,w) in enumerate(workers())
             @async Qs[i] = remotecall_fetch((sp,outcome_generator)->begin
@@ -36,22 +36,22 @@ function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
 end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario; solver = solver)
+                                  optimizer_factory::OptimizerFactory) where {S, SP <: ScenarioProblems}
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer factory)
     𝔼Q, σ² = welford(outcome_generator, scenarios(stochasticprogram))
     return 𝔼Q, sqrt(σ²)
 end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
-                                  solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
+                                  optimizer_factory::OptimizerFactory) where {S, SP <: DScenarioProblems}
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
-            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,x,solver)->begin
+            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,x,optimizer)->begin
                 scenarioproblems = fetch(sp)
                 isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x))
                     outcome_generator = scenario -> begin
-                        outcome_model = Model(solver = solver)
+                        outcome_model = Model(optimizer)
                         _outcome_model!(outcome_model,
                                         stage_one_generator,
                                         stage_two_generator,
@@ -70,18 +70,20 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
             stage_parameters(stochasticprogram, 1),
             stage_parameters(stochasticprogram, 2),
             x,
-            solver)
+            optimizer_factory)
         end
     end
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
     return 𝔼Q, sqrt(σ²)
 end
-function _eval(stochasticprogram::StochasticProgram{2}, x::AbstractVector, solver::MPB.AbstractMathProgSolver)
+function _eval(stochasticprogram::StochasticProgram{2},
+               x::AbstractVector,
+               optimizer_factory::OptimizerFactory)
     xlength = decision_length(stochasticprogram)
     length(x) == xlength || error("Incorrect length of given decision vector, has ", length(x), " should be ", xlength)
     all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
     cᵀx = _eval_first_stage(stochasticprogram, x)
-    𝔼Q = _eval_second_stages(stochasticprogram, x, solver)
+    𝔼Q = _eval_second_stages(stochasticprogram, x, optimizer_factory)
     return cᵀx+𝔼Q
 end
 # Mean/variance calculations #
@@ -146,41 +148,43 @@ end
 # ========================== #
 """
     evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
-                      decision::AbstractVector;
-                      solver = JuMP.UnsetSolver())
+                      decision::AbstractVector,
+                      optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
 
 Evaluate the first-stage `decision` in `stochasticprogram`.
 
-In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. Optionally, supply a capable `solver` to solve the outcome models. Otherwise, any previously set solver will be used.
+In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. Optionally, supply a capable `optimizer_factory` to solve the outcome models. Otherwise, any previously set solver will be used.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::AbstractVector; solver::SPSolverType = JuMP.UnsetSolver())
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot evaluate decision without a solver.")
+function evaluate_decision(stochasticprogram::StochasticProgram{2},
+                           decision::AbstractVector,
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
+    # Use cached optimizer if available
+    supplied_optimizer = pick_optimizer(stochasticprogram, optimizer_factory)
+    # Abort if no optimizer was given
+    if supplied_optimizer == nothing
+        error("Cannot evaluate decision without an optimizer.")
     end
-    return _eval(stochasticprogram, decision, internal_solver(supplied_solver))
+    return _eval(stochasticprogram, decision, supplied_optimizer)
 end
 """
     evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
                       decision::AbstractVector,
-                      scenario::AbstractScenario;
-                      solver = JuMP.UnsetSolver())
+                      scenario::AbstractScenario,
+                      optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
 
 Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram{2},
                            decision::AbstractVector,
-                           scenario::AbstractScenario;
-                           solver::SPSolverType = JuMP.UnsetSolver())
-    # Use cached solver if available
-    supplied_solver = pick_solver(stochasticprogram, solver)
-    # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
-        error("Cannot evaluate decision without a solver.")
+                           scenario::AbstractScenario,
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
+    # Use cached optimizer if available
+    supplied_optimizer = pick_optimizer(stochasticprogram, optimizer_factory)
+    # Abort if no optimizer was given
+    if supplied_optimizer == nothing
+        error("Cannot evaluate decision without an optimizer.")
     end
-    outcome = outcome_model(stochasticprogram, decision, scenario; solver = solver)
+    outcome = outcome_model(stochasticprogram, decision, scenario, supplied_optimizer)
     status = solve(outcome)
     if status == :Optimal
         return _eval_first_stage(stochasticprogram, decision) + getobjectivevalue(outcome)
@@ -190,8 +194,8 @@ end
 """
     evaluate_decision(stochasticmodel::StochasticModel{2},
                       decision::AbstractVector,
-                      sampler::AbstractSampler;
-                      solver = JuMP.UnsetSolver(),
+                      sampler::AbstractSampler,
+                      optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                       confidence = 0.95,
                       N = 1000)
 
@@ -203,8 +207,8 @@ See also: [`confidence_interval`](@ref)
 """
 function evaluate_decision(stochasticmodel::StochasticModel{2},
                            decision::AbstractVector,
-                           sampler::AbstractSampler;
-                           solver::SPSolverType = JuMP.UnsetSolver(),
+                           sampler::AbstractSampler,
+                           optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                            confidence::AbstractFloat = 0.95,
                            Ñ::Integer = 1000,
                            kw...)
@@ -212,7 +216,7 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
         # Condidence level
         α = 1-confidence
         cᵀx = _eval_first_stage(eval_model, decision)
-        𝔼Q, σ = _stat_eval_second_stages(eval_model, decision, internal_solver(solver))
+        𝔼Q, σ = _stat_eval_second_stages(eval_model, decision, optimizer_factory)
         z = quantile(Normal(0,1), 1-α)
         L = cᵀx + 𝔼Q - z*σ/sqrt(Ñ)
         U = cᵀx + 𝔼Q + z*σ/sqrt(Ñ)
@@ -223,8 +227,8 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
 end
 """
     lower_bound(stochasticmodel::StochasticModel{2},
-                sampler::AbstractSampler;
-                solver = JuMP.UnsetSolver(),
+                sampler::AbstractSampler,
+                optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                 confidence = 0.95,
                 N = 100,
                 M = 10)
@@ -233,7 +237,17 @@ Generate a confidence interval around a lower bound on the true optimum of the t
 
 `N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models.
 """
-function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, M::Integer = 10, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function lower_bound(stochasticmodel::StochasticModel{2},
+                     sampler::AbstractSampler,
+                     optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                     confidence::AbstractFloat = 0.95,
+                     N::Integer = 100,
+                     M::Integer = 10,
+                     log = true,
+                     keep = true,
+                     offset = 0,
+                     indent::Int = 0,
+                     kw...)
     # Condidence level
     α = 1-confidence
     # Lower bound
@@ -258,8 +272,8 @@ function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampl
 end
 """
     upper_bound(stochasticmodel::StochasticModel{2},
-                sampler::AbstractSampler;
-                solver = JuMP.UnsetSolver(),
+                sampler::AbstractSampler,
+                optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                 confidence = 0.95,
                 N = 100,
                 T = 10,
@@ -269,7 +283,18 @@ Generate a confidence interval around an upper of the true optimum of the two-st
 
 `N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of each sampled model and `T` is the number of sampled models.
 """
-function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function upper_bound(stochasticmodel::StochasticModel{2},
+                     sampler::AbstractSampler,
+                     optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                     confidence::AbstractFloat = 0.95,
+                     N::Integer = 100,
+                     T::Integer = 10,
+                     Ñ::Integer = 1000,
+                     log = true,
+                     keep = true,
+                     offset = 0,
+                     indent::Int = 0,
+                     kw...)
     # Condidence level
     α = 1-confidence
     # decision generation
@@ -281,8 +306,8 @@ end
 """
     upper_bound(stochasticmodel::StochasticModel{2},
                 x::AbstractVector,
-                sampler::AbstractSampler;
-                solver = JuMP.UnsetSolver(),
+                sampler::AbstractSampler,
+                optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                 confidence = 0.95,
                 T = 10,
                 Ñ = 1000)
@@ -291,7 +316,18 @@ Generate a confidence interval around an upper bound of the expected value of th
 
 `Ñ` is the size of each sampled model and `T` is the number of sampled models.
 """
-function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function upper_bound(stochasticmodel::StochasticModel{2},
+                     x::AbstractVector,
+                     sampler::AbstractSampler,
+                     optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                     confidence::AbstractFloat = 0.95,
+                     T::Integer = 10,
+                     Ñ::Integer = 1000,
+                     log = true,
+                     keep = true,
+                     offset = 0,
+                     indent::Int = 0,
+                     kw...)
     # Condidence level
     α = 1-confidence
     Qs = Vector{Float64}(undef, T)
@@ -314,8 +350,8 @@ function upper_bound(stochasticmodel::StochasticModel{2}, x::AbstractVector, sam
 end
 """
     confidence_interval(stochasticmodel::StochasticModel{2},
-                        sampler::AbstractSampler;
-                        solver = JuMP.UnsetSolver(),
+                        sampler::AbstractSampler,
+                        optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
                         confidence = 0.9,
                         N = 100,
                         M = 10,
@@ -325,7 +361,19 @@ Generate a confidence interval around the true optimum of the two-stage `stochas
 
 `N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
 """
-function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function confidence_interval(stochasticmodel::StochasticModel{2},
+                             sampler::AbstractSampler,
+                             optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+                             confidence::AbstractFloat = 0.9,
+                             N::Integer = 100,
+                             M::Integer = 10,
+                             T::Integer = 10,
+                             Ñ::Integer = 1000,
+                             log = true,
+                             keep = true,
+                             offset = 0,
+                             indent::Int = 0,
+                             kw...)
     # Condidence level
     α = (1-confidence)/2
     # Lower bound
@@ -339,8 +387,8 @@ end
 """
     gap(stochasticmodel::StochasticModel{2},
         x::AbstractVector,
-        sampler::AbstractSampler;
-        solver = JuMP.UnsetSolver(),
+        sampler::AbstractSampler,
+        optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
         confidence = 0.9,
         N = 100,
         M = 10,
@@ -350,7 +398,20 @@ Generate a confidence interval around the gap between the result of using deciso
 
 `N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
 """
-function gap(stochasticmodel::StochasticModel{2}, x::AbstractVector, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.9, N::Integer = 100, M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, log = true, keep = true, offset = 0, indent::Int = 0, kw...)
+function gap(stochasticmodel::StochasticModel{2},
+             x::AbstractVector,
+             sampler::AbstractSampler,
+             optimizer_factory::Union{Nothing, OptimizerFactory} = nothing;
+             confidence::AbstractFloat = 0.9,
+             N::Integer = 100,
+             M::Integer = 10,
+             T::Integer = 10,
+             Ñ::Integer = 1000,
+             log = true,
+             keep = true,
+             offset = 0,
+             indent::Int = 0,
+             kw...)
     # Condidence level
     α = (1-confidence)/2
     # Lower bound

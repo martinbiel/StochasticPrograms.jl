@@ -3,41 +3,31 @@
 
 Default `SampledSolver`. Generates a `StochasticSolution` using the sample average approximation (SAA) method, to the desired confidence level.
 """
-struct SAA{S <: SPSolverType} <: AbstractSampledSolver
-    internal_solver::S
+struct SAA <: AbstractSampledSolver
+    internal_optimizer::OptimizerFactory
 
-    function SAA(solver::SPSolverType)
-        if isa(solver, JuMP.UnsetSolver)
-            error("Cannot solve emerging SAA problems without functional solver.")
+    function SAA(optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
+        if optimizer_factory = nothing
+            error("Cannot solve emerging SAA problems without functional optimizer.")
         end
-        S = typeof(solver)
-        return new{S}(solver)
+        return new(optimizer_factory)
     end
 end
-"""
-    SAA(; solver::SPSolverType = JuMP.UnsetSolver())
 
-Return an SAA where the emerging SAA problems are solved using `solver`.
-"""
-function SAA(; solver::SPSolverType = JuMP.UnsetSolver())
-    return SAA(solver)
-end
-
-mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSampledModel
+mutable struct SAAModel{M <: StochasticModel} <: AbstractSampledModel
     stochasticmodel::M
-    solver::S
+    optimizer::OptimizerFactory
     solution::StochasticSolution
     saa::StochasticProgram
 
-    function SAAModel(stochasticmodel::StochasticModel, solver::SPSolverType)
+    function SAAModel(stochasticmodel::StochasticModel, optimizer::OptimizerFactory)
         M = typeof(stochasticmodel)
-        S = typeof(solver)
-        return new{M, S}(stochasticmodel, solver, EmptySolution())
+        return new{M}(stochasticmodel, optimizer, EmptySolution())
     end
 end
 
-function SampledModel(stochasticmodel::StochasticModel, solver::SAA)
-    return SAAModel(stochasticmodel, solver.internal_solver)
+function SampledModel(stochasticmodel::StochasticModel, saa::SAA)
+    return SAAModel(stochasticmodel, saa.internal_optimizer)
 end
 
 function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confidence::AbstractFloat; M::Integer = 10, T::Integer = 10, Ñ::Integer = 1000, tol::AbstractFloat = 1e-2, Ninit::Int = 16, Nmax::Integer = 5000, solver_config::Function = (solver,N)->nothing, log = true)

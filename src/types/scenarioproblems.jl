@@ -172,7 +172,7 @@ function parentmodel(scenarioproblems::AbstractScenarioProblems)
     return scenarioproblems.parent
 end
 function recourse_length(scenarioproblems::ScenarioProblems)
-    return scenarioproblems.problems[1].numCols
+    return num_variables(scenarioproblems.problems[1])
 end
 function recourse_length(scenarioproblems::DScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")

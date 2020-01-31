@@ -588,8 +588,8 @@ macro stage(stage, args, defer)
             for var in args
                 varkey = Meta.quot(var)
                 decisiondef = @q begin
-                    haskey(parent.objDict, $varkey) || error("Decision $($varkey) not present in parent model.")
-                    $var = parent.objDict[$varkey]
+                    haskey(parent.obj_dict, $varkey) || error("Decision $($varkey) not present in parent model.")
+                    $var = parent.obj_dict[$varkey]
                 end
                 push!(code.args, decisiondef)
             end

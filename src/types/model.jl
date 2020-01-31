@@ -6,10 +6,12 @@ A mathematical model of a stochastic optimization problem.
 struct StochasticModel{N, P <: NTuple{N, StageParameters}}
     parameters::P
     generator::Function
-    spsolver::SPSolver
+    sp_optimizer::SPOptimizer
 
-    function StochasticModel(generator::Function, parameters::Vararg{StageParameters,N}; solver::SPSolverType = JuMP.UnsetSolver()) where N
-        return new{N,typeof(parameters)}(parameters, generator, SPSolver(solver))
+    function StochasticModel(generator::Function,
+                             parameters::Vararg{StageParameters,N},
+                             optimizer_factory::Union{Nothing, OptimizerFactory} = nothing) where N
+        return new{N,typeof(parameters)}(parameters, generator, SPOptimizer(optimizer_factory))
     end
 end
 nstages(::StochasticModel{N}) where N = N

@@ -146,14 +146,17 @@ end
     outcome_model(stochasticprogram::TwoStageStochasticProgram,
                   decision::AbstractVector,
                   scenario::AbstractScenario;
-                  solver::MOI.AbstractOptimizer = UnsetSolver())
+                  optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
 
 Return the resulting second stage model if `decision` is the first-stage decision in scenario `i`, in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """
-function outcome_model(stochasticprogram::StochasticProgram{2}, decision::AbstractVector, scenario::AbstractScenario; solver = UnsetSolver())
+function outcome_model(stochasticprogram::StochasticProgram{2},
+                       decision::AbstractVector,
+                       scenario::AbstractScenario,
+                       optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
     has_generator(stochasticprogram,:stage_1_vars) || error("First-stage not defined in stochastic program. Consider @first_stage or @stage 1.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
-    outcome_model = Model()
+    outcome_model = optimizer_factory == nothing ? Model() : Model(optimizer_factory)
     _outcome_model!(outcome_model,
                     generator(stochasticprogram,:stage_1_vars),
                     generator(stochasticprogram,:stage_2),
@@ -167,7 +170,7 @@ end
     outcome_model(stochasticprogram::StochasticProgram{N},
                   decisions::NTuple{N-1,AbstractVector}
                   scenario_path::NTuple{N-1,AbstractScenario},
-                  solver::MOI.Abs = UnsetSolver())
+                  solver::MOI.AbstractOptimizer)
 
 Return the resulting `N`:th stage model if `decisions` are the decisions taken in the previous stages and `scenario_path` are the realized scenarios up to stage `N` in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """

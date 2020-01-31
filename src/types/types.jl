@@ -1,37 +1,26 @@
 # Types #
 # ========================== #
 """
-    AbstractStructuredSolver
+    AbstractStructuredOptimizer
 
-Abstract supertype for structured solver interface objects.
+Abstract supertype for structure-exploiting optimizers.
 """
-abstract type AbstractStructuredSolver end
+abstract type AbstractStructuredOptimizer end
 """
-    AbstractStructuredModel
+    AbstractSampledOptimizer
 
-Abstract supertype for structured solver objects.
+Abstract supertype for sample-based optimizers.
 """
-abstract type AbstractStructuredModel end
-"""
-    AbstractSampledSolver
+abstract type AbstractSampledOptimizer end
 
-Abstract supertype for sample-based solver interface objects.
-"""
-abstract type AbstractSampledSolver end
-"""
-    AbstractSampledModel
+SPOptimizerType = Union{MOI.AbstractOptimizer, AbstractStructuredOptimizer, AbstractSampledOptimizer}
 
-Abstract supertype for sample-based solver objects.
-"""
-abstract type AbstractSampledModel end
+mutable struct SPOptimizer
+    optimizer_factory::Union{Nothing, OptimizerFactory}
+    optimizer::SPOptimizerType
 
-SPSolverType = Union{MPB.AbstractMathProgSolver, AbstractStructuredSolver, AbstractSampledSolver}
-mutable struct SPSolver
-    solver::SPSolverType
-    internal_model
-
-    function SPSolver(solver::SPSolverType)
-        return new(solver, nothing)
+    function SPOptimizer(optimizer_factory::Union{Nothing, OptimizerFactory})
+        return new(optimizer_factory, nothing)
     end
 end
 

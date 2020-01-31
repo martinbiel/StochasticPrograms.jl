@@ -114,7 +114,7 @@ function _clear_model!(model::JuMP.Model)
     empty!(model.colCat)
     empty!(model.colNames)
     empty!(model.colNamesIJulia)
-    empty!(model.objDict)
+    empty!(model.obj_dict)
     model.numCols = 0
     return nothing
 end
@@ -222,16 +222,16 @@ function get_stage(stochasticprogram::StochasticProgram, stage::Integer)
     haskey(stochasticprogram.problemcache, stage_key) || error("Stage problem $stage not generated.")
     return stochasticprogram.problemcache[stage_key]
 end
-function pick_solver(stochasticprogram::StochasticProgram, supplied_solver::SPSolverType)
-    if supplied_solver isa JuMP.UnsetSolver
-        return stochasticprogram.spsolver.solver
+function pick_optimizer(stochasticprogram::StochasticProgram, supplied_optimizer::Union{Nothing, OptimizerFactory})
+    if supplied_optimizer == nothing
+        return stochasticprogram.sp_optimizer.optimizer_factory
     end
-    return supplied_solver
+    return supplied_optimizer
 end
 
-internal_solver(solver::MathProgBase.AbstractMathProgSolver) = solver
+internal_optimizer(optimizer::MOI.AbstractOptimizer) = optimizer
 
-solverstr(solver::MathProgBase.AbstractMathProgSolver) = split(split(string(solver), "Solver")[1], ".")[2]
+optimizerstr(optimizer::MOI.AbstractOptimizer) = JuMP._try_get_solver_name(optimizer)
 
 typename(dtype::UnionAll) = dtype.body.name.name
 typename(dtype::DataType) = dtype.name.name
