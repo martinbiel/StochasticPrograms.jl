@@ -1,7 +1,7 @@
 # SP Constructs #
 # ========================== #
 """
-    WS(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenarioaData; solver = JuMP.UnsetSolver())
+    WS(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenarioaData; solver = UnsetSolver())
 
 Generate a **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
@@ -9,31 +9,31 @@ In other words, generate the first stage and the second stage of the `stochastic
 
 See also: [`DEP`](@ref), [`EVP`](@ref)
 """
-function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
+function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Check that the required generators have been defined
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
     # Return WS model
-    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), stage_parameters(stochasticprogram, 1), stage_parameters(stochasticprogram, 2), scenario, internal_solver(supplied_solver))
+    return _WS(generator(stochasticprogram,:stage_1), generator(stochasticprogram,:stage_2), stage_parameters(stochasticprogram, 1), stage_parameters(stochasticprogram, 2), scenario, supplied_solver)
 end
 function _WS(stage_one_generator::Function,
              stage_two_generator::Function,
              stage_one_params::Any,
              stage_two_params::Any,
              scenario::AbstractScenario,
-             solver::MathProgBase.AbstractMathProgSolver)
-    ws_model = Model(solver = solver)
+             solver::SPSolverType)
+    ws_model = Model()
     stage_one_generator(ws_model, stage_one_params)
-    ws_obj = copy(ws_model.obj)
+    ws_obj = copy(objective_function(ws_model))
     stage_two_generator(ws_model, stage_two_params, scenario, ws_model)
-    append!(ws_obj, ws_model.obj)
-    ws_model.obj = ws_obj
+    ws_obj += objective_function(ws_model)
+    set_objective_function(ws_model, ws_obj)
     return ws_model
 end
 """
-    WS_decision(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenario; solver = JuMP.UnsetSolver())
+    WS_decision(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenario; solver = UnsetSolver())
 
 Calculate the optimizer of the **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
@@ -41,7 +41,7 @@ Optionally, supply a capable `solver` to solve the wait-and-see problem. The def
 
 See also: [`WS`](@ref)
 """
-function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = JuMP.UnsetSolver())
+function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario; solver::SPSolverType = UnsetSolver())
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, solver = solver)
     solve(ws_model)
@@ -53,7 +53,7 @@ function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::Abstract
     return decision
 end
 """
-    EWS(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    EWS(stochasticprogram::StochasticProgram; solver = UnsetSolver())
 
 Calculate the **expected wait-and-see result** (`EWS`) of the `stochasticprogram`.
 
@@ -61,18 +61,18 @@ In other words, calculate the expectated result of all possible wait-and-see mod
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EWS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
+    if isa(supplied_solver, UnsetSolver)
         error("Cannot determine EWS without a solver.")
     end
     # Solve all possible WS models and compute EWS
     return _EWS(stochasticprogram, internal_solver(supplied_solver))
 end
 """
-    EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), confidence = 0.95, N::Integer = 1000)
+    EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = UnsetSolver(), confidence = 0.95, N::Integer = 1000)
 
 Approximately calculate the **expected wait-and-see result** (`EWS`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
 
@@ -80,7 +80,7 @@ Supply a capable `solver` to solve the intermediate problems. `N` is the number 
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer)
+function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer)
     sp = sample(stochasticmodel, sampler, N)
     𝔼WS, σ = _stat_EWS(sp, solver)
     z = quantile(Normal(0,1), confidence)
@@ -88,7 +88,7 @@ function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solv
     U = 𝔼WS + z*σ/sqrt(N)
     return ConfidenceInterval(L, U, confidence)
 end
-function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathProgBase.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
+function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MOI.AbstractOptimizer) where {S, SP <: ScenarioProblems}
     return sum([begin
                 ws = _WS(stochasticprogram.generator[:stage_1],
                          stochasticprogram.generator[:stage_2],
@@ -100,7 +100,7 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathPr
                 probability(scenario)*getobjectivevalue(ws)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
-function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathProgBase.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
+function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MOI.AbstractOptimizer) where {S, SP <: DScenarioProblems}
     partial_ews = Vector{Float64}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -130,13 +130,13 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}, solver::MathPr
     return sum(partial_ews)
 end
 function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{S,SP},
-                        solver::MPB.AbstractMathProgSolver) where {S, SP <: ScenarioProblems}
+                        solver::MOI.AbstractOptimizer) where {S, SP <: ScenarioProblems}
     ws_generator = scenario -> WS(stochasticprogram, scenario; solver = solver)
     𝔼WS, σ² = welford(ws_generator, scenarios(stochasticprogram))
     return 𝔼WS, sqrt(σ²)
 end
 function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{S,SP},
-                        solver::MPB.AbstractMathProgSolver) where {S, SP <: DScenarioProblems}
+                        solver::MOI.AbstractOptimizer) where {S, SP <: DScenarioProblems}
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -164,7 +164,7 @@ function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{S,SP},
     return 𝔼WS, sqrt(σ²)
 end
 """
-    DEP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    DEP(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Generate the **deterministically equivalent problem** (`DEP`) of the two-stage `stochasticprogram`.
 
@@ -172,84 +172,63 @@ In other words, generate the extended form the `stochasticprogram` as a single J
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function DEP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function DEP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache,:dep)
         dep = cache[:dep]
-        setsolver(dep, supplied_solver)
         return dep
     end
     # Check that the required generators have been defined
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
     # Define first-stage problem
-    dep_model = Model(solver = internal_solver(supplied_solver))
-    generator(stochasticprogram,:stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
-    dep_obj = copy(dep_model.obj)
+    dep_model = Model()
+    generator(stochasticprogram, :stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
+    dep_obj = objective_function(dep_model)
     # Define second-stage problems, renaming variables according to scenario.
     stage_two_params = stage_parameters(stochasticprogram, 2)
-    visited_objs = collect(keys(dep_model.objDict))
+    visited_objs = collect(keys(object_dictionary(dep_model)))
     for (i, scenario) in enumerate(scenarios(stochasticprogram))
         generator(stochasticprogram,:stage_2)(dep_model, stage_two_params, scenario, dep_model)
-        append!(dep_obj,probability(scenario)*dep_model.obj)
-        for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, dep_model.objDict)
-            newkey = if isa(obj,JuMP.Variable)
-                varname = add_subscript(dep_model.colNames[obj.col], i)
-                dep_model.colNames[obj.col] = varname
-                dep_model.colNamesIJulia[obj.col] = varname
+        dep_obj += probability(scenario)*objective_function(dep_model)
+        for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
+            newkey = if isa(obj, VariableRef)
+                varname = add_subscript(name(obj), i)
+                set_name(obj, varname)
                 newkey = Symbol(varname)
-            elseif isa(obj,Array{JuMP.Variable})
-                JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
+            elseif isa(obj, AbstractArray{<:VariableRef})
                 arrayname = add_subscript(objkey, i)
                 for var in obj
-                    splitname = split(dep_model.colNames[var.col],"[")
+                    splitname = split(name(var), "[")
                     varname = @sprintf("%s[%s", add_subscript(splitname[1],i), splitname[2])
-                    dep_model.colNames[var.col] = varname
-                    dep_model.colNamesIJulia[var.col] = varname
+                    set_name(var, varname)
                 end
                 newkey = Symbol(arrayname)
             elseif isa(obj,JuMP.ConstraintRef)
                 arrayname = add_subscript(objkey, i)
                 newkey = Symbol(arrayname)
-            elseif isa(obj,Array{ConstraintRef})
+            elseif isa(obj, AbstractArray{<:ConstraintRef})
                 arrayname = add_subscript(objkey, i)
                 newkey = Symbol(arrayname)
-            elseif isa(obj,JuMP.JuMPArray)
-                newkey = if isa(obj,JuMP.JuMPArray{JuMP.ConstraintRef})
-                    arrayname = add_subscript(objkey, i)
-                    newkey = Symbol(arrayname)
-                else
-                    JuMP.fill_var_names(JuMP.REPLMode, dep_model.colNames, obj)
-                    arrayname = add_subscript(dep_model.varData[obj].name, i)
-                    newkey = Symbol(arrayname)
-                    dep_model.varData[obj].name = newkey
-                    for var in obj.innerArray
-                        splitname = split(dep_model.colNames[var.col],"[")
-                        varname = @sprintf("%s[%s", add_subscript(splitname[1],i), splitname[2])
-                        dep_model.colNames[var.col] = varname
-                        dep_model.colNamesIJulia[var.col] = varname
-                    end
-                    newkey
-                end
             else
                 continue
             end
-            dep_model.objDict[newkey] = obj
-            delete!(dep_model.objDict,objkey)
-            push!(visited_objs,newkey)
+            dep_model.obj_dict[newkey] = obj
+            delete!(dep_model.obj_dict, objkey)
+            push!(visited_objs, newkey)
         end
     end
-    dep_model.obj = dep_obj
+    set_objective_function(dep_model, dep_obj)
     # Cache DEP
     cache[:dep] = dep_model
     # Return DEP
     return dep_model
 end
 """
-    VRP(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+    VRP(stochasticprogram::StochasticProgram; solver = UnsetSolver())
 
 Calculate the **value of the recouse problem** (`VRP`) in `stochasticprogram`.
 
@@ -257,14 +236,14 @@ In other words, optimize the stochastic program and return the optimal value. Op
 
 See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
-function VRP(stochasticprogram::StochasticProgram; solver::SPSolverType = JuMP.UnsetSolver())
+function VRP(stochasticprogram::StochasticProgram; solver::SPSolverType = UnsetSolver())
     # Solve DEP
     optimize!(stochasticprogram, solver = solver)
     # Return optimal value
     return optimal_value(stochasticprogram)
 end
 """
-    VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), confidence = 0.95)
+    VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = UnsetSolver(), confidence = 0.95)
 
 Return a confidence interval around the **value of the recouse problem** (`VRP`) of `stochasticmodel` to the given `confidence` level.
 
@@ -272,12 +251,12 @@ Optionally, supply a capable `solver` to optimize the stochastic program. Otherw
 
 See also: [`EVPI`](@ref), [`VSS`](@ref), [`EWS`](@ref)
 """
-function VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95)
+function VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = UnsetSolver(), confidence::AbstractFloat = 0.95)
     ss = optimize!(stochasticmodel, sampler; solver = solver, confidence = confidence)
     return confidence_interval(ss)
 end
 """
-    EVPI(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    EVPI(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticprogram`.
 
@@ -285,11 +264,11 @@ In other words, calculate the gap between `VRP` and `EWS`. Optionally, supply a 
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
-function EVPI(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EVPI(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
+    if isa(supplied_solver, UnsetSolver)
         error("Cannot determine EVPI without a solver.")
     end
     # Calculate VRP
@@ -300,7 +279,7 @@ function EVPI(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = Ju
     return abs(ews-vrp)
 end
 """
-    EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), confidence = 0.95)
+    EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = UnsetSolver(), confidence = 0.95)
 
 Approximately calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
 
@@ -308,7 +287,7 @@ In other words, calculate confidence intervals around `VRP` and `EWS`. If they d
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
-function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, tol::AbstractFloat = 1e-1, kwargs...)
+function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = UnsetSolver(), confidence::AbstractFloat = 0.95, tol::AbstractFloat = 1e-1, kwargs...)
     # Condidence level
     α = (1-confidence)/2
     # Calculate confidence interval around VRP
@@ -326,7 +305,7 @@ function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; sol
     end
 end
 """
-    EVP(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    EVP(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Generate the **expected value problem** (`EVP`) of the two-stage `stochasticprogram`.
 
@@ -334,7 +313,7 @@ In other words, generate a wait-and-see model corresponding to the expected scen
 
 See also: [`EVP_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
 """
-function EVP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EVP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Return possibly cached model
@@ -352,7 +331,7 @@ function EVP(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuM
     return ev_model
 end
 """
-    EVP_decision(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    EVP_decision(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Calculate the optimizer of the `EVP` of the two-stage `stochasticprogram`.
 
@@ -360,11 +339,11 @@ Optionally, supply a capable `solver` to solve the expected value problem. The d
 
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
-function EVP_decision(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EVP_decision(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Use cached solver if available
     supplied_solver = pick_solver(stochasticprogram, solver)
     # Abort if no solver was given
-    if isa(supplied_solver, JuMP.UnsetSolver)
+    if isa(supplied_solver, UnsetSolver)
         error("Cannot determine EWS without a solver.")
     end
     # Solve EVP
@@ -378,7 +357,7 @@ function EVP_decision(stochasticprogram::StochasticProgram{2}; solver::SPSolverT
     return decision
 end
 """
-    EV(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    EV(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Calculate the optimal value of the `EVP` of the two-stage `stochasticprogram`.
 
@@ -386,7 +365,7 @@ Optionally, supply a capable `solver` to solve the expected value problem. The d
 
 See also: [`EVP`](@ref), [`EVP_decision`](@ref), [`EEV`](@ref)
 """
-function EV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Solve EVP model
     evp = EVP(stochasticprogram; solver = solver)
     solve(evp)
@@ -394,7 +373,7 @@ function EV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP
     return getobjectivevalue(evp)
 end
 """
-    EEV(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    EEV(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Calculate the **expected value of the expected value solution** (`EEV`) of the two-stage `stochasticprogram`.
 
@@ -402,7 +381,7 @@ In other words, evaluate the `EVP` decision. Optionally, supply a capable `solve
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
-function EEV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function EEV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Solve EVP model
     evp_decision = EVP_decision(stochasticprogram; solver = solver)
     # Calculate EEV by evaluating the EVP decision
@@ -411,7 +390,7 @@ function EEV(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuM
     return eev
 end
 """
-    EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), confidence = 0.95, N::Integer = 100, Ñ::Integer = 1000)
+    EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = UnsetSolver(), confidence = 0.95, N::Integer = 100, Ñ::Integer = 1000)
 
 Approximately calculate the **expected value of the expected value decision** (`EEV`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
 
@@ -419,19 +398,19 @@ Supply a capable `solver` to solve the intermediate problems. `N` is the number 
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
-function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, Ñ::Integer = 1000)
+function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = UnsetSolver(), confidence::AbstractFloat = 0.95, N::Integer = 100, Ñ::Integer = 1000)
     sp = sample(stochasticmodel, sampler, N)
     x̄ = EVP_decision(sp; solver = internal_solver(solver))
     return evaluate_decision(stochasticmodel, x̄, sampler; solver = internal_solver(solver), confidence = confidence, Ñ = Ñ)
 end
 """
-    VSS(stochasticprogram::TwoStageStochasticProgram; solver = JuMP.UnsetSolver())
+    VSS(stochasticprogram::TwoStageStochasticProgram; solver = UnsetSolver())
 
 Calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticprogram`.
 
 In other words, calculate the gap between `EEV` and `VRP`. Optionally, supply a capable `solver` to solve the intermediate problems. The default behaviour is to rely on any previously set solver.
 """
-function VSS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuMP.UnsetSolver())
+function VSS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = UnsetSolver())
     # Solve EVP and determine EEV
     eev = EEV(stochasticprogram; solver = solver)
     # Calculate VRP
@@ -440,7 +419,7 @@ function VSS(stochasticprogram::StochasticProgram{2}; solver::SPSolverType = JuM
     return abs(vrp-eev)
 end
 """
-    VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = JuMP.UnsetSolver(), confidence = 0.95, Ñ::Integer = 1000)
+    VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver = UnsetSolver(), confidence = 0.95, Ñ::Integer = 1000)
 
 Approximately calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
 
@@ -448,7 +427,7 @@ In other words, calculate confidence intervals around `EEV` and `VRP`. If they d
 
 See also: [`VRP`](@ref), [`EEV`](@ref), [`EVPI`](@ref)
 """
-function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = JuMP.UnsetSolver(), confidence::AbstractFloat = 0.95, Ñ::Integer = 1000, tol::AbstractFloat = 1e-1, kwargs...)
+function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; solver::SPSolverType = UnsetSolver(), confidence::AbstractFloat = 0.95, Ñ::Integer = 1000, tol::AbstractFloat = 1e-1, kwargs...)
     # Condidence level
     α = (1-confidence)/2
     # Calculate confidence interval around VRP

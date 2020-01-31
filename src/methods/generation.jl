@@ -5,14 +5,14 @@
 
 Return a generated copy of the first stage model in `stochasticprogram`.
 """
-function stage_one_model(stochasticprogram::StochasticProgram; solver = JuMP.UnsetSolver())
+function stage_one_model(stochasticprogram::StochasticProgram; solver = UnsetSolver())
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
-    stage_one_model = Model(solver=solver)
+    stage_one_model = Model()
     generator(stochasticprogram, :stage_1)(stage_one_model, stage_parameters(stochasticprogram, 1))
     return stage_one_model
 end
 function _stage_model(generator::Function, stage_params::Any, scenario::AbstractScenario, parent::JuMP.Model)
-    stage_model = Model(solver=JuMP.UnsetSolver())
+    stage_model = Model()
     generator(stage_model, stage_params, scenario, parent)
     return stage_model
 end
@@ -21,7 +21,7 @@ end
 
 Return a generated second stage model corresponding to `scenario`, in `stochasticprogram`.
 """
-function stage_model(stochasticprogram::StochasticProgram{N}, stage::Integer, scenario::AbstractScenario; solver = JuMP.UnsetSolver()) where N
+function stage_model(stochasticprogram::StochasticProgram{N}, stage::Integer, scenario::AbstractScenario; solver = UnsetSolver()) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N")
     stage == 1 && return stage_one_model(stochasticprogram; solver = solver)
     stage_key = Symbol(:stage_, stage)
@@ -126,28 +126,14 @@ function _outcome_model!(outcome_model::JuMP.Model,
                          decision::AbstractVector,
                          scenario::AbstractScenario)
     stage_one_generator(outcome_model, stage_one_params)
-    for obj in values(outcome_model.objDict)
-        if isa(obj,JuMP.Variable)
-            val = decision[obj.col]
-            outcome_model.colCat[obj.col] = :Fixed
-            outcome_model.colVal[obj.col] = val
-            outcome_model.colLower[obj.col] = val
-            outcome_model.colUpper[obj.col] = val
-        elseif isa(obj,JuMP.JuMPArray{JuMP.Variable})
-            for var in obj.innerArray
-                val = decision[var.col]
-                outcome_model.colCat[var.col] = :Fixed
-                outcome_model.colVal[var.col] = val
-                outcome_model.colLower[var.col] = val
-                outcome_model.colUpper[var.col] = val
-            end
-        elseif isa(obj,Array{JuMP.Variable})
+    for obj in values(outcome_model.obj_dict)
+        if isa(obj, VariableRef)
+            val = decision[index(obj).value]
+            fix(obj, val, force = true)
+        elseif isa(obj, AbstractArray{<:VariableRef})
             for var in obj
-                val = decision[var.col]
-                outcome_model.colCat[var.col] = :Fixed
-                outcome_model.colVal[var.col] = val
-                outcome_model.colLower[var.col] = val
-                outcome_model.colUpper[var.col] = val
+                val = decision[index(var).value]
+                fix(var, val, force = true)
             end
         else
             continue
@@ -160,14 +146,14 @@ end
     outcome_model(stochasticprogram::TwoStageStochasticProgram,
                   decision::AbstractVector,
                   scenario::AbstractScenario;
-                  solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+                  solver::MOI.AbstractOptimizer = UnsetSolver())
 
 Return the resulting second stage model if `decision` is the first-stage decision in scenario `i`, in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """
-function outcome_model(stochasticprogram::StochasticProgram{2}, decision::AbstractVector, scenario::AbstractScenario; solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver())
+function outcome_model(stochasticprogram::StochasticProgram{2}, decision::AbstractVector, scenario::AbstractScenario; solver = UnsetSolver())
     has_generator(stochasticprogram,:stage_1_vars) || error("First-stage not defined in stochastic program. Consider @first_stage or @stage 1.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
-    outcome_model = Model(solver = solver)
+    outcome_model = Model()
     _outcome_model!(outcome_model,
                     generator(stochasticprogram,:stage_1_vars),
                     generator(stochasticprogram,:stage_2),
@@ -181,14 +167,14 @@ end
     outcome_model(stochasticprogram::StochasticProgram{N},
                   decisions::NTuple{N-1,AbstractVector}
                   scenario_path::NTuple{N-1,AbstractScenario},
-                  solver::MathProgBase.AbstractMathProgSolver = JuMP.UnsetSolver())
+                  solver::MOI.Abs = UnsetSolver())
 
 Return the resulting `N`:th stage model if `decisions` are the decisions taken in the previous stages and `scenario_path` are the realized scenarios up to stage `N` in `stochasticprogram`. Optionally, supply a capable `solver` to the outcome model.
 """
 function outcome_model(stochasticprogram::StochasticProgram{N},
                        decisions::NTuple{M,AbstractVector},
                        scenario_path::NTuple{M,AbstractScenario};
-                       solver::MPB.AbstractMathProgSolver = JuMP.UnsetSolver()) where {N,M}
+                       solver::MOI.AbstractOptimizer = UnsetSolver()) where {N,M}
     N == M - 1 || error("Inconsistent number of stages $N and number of decisions and scenarios $M")
     # TODO
 end
