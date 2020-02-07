@@ -9,9 +9,8 @@ struct StochasticModel{N, P <: NTuple{N, StageParameters}}
     sp_optimizer::SPOptimizer
 
     function StochasticModel(generator::Function,
-                             parameters::Vararg{StageParameters,N},
-                             optimizer_factory::Union{Nothing, OptimizerFactory} = nothing) where N
-        return new{N,typeof(parameters)}(parameters, generator, SPOptimizer(optimizer_factory))
+                             parameters::Vararg{StageParameters,N}) where N
+        return new{N,typeof(parameters)}(parameters, generator, SPOptimizer(nothing))
     end
 end
 nstages(::StochasticModel{N}) where N = N

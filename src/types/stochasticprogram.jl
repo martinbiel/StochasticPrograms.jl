@@ -38,7 +38,6 @@ struct StochasticProgram{N, M, S <: NTuple{N, Stage}, SP <: Union{AbstractScenar
 
     function StochasticProgram(stage_params::NTuple{N, Any},
                                scenario_types::NTuple{M, DataType},
-                               solver::SPSolverType, procs::Vector{Int},
                                optimizer_factory::Union{Nothing, OptimizerFactory}) where {N, M}
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")

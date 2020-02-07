@@ -133,7 +133,7 @@ end
 
 include("types/types.jl")
 include("methods/methods.jl")
-include("spinterface.jl")
+#include("spinterface.jl")
 #include("crash.jl")
 #include("solvers/solvers.jl")
 

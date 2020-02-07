@@ -31,15 +31,15 @@ function stage_model(stochasticprogram::StochasticProgram{N}, stage::Integer, sc
                         scenario,
                         parentmodel(stochasticprogram, stage))
 end
-function generate_parent!(scenarioproblems::ScenarioProblems, generator::Function, parent_params::Any)
+function generate_decision_variables!(scenarioproblems::ScenarioProblems, generator::Function, parent_params::Any)
     generator(parentmodel(scenarioproblems), parent_params)
     return nothing
 end
-function generate_parent!(scenarioproblems::DScenarioProblems, generator::Function, parent_params::Any)
+function generate_decision_variables!(scenarioproblems::DScenarioProblems, generator::Function, parent_params::Any)
     generator(parentmodel(scenarioproblems), parent_params)
     @sync begin
         for w in workers()
-            @async remotecall_fetch((sp,generator,params)->generate_parent!(fetch(sp),generator,params),
+            @async remotecall_fetch((sp,generator,params)->generate_decision_variables!(fetch(sp),generator,params),
                                     w,
                                     scenarioproblems[w-1],
                                     generator,
@@ -48,14 +48,14 @@ function generate_parent!(scenarioproblems::DScenarioProblems, generator::Functi
     end
     return nothing
 end
-function generate_parent!(stochasticprogram::StochasticProgram, stage::Integer)
+function generate_decision_variables!(stochasticprogram::StochasticProgram, stage::Integer)
     if stage == 1
         @warn "The first stage has no predecessors."
         return nothing
     end
     parent_key = Symbol(:stage_, stage - 1, :_vars)
     has_generator(stochasticprogram, parent_key) || error("Stage problem $(stage - 1) not defined in stochastic program. Consider @stage $(stage - 1).")
-    generate_parent!(scenarioproblems(stochasticprogram, stage), generator(stochasticprogram, parent_key), stage_parameters(stochasticprogram, stage - 1))
+    generate_decision_variables!(scenarioproblems(stochasticprogram, stage), generator(stochasticprogram, parent_key), stage_parameters(stochasticprogram, stage - 1))
     return nothing
 end
 function generate_stage_one!(stochasticprogram::StochasticProgram)
@@ -87,7 +87,7 @@ function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer
             invalidate_cache!(stochasticprogram)
         end
         generate_stage_one!(stochasticprogram)
-        generate_parent!(stochasticprogram, 2)
+        generate_decision_variables!(stochasticprogram, 2)
     else
         if nsubproblems(stochasticprogram, stage) > 0
             remove_stages!(stochasticprogram, stage)
@@ -99,7 +99,7 @@ function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer
             p = stage_probability(stochasticprogram, stage)
             abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
         end
-        stage < N && generate_parent!(stochasticprogram, stage + 1)
+        stage < N && generate_decision_variables!(stochasticprogram, stage + 1)
         generate!(scenarioproblems(stochasticprogram, stage),
                   stage_parameters(stochasticprogram, stage),
                   generator(stochasticprogram, stage_key))

@@ -7,7 +7,7 @@ struct SAA <: AbstractSampledSolver
     internal_optimizer::OptimizerFactory
 
     function SAA(optimizer_factory::Union{Nothing, OptimizerFactory} = nothing)
-        if optimizer_factory = nothing
+        if optimizer_factory == nothing
             error("Cannot solve emerging SAA problems without functional optimizer.")
         end
         return new(optimizer_factory)

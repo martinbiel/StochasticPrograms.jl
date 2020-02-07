@@ -37,7 +37,7 @@ end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
                                   optimizer_factory::OptimizerFactory) where {S, SP <: ScenarioProblems}
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer factory)
+    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
     𝔼Q, σ² = welford(outcome_generator, scenarios(stochasticprogram))
     return 𝔼Q, sqrt(σ²)
 end
