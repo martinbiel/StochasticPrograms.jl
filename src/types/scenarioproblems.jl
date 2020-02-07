@@ -2,14 +2,14 @@ abstract type AbstractScenarioProblems{S <: AbstractScenario} end
 struct ScenarioProblems{S <: AbstractScenario} <: AbstractScenarioProblems{S}
     scenarios::Vector{S}
     problems::Vector{JuMP.Model}
-    parent::JuMP.Model
+    decision_variables::DecisionVariables
 
     function ScenarioProblems(::Type{S}) where S <: AbstractScenario
-        return new{S}(Vector{S}(), Vector{JuMP.Model}(), JuMP.Model())
+        return new{S}(Vector{S}(), Vector{JuMP.Model}(), DecisionVariables(Float64))
     end
 
     function ScenarioProblems(scenarios::Vector{S}) where S <: AbstractScenario
-        return new{S}(scenarios, Vector{JuMP.Model}(), JuMP.Model())
+        return new{S}(scenarios, Vector{JuMP.Model}(), DecisionVariables(Float64))
     end
 end
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
