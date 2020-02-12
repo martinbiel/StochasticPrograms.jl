@@ -543,44 +543,42 @@ Solver is default solver
 
 See also: [`@parameters`](@ref), [`@decision`](@ref), [`@uncertain`](@ref)
 """
-macro stage(stage, arg) esc(:(@stage $stage $arg generate)) end
-macro stage(stage, args, defer)
-    generate = if defer == :defer
-        :false
-    elseif defer == :generate
-        :true
-    else
-        error("Unknown option $defer")
-    end
+macro stage(stage, args)
     @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
-    # Handle @decision annotations first
+    # Decision definitions might require parameter calculations,
+    # so we need first need to extract and save any such lines
+    vardefs = Expr(:block)
+    for line in block(def).args
+        if  @capture(line, @variable(m_Symbol, variabledef__)) ||
+            @capture(line, @decision(m_Symbol, decisiondef__)) ||
+            @capture(line, @constraint(m_Symbol, constdef__)) ||
+            @capture(line, @objective(m_Symbol, objdef__)) ||
+            @capture(line, @parameters args__) ||
+            @capture(line, @uncertain args__)
+            # Skip any line related to the JuMP model, stochastics, or unhandled @decision/@parameter lines
+            continue
+        else
+            # Everything else could be required for decision variable construction, and is therefore saved
+            push!(decisiondefs.args, line)
+            push!(decisionnames.args, line)
+        end
+    end
+    # Next, handle @decision annotations
     decisiondefs = Expr(:block)
+    decisionnames = Expr(:block)
     def = postwalk(def) do x
         if @capture(x, @decision args__)
             decisiondef = @q begin
                 @variable $((args)...) Decision()
             end
             push!(decisiondefs.args, decisiondef)
-            return @q begin
+            variabledef = @q begin
                 @variable $((args)...)
             end
+            push!(decisionnames, variabledef)
+            return variabledef
         end
         return x
-    end
-    # Save variable definitions separately (required for parent models + WS/DEP construction)
-    vardefs = Expr(:block)
-    for line in block(def).args
-        if @capture(line, @constraint(m_Symbol, constdef__)) || @capture(line, @objective(m_Symbol, objdef__)) || @capture(line, @parameters args__) || @capture(line, @uncertain args__)
-            # Skip any line that is not related to variable construction
-            continue
-        else
-            # Everything else could be required for variable construction, and is therefore saved
-            push!(vardefs.args, line)
-            if !@capture(line, @variable(m_Symbol, variabledef__))
-                # Any line that is not the actual @variable line as also needed for decision variables
-                pushfirst!(decisiondefs.args, line)
-            end
-        end
     end
     # Handle parameters
     def = postwalk(def) do x
@@ -593,16 +591,18 @@ macro stage(stage, args, defer)
                     error("Incorrect @parameters syntax. Specify parameter names, possibly with a default value.")
                 end
             end
-            pushfirst!(vardefs.args, code)
+            # Extracted parameters might be required for decision variable construction
             pushfirst!(decisiondefs.args, code)
+            pushfirst!(decisionnames.args, code)
             return code
         elseif @capture(x, @parameters args__)
             code = Expr(:block)
             for param in args
                 push!(code.args, :($param = stage.$param))
             end
-            pushfirst!(vardefs.args, code)
+            # Extracted paremeters might be required for decision variable construction
             pushfirst!(decisiondefs.args, code)
+            pushfirst!(decisionnames.args, code)
             return code
          elseif @capture(x, @uncertain var_Symbol::t_Symbol)
             stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
@@ -669,33 +669,32 @@ macro stage(stage, args, defer)
         @q begin
             $(esc(sp)).generator[:stage_1] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
                 $(esc(def))
-	        return $(esc(:model))
+	            return $(esc(:model))
             end
         end
     else
         @q begin
-            $(esc(sp)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario, $(esc(:parent))::JuMP.Model) -> begin
+            $(esc(sp)).generator[Symbol(:stage_,$stage)] = ($(esc(:model))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario) -> begin
                 $(esc(def))
-	        return $(esc(:model))
+	            return $(esc(:model))
             end
         end
     end
     # Create definition code
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        $(esc(sp)).generator[Symbol(:stage_,$stage,:_vars)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(vardefs))
-	        return $(esc(:model))
+        if $stage < nstages($(esc(sp)))
+            $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+                $(esc(decisiondefs))
+	            return $(esc(:model))
+            end
         end
-        $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:decision_variables)), $(esc(:stage))) -> begin
-            model.ext[:decisionvariables] = decision_variables
-            $(esc(decisiondefs))
-	        return $(esc(:model))
-        end
+        # Generate the decision variable names
+        model = Model()
+        $decisionnames
+        set_decision_variables!(decision_variables($(esc(sp)), $stage), model)
+        # Stage model generation code
         $generatordefs
-        if $generate
-            generate_stage!($(esc(sp)), $stage)
-        end
         $(esc(sp))
     end
     # Return code

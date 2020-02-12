@@ -4,32 +4,28 @@ function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVect
     first_stage = get_stage_one(stochasticprogram)
     return eval_objective(first_stage.obj, x)
 end
-function _eval_second_stage(stochasticprogram::TwoStageStochasticProgram, x::AbstractVector, scenario::AbstractScenario, optimizer::MOI.AbstractOptimizer)
-    outcome = outcome_model(stochasticprogram, x, scenario, optimizer)
-    solve(outcome)
-    return probability(scenario)*getobjectivevalue(outcome)
-end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
                              optimizer_factory::OptimizerFactory) where {S, SP <: ScenarioProblems}
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
-    return outcome_mean(outcome_generator, scenarios(stochasticprogram))
+    sp = scenarioproblems(stochasticprogram)
+    update_decision_variables!(decision_variables(sp), x)
+    return outcome_mean(sp, optimizer_factory)
 end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                              x::AbstractVector,
                              optimizer_factory::OptimizerFactory) where {S, SP <: DScenarioProblems}
     Qs = Vector{Float64}(undef, nworkers())
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
     @sync begin
         for (i,w) in enumerate(workers())
-            @async Qs[i] = remotecall_fetch((sp,outcome_generator)->begin
+            @async Qs[i] = remotecall_fetch((sp, x, optimizer)->begin
                 scenarioproblems = fetch(sp)
                 isempty(scenarioproblems.scenarios) && return 0.0
-                return outcome_mean(outcome_generator, scenarioproblems.scenarios)
+                update_decision_variables!(decision_variables(scenarioproblems), x)
+                return outcome_mean(scenarioproblems, optimizer)
             end,
             w,
             stochasticprogram.scenarioproblems[w-1],
-            outcome_generator)
+            x)
         end
     end
     return sum(Qs)
@@ -37,8 +33,9 @@ end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
                                   x::AbstractVector,
                                   optimizer_factory::OptimizerFactory) where {S, SP <: ScenarioProblems}
-    outcome_generator = scenario -> outcome_model(stochasticprogram, x, scenario, optimizer_factory)
-    𝔼Q, σ² = welford(outcome_generator, scenarios(stochasticprogram))
+    sp = scenarioproblems(stochasticprogram)
+    update_decision_variables!(decision_variables(sp), x)
+    𝔼Q, σ² = welford(sp, optimizer_factory)
     return 𝔼Q, sqrt(σ²)
 end
 function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
@@ -47,28 +44,14 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
-            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,x,optimizer)->begin
+            @async partial_welfords[i] = remotecall_fetch((sp,x,optimizer)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x))
-                    outcome_generator = scenario -> begin
-                        outcome_model = Model(optimizer)
-                        _outcome_model!(outcome_model,
-                                        stage_one_generator,
-                                        stage_two_generator,
-                                        stage_one_params,
-                                        stage_two_params,
-                                        x,
-                                        scenario)
-                        return outcome_model
-                    end
-                return (welford(outcome_generator, scenarioproblems.scenarios)..., length(scenarioproblems.scenarios))
+                isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x)), zero(Int)
+                update_decision_variables!(scenarioproblems, x)
+                return (welford(scenarioproblems, optimizer)..., length(scenarioproblems.scenarios))
             end,
             w,
             stochasticprogram.scenarioproblems[w-1],
-            stochasticprogram.generator[:stage_1_vars],
-            stochasticprogram.generator[:stage_2],
-            stage_parameters(stochasticprogram, 1),
-            stage_parameters(stochasticprogram, 2),
             x,
             optimizer_factory)
         end
@@ -88,48 +71,54 @@ function _eval(stochasticprogram::StochasticProgram{2},
 end
 # Mean/variance calculations #
 # ========================== #
-function outcome_mean(outcome_generator::Function, scenarios::Vector{<:AbstractScenario})
-    Qs = zeros(length(scenarios))
-    for (i,scenario) in enumerate(scenarios)
-        let outcome = outcome_generator(scenario)
-            status = solve(outcome, suppress_warnings = true)
-            if status != :Optimal
-                if status == :Infeasible
-                    Qs[i] = outcome.objSense == :Max ? -Inf : Inf
-                elseif status == :Unbounded
-                    Qs[i] = outcome.objSense == :Max ? Inf : -Inf
-                else
-                    error("Outcome model could not be solved, returned status: $status")
-                end
-            else
-                Qs[i] = probability(scenario)*getobjectivevalue(outcome)
-            end
-        end
+function outcome_mean(scenarioproblems::ScenarioProblems, optimizer_factory::OptimizerFactory)
+    N = nsubproblems(scenarioproblems)
+    Qs = zeros(N)
+    for i in 1:N
+        outcome = subproblem(scenarioproblems, i)
+        set_optimizer(outcome, optimizer_factory)
+        optimize!(outcome)
+        π = probability(scenario(scenarioproblems, i))
+        Qs[i] = π*objective_value(outcome)
+        # if status != :Optimal
+        #     if status == :Infeasible
+        #         Qs[i] = outcome.objSense == :Max ? -Inf : Inf
+        #     elseif status == :Unbounded
+        #         Qs[i] = outcome.objSense == :Max ? Inf : -Inf
+        #     else
+        #         error("Outcome model could not be solved, returned status: $status")
+        #     end
+        # else
+        #     π = probability(scenario(scenarioproblems, i))
+        #     Qs[i] = π*objective_value(outcome)
+        #     end
+        # end
     end
     return sum(Qs)
 end
-function welford(generator::Function, scenarios::Vector{<:AbstractScenario})
+function welford(scenarioproblems::ScenarioProblems, optimizer_factory::OptimizerFactory)
     Q̄ₖ = 0
     Sₖ = 0
-    N = length(scenarios)
+    N = length(nsubproblems(scenarioproblems))
     for k = 1:N
         Q̄ₖ₋₁ = Q̄ₖ
-        let problem = generator(scenarios[k])
-            status = solve(problem, suppress_warnings = true)
-            Q = if status != :Optimal
-                Q = if status == :Infeasible
-                    problem.objSense == :Max ? -Inf : Inf
-                elseif status == :Unbounded
-                    problem.objSense == :Max ? Inf : -Inf
-                else
-                    error("Outcome model could not be solved, returned status: $status")
-                end
-            else
-                Q = getobjectivevalue(problem)
-            end
-            Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
-            Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
-        end
+        problem = subproblem(scenarioproblems, k)
+        set_optimizer(problem, optimizerfactory)
+        optimize!(problem)
+        Q = getobjectivevalue(problem)
+        # Q = if status != :Optimal
+        #     Q = if status == :Infeasible
+        #         problem.objSense == :Max ? -Inf : Inf
+        #     elseif status == :Unbounded
+        #         problem.objSense == :Max ? Inf : -Inf
+        #     else
+        #         error("Outcome model could not be solved, returned status: $status")
+        #     end
+        # else
+        #     Q = getobjectivevalue(problem)
+        # end
+        Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
+        Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
     end
     return Q̄ₖ, Sₖ/(N-1)
 end
@@ -185,9 +174,9 @@ function evaluate_decision(stochasticprogram::StochasticProgram{2},
         error("Cannot evaluate decision without an optimizer.")
     end
     outcome = outcome_model(stochasticprogram, decision, scenario, supplied_optimizer)
-    status = solve(outcome)
+    status = optimize!(outcome)
     if status == :Optimal
-        return _eval_first_stage(stochasticprogram, decision) + getobjectivevalue(outcome)
+        return _eval_first_stage(stochasticprogram, decision) + objective_value(outcome)
     end
     error("Outcome model could not be solved, returned status: $status")
 end
