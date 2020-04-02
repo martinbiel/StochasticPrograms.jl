@@ -39,7 +39,7 @@ end
 ξ₂ = YieldScenario(2.5, 3.0, 20.0, probability = 1/3)
 ξ₃ = YieldScenario(2.0, 2.4, 16.0, probability = 1/3)
 
-farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], solver=GLPKSolverLP())
+farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], optimizer = GLPK.Optimizer)
 
 farmer_res = SPResult([170,80,250], -108390, -115405.56, 7015.56, 1150, -118600, -107240)
 push!(problems, (farmer,farmer_res,"Farmer"))

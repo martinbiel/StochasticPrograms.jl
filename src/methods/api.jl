@@ -2,70 +2,71 @@
 # ========================== #
 """
     instantiate(stochasticmodel::StochasticModel{2},
-                scenarios::Vector{<:AbstractScenario},
-                optimizer_constructor = nothing;
+                scenarios::Vector{<:AbstractScenario};
+                optimizer = nothing;
                 procs::Vector{Int} = workers(),
-                float_type::AbstractFloat = Float64,
+                float_type::Type{<:AbstractFloat} = Float64,
                 kw...)
 
 Instantiate a new two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel`, and the given collection of `scenarios`.
 """
 function instantiate(sm::StochasticModel{2},
-                     scenarios::Vector{<:AbstractScenario},
-                     optimizer_constructor = nothing;
+                     scenarios::Vector{<:AbstractScenario};
+                     optimizer = nothing,
                      procs::Vector{Int} = workers(),
-                     float_type::AbstractFloat = Float64,
+                     float_type::Type{<:AbstractFloat} = Float64,
                      kw...)
     sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
                            parameters(sm.parameters[2]; kw...),
                            float_type,
                            scenarios,
                            procs,
-                           optimizer_factory)
+                           optimizer)
     sm.generator(sp)
+    initialize!(sp)
     return sp
 end
 """
-    instantiate(stochasticmodel::StochasticModel{2},
-                optimizer_constructor = nothing;
+    instantiate(stochasticmodel::StochasticModel{2};
+                optimizer = nothing,
                 scenariotype::Type{S} = Scenario,
                 procs::Vector{Int} = workers(),
-                float_type::AbstractFloat = Float64,
+                float_type::Type{<:AbstractFloat} = Float64,
                 kw...) where S <: AbstractScenario
 
 Instantiate a deferred two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel` over the scenario type `S`.
 """
-function instantiate(sm::StochasticModel{2},
-                     optimizer_constructor = nothing;
+function instantiate(sm::StochasticModel{2};
+                     optimizer = nothing,
                      scenariotype::Type{S} = Scenario,
                      procs::Vector{Int} = workers(),
-                     float_type::AbstractFloat = Float64,
+                     float_type::Type{<:AbstractFloat} = Float64,
                      kw...) where S <: AbstractScenario
     sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
                            parameters(sm.parameters[2]; kw...),
                            float_type,
                            scenariotype,
                            procs,
-                           optimizer_factory)
+                           optimizer)
     sm.generator(sp)
     initialize!(sp)
     return sp
 end
 """
     instantiate(stochasticmodel::StochasticModel,
-                scenarios::Vector{<:AbstractScenario},
-                optimizer_constructor = nothing;
+                scenarios::Vector{<:AbstractScenario};
+                optimizer = nothing,
                 procs::Vector{Int} = workers(),
-                float_type::AbstractFloat = Float64,
+                float_type::Type{<:AbstractFloat} = Float64,
                 kw...)
 
 Instantiate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
 """
 function instantiate(sm::StochasticModel{N},
-                     scenarios::NTuple{M,Vector{<:AbstractScenario}},
-                     optimizer_constructor = nothing;
+                     scenarios::NTuple{M,Vector{<:AbstractScenario}};
+                     optimizer = nothing,
                      procs::Vector{Int} = workers(),
-                     float_type::AbstractFloat = Float64,
+                     float_type::Type{<:AbstractFloat} = Float64,
                      kw...) where {N,M}
     M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
     params = ntuple(Val(N)) do i
@@ -75,7 +76,7 @@ function instantiate(sm::StochasticModel{N},
                            float_type,
                            scenarios,
                            procs,
-                           optimizer_factory)
+                           optimizer)
     sm.generator(sp)
     # Initialize model
     initialize!(sp)
@@ -84,24 +85,24 @@ end
 """
     sample(stochasticmodel::StochasticModel,
            sampler::AbstractSampler,
-           n::Integer,
-           optimizer_constructor = nothing;
+           n::Integer;
+           optimizer = nothing,
            procs::Vector{Int} = workers(),
-           float_type::AbstractFloat = Float64,
+           float_type::Type{<:AbstractFloat} = Float64,
            kw...)
 
 Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
 
-Optionally, a capable `solver` can be supplied to `sample`. Otherwise, any previously set solver will be used.
+Optionally, a capable `optimizer` can be supplied to `sample`. Otherwise, any previously set solver will be used.
 
 See also: [`sample!`](@ref)
 """
 function sample(sm::StochasticModel{2},
                 sampler::AbstractSampler{S},
-                n::Integer,
-                optimizer_constructor = nothing;
+                n::Integer;
+                optimizer = nothing,
                 procs::Vector{Int} = workers(),
-                float_type::AbstractFloat = Float64,
+                float_type::Type{<:AbstractFloat} = Float64,
                 kw...) where S <: AbstractScenario
     # Create new stochastic program instance
     sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
@@ -109,7 +110,7 @@ function sample(sm::StochasticModel{2},
                            float_type,
                            S,
                            procs,
-                           optimizer_factory)
+                           optimizer)
     sm.generator(sp)
     # Sample n scenarios
     add_scenarios!(sp, n) do
@@ -122,8 +123,8 @@ function sample(sm::StochasticModel{2},
 end
 function sample(sm::StochasticModel{2},
                 sampler::AbstractSampler{S},
-                n::Integer,
-                optimizer_constructor = nothing;
+                n::Integer;
+                optimizer = nothing,
                 procs::Vector{Int} = workers(),
                 float_type::AbstractFloat = Float64,
                 kw...) where S <: Scenario
@@ -133,7 +134,7 @@ function sample(sm::StochasticModel{2},
                            float_type,
                            typeof(sample(sampler)),
                            procs,
-                           optimizer_factory)
+                           optimizer)
     sm.generator(sp)
     # Sample n scenarios
     add_scenarios!(sp, n) do
@@ -146,26 +147,26 @@ function sample(sm::StochasticModel{2},
 end
 function sample(sm::StochasticModel{2},
                 sampler::AbstractSampler{S},
-                solution::StochasticSolution,
-                optimizer_constructor = nothing;
+                solution::StochasticSolution;
+                optimizer = nothing,
                 procs::Vector{Int} = workers(),
                 float_type::AbstractFloat = Float64,
                 kw...) where S <: AbstractScenario
-    if optimizer_factory == nothing
+    if optimizer == nothing
         error("Cannot generate sample from stochastic solution without an optimizer.")
     end
     n = 16
     CI = confidence_interval(solution)
     α = 1 - confidence(CI)
-    while !(confidence_interval(sm, sampler, optimizer_factory; N = n, M = M, confidence = 1-α) ⊆ CI)
+    while !(confidence_interval(sm, sampler, optimizer; N = n, M = M, confidence = 1-α) ⊆ CI)
         n = n * 2
     end
-    return sample(sm, sampler, n, optimizer_factory; float_type = float_type, procs = procs)
+    return sample(sm, sampler, n, optimizer; float_type = float_type, procs = procs)
 end
 """
-    optimize!(stochasticprogram::StochasticProgram, optimizer_factory::Union{Nothing, OptimizerFactory};)
+    optimize!(stochasticprogram::StochasticProgram)
 
-Optimize the `stochasticprogram` in expectation using `solver`.
+Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 ## Examples
 
@@ -175,7 +176,8 @@ The following solves the stochastic program `sp` using the L-shaped algorithm.
 using LShapedSolvers
 using GLPKMathProgInterface
 
-optimize!(sp, solver = LShapedSolver(:ls, GLPKSolverLP()));
+set_optimizer!(sp, LShapedOptimizer)
+optimize!(sp);
 
 # output
 
@@ -191,52 +193,47 @@ The following solves the stochastic program `sp` using GLPK on the extended form
 ```julia
 using GLPKMathProgInterface
 
-optimize!(sp, solver = GLPKSolverLP())
+set_optimizer!(sp, GLPK.Optimizer)
+optimize!(sp)
 
 :Optimal
 ```
 
 See also: [`VRP`](@ref)
 """
-function optimize!(stochasticprogram::StochasticProgram{2},
-                   optimizer_constructor = nothing;
-                   kwargs...)
-    if deferred(stochasticprogram)
-        generate!(stochasticprogram)
-    end
-    # Prefer cached optimizer if available
-    supplied_optimizer = pick_optimizer(stochasticprogram, optimizer_factory)
-    # Abort if no solver was given
-    if supplied_optimizer == nothing
-        error("Cannot optimize without an optimizer.")
-    end
+function optimize!(stochasticprogram::StochasticProgram{2}; kwargs...)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Switch on solver type
-    return _optimize!(stochasticprogram, supplied_optimizer; kwargs...)
+    return _optimize!(stochasticprogram, provided_optimizer(stochasticprogram); kwargs...)
 end
-function _optimize!(stochasticprogram::StochasticProgram{2}, optimizer::MOI.AbstractOptimizer; kwargs...)
-    # Standard mathoptinterface solver. Fallback to solving DEP, relying on JuMP.
-    dep = DEP(stochasticprogram; optimizer = optimizer)
-    status = solve(dep; kwargs...)
-    stochasticprogram.spsolver.internal_model = dep.internalModel
+function _optimize!(stochasticprogram::StochasticProgram{2}, ::OptimizerProvided; kwargs...)
+    # MOI optimizer. Fallback to solving DEP, relying on JuMP.
+    dep = DEP(stochasticprogram)
+    optimize!(dep)
     if status ∈ [:Optimal, :Infeasible, :Unbounded]
         fill_solution!(stochasticprogram)
     end
     return status
 end
-function _optimize!(stochasticprogram::StochasticProgram{2}, optimizer::AbstractStructuredOptimizer; kwargs...)
-    # Use structured optimizer
-    structuredmodel = StructuredModel(stochasticprogram, optimizer)
-    stochasticprogram.spsolver.internal_model = structuredmodel
-    status = optimize_structured!(structuredmodel)
-    if status ∈ [:Optimal, :Infeasible, :Unbounded]
-        fill_solution!(stochasticprogram, structuredmodel)
+function _optimize!(stochasticprogram::StochasticProgram{2}, ::StructuredOptimizerProvided; kwargs...)
+    # Ensure stochastic program has been generated at this point
+    if deferred(stochasticprogram)
+        generate!(stochasticprogram)
     end
-    # Now safe to generate the objective value of the stochastic program
-    calculate_objective_value!(stochasticprogram)
+    # # Use structured optimizer
+    # structuredmodel = StructuredModel(stochasticprogram, optimizer)
+    # stochasticprogram.spsolver.internal_model = structuredmodel
+    # status = optimize_structured!(structuredmodel)
+    # if status ∈ [:Optimal, :Infeasible, :Unbounded]
+    #     fill_solution!(stochasticprogram, structuredmodel)
+    # end
+    # # Now safe to generate the objective value of the stochastic program
+    # calculate_objective_value!(stochasticprogram)
     return status
 end
 """
-    optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, optimizer_factory::Union{Nothing, OptimizerFactory};, confidence::AbstractFloat = 0.95, kwargs...)
+    optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, optimizer_constructor::Union{Nothing, OptimizerFactory};, confidence::AbstractFloat = 0.95, kwargs...)
 
 Approximately optimize the `stochasticmodel` using `solver` when the underlying scenario distribution is inferred by `sampler` and return a `StochasticSolution` with the given `confidence` level.
 
@@ -248,11 +245,11 @@ function optimize!(stochasticmodel::StochasticModel,
                    confidence::AbstractFloat = 0.95,
                    kwargs...)
     # Abort if no solver was given
-    if optimizer_factory == nothing
+    if optimizer_constructor == nothing
         error("Cannot optimize without an optimizer.")
     end
     # Switch on solver type
-    return _optimize!(stochasticmodel, sampler, optimizer_factory(), confidence; kwargs...)
+    return _optimize!(stochasticmodel, sampler, optimizer_constructor(), confidence; kwargs...)
 end
 function _optimize!(stochasticmodel::StochasticModel,
                     sampler::AbstractSampler,
@@ -570,6 +567,14 @@ function deferred_stage(stochasticprogram::StochasticProgram{N}, s::Integer) whe
     nsubproblems(stochasticprogram, s) < nscenarios(stochasticprogram, s)
 end
 """
+        optimizer_constructor(stochasticmodel::StochasticModel)
+
+    Return any optimizer constructor supplied to the `stochasticmodel`.
+    """
+function optimizer_constructor(stochasticmodel::StochasticModel)
+    return stochasticmodel.optimizer.optimizer_constructor
+end
+"""
         optimizer_constructor(stochasticprogram::StochasticProgram)
 
     Return any optimizer constructor supplied to the `stochasticprogram`.
@@ -578,12 +583,36 @@ function optimizer_constructor(stochasticprogram::StochasticProgram)
     return stochasticprogram.optimizer.optimizer_constructor
 end
 """
+    provided_optimizer(stochasticmodel::StochasticModel)
+
+Return the currently provided optimizer type of `stochasticmodel`.
+"""
+function provided_optimizer(stochasticmodel::StochasticModel)
+    return provided_optimizer(optimizer_constructor(stochasticmodel))
+end
+"""
     provided_optimizer(stochasticprogram::StochasticProgram)
 
 Return the currently provided optimizer type of `stochasticprogram`.
 """
 function provided_optimizer(stochasticprogram::StochasticProgram)
     return provided_optimizer(optimizer_constructor(stochasticprogram))
+end
+"""
+    moi_optimizer(stochasticmodel::StochasticModel)
+
+Return a MOI capable optimizer using the currently provided optimizer of `stochasticmodel`.
+"""
+function moi_optimizer(stochasticmodel::StochasticModel)
+    return moi_optimizer(stochasticmodel.optimizer)
+end
+"""
+    moi_optimizer(stochasticprogram::StochasticProgram)
+
+Return a MOI capable optimizer using the currently provided optimizer of `stochasticprogram`.
+"""
+function moi_optimizer(stochasticprogram::StochasticProgram)
+    return moi_optimizer(stochasticprogram.optimizer)
 end
 """
     optimizer(stochasticprogram::StochasticProgram)
@@ -603,12 +632,21 @@ end
 # Setters
 # ========================== #
 """
-    set_sp_optimizer!(stochasticprogram::StochasticProgram, optimizer_factory::OptimizerFactory)
+    set_optimizer!(stochasticmodel::StochasticModel, optimizer)
+
+Set the optimizer of the `stochasticmodel`.
+"""
+function set_optimizer!(stochasticmodel::StochasticModel, optimizer)
+    stochasticmodel.optimizer.optimizer_constructor = optimizer
+    nothing
+end
+"""
+    set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
 
 Set the optimizer of the `stochasticprogram`.
 """
-function set_sp_optimizer!(stochasticprogram::StochasticProgram, optimizer_factory::OptimizerFactory)
-    stochasticprogram.sp_optimizer.sp_optimizer_factory = optimizer_factory
+function set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
+    stochasticprogram.optimizer.optimizer_constructor = optimizer
     nothing
 end
 """

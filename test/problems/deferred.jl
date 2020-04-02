@@ -1,6 +1,6 @@
 s₁ = Scenario(q₁ = -24.0, q₂ = -28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
 s₂ = Scenario(q₁ = -28.0, q₂ = -32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
-deferred = StochasticProgram([s₁,s₂], solver=GLPKSolverLP())
+deferred = StochasticProgram([s₁,s₂], GLPK.Optimizer)
 
 @first_stage deferred = begin
     @variable(model, x₁ >= 40)

@@ -8,7 +8,7 @@ end
 ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
 ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
 
-sp = StochasticProgram([ξ₁, ξ₂], solver = GLPKSolverLP())
+sp = StochasticProgram([ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 
 @first_stage sp = begin
     @variable(model, x₁ >= 40)

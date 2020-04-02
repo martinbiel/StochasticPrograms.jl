@@ -5,11 +5,11 @@ struct DecisionVariables{T}
     decisions::Vector{T}
 
     function DecisionVariables(::Type{T}) where T <: AbstractFloat
-        return new{T}(Vector{DecisionVariable}(), zeros(T))
+        return new{T}(Vector{DecisionVariable}(), Vector{T}())
     end
 
     function DecisionVariables(names::Vector{String}, ::Type{T}) where T <: AbstractFloat
-        return new{T}(names, zeros(T))
+        return new{T}(names, zeros(T, length(names)))
     end
 
     function DecisionVariables(names::Vector{String}, decisions::Vector{T}) where T <: AbstractFloat
@@ -21,17 +21,18 @@ function _set_names!(decision_variables::DecisionVariables{T}, names::Vector{Dec
     empty!(decision_variables.names)
     append!(decision_variables.names, names)
     empty!(decision_variables.decisions)
-    append!(decision_variables.decisions, zero(T))
+    append!(decision_variables.decisions, zeros(T, length(names)))
     return
 end
 
 function set_decision_variables!(decision_variables::DecisionVariables{T}, origin::JuMP.Model) where T <: AbstractFloat
-    resize!(decision_variables.names, num_variables(model))
-    for i in 1:num_variables(model)
+    n = num_variables(origin)
+    resize!(decision_variables.names, n)
+    for i in 1:n
         decision_variables.names[i] = name(VariableRef(origin, MOI.VariableIndex(i)))
     end
     empty!(decision_variables.decisions)
-    append!(decision_variables.decisions, zero(T))
+    append!(decision_variables.decisions, zeros(T, n))
     return
 end
 

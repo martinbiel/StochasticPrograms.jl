@@ -39,12 +39,12 @@ function fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::A
     throw(MethodError(fill_solution!, stochasticprogram, structuredmodel))
 end
 """
-    solverstr(solver::AbstractStructuredSolver)
+    optimizer_name(optimizer::AbstractStructuredOptimizer)
 
-Optionally, return a string identifier of `AbstractStructuredSolver`.
+Optionally, return a string identifier of `AbstractStructuredOptimizer`.
 """
-function solverstr(::AbstractStructuredSolver)
-    return "Unnamed structured solver"
+function optimizer_name(::AbstractStructuredOptimizer)
+    return "SolverName() attribute not implemented by the optimizer."
 end
 # Sample-based solver interface
 # ========================== #

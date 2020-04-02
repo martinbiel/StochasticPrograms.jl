@@ -19,6 +19,8 @@ using ProgressMeter
 import Base: getindex, length, in, issubset, show
 
 const MOI = MathOptInterface
+const MOIU = MOI.Utilities
+const MOIB = MOI.Bridges
 
 export
     StochasticModel,
@@ -74,7 +76,6 @@ export
     subproblem,
     subproblems,
     nsubproblems,
-    parentmodel,
     masterterms,
     transfer_model!,
     nscenarios,

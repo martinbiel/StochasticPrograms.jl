@@ -1,7 +1,7 @@
 s₁ = Scenario(ξ₁ = 6., ξ₂ = 8., probability = 0.5)
 s₂ = Scenario(ξ₁ = 4., ξ₂ = 4., probability = 0.5)
 
-infeasible = StochasticProgram([s₁,s₂], solver=GLPKSolverLP())
+infeasible = StochasticProgram([s₁,s₂], optimizer = GLPK.Optimizer)
 
 @first_stage infeasible = begin
     @variable(model, x₁ >= 0)

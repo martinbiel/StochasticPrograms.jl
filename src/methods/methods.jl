@@ -1,5 +1,6 @@
 include("api.jl")
 include("generation.jl")
+include("initialization.jl")
 include("evaluation.jl")
 include("spconstructs.jl")
 include("util.jl")

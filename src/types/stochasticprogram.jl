@@ -13,7 +13,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                procs::Vector{Int},
                                optimizer_constructor) where {T <: AbstractFloat, S <: AbstractScenario}
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
-        scenarioproblems = ScenarioProblems(S, procs)
+        scenarioproblems = ScenarioProblems(T, S, procs)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, typeof(stages), SP}(stages,
                                                 scenarioproblems,
@@ -31,11 +31,11 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                optimizer_constructor) where T <: AbstractFloat
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
         S = typeof(stages)
-        scenarioproblems = ScenarioProblems(scenarios, procs)
+        scenarioproblems = ScenarioProblems(T, scenarios, procs)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, S, SP}(stages,
                                    scenarioproblems,
-                                   (DecisionVariables(T),)
+                                   (DecisionVariables(T),),
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
                                    StochasticProgramOptimizer(optimizer_constructor))
@@ -52,7 +52,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
         end
         S = typeof(stages)
         scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(scenarios[i], procs)
+            ScenarioProblems(T, scenarios[i], procs)
         end
         decision_variables = ntuple(Val(M)) do i
             DecisionVariables(T)
@@ -78,7 +78,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
         end
         S = typeof(stages)
         scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(scenarios[i], procs)
+            ScenarioProblems(T, scenarios[i], procs)
         end
         decision_variables = ntuple(Val(M)) do i
             DecisionVariables(T)

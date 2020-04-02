@@ -6,11 +6,11 @@ A mathematical model of a stochastic optimization problem.
 struct StochasticModel{N, P <: NTuple{N, StageParameters}}
     parameters::P
     generator::Function
-    sp_optimizer::SPOptimizer
+    optimizer::StochasticProgramOptimizer
 
     function StochasticModel(generator::Function,
                              parameters::Vararg{StageParameters,N}) where N
-        return new{N,typeof(parameters)}(parameters, generator, SPOptimizer(nothing))
+        return new{N,typeof(parameters)}(parameters, generator, StochasticProgramOptimizer(nothing))
     end
 end
 nstages(::StochasticModel{N}) where N = N

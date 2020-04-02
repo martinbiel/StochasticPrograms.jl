@@ -222,9 +222,10 @@ function get_stage(stochasticprogram::StochasticProgram, stage::Integer)
     haskey(stochasticprogram.problemcache, stage_key) || error("Stage problem $stage not generated.")
     return stochasticprogram.problemcache[stage_key]
 end
-function pick_optimizer(stochasticprogram::StochasticProgram, supplied_optimizer::Union{Nothing, OptimizerFactory})
+
+function pick_optimizer(stochasticprogram::StochasticProgram, supplied_optimizer)
     if supplied_optimizer == nothing
-        return stochasticprogram.sp_optimizer.optimizer_factory
+        return moi_optimizer(stochasticprogram)
     end
     return supplied_optimizer
 end

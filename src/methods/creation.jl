@@ -546,8 +546,10 @@ See also: [`@parameters`](@ref), [`@decision`](@ref), [`@uncertain`](@ref)
 macro stage(stage, args)
     @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
     # Decision definitions might require parameter calculations,
-    # so we need first need to extract and save any such lines
+    # so we first need to extract and save any such lines
     vardefs = Expr(:block)
+    decisiondefs = Expr(:block)
+    decisionnames = Expr(:block)
     for line in block(def).args
         if  @capture(line, @variable(m_Symbol, variabledef__)) ||
             @capture(line, @decision(m_Symbol, decisiondef__)) ||
@@ -564,8 +566,6 @@ macro stage(stage, args)
         end
     end
     # Next, handle @decision annotations
-    decisiondefs = Expr(:block)
-    decisionnames = Expr(:block)
     def = postwalk(def) do x
         if @capture(x, @decision args__)
             decisiondef = @q begin
@@ -575,7 +575,7 @@ macro stage(stage, args)
             variabledef = @q begin
                 @variable $((args)...)
             end
-            push!(decisionnames, variabledef)
+            push!(decisionnames.args, variabledef)
             return variabledef
         end
         return x
