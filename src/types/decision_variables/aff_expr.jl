@@ -31,10 +31,23 @@ function JuMP.check_belongs_to_model(aff::DecisionVariableAffExpr, model::Abstra
 end
 
 function JuMP.function_string(mode, aff::DecisionVariableAffExpr, show_constant=true)
+    ret = ""
     variable_terms = JuMP.function_string(mode, aff.v, false)
+    if variable_terms != "0"
+        ret = variable_terms
+    end
     decision_terms = JuMP.function_string(mode, aff.dv, false)
-    first_decision_term_coef = first(linear_terms(aff.dv))[1]
-    ret = string(variable_terms, JuMP._sign_string(first_decision_term_coef), decision_terms)
+    if decision_terms != "0"
+        if ret == ""
+            ret = decision_terms
+        else
+            if decision_terms[1] == '-'
+                ret = ret * " - " * decision_terms[2:end]
+            else
+                ret = ret * " + " * decision_terms
+            end
+        end
+    end
     if !JuMP._is_zero_for_printing(aff.v.constant) && show_constant
         ret = string(ret, JuMP._sign_string(aff.v.constant),
 

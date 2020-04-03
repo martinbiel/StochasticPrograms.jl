@@ -1,3 +1,4 @@
+
 struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: Union{AbstractScenarioProblems, NTuple{M, AbstractScenarioProblems}}}
     stages::S
     scenarioproblems::SP

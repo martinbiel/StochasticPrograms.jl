@@ -5,19 +5,19 @@ struct DecisionRef <: JuMP.AbstractVariableRef
     index::MOI.VariableIndex
 end
 
-function _get_decision_variables(decision::DecisionRef)
-    return _getdecisionvariables(decision.model)
+function get_decision_variables(decision::DecisionRef)
+    return get_decision_variables(decision.model)
 end
 
 # JuMP variable interface
 # ========================== #
 function JuMP.name(dref::DecisionRef)
-    decision_variables = _get_decision_variables(dref)::DecisionVariables
+    decision_variables = get_decision_variables(dref)::DecisionVariables
     return decision_variables.names[dref.index.value]
 end
 
 function decision_by_name(model::Model, name::String)
-    decision_variables = _get_decision_variables(dref)::DecisionVariables
+    decision_variables = get_decision_variables(dref)::DecisionVariables
     index = findfirst(decision_variables.names, name)
     index == nothing && return nothing
     return DecisionRef(model, MOI.VariableIndex(index))
@@ -26,15 +26,15 @@ end
 JuMP.index(dref::DecisionRef) = dref.index
 
 function JuMP.value(dref::DecisionRef)
-    decision_variables = _get_decision_variables(dref)::DecisionVariables
-    return value(decision_variables.decisions[dref.index.value])
+    decision_variables = get_decision_variables(dref)::DecisionVariables
+    return decision_variables.decisions[dref.index.value]
 end
 
 JuMP.is_fixed(::DecisionRef) = true
 JuMP.unfix(::DecisionRef) = error("Decision variable cannot be unfixed.")
 
 function JuMP.fix(dref::DecisionRef, val::Real)
-    decision_variables = _get_decision_variables(dref)::DecisionVariables
+    decision_variables = get_decision_variables(dref)::DecisionVariables
     decision_variables.decisions[dref] = val
     return
 end

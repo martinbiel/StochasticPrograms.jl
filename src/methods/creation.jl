@@ -569,7 +569,7 @@ macro stage(stage, args)
     def = postwalk(def) do x
         if @capture(x, @decision args__)
             decisiondef = @q begin
-                @variable $((args)...) Decision()
+                @variable $((args)...) StochasticPrograms.Decision()
             end
             push!(decisiondefs.args, decisiondef)
             variabledef = @q begin
@@ -688,11 +688,11 @@ macro stage(stage, args)
                 $(esc(decisiondefs))
 	            return $(esc(:model))
             end
+            # Generate the decision variable names
+            $(esc(:model)) = Model()
+            $(esc(decisionnames))
+            set_decision_variables!(decision_variables($(esc(sp)), $stage), $(esc(:model)))
         end
-        # Generate the decision variable names
-        model = Model()
-        $decisionnames
-        set_decision_variables!(decision_variables($(esc(sp)), $stage), model)
         # Stage model generation code
         $generatordefs
         $(esc(sp))

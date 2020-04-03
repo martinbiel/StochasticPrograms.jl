@@ -49,17 +49,17 @@ function _stage_model(decision_generator::Function,
 end
 function generate_stage_one!(stochasticprogram::StochasticProgram)
     haskey(stochasticprogram.problemcache, :stage_1) && return nothing
-    has_generator(stochasticprogram, :stage) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     stochasticprogram.problemcache[:stage_1] = JuMP.Model()
     generator(stochasticprogram, :stage_1)(stochasticprogram.problemcache[:stage_1], stage_parameters(stochasticprogram, 1))
     return nothing
 end
-function generate!(scenarioproblems::ScenarioProblems{S},
+function generate!(scenarioproblems::ScenarioProblems,
                    decision_generator::Function,
                    generator::Function,
                    decision_params::Any,
                    stage_params::Any,
-                   optimizer) where S <: AbstractScenario
+                   optimizer)
     for i in nsubproblems(scenarioproblems)+1:nscenarios(scenarioproblems)
         push!(scenarioproblems.problems, _stage_model(decision_generator,
                                                       generator,
@@ -71,12 +71,12 @@ function generate!(scenarioproblems::ScenarioProblems{S},
     end
     return nothing
 end
-function generate!(scenarioproblems::DScenarioProblems{S},
+function generate!(scenarioproblems::DScenarioProblems,
                    decision_generator::Function,
                    generator::Function,
                    decision_params::Any,
                    stage_params::Any,
-                   optimizer) where S <: AbstractScenario
+                   optimizer)
     @sync begin
         for w in workers()
             @async remotecall_fetch((sp,decision_generator,generator,decision_params,params,optimizer)->
@@ -110,14 +110,19 @@ function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer
             remove_stages!(stochasticprogram, stage)
             invalidate_cache!(stochasticprogram)
         end
+        # Check that the appropriate generators have been defined
         stage_key = Symbol(:stage_, stage)
         decision_key = Symbol(:stage_, stage - 1, :_decisions)
         has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
         has_generator(stochasticprogram, decision_key) || error("Decision variables for stage problem $(stage-1) not defined in stochastic program. Consider @stage $(stage-1)")
+        # Sanity check on scenario probabilities
         if nscenarios(stochasticprogram, stage) > 0
             p = stage_probability(stochasticprogram, stage)
             abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
         end
+        # Generate decision variables from previous stage
+        set_decision_variables!(scenarioproblems(stochasticprogram, stage), decision_variables(stochasticprogram, stage - 1))
+        # Generate
         generate!(scenarioproblems(stochasticprogram, stage),
                   generator(stochasticprogram, decision_key),
                   generator(stochasticprogram, stage_key),
@@ -162,7 +167,7 @@ function _generate_deterministic_equivalent!(stochasticprogram::StochasticProgra
     stage_two_params = stage_parameters(stochasticprogram, 2)
     visited_objs = collect(keys(object_dictionary(dep_model)))
     for (i, scenario) in enumerate(scenarios(stochasticprogram))
-        generator(stochasticprogram,:stage_2)(dep_model, stage_two_params, scenario, dep_model)
+        generator(stochasticprogram,:stage_2)(dep_model, stage_two_params, scenario)
         dep_obj += probability(scenario)*objective_function(dep_model)
         for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
             newkey = if isa(obj, VariableRef)
@@ -220,13 +225,13 @@ Return the resulting second stage model if `decision` is the first-stage decisio
 """
 function outcome_model(stochasticprogram::StochasticProgram{2},
                        decision::AbstractVector,
-                       scenario::AbstractScenario,
+                       scenario::AbstractScenario;
                        optimizer = nothing)
-    has_generator(stochasticprogram,:stage_1_vars) || error("First-stage not defined in stochastic program. Consider @first_stage or @stage 1.")
+    has_generator(stochasticprogram,:stage_1_decisions) || error("First-stage not defined in stochastic program. Consider @first_stage or @stage 1.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
     outcome_model = optimizer == nothing ? Model() : Model(optimizer)
     _outcome_model!(outcome_model,
-                    generator(stochasticprogram,:stage_1_vars),
+                    generator(stochasticprogram,:stage_1_decisions),
                     generator(stochasticprogram,:stage_2),
                     stage_parameters(stochasticprogram, 1),
                     stage_parameters(stochasticprogram, 2),

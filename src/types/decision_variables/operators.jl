@@ -85,6 +85,9 @@ Base.:(-)(lhs::GAEDV{C}, rhs::JuMP.VariableRef) where {C} = (+)(-rhs,lhs)
 Base.:(+)(lhs::GAEDV{C}, rhs::GAEV{C}) where {C} = (+)(rhs,lhs)
 Base.:(-)(lhs::GAEDV{C}, rhs::GAEV{C}) where {C} = (+)(-rhs,lhs)
 
+# GenericAffExpr{C,DecisionRef}--DVAE{C}
+Base.:(+)(lhs::GAEDV{C}, rhs::DVAE{C}) where {C} = DVAE{C}(rhs.v, lhs + rhs.dv)
+
 #=
     DVAE{C}
 =#

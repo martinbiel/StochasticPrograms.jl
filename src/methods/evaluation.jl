@@ -2,22 +2,22 @@
 # ========================== #
 function _eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVector)
     first_stage = get_stage_one(stochasticprogram)
-    return eval_objective(first_stage.obj, x)
+    return evaluate_objective(objective_function(first_stage), x)
 end
-function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
-                             x::AbstractVector) where {S, SP <: ScenarioProblems}
+function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP},
+                             x::AbstractVector) where {T <: AbstractFloat, S , SP <: ScenarioProblems}
     sp = scenarioproblems(stochasticprogram)
-    update_decision_variables!(decision_variables(sp), x)
+    update_decision_variables!(scenarioproblems(stochasticprogram), x)
     return outcome_mean(sp)
 end
-function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S,SP},
-                             x::AbstractVector) where {S, SP <: DScenarioProblems}
+function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP},
+                             x::AbstractVector) where {T <: AbstractFloat, S, SP <: DScenarioProblems}
     Qs = Vector{Float64}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
             @async Qs[i] = remotecall_fetch((sp, x)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return 0.0
+                isempty(scenarioproblems.scenarios) && return zero{T}
                 update_decision_variables!(decision_variables(scenarioproblems), x)
                 return outcome_mean(scenarioproblems)
             end,
@@ -71,7 +71,7 @@ function outcome_mean(scenarioproblems::ScenarioProblems)
     for i in 1:N
         outcome = subproblem(scenarioproblems, i)
         try
-            optimize!(outcome)
+            JuMP.optimize!(outcome)
             π = probability(scenario(scenarioproblems, i))
             Qs[i] = π*objective_value(outcome)
         catch error
@@ -107,7 +107,7 @@ function welford(subproblems::Vector{JuMP.Model})
         Q̄ₖ₋₁ = Q̄ₖ
         problem = subproblems[k]
         try
-            optimize!(problem)
+            JuMP.optimize!(problem)
             Q = getobjectivevalue(problem)
             Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
             Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)

@@ -7,7 +7,7 @@ function MOIB.Constraint.bridge_constraint(::Type{DecisionVariableBridge{T, S}},
                                            f::MOI.ScalarAffineFunction{T},
                                            dvar_set::DecisionVariableSet{T,S}) where {T, S}
     dvar_value = JuMP.value(dvar_set.decision_variables, JuMP.value)
-    set = MOIU.shift_constant(dvar_set.set, convert(T, -dvar_value))
+    set = MOIU.shift_constant(dvar_set.set, convert(T, dvar_value))
     constraint = MOI.add_constraint(model, f, set)
     return DecisionVariableBridge{T, S}(constraint)
 end

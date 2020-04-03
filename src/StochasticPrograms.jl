@@ -22,6 +22,9 @@ const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 
+import MutableArithmetics
+const MA = MutableArithmetics
+
 export
     StochasticModel,
     StochasticProgram,

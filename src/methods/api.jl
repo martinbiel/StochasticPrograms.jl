@@ -210,9 +210,10 @@ end
 function _optimize!(stochasticprogram::StochasticProgram{2}, ::OptimizerProvided; kwargs...)
     # MOI optimizer. Fallback to solving DEP, relying on JuMP.
     dep = DEP(stochasticprogram)
-    optimize!(dep)
-    if status ∈ [:Optimal, :Infeasible, :Unbounded]
-        fill_solution!(stochasticprogram)
+    JuMP.optimize!(dep)
+    status = termination_status(dep)
+    if status ∈ [MOI.OPTIMAL, MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE]
+        #fill_solution!(stochasticprogram)
     end
     return status
 end
@@ -319,7 +320,11 @@ end
 Return the optimal value of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
 function optimal_value(stochasticprogram::StochasticProgram)
-    return get_stage_one(stochasticprogram).objVal
+    return _optimal_value(stochasticprogram, provided_optimizer(stochasticprogram))
+end
+function _optimal_value(stochasticprogram::StochasticProgram, ::OptimizerProvided)
+    dep = DEP(stochasticprogram)
+    return objective_value(dep)
 end
 """
     optimal_value(stochasticprogram::StochasticProgram, i::Integer)

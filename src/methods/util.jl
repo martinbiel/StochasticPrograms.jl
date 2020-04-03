@@ -1,10 +1,9 @@
 # Utility #
 # ========================== #
-function eval_objective(objective::JuMP.GenericQuadExpr, x::AbstractVector)
-    aff = objective.aff
-    val = aff.constant
-    for (i,var) in enumerate(aff.vars)
-        val += aff.coeffs[i]*x[var.col]
+function evaluate_objective(objective::JuMP.GenericAffExpr, x::AbstractVector)
+    val = objective.constant
+    for (var, coeff) in objective.terms
+        val += coeff*x[index(var).value]
     end
     return val
 end
@@ -95,8 +94,8 @@ function remove_stage!(stochasticprogram::StochasticProgram{N}, s::Integer) wher
     else
         haskey(stochasticprogram.problemcache, :stage_1) || return nothing
         remove_subproblems!(stochasticprogram, s)
+        remove_decision_variables!(stochasticprogram, s)
     end
-    s < N && clear_parent!(scenarioproblems(stochasticprogram, s+1))
     return nothing
 end
 
@@ -107,31 +106,13 @@ function remove_stages!(stochasticprogram::StochasticProgram{N}, s::Integer) whe
     end
 end
 
-function _clear_model!(model::JuMP.Model)
-    empty!(model.colLower)
-    empty!(model.colUpper)
-    empty!(model.colVal)
-    empty!(model.colCat)
-    empty!(model.colNames)
-    empty!(model.colNamesIJulia)
-    empty!(model.obj_dict)
-    model.numCols = 0
-    return nothing
-end
-function clear_parent!(scenarioproblems::ScenarioProblems)
-    _clear_model!(scenarioproblems.parent)
-    return nothing
-end
-function clear_parent!(scenarioproblems::DScenarioProblems)
-    _clear_model!(scenarioproblems.parent)
-    for w in workers()
-        remotecall_fetch((sp) -> clear_parent!(fetch(sp)), w, scenarioproblems[w-1])
-    end
+function remove_scenarios!(stochasticprogram::StochasticProgram)
+    remove_scenarios!(stochasticprogram.scenarioproblems)
     return nothing
 end
 
-function remove_scenarios!(stochasticprogram::StochasticProgram)
-    remove_scenarios!(stochasticprogram.scenarioproblems)
+function remove_decision_variables!(stochasticprogram::StochasticProgram, s::Integer)
+    remove_decision_variables!(scenarioproblems(stochasticprogram, s))
     return nothing
 end
 
@@ -149,32 +130,6 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     return dest
-end
-
-function masterterms(scenarioproblems::ScenarioProblems, i::Integer)
-    model = scenarioproblems.problems[i]
-    parent = parentmodel(scenarioproblems)
-    masterterms = Vector{Tuple{Int,Int,Float64}}()
-    for (i,constr) in enumerate(model.linconstr)
-        for (j,var) in enumerate(constr.terms.vars)
-            if var.m == parent
-                push!(masterterms,(i,var.col,-constr.terms.coeffs[j]))
-            end
-        end
-    end
-    return masterterms
-end
-
-function masterterms(scenarioproblems::DScenarioProblems, i::Integer)
-    j = 0
-    for w in workers()
-        n = scenarioproblems.scenario_distribution[w-1]
-        if i <= n+j
-            return remotecall_fetch((sp,idx) -> masterterms(fetch(sp),idx), w, scenarioproblems[w-1], i-j)
-        end
-        j += n
-    end
-    throw(BoundsError(scenarioproblems, i))
 end
 
 function Base.copy(src::TwoStageStochasticProgram; procs = workers())
