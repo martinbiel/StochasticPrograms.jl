@@ -8,6 +8,7 @@ function initialize!(stochasticprogram::StochasticProgram, ::UnrecognizedOptimiz
 end
 
 function initialize!(stochasticprogram::StochasticProgram, ::NoOptimizerProvided)
+    @warn "Cannot initialize without optimizer. Consider [`set_optimizer!`](@ref)."
     # Do not initialize anything if no optimizer is attached
     return
 end
@@ -31,7 +32,12 @@ function initialize!(stochasticprogram::StochasticProgram, ::OptimizerProvided)
 end
 
 function initialize!(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided)
-
+    # Check that all generators are there
+    _check_generators(stochasticprogram)
+    # Generate block-structured stochastic program
+    if deferred(stochasticprogram)
+        generate!(stochasticprogram)
+    end
 end
 
 _check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))

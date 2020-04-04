@@ -19,16 +19,6 @@
         @test VSS(sp) <= EEV(sp)-EV(sp)
         @test EVPI(sp) <= EEV(sp)-EV(sp)
     end
-    @testset "Deferred model creation" begin
-        @test decision_length(deferred) == 0
-        @test nscenarios(deferred) == 2
-        @test nsubproblems(deferred) == 0
-        @test optimize!(deferred) == :Optimal
-        @test decision_length(deferred) == 2
-        @test nscenarios(deferred) == 2
-        @test nsubproblems(deferred) == 2
-        @test isapprox(optimal_value(deferred), -855.83, rtol = 1e-2)
-    end
     @testset "Copying: $name" for (sp,res,name) in problems
         tol = 1e-2
         sp_copy = copy(sp)

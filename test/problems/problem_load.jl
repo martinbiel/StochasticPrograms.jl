@@ -16,8 +16,6 @@ include("simple.jl")
 include("instant_simple.jl")
 @info "Loading infeasible..."
 include("infeasible.jl")
-@info "Loading deferred simple..."
-include("deferred.jl")
 @info "Loading farmer..."
 include("farmer.jl")
 @info "Loading sampler..."

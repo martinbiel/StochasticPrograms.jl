@@ -3,7 +3,7 @@ struct DecisionVariableSet{C, S <: Union{MOI.LessThan,MOI.GreaterThan,MOI.EqualT
     set::S
 end
 
-function update_decision_variable_constraints(model::JuMP.Model)
+function update_decision_variable_constraints!(model::JuMP.Model)
     F = GAEV{Float64}
     for set_type in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
         S = DecisionVariableSet{Float64, set_type}
@@ -15,14 +15,18 @@ end
 
 function _update_decision_variables_constraint(cref::ConstraintRef)
     _update_decision_variables_constraint(backend(owner_model(cref)), cref.index)
+    return nothing
 end
 
 function _update_decision_variables_constraint(model::MOI.ModelLike, ci::MOI.ConstraintIndex{MOI.ScalarAffineFunction{T}, DecisionVariableSet{T,S}}) where {T,S}
-    dvar_set = MOI.get(model, MOI.ConstraintSet(), ci)
-    dvar_value = JuMP.value(dvar_set.decision_variables, JuMP.value)
-    set = MOIU.shift_constant(dvar_set.set, convert(T, dvar_value))
-    MOI.set(model, MOI.ConstraintSet(), ci, set)
-    return
+    # Only update if an optimizer has been attached.
+    if MOIU.state(model) == MOIU.ATTACHED_OPTIMIZER
+        dvar_set = MOI.get(model, MOI.ConstraintSet(), ci)
+        dvar_value = JuMP.value(dvar_set.decision_variables, JuMP.value)
+        set = MOIU.shift_constant(dvar_set.set, convert(T, dvar_value))
+        MOI.set(model, MOI.ConstraintSet(), ci, set)
+    end
+    return nothing
 end
 
 function JuMP.build_constraint(_error::Function, aff::DecisionVariableAffExpr, set::S) where S <: Union{MOI.LessThan,MOI.GreaterThan,MOI.EqualTo}

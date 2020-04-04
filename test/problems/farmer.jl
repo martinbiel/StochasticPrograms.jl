@@ -5,12 +5,11 @@ farmer_model = @stochastic_model begin
             Cost = Dict(:wheat=>150, :corn=>230, :beets=>260)
             Budget = 500
         end
-        @variable(model, x[c = Crops] >= 0)
+        @decision(model, x[c = Crops] >= 0)
         @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
         @constraint(model, sum(x[c] for c in Crops) <= Budget)
     end
     @stage 2 begin
-        @decision x
         @parameters begin
             Purchased  = [:wheat, :corn]
             Sold = [:wheat, :corn, :bquota, :bextra]

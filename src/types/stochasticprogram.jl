@@ -64,7 +64,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                    decision_variables,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
-                                   StochasticProgram(optimizer_constructor))
+                                   StochasticProgramOptimizer(optimizer_constructor))
     end
 
     function StochasticProgram(::Type{T},
@@ -90,7 +90,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                    decision_variables,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
-                                   StochasticProgram(optimizer_constructor))
+                                   StochasticProgramOptimizer(optimizer_constructor))
     end
 end
 TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProblems} = StochasticProgram{2, 1, T, S, SP}
@@ -192,21 +192,11 @@ end
 
 # Printing #
 # ========================== #
-function optimizer_name(stochasticprogram::StochasticProgram)
-    if optimizer(stochasticprogram) == nothing
-        return "No optimizer attached."
-    else
-        return JuMP._try_get_solver_name(optimizer(stochasticprogram))
-    end
-end
-JuMP._try_get_solver_name(optimizer::AbstractStructuredOptimizer) = solver_name(optimizer)
-
 function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
-    plural(n) = (n==1 ? "" : "s")
-    defer_stage(sp, s) = begin
-        if deferred_stage(sp,s)
-            return " * deferred stage $s"
-        else
+    plural(n) = (n == 1 ? "" : "s")
+    stage(sp, s) = begin
+        stage_key = Symbol(:stage_,s)
+        if has_generator(sp, stage_key)
             xdim = decision_length(sp, s)
             n = nscenarios(sp, s)
             if s == 1
@@ -217,42 +207,67 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
                 end
             elseif s == 2 && N == 2
                 stype = typename(scenariotype(stochasticprogram))
-                return " * $(xdim) recourse variable$(plural(xdim))\n * $(n) scenario$(plural(n)) of type $stype"
+                return " * $(n) scenario$(plural(n)) of type $stype"
             else
                 stype = typename(scenariotype(stochasticprogram, s))
                 if distributed(stochasticprogram, s)
-                    return " * Distributed stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
+                    if s == N
+                        return " * Distributed stage $s:\n   * $(n) scenario$(plural(n)) of type $stype"
+                    else
+                        return " * Distributed stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
+                    end
                 else
-                    return " * Stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
+                    if s == N
+                        return " * Stage $s:\n   * $(n) scenario$(plural(n)) of type $stype"
+                    else
+                        return " * Stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
+                    end
                 end
             end
-        end
-    end
-    stage(sp, s) = begin
-        stage_key = Symbol(:stage_,s)
-        if has_generator(sp, stage_key)
-            return defer_stage(sp,s)
         else
             " * undefined stage $s"
         end
     end
-    if N == 2 && distributed(stochasticprogram)
-        println(io, "Distributed stochastic program with:")
+    if initialized(stochasticprogram)
+        if N == 2 && distributed(stochasticprogram)
+            println(io, "Distributed stochastic program with:")
+        else
+            println(io, "Stochastic program with:")
+        end
     else
-        println(io, "Stochastic program with:")
+        println(io, "Uninitialized stochastic program with:")
     end
-    println(io, stage(stochasticprogram, 1))
+    print(io, stage(stochasticprogram, 1))
     for s = 2:N
-        println(io, stage(stochasticprogram, s))
+        println(io,"")
+        print(io, stage(stochasticprogram, s))
     end
-    print(io, "Solver name: ")
-    if optimizer(stochasticprogram) == nothing
-        print(io, "No optimizer attached.")
-    else
-        print(io, optimizer_name(optimizer(stochasticprogram)))
+    if initialized(stochasticprogram)
+        println(io,"")
+        print(io, "Solver name: ")
+        print(io, optimizer_name(stochasticprogram))
     end
 end
-function Base.print(io::IO, stochasticprogram::StochasticProgram{N}) where N
+function Base.print(io::IO, stochasticprogram::StochasticProgram)
+    if initialized(stochasticprogram)
+        # Delegate printing according to provided optimizer
+        _print(io, stochasticprogram, provided_optimizer(stochasticprogram))
+    else
+        # Just give summary if the stochastic program has not been initialized yet
+        show(io, stochasticprogram)
+    end
+end
+function _print(io::IO, stochasticprogram::StochasticProgram, ::AbstractProvidedOptimizer)
+    # Just give summary if no optimizer has been provided
+    show(io, stochasticprogram)
+end
+function _print(io::IO, stochasticprogram::StochasticProgram, ::OptimizerProvided)
+    print(io, "Deterministic equivalent problem\n")
+    print(io, DEP(stochasticprogram))
+    print(io, "Solver name: ")
+    print(io, optimizer_name(stochasticprogram))
+end
+function _print(io::IO, stochasticprogram::StochasticProgram{N}, ::StructuredOptimizerProvided) where N
     print(io, "Stage 1\n")
     print(io, "============== \n")
     print(io, get_stage_one(stochasticprogram))
@@ -265,8 +280,10 @@ function Base.print(io::IO, stochasticprogram::StochasticProgram{N}) where N
             print(io, "\n")
         end
     end
+    print(io, "Solver name: ")
+    print(io, optimizer_name(stochasticprogram))
 end
-function Base.print(io::IO, stochasticprogram::StochasticProgram{2})
+function _print(io::IO, stochasticprogram::StochasticProgram{2}, ::StructuredOptimizerProvided)
     print(io, "First-stage \n")
     print(io, "============== \n")
     print(io, get_stage_one(stochasticprogram))
@@ -277,5 +294,7 @@ function Base.print(io::IO, stochasticprogram::StochasticProgram{2})
         print(io, subproblem)
         print(io, "\n")
     end
+    print(io, "Solver name: ")
+    print(io, optimizer_name(stochasticprogram))
 end
 # ========================== #

@@ -72,8 +72,8 @@ function instantiate(sm::StochasticModel{N},
     params = ntuple(Val(N)) do i
         parameters(sm.parameters[i]; kw...)
     end
-    sp = StochasticProgram(params,
-                           float_type,
+    sp = StochasticProgram(float_type,
+                           params,
                            scenarios,
                            procs,
                            optimizer)
@@ -212,9 +212,6 @@ function _optimize!(stochasticprogram::StochasticProgram{2}, ::OptimizerProvided
     dep = DEP(stochasticprogram)
     JuMP.optimize!(dep)
     status = termination_status(dep)
-    if status ∈ [MOI.OPTIMAL, MOI.INFEASIBLE, MOI.DUAL_INFEASIBLE]
-        #fill_solution!(stochasticprogram)
-    end
     return status
 end
 function _optimize!(stochasticprogram::StochasticProgram{2}, ::StructuredOptimizerProvided; kwargs...)
@@ -278,41 +275,12 @@ end
 Return the optimal first stage decision of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
 function optimal_decision(stochasticprogram::StochasticProgram)
-    decision = get_stage_one(stochasticprogram).colVal
-    if any(isnan.(decision))
-        @warn "Optimal decision not defined. Check that the model was properly solved."
-    end
+    return _optimal_decision(stochasticprogram, provided_optimizer(stochasticprogram))
+end
+function _optimal_decision(stochasticprogram::StochasticProgram, ::OptimizerProvided)
+    dep = DEP(stochasticprogram)
+    decision = extract_decision_variables(dep, decision_variables(stochasticprogram, 1))
     return decision
-end
-"""
-    optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
-
-Return the optimal first stage variable `var` of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
-"""
-function optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
-    return getvalue(get_stage_one(stochasticprogram).objDict[var])
-end
-"""
-    optimal_decision(stochasticprogram::StochasticProgram, i::Integer)
-
-Return the optimal second stage decision of `stochasticprogram` in the `i`th scenario, after a call to `optimize!(stochasticprogram)`.
-"""
-function optimal_decision(stochasticprogram::StochasticProgram, i::Integer)
-    submodel = subproblem(stochasticprogram, i)
-    decision = submodel.colVal
-    if any(isnan.(decision))
-        @warn "Optimal decision not defined in subproblem $i. Check that the model was properly solved."
-    end
-    return decision
-end
-"""
-    optimal_decision(stochasticprogram::StochasticProgram, var::Symbol)
-
-Return the optimal second stage variable `var` of `stochasticprogram` in the `i`th scenario, after a call to `optimize!(stochasticprogram)`.
-"""
-function optimal_decision(stochasticprogram::StochasticProgram, i::Integer, var::Symbol)
-    submodel = subproblem(stochasticprogram, i)
-    return getvalue(submodel.objDict[var])
 end
 """
     optimal_value(stochasticprogram::StochasticProgram)
@@ -389,19 +357,16 @@ end
 Return the length of the decision at stage `s` in the `stochasticprogram`.
 """
 function decision_length(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    if s == 1
-        haskey(stochasticprogram.problemcache, :stage_1) || return 0
-        return num_variables(stochasticprogram.problemcache[:stage_1])
-    end
-    nsubproblems(stochasticprogram, s) == 0 && return 0
-    return recourse_length(scenarioproblems(stochasticprogram, s))
+    1 <= s <= N || error("Stage $s not in range 2 to $N.")
+    s == N && return 0
+    return ndecisions(decision_variables(stochasticprogram, s))
 end
 """
     decision_length(stochasticprogram::TwoStageStochasticProgram)
 
-Return the length of the first-stage decision of the two-stage `stochasticprogram`.
+Return the number of first-stage decisions in the `stochasticprogram`.
 """
-function decision_length(stochasticprogram::StochasticProgram{2})
+function decision_length(stochasticprogram::StochasticProgram{2}) where N
     return decision_length(stochasticprogram, 1)
 end
 """
@@ -412,7 +377,7 @@ Return the number of constraints in the the first stage of `stochasticprogram`.
 function first_stage_nconstraints(stochasticprogram::StochasticProgram)
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0
     first_stage = get_stage_one(stochasticprogram)
-    return length(first_stage.linconstr)
+    return num_constraints(first_stage)
 end
 """
     first_stage_dims(stochasticprogram::StochasticProgram)
@@ -436,7 +401,6 @@ function recourse_length(stochasticprogram::StochasticProgram{2})
 end
 """
     scenario(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-
 
 Return the `i`th scenario of stochasticprogram` at stage `s`. Defaults to the second stage.
 """
@@ -556,6 +520,19 @@ Return true if the `stochasticprogram` is memory distributed at stage `s`. Defau
 """
 distributed(stochasticprogram::StochasticProgram, s::Integer = 2) = distributed(scenarioproblems(stochasticprogram, s))
 """
+    initialized(stochasticprogram::StochasticProgram)
+
+Return true if `stochasticprogram` has been initialized.
+
+See also: [`initialize!`](@ref)
+"""
+function initialized(stochasticprogram::StochasticProgram)
+    return initialized(stochasticprogram, provided_optimizer(stochasticprogram))
+end
+initialized(stochasticprogram::StochasticProgram, ::AbstractProvidedOptimizer) = false
+initialized(stochasticprogram::StochasticProgram, ::OptimizerProvided) = haskey(problemcache(stochasticprogram), :dep)
+initialized(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided) = !deferred(stochasticprogram)
+"""
     deferred(stochasticprogram::StochasticProgram)
 
 Return true if `stochasticprogram` is not fully generated.
@@ -604,6 +581,32 @@ function provided_optimizer(stochasticprogram::StochasticProgram)
     return provided_optimizer(optimizer_constructor(stochasticprogram))
 end
 """
+    optimizer_name(stochasticmodel::StochasticModel)
+
+Return the currently provided optimizer type of `stochasticmodel`.
+"""
+function optimizer_name(stochasticmodel::StochasticModel)
+    return _optimizer_name(optimizer(stochasticmodel), provided_optimizer(stochasticmodel))
+end
+"""
+    optimizer_name(stochasticprogram::StochasticProgram)
+
+Return the currently provided optimizer type of `stochasticprogram`.
+"""
+function optimizer_name(stochasticprogram::StochasticProgram)
+    initialized(stochasticprogram) || return "Uninitialized"
+    return _optimizer_name(stochasticprogram, provided_optimizer(stochasticprogram))
+end
+function _optimizer_name(::StochasticProgram, ::NoOptimizerProvided)
+    return "No optimizer attached."
+end
+function _optimizer_name(stochasticprogram::StochasticProgram, ::OptimizerProvided)
+    return JuMP._try_get_solver_name(optimizer(stochasticprogram))
+end
+function _optimizer_name(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided)
+    return optimizer_name(optimizer(stochasticprogram))
+end
+"""
     moi_optimizer(stochasticmodel::StochasticModel)
 
 Return a MOI capable optimizer using the currently provided optimizer of `stochasticmodel`.
@@ -626,8 +629,8 @@ Return, if any, the optimizer attached to `stochasticprogram`.
 """
 function optimizer(stochasticprogram::StochasticProgram)
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
-    if deferred(stochasticprogram)
-        @warn "The stochastic program is deffered. Consider `initialize!`"
+    if !initialized(stochasticprogram)
+        @warn "The stochastic program has not been initialized. Consider `initialize!`"
         return nothing
     end
     return stochasticprogram.optimizer.optimizer

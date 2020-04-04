@@ -31,9 +31,9 @@ Reexport = "0.2"
 julia = "1"
 
 [extras]
-GLPKMathProgInterface = "3c7084bd-78ad-589a-b5bb-dbd673274bea"
+GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Logging", "GLPKMathProgInterface"]
+test = ["Test", "Logging", "GLPK"]

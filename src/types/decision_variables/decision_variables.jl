@@ -25,6 +25,10 @@ function decisions(decision_variables::DecisionVariables)
     return decision_variables.decisions
 end
 
+function ndecisions(decision_variables::DecisionVariables)
+    return length(decision_variables.names)
+end
+
 function set_decision_variables!(decision_variables::DecisionVariables{T}, names::Vector{DecisionVariable}) where T <: AbstractFloat
     empty!(decision_variables.names)
     append!(decision_variables.names, names)
@@ -65,11 +69,11 @@ end
 function extract_decision_variables(model::JuMP.Model, decision_variables::DecisionVariables{T}) where T <: AbstractFloat
     termination_status(model) == MOI.OPTIMAL || error("Model is not optimized, cannot extract decision variables.")
     length(decision_variables.names) > 0 || error("No decision variables.")
-    decision = zeros(T, length(decision_variables.names))
-    for (i,dvar) in enumerate(decision_variables.names)
+    decision = DecisionVariables(decision_names(decision_variables), T)
+    for (i,dvar) in enumerate(decision_names(decision))
         var = variable_by_name(model, dvar)
         var == nothing && error("Decision variable $dvar not in given model.")
-        decision[i] = value(var)
+        decision.decisions[i] = value(var)
     end
     return decision
 end
@@ -87,7 +91,19 @@ function update_decision_variables!(decision_variables::DecisionVariables, x::Ab
 end
 
 function Base.copy(decision_variables::DecisionVariables)
-    return DecisionVariables(copy(decision_variables.names), decision_variables.decisions)
+    return DecisionVariables(copy(decision_names(decision_variables)), copy(decisions(decision_variables)))
+end
+
+function Base.show(io::IO, decision_variables::DecisionVariables)
+    println(io, "Decision variables")
+    print(io, join(decision_names(decision_variables), " "))
+end
+
+function Base.print(io::IO, decision_variables::DecisionVariables)
+    println(io, "Decision variables")
+    for (dvar, value) in zip(decision_names(decision_variables), decisions(decision_variables))
+        println(io, "$dvar = $value")
+    end
 end
 
 include("decision_variable.jl")

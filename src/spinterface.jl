@@ -87,11 +87,11 @@ function internal_solver(solver::AbstractSampledSolver)
     throw(MethodError(optimsolver, solver))
 end
 """
-    solverstr(solver::AbstractStructuredSolver)
+    optimizer_name(optimizer::AbstractSampledSolver)
 
-Optionally, return a string identifier of `AbstractStructuredSolver`.
+Optionally, return a string identifier of `AbstractSampledSolver`.
 """
-function solverstr(::AbstractSampledSolver)
-    return "Unnamed sample-based solver"
+function optimizer_name(::AbstractSampledSolver)
+    return "SolverName() attribute not implemented by the optimizer."
 end
 # ========================== #

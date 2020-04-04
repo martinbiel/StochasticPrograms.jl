@@ -54,14 +54,17 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
     return 𝔼Q, sqrt(σ²)
 end
-function _eval(stochasticprogram::StochasticProgram{2},
-               x::AbstractVector)
+function _eval(stochasticprogram::StochasticProgram{2}, decision::AbstractVector)
     xlength = decision_length(stochasticprogram)
     length(x) == xlength || error("Incorrect length of given decision vector, has ", length(x), " should be ", xlength)
     all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
     cᵀx = _eval_first_stage(stochasticprogram, x)
     𝔼Q = _eval_second_stages(stochasticprogram, x)
     return cᵀx+𝔼Q
+end
+function _eval(stochasticprogram::StochasticProgram{2}, decision::DecisionVariables)
+    decision_names(decision_variables(stochasticprogram)) .== decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    return _eval(stochasticprogram, decisions(decision))
 end
 # Mean/variance calculations #
 # ========================== #
@@ -155,6 +158,22 @@ Evaluate the first-stage `decision` in `stochasticprogram`.
 In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::AbstractVector)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    # Ensure stochastic program has been generated at this point
+    if deferred(stochasticprogram)
+        generate!(stochasticprogram)
+    end
+    return _eval(stochasticprogram, decision)
+end
+"""
+    evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::DecisionVariables)
+
+Evaluate the first-stage `decision` in `stochasticprogram`.
+
+In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+"""
+function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::DecisionVariables)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Ensure stochastic program has been generated at this point

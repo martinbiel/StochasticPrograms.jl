@@ -4,13 +4,12 @@ s₂ = Scenario(ξ₁ = 4., ξ₂ = 4., probability = 0.5)
 infeasible = StochasticProgram([s₁,s₂], optimizer = GLPK.Optimizer)
 
 @first_stage infeasible = begin
-    @variable(model, x₁ >= 0)
-    @variable(model, x₂ >= 0)
+    @decision(model, x₁ >= 0)
+    @decision(model, x₂ >= 0)
     @objective(model, Min, 3*x₁ + 2*x₂)
 end
 
 @second_stage infeasible = begin
-    @decision x₁ x₂
     @uncertain ξ₁ ξ₂
     @variable(model, 0.8*ξ₁ <= y₁ <= ξ₁)
     @variable(model, 0.8*ξ₂ <= y₂ <= ξ₂)

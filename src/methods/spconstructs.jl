@@ -317,7 +317,7 @@ function EVP_decision(stochasticprogram::StochasticProgram{2})
     JuMP.optimize!(evp)
     # Return EVP decision
     decision = extract_decision_variables(evp, decision_variables(stochasticprogram, 1))
-    if any(isnan.(decision))
+    if any(isnan.(decisions(decision)))
         warn("Optimal decision not defined. Check that the EVP model was properly solved.")
     end
     return decision

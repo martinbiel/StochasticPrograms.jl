@@ -11,14 +11,13 @@ end
 sp = StochasticProgram([ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 
 @first_stage sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
+    @decision(model, x₁ >= 40)
+    @decision(model, x₂ >= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
     @constraint(model, x₁ + x₂ <= 120)
 end
 
 @second_stage sp = begin
-    @decision x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
     @variable(model, 0 <= y₁ <= d₁)
     @variable(model, 0 <= y₂ <= d₂)

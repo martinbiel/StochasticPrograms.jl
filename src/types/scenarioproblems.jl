@@ -23,7 +23,7 @@ struct DScenarioProblems{T <: AbstractFloat, S <: AbstractScenario} <: AbstractS
 end
 function ScenarioProblems(::Type{T}, ::Type{S}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(S)
+        return ScenarioProblems(T,S)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -217,7 +217,7 @@ function set_decision_variables!(scenarioproblems::DScenarioProblems{T}, decisio
 end
 function update_decision_variables!(scenarioproblems::ScenarioProblems, x::AbstractVector)
     update_decision_variables!(decision_variables(scenarioproblems), x)
-    map(s -> update_decision_variable_constraints(s), subproblems(scenarioproblems))
+    map(s -> update_decision_variable_constraints!(s), subproblems(scenarioproblems))
     return nothing
 end
 # TODO DScenarioProblems
