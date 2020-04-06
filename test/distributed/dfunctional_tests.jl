@@ -4,19 +4,19 @@
         optimize!(sp)
         sp_nondist = copy(sp, procs = [1])
         add_scenarios!(sp_nondist, scenarios(sp))
-        optimize!(sp_nondist,solver=GLPKSolverLP())
+        optimize!(sp_nondist) == MOI.OPTIMAL
         @test scenariotype(sp) == scenariotype(sp_nondist)
         @test isapprox(stage_probability(sp), stage_probability(sp_nondist))
         @test nscenarios(sp) == nscenarios(sp_nondist)
         @test nscenarios(sp) == length(scenarios(sp))
         @test nsubproblems(sp) == nsubproblems(sp_nondist)
-        @test isapprox(optimal_decision(sp), optimal_decision(sp_nondist))
+        @test isapprox(decisions(optimal_decision(sp)), decisions(optimal_decision(sp_nondist)))
         @test isapprox(optimal_value(sp), optimal_value(sp_nondist))
     end
     @testset "Distributed SP Constructs: $name" for (sp,res,name) in problems
         tol = 1e-2
-        @test optimize!(sp) == :Optimal
-        @test isapprox(optimal_decision(sp), res.x̄, rtol = tol)
+        @test optimize!(sp) == MOI.OPTIMAL
+        @test isapprox(decisions(optimal_decision(sp)), res.x̄, rtol = tol)
         @test isapprox(optimal_value(sp), res.VRP, rtol = tol)
         @test isapprox(EWS(sp), res.EWS, rtol = tol)
         @test isapprox(EVPI(sp), res.EVPI, rtol = tol)
@@ -39,9 +39,9 @@
         @test nscenarios(sp_copy) == nscenarios(sp)
         generate!(sp_copy)
         @test nsubproblems(sp_copy) == nsubproblems(sp)
-        @test optimize!(sp_copy) == :Optimal
-        optimize!(sp)
-        @test isapprox(optimal_decision(sp_copy), optimal_decision(sp), rtol = tol)
+        @test optimize!(sp_copy) == MOI.OPTIMAL
+        @test optimize!(sp)  == MOI.OPTIMAL
+        @test isapprox(decisions(optimal_decision(sp_copy)), decisions(optimal_decision(sp)), rtol = tol)
         @test isapprox(optimal_value(sp_copy), optimal_value(sp), rtol = tol)
         @test isapprox(EWS(sp_copy), EWS(sp), rtol = tol)
         @test isapprox(EVPI(sp_copy), EVPI(sp), rtol = tol)
@@ -50,7 +50,7 @@
         @test isapprox(EEV(sp_copy), EEV(sp), rtol = tol)
     end
     @testset "Distributed Sampling" begin
-        sampled_sp = sample(simple_model, sampler, 100, solver=GLPKSolverLP())
+        sampled_sp = sample(simple_model, sampler, 100, optimizer = GLPK.Optimizer)
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test isapprox(stage_probability(sampled_sp), 1.0)
@@ -60,12 +60,12 @@
         @test isapprox(stage_probability(sampled_sp), 1.0)
     end
     @testset "Distributed confidence intervals" begin
-        glpk = GLPKSolverLP()
         try
-            CI = confidence_interval(simple_model, sampler, solver = glpk, N = 200, log = false)
+            CI = confidence_interval(simple_model, sampler, optimizer = GLPK.Optimizer, N = 200, log = false)
             @test lower(CI) <= upper(CI)
         catch end
-        sol = optimize!(simple_model, sampler, solver = glpk, confidence = 0.95, tol = 1e-1, log = false)
-        @test lower(confidence_interval(sol)) <= upper(confidence_interval(sol))
+        set_optimizer!(simple_model, GLPK.Optimizer)
+        sol = optimize!(simple_model, sampler, confidence = 0.95, tol = 1e-1, log = false)
+        @test lower(optimal_value(simple_model)) <= upper(optimal_value(simple_model))
     end
 end

@@ -113,6 +113,6 @@ end
 
 function JuMP.add_variable(model::JuMP.Model, d::Decision, name::String="")
     isempty(name) && error("Name must be provided for decision variables.")
-    dref = add_decision_variable(model, name)
+    dref = add_decision_variable!(model, name)
     return dref
 end

@@ -17,6 +17,8 @@ using Reexport
 using ProgressMeter
 
 import Base: getindex, length, in, issubset, show
+import JuMP: optimize!, termination_status
+import Distributions: sample
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
@@ -54,6 +56,7 @@ export
     spsolver,
     spsolver_model,
     distributed,
+    initialize!,
     initialized,
     deferred,
     internal_model,
@@ -61,7 +64,11 @@ export
     add_scenarios!,
     scenarioproblems,
     DecisionVariables,
+    decision_variables,
     decision_length,
+    decisions,
+    ndecisions,
+    decision_names,
     recourse_length,
     first_stage_nconstraints,
     first_stage_dims,
@@ -117,6 +124,7 @@ export
     @expectation,
     @sample,
     @decision,
+    @known,
     @parameters,
     @uncertain,
     WS,
@@ -141,6 +149,6 @@ include("types/types.jl")
 include("methods/methods.jl")
 #include("spinterface.jl")
 #include("crash.jl")
-#include("solvers/solvers.jl")
+include("solvers/solvers.jl")
 
 end # module

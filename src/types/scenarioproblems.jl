@@ -4,12 +4,12 @@ struct ScenarioProblems{T <: AbstractFloat, S <: AbstractScenario} <: AbstractSc
     problems::Vector{JuMP.Model}
     decision_variables::DecisionVariables{T}
 
-    function ScenarioProblems(::Type{T}, ::Type{S}) where {T <: AbstractFloat, S <: AbstractScenario}
-        return new{T,S}(Vector{S}(), Vector{JuMP.Model}(), DecisionVariables(T))
+    function ScenarioProblems(::Type{T}, ::Type{S}, decision_variables::DecisionVariables{T}) where {T <: AbstractFloat, S <: AbstractScenario}
+        return new{T,S}(Vector{S}(), Vector{JuMP.Model}(), decision_variables)
     end
 
-    function ScenarioProblems(::Type{T}, scenarios::Vector{S}) where {T <: AbstractFloat, S <: AbstractScenario}
-        return new{T,S}(scenarios, Vector{JuMP.Model}(), DecisionVariables(T))
+    function ScenarioProblems(::Type{T}, scenarios::Vector{S}, decision_variables::DecisionVariables{T}) where {T <: AbstractFloat, S <: AbstractScenario}
+        return new{T,S}(scenarios, Vector{JuMP.Model}(), decision_variables)
     end
 end
 ScenarioProblemChannel{T,S} = RemoteChannel{Channel{ScenarioProblems{T,S}}}
@@ -21,9 +21,9 @@ struct DScenarioProblems{T <: AbstractFloat, S <: AbstractScenario} <: AbstractS
         return new{T,S}(JuMP.Model(), scenario_distribution, scenarioproblems)
     end
 end
-function ScenarioProblems(::Type{T}, ::Type{S}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}
+function ScenarioProblems(::Type{T}, ::Type{S}, decision_variables::DecisionVariables{T}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(T,S)
+        return ScenarioProblems(T, S, decision_variables)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -31,7 +31,7 @@ function ScenarioProblems(::Type{T}, ::Type{S}, procs::Vector{Int}) where {T <: 
         @sync begin
             for (i,p) in enumerate(procs)
                 scenarioproblems[i] = RemoteChannel(() -> Channel{ScenarioProblems{T,S}}(1), p)
-                @async remotecall_fetch((sp,T,S)->put!(sp, ScenarioProblems(T,S)),
+                @async remotecall_fetch((sp,T,S)->put!(sp, ScenarioProblems(T,S,DecisionVariables(T))),
                                         p,
                                         scenarioproblems[i],
                                         T,
@@ -42,9 +42,9 @@ function ScenarioProblems(::Type{T}, ::Type{S}, procs::Vector{Int}) where {T <: 
     end
 end
 
-function ScenarioProblems(::Type{T}, scenarios::Vector{S}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}
+function ScenarioProblems(::Type{T}, scenarios::Vector{S}, decision_variables::DecisionVariables{T}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}
     if (length(procs) == 1 || nworkers() == 1) && procs[1] == 1
-        return ScenarioProblems(T,scenarios)
+        return ScenarioProblems(T, scenarios, decision_variables)
     else
         isempty(procs) && error("No requested procs.")
         length(procs) <= nworkers() || error("Not enough workers to satisfy requested number of procs. There are ", nworkers(), " workers, but ", length(procs), " were requested.")
@@ -58,7 +58,7 @@ function ScenarioProblems(::Type{T}, scenarios::Vector{S}, procs::Vector{Int}) w
                 n = nscen + (extra > 0)
                 scenarioproblems[i] = RemoteChannel(() -> Channel{ScenarioProblems{T,S}}(1), p)
                 scenario_range = start:stop
-                @async remotecall_fetch((sp,T,scenarios)->put!(sp, ScenarioProblems(T,scenarios)),
+                @async remotecall_fetch((sp,T,scenarios)->put!(sp, ScenarioProblems(T,scenarios,DecisionVariables(T))),
                                         p,
                                         scenarioproblems[i],
                                         T,
@@ -205,7 +205,7 @@ distributed(scenarioproblems::DScenarioProblems) = true
 # Setters
 # ========================== #
 function set_decision_variables!(scenarioproblems::ScenarioProblems{T}, decision_variables::DecisionVariables{T}) where T <: AbstractFloat
-    set_decision_variables!(scenarioproblems.decision_variables, decision_names(decision_variables))
+    scenarioproblems.decision_variables = decision_variables
 end
 function set_decision_variables!(scenarioproblems::DScenarioProblems{T}, decision_variables::DecisionVariables{T}) where T <: AbstractFloat
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")

@@ -14,11 +14,12 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                procs::Vector{Int},
                                optimizer_constructor) where {T <: AbstractFloat, S <: AbstractScenario}
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
-        scenarioproblems = ScenarioProblems(T, S, procs)
+        decision_variables = (DecisionVariables(T),)
+        scenarioproblems = ScenarioProblems(T, S, decision_variables[1], procs)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, typeof(stages), SP}(stages,
                                                 scenarioproblems,
-                                                (DecisionVariables(T),),
+                                                decision_variables,
                                                 Dict{Symbol, Function}(),
                                                 Dict{Symbol, JuMP.Model}(),
                                                 StochasticProgramOptimizer(optimizer_constructor))
@@ -32,11 +33,12 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                optimizer_constructor) where T <: AbstractFloat
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
         S = typeof(stages)
-        scenarioproblems = ScenarioProblems(T, scenarios, procs)
+        decision_variables = (DecisionVariables(T),)
+        scenarioproblems = ScenarioProblems(T, scenarios, decision_variables[1], procs)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, S, SP}(stages,
                                    scenarioproblems,
-                                   (DecisionVariables(T),),
+                                   decision_variables,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
                                    StochasticProgramOptimizer(optimizer_constructor))
@@ -52,11 +54,11 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
             Stage(i, stage_params[i])
         end
         S = typeof(stages)
-        scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(T, scenarios[i], procs)
-        end
         decision_variables = ntuple(Val(M)) do i
             DecisionVariables(T)
+        end
+        scenarioproblems = ntuple(Val(M)) do i
+            ScenarioProblems(T, scenarios[i], decision_variables[i], procs)
         end
         SP = typeof(scenarioproblems)
         return new{N, M, T, S, SP}(stages,
@@ -78,11 +80,11 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
             Stage(i, stage_params[i])
         end
         S = typeof(stages)
-        scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(T, scenarios[i], procs)
-        end
         decision_variables = ntuple(Val(M)) do i
             DecisionVariables(T)
+        end
+        scenarioproblems = ntuple(Val(M)) do i
+            ScenarioProblems(T, scenarios[i], decision_variables[i], procs)
         end
         SP = typeof(scenarioproblems)
         return new{N, M, T, S, SP}(stages,
@@ -173,7 +175,7 @@ function StochasticProgram(first_stage_params::Any,
                            scenarios::Vector{<:AbstractScenario},
                            optimizer_constructor = nothing;
                            procs = workers()) where T <: AbstractFloat
-    return StochasticProgram(first_stage_params, second_stage_params, scenarios, procs, optimizer_constructor)
+    return StochasticProgram(first_stage_params, second_stage_params, T, scenarios, procs, optimizer_constructor)
 end
 """
     StochasticProgram(::Type{T},
@@ -188,6 +190,18 @@ function StochasticProgram(::Type{T},
                            optimizer_constructor = nothing;
                            procs = workers()) where T <: AbstractFloat
     return StochasticProgram(nothing, nothing, T, scenarios, optimizer_constructor; procs = procs)
+end
+"""
+    StochasticProgram(scenarios::Vector{<:AbstractScenario},
+                      optimizer_constructor = nothing;
+                      procs = workers()) where {T <: AbstractFloat}
+
+Create a new two-stage stochastic program with a given collection of `scenarios` and no stage data. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
+"""
+function StochasticProgram(scenarios::Vector{<:AbstractScenario},
+                           optimizer_constructor = nothing;
+                           procs = workers()) where T <: AbstractFloat
+    return StochasticProgram(nothing, nothing, Float64, scenarios, optimizer_constructor; procs = procs)
 end
 
 # Printing #

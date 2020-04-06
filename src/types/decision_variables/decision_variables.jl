@@ -59,11 +59,19 @@ function clear_decision_variables!(decision_variables::DecisionVariables)
     return nothing
 end
 
-function add_decision_variable(model::JuMP.Model, name::String)
+function add_decision_variable!(model::JuMP.Model, name::String)
     decision_variables = get_decision_variables(model)
     index = findfirst(d -> d == name, decision_variables.names)
-    index == nothing && error("No matching decision variable with name $name.")
+    if index == nothing
+        index = new_decision_variable!(decision_variables, name)
+    end
     return DecisionRef(model, MOI.VariableIndex(index))
+end
+
+function new_decision_variable!(decision_variables::DecisionVariables{T}, name::String) where T <: AbstractFloat
+    push!(decision_variables.names, name)
+    push!(decision_variables.decisions, zero(T))
+    return ndecisions(decision_variables)
 end
 
 function extract_decision_variables(model::JuMP.Model, decision_variables::DecisionVariables{T}) where T <: AbstractFloat
@@ -85,7 +93,7 @@ function update_decision_variables!(model::JuMP.Model, x::AbstractVector)
 end
 
 function update_decision_variables!(decision_variables::DecisionVariables, x::AbstractVector)
-    length(decision_variables.decisions) == length(x) || error("Given decision of length $(length(x)) not compatible with defined decision variables of length $(length(decision_variables.decisions)).")
+    ndecisions(decision_variables) == length(x) || error("Given decision of length $(length(x)) not compatible with number of defined decision variables ndecisions(decision_variables).")
     decision_variables.decisions .= x
     return nothing
 end

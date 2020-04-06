@@ -7,7 +7,7 @@ end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP},
                              x::AbstractVector) where {T <: AbstractFloat, S , SP <: ScenarioProblems}
     sp = scenarioproblems(stochasticprogram)
-    update_decision_variables!(scenarioproblems(stochasticprogram), x)
+    update_decision_variables!(decision_variables(stochasticprogram), x)
     return outcome_mean(sp)
 end
 function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP},
@@ -54,18 +54,6 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
     return 𝔼Q, sqrt(σ²)
 end
-function _eval(stochasticprogram::StochasticProgram{2}, decision::AbstractVector)
-    xlength = decision_length(stochasticprogram)
-    length(x) == xlength || error("Incorrect length of given decision vector, has ", length(x), " should be ", xlength)
-    all(.!(isnan.(x))) || error("Given decision vector has NaN elements")
-    cᵀx = _eval_first_stage(stochasticprogram, x)
-    𝔼Q = _eval_second_stages(stochasticprogram, x)
-    return cᵀx+𝔼Q
-end
-function _eval(stochasticprogram::StochasticProgram{2}, decision::DecisionVariables)
-    decision_names(decision_variables(stochasticprogram)) .== decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
-    return _eval(stochasticprogram, decisions(decision))
-end
 # Mean/variance calculations #
 # ========================== #
 function outcome_mean(scenarioproblems::ScenarioProblems)
@@ -74,9 +62,20 @@ function outcome_mean(scenarioproblems::ScenarioProblems)
     for i in 1:N
         outcome = subproblem(scenarioproblems, i)
         try
-            JuMP.optimize!(outcome)
-            π = probability(scenario(scenarioproblems, i))
-            Qs[i] = π*objective_value(outcome)
+            optimize!(outcome)
+            status = termination_status(outcome)
+            if status != MOI.OPTIMAL
+                if status == MOI.INFEASIBLE
+                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+                elseif status == MOI.DUAL_INFEASIBLE
+                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+                else
+                    error("Outcome model could not be solved, returned status: $status")
+                end
+            else
+                π = probability(scenario(scenarioproblems, i))
+                Qs[i] = π*objective_value(outcome)
+            end
         catch error
             if isa(error, NoOptimizer)
                 @warn "No optimizer set, cannot solve outcome model."
@@ -86,19 +85,6 @@ function outcome_mean(scenarioproblems::ScenarioProblems)
                 rethrow(error)
             end
         end
-        # if status != :Optimal
-        #     if status == :Infeasible
-        #         Qs[i] = outcome.objSense == :Max ? -Inf : Inf
-        #     elseif status == :Unbounded
-        #         Qs[i] = outcome.objSense == :Max ? Inf : -Inf
-        #     else
-        #         error("Outcome model could not be solved, returned status: $status")
-        #     end
-        # else
-        #     π = probability(scenario(scenarioproblems, i))
-        #     Qs[i] = π*objective_value(outcome)
-        #     end
-        # end
     end
     return sum(Qs)
 end
@@ -110,8 +96,19 @@ function welford(subproblems::Vector{JuMP.Model})
         Q̄ₖ₋₁ = Q̄ₖ
         problem = subproblems[k]
         try
-            JuMP.optimize!(problem)
-            Q = getobjectivevalue(problem)
+            optimize!(problem)
+            status = termination_status(problem)
+            Q = if status != MOI.OPTIMAL
+                Q = if status == MOI.INFEASIBLE
+                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+                elseif status == MOI.DUAL_INFEASIBLE
+                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+                else
+                    error("Outcome model could not be solved, returned status: $status")
+                end
+            else
+                Q = objective_value(problem)
+            end
             Q̄ₖ = Q̄ₖ + (Q-Q̄ₖ)/k
             Sₖ = Sₖ + (Q-Q̄ₖ)*(Q-Q̄ₖ₋₁)
         catch error
@@ -124,17 +121,6 @@ function welford(subproblems::Vector{JuMP.Model})
             end
         end
     end
-    # Q = if status != :Optimal
-    #     Q = if status == :Infeasible
-    #         problem.objSense == :Max ? -Inf : Inf
-    #     elseif status == :Unbounded
-    #         problem.objSense == :Max ? Inf : -Inf
-    #     else
-    #         error("Outcome model could not be solved, returned status: $status")
-    #     end
-    # else
-    #     Q = getobjectivevalue(problem)
-    # end
     return Q̄ₖ, Sₖ/(N-1)
 end
 function aggregate_welford(left::Tuple, right::Tuple)
@@ -151,11 +137,11 @@ end
 # Evaluation API #
 # ========================== #
 """
-    evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
+    evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::Union{AbstractVector, DecisionVariables)
 
 Evaluate the first-stage `decision` in `stochasticprogram`.
 
-In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
@@ -164,37 +150,34 @@ function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::Ab
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
-    return _eval(stochasticprogram, decision)
+    # Sanity checks on given decision vector
+    length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
+    all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Evalaute decision stage-wise
+    cᵀx = _eval_first_stage(stochasticprogram, decision)
+    𝔼Q = _eval_second_stages(stochasticprogram, decision)
+    return return cᵀx+𝔼Q
 end
-"""
-    evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::DecisionVariables)
-
-Evaluate the first-stage `decision` in `stochasticprogram`.
-
-In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
-"""
 function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::DecisionVariables)
-    # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
-    # Ensure stochastic program has been generated at this point
-    if deferred(stochasticprogram)
-        generate!(stochasticprogram)
-    end
-    return _eval(stochasticprogram, decision)
+    decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    return evaluate_decision(stochasticprogram, decisions(decision))
 end
 """
     evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
-                      decision::AbstractVector,
+                      decision::Union{AbstractVector, DecisionVariables},
                       scenario::AbstractScenario;
                       optimizer = nothing)
 
-Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
 function evaluate_decision(stochasticprogram::StochasticProgram{2},
                            decision::AbstractVector,
                            scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    # Sanity checks on given decision vector
+    length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
+    all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
     # Generate and solve outcome model
     outcome = outcome_model(stochasticprogram, decision, scenario, moi_optimizer(stochasticprogram))
     optimize!(outcome)
@@ -203,9 +186,15 @@ function evaluate_decision(stochasticprogram::StochasticProgram{2},
     end
     error("Outcome model could not be solved, returned status: $status")
 end
+function evaluate_decision(stochasticprogram::StochasticProgram{2},
+                           decision::DecisionVariables,
+                           scenario::AbstractScenario)
+    decision_names(decision_variables(stochasticprogram)) .== decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    return evaluate_decision(stochasticprogram, decisions(decision), scenario)
+end
 """
     evaluate_decision(stochasticmodel::StochasticModel{2},
-                      decision::AbstractVector,
+                      decision::Union{AbstractVector, DecisionVariables},
                       sampler::AbstractSampler;
                       optimizer = nothing;
                       confidence = 0.95,
@@ -215,7 +204,7 @@ Return a statistical estimate of the objective of the two-stage `stochasticmodel
 
 In other words, evaluate `decision` on a sampled model of size `N`. Generate an confidence interval using the sample variance of the evaluation.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`confidence_interval`](@ref)
 """
@@ -228,7 +217,12 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Calculate confidence interval using provided optimizer
-    CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), kw...)
+    CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), defer = true, kw...)
+        # Sanity checks on given decision vector
+        length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
+        all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+        # Initialize after checks
+        initialize!(eval_model)
         # Condidence level
         α = 1-confidence
         cᵀx = _eval_first_stage(eval_model, decision)
@@ -240,6 +234,12 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
         return ConfidenceInterval(L, U, confidence)
     end
     return CI
+end
+function evaluate_decision(stochasticmodel::StochasticModel{2},
+                           decision::DecisionVariables,
+                           sampler::AbstractSampler;
+                           kw...)
+    return evaluate_decision(stochasticmodel, decisions(decision), sampler; kw...)
 end
 """
     lower_bound(stochasticmodel::StochasticModel{2},
@@ -325,20 +325,20 @@ function upper_bound(stochasticmodel::StochasticModel{2},
 end
 """
     upper_bound(stochasticmodel::StochasticModel{2},
-                x::AbstractVector,
+                decision::Union{AbstractVector, DecisionVariables},
                 sampler::AbstractSampler;
                 confidence = 0.95,
                 T = 10,
                 Ñ = 1000)
 
-Generate a confidence interval around an upper bound of the expected value of the decision `x` in the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around an upper bound of the expected value of `decision` in the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
 
 `Ñ` is the size of each sampled model and `T` is the number of sampled models.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
 function upper_bound(stochasticmodel::StochasticModel{2},
-                     x::AbstractVector,
+                     decision::AbstractVector,
                      sampler::AbstractSampler;
                      confidence::AbstractFloat = 0.95,
                      T::Integer = 10,
@@ -357,8 +357,14 @@ function upper_bound(stochasticmodel::StochasticModel{2},
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:T
-        let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), kw...)
-            Qs[i] = evaluate_decision(eval_model)
+        let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), defer = true, kw...)
+            # Sanity checks on given decision vector
+            length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
+            all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+            # Initialize after checks
+            initialize!(eval_model)
+            # Evaluate on sampled model
+            Qs[i] = evaluate_decision(eval_model, decision)
             remove_scenarios!(eval_model)
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
@@ -369,6 +375,12 @@ function upper_bound(stochasticmodel::StochasticModel{2},
     L = Q̂ - t*σ/sqrt(T)
     U = Q̂ + t*σ/sqrt(T)
     return ConfidenceInterval(L, U, 1-α)
+end
+function upper_bound(stochasticmodel::StochasticModel{2},
+                     decision::DecisionVariables,
+                     sampler::AbstractSampler;
+                     kw...)
+    return upper_bound(stochasticmodel, decisions(decision), sampler; kw...)
 end
 """
     confidence_interval(stochasticmodel::StochasticModel{2},
@@ -410,21 +422,21 @@ function confidence_interval(stochasticmodel::StochasticModel{2},
 end
 """
     gap(stochasticmodel::StochasticModel{2},
-        x::AbstractVector,
+        decision::Union{AbstractVector, DecisionVariables},
         sampler::AbstractSampler;
         confidence = 0.9,
         N = 100,
         M = 10,
         T = 10)
 
-Generate a confidence interval around the gap between the result of using decison `x` and true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around the gap between the result of using `decision` and the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
 `N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
 function gap(stochasticmodel::StochasticModel{2},
-             x::AbstractVector,
+             decision::AbstractVector,
              sampler::AbstractSampler;
              confidence::AbstractFloat = 0.9,
              N::Integer = 100,
@@ -447,5 +459,11 @@ function gap(stochasticmodel::StochasticModel{2},
     upper_CI = upper_bound(stochasticmodel, x, sampler; confidence = 1-α, N = N, T = T, Ñ = Ñ, log = log, keep = keep, offset = offset, indent = indent, kw...)
     U = upper(upper_CI)
     return ConfidenceInterval(0., U-L, confidence)
+end
+function gap(stochasticmodel::StochasticModel{2},
+             decision::DecisionVariables,
+             sampler::AbstractSampler;
+             kw...)
+    return gap(stochasticmodel, decisions(decision), sampler; kw...)
 end
 # ========================== #

@@ -120,8 +120,6 @@ function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer
             p = stage_probability(stochasticprogram, stage)
             abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
         end
-        # Generate decision variables from previous stage
-        set_decision_variables!(scenarioproblems(stochasticprogram, stage), decision_variables(stochasticprogram, stage - 1))
         # Generate
         generate!(scenarioproblems(stochasticprogram, stage),
                   generator(stochasticprogram, decision_key),

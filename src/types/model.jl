@@ -74,6 +74,7 @@ macro stochastic_model(def)
     stage = 0
     scenariodef = Expr(:block)
     paramdefs = Vector{Expr}()
+    decisiondefs = Vector{Vector{Symbol}}()
     def = prewalk(prettify(def)) do x
         x = if @capture(x, @stage n_ arg_)
             if @capture(arg, sp_ = def_)
@@ -83,6 +84,10 @@ macro stochastic_model(def)
                 stage == n - 1 || error("Define the stages in coherent order.")
                 stage += 1
                 push!(paramdefs, :(StageParameters()))
+                push!(decisiondefs, Vector{Symbol}())
+                if n > 1
+                    pushfirst!(arg.args, :(@known $(decisiondefs[n-1]...)))
+                end
                 return :(@stage $n sp = $arg)
             end
         else
@@ -110,6 +115,15 @@ macro stochastic_model(def)
         end
         if paramdef != nothing
             paramdefs[stage] = paramdef
+        end
+        if @capture(x, @decision arg__)
+            if @capture(x, @decision model_ var_Symbol) || @capture(x, @decision model_ var_Symbol[range_]) ||
+               @capture(x, @decision model_ var_Symbol <= ub_) || @capture(x, @decision model_ var_Symbol >= lb_) ||
+               @capture(x, @decision model_ var_Symbol[range_] <= ub_) || @capture(x, @decision model_ var_Symbol[range_] >= ln_) ||
+               @capture(x, @decision model_ var_Symbol in set_) || @capture(x, @decision model_ var_Symbol[range_] in set_) ||
+               @capture(x, @decision model_ lb_ <= var_Symbol <= ub_) || @capture(x, @decision model_ lb_ <= var_Symbol[range_] <= ub_)
+                push!(decisiondefs[stage], var)
+            end
         end
         scenariodef = if @capture(x, @uncertain var_Symbol::t_Symbol = def_)
             esc(@q begin

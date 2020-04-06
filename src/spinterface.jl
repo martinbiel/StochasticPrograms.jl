@@ -29,6 +29,14 @@ function optimize_structured!(structuredmodel::AbstractStructuredModel)
     throw(MethodError(optimize_structured!, structuredmodel))
 end
 """
+    termination_status(structuredoptimizer::AbstractStructuredOptimizer)
+
+Return the reason why the solver stopped (i.e., the MathOptInterface model attribute `TerminationStatus`).
+"""
+function termination_status(structuredoptimizer::AbstractStructuredOptimizer)
+    throw(MethodError(termination_status, structuredoptimizer))
+end
+"""
     fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::AbstractStructuredModel)
 
 Fill in the optimal solution in `stochasticprogram` after a call to `optimize_structured!`. Should fill in the first stage result and second stage results for each available scenario.
@@ -49,49 +57,37 @@ end
 # Sample-based solver interface
 # ========================== #
 """
-    SampledModel(stochasticmodel::StochasticModel, sampler::AbstractSampler, solver::AbstractSampledSolver)
+    optimize_sampled!(sampledoptimizer::AbstractSampledOptimizer, stochasticmodel::StochasticModel, sampler::AbstractSampler, confidence::AbstractFloat)
 
-Return an instance of `AbstractSampledModel` based on `stochasticmodel`, `sampler` and the given `solver`.
-
-See also: [`optimize_sampled!`](@ref), [`stochastic_solution`](@ref)
+Approximately optimize the `stochasticmodel` to the given `confidence` level, using `sampler` to generate scenarios.
 """
-function SampledModel(stochasticmodel::StochasticModel, solver::AbstractSampledSolver)
-    throw(MethodError(StructuredModel, (stochasticprogram, solver)))
+function optimize_sampled!(sampledoptimizer::AbstractSampledOptimizer, stochasticmodel::StochasticModel, sampler::AbstractSampler, confidence::AbstractFloat)
+    throw(MethodError(optimize_sampled!, sampledoptimizer, stochasticmodel, sampler))
 end
 """
-    optimize_sampled!(sampledmodel::AbstractSampledmodel, sampler::AbstractSampler, confidence::AbstractFloat)
+    optimal_value(sampledoptimizer::AbstractStructuredOptimizer)
 
-Optimize the `AbstractSampledModel` to the given `confidence` level, using `sampler` to generate scenarios. This should approximately optimize the `stochasticmodel` the sampled model was instantiated from.
-
-See also: [`stochastic_solution`](@ref)
-"""
-function optimize_sampled!(sampledmodel::AbstractSampledModel, sampler::AbstractSampler, confidence::AbstractFloat)
-    throw(MethodError(optimize_sampled!, sampledmodel, sampler))
-end
-"""
-    stochastic_solution(sampledmodel::AbstractSampledmodel)
-
-Generate a `StochasticSolution` from `sampledmodel` after a call to `optimize_sampled!`. The solution should include an approximately optimal first-stage decision, an an approximate optimal value and a confidence interval around the true optimum of the original stochastic model.
+Generate a `StochasticSolution` from `sampledoptimizer` after a call to `optimize_sampled!`. The solution should include an approximately optimal first-stage decision, an an approximate optimal value and a confidence interval around the true optimum of the original stochastic model.
 
 See also: [`optimize_sampled!`](@ref), [`StochasticSolution`](@ref)
 """
-function stochastic_solution(sampledmodel::AbstractSampledModel)
-    throw(MethodError(stochastic_solution, sampledmodel))
+function optimal_value(sampledoptimizer::AbstractStructuredOptimizer)
+    throw(MethodError(optimal_value, sampledoptimizer))
 end
 """
-    internal_solver(solver::AbstractSampledSolver)
+    internal_solver(solver::AbstractSampledOptimizer)
 
 Return an `AbstractMathProgSolver`, if available, from `solver`.
 """
-function internal_solver(solver::AbstractSampledSolver)
+function internal_solver(solver::AbstractSampledOptimizer)
     throw(MethodError(optimsolver, solver))
 end
 """
-    optimizer_name(optimizer::AbstractSampledSolver)
+    optimizer_name(optimizer::AbstractSampledOptimizer)
 
-Optionally, return a string identifier of `AbstractSampledSolver`.
+Optionally, return a string identifier of `AbstractSampledOptimizer`.
 """
-function optimizer_name(::AbstractSampledSolver)
+function optimizer_name(::AbstractSampledOptimizer)
     return "SolverName() attribute not implemented by the optimizer."
 end
 # ========================== #

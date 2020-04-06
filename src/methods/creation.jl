@@ -322,8 +322,6 @@ end [defer]
 ```
 where JuMP syntax is used inside the block to define the first stage model. During definition, the first stage model is referenced through the reserved keyword `model`.
 
-Optionally, give the keyword `defer` after the  to delay generation of the first stage model.
-
 ## Examples
 
 The following defines the first stage model given by:
@@ -346,9 +344,8 @@ end
 
 See also: [`@second_stage`](@ref)
 """
-macro first_stage(arg) esc(:(@first_stage $arg generate)) end
-macro first_stage(arg, defer)
-    return esc(:(@stage 1 $arg $defer))
+macro first_stage(arg)
+    return esc(:(@stage 1 $arg))
 end
 """
     @second_stage(def)
@@ -361,8 +358,6 @@ Add a second stage model generation recipe to `stochasticprogram` using the synt
 end [defer]
 ```
 where JuMP syntax is used inside the block to define the second stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
-
-Optionally, give the keyword `defer` after the  to delay generation of the first stage model.
 
 ## Examples
 
@@ -390,9 +385,8 @@ end
 
 See also: [`@first_stage`](@ref)
 """
-macro second_stage(arg) esc(:(@second_stage $arg generate)) end
-macro second_stage(arg, defer)
-    return esc(:(@stage 2 $arg $defer))
+macro second_stage(arg)
+    return esc(:(@stage 2 $arg))
 end
 """
     @parameters(def)
@@ -435,6 +429,30 @@ In a @stage block, annotate each decision taken in the previous stage using the 
 See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
 macro decision(def) @warn "@decision should be used inside a @stage block." end
+"""
+    @known(def)
+
+In a @stage block, annotate each decision taken in the previous stage using the syntax
+```julia
+@known var1, var2, ...
+```
+
+## Examples
+
+```julia
+@known x₁, x₂
+```
+
+See also [`@decision`](@ref), [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
+"""
+macro known(args...)
+    code = Expr(:block)
+    for var in args
+        varkey = Meta.quot(var)
+        push!(code.args, :($(esc(var)) = $(esc(:model))[$varkey]))
+    end
+    return code
+end
 """
     @uncertain(def)
 
@@ -486,8 +504,6 @@ Add a stage model generation recipe to `stochasticprogram` using the syntax
 end [defer]
 ```
 where JuMP syntax is used inside the block to define the stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
-
-Optionally, give the keyword `defer` after the  to delay generation of the stage model.
 
 ## Examples
 
@@ -689,9 +705,9 @@ macro stage(stage, args)
 	            return $(esc(:model))
             end
             # Generate the decision variable names
-            $(esc(:model)) = Model()
-            $(esc(decisionnames))
-            set_decision_variables!(decision_variables($(esc(sp)), $stage), $(esc(:model)))
+            decision_model = Model()
+            decision_model.ext[:decisionvariables] = decision_variables($(esc(sp)), $stage)
+            $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)](decision_model, stage_parameters($(esc(sp)), $stage))
         end
         # Stage model generation code
         $generatordefs

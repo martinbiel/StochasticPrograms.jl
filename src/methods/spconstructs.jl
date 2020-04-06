@@ -49,7 +49,7 @@ function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::Abstract
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, optimizer = moi_optimizer(stochasticprogram))
-    JuMP.optimize!(ws_model)
+    optimize!(ws_model)
     # Return WS decision
     decision = ws_model.colVal[1:decision_length(stochasticprogram)]
     if any(isnan.(decision))
@@ -102,7 +102,7 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
                          stage_parameters(stochasticprogram, 2),
                          scenario,
                          moi_optimizer(stochasticprogram))
-                JuMP.optimize!(ws)
+                optimize!(ws)
                 probability(scenario)*objective_value(ws)
                 end for scenario in scenarios(stochasticprogram.scenarioproblems)])
 end
@@ -120,7 +120,7 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
                                      stage_two_params,
                                      scenario,
                                      optimizer)
-                            JuMP.optimize!(ws)
+                            optimize!(ws)
                             probability(scenario)*objective_value(ws)
                             end for scenario in scenarioproblems.scenarios])
                 end,
@@ -314,7 +314,7 @@ function EVP_decision(stochasticprogram::StochasticProgram{2})
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Solve EVP
     evp = EVP(stochasticprogram, optimizer = moi_optimizer(stochasticprogram))
-    JuMP.optimize!(evp)
+    optimize!(evp)
     # Return EVP decision
     decision = extract_decision_variables(evp, decision_variables(stochasticprogram, 1))
     if any(isnan.(decisions(decision)))
@@ -336,9 +336,9 @@ function EV(stochasticprogram::StochasticProgram{2})
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Solve EVP model
     evp = EVP(stochasticprogram, optimizer = moi_optimizer(stochasticprogram))
-    JuMP.optimize!(evp)
+    optimize!(evp)
     # Return optimal value
-    return getobjectivevalue(evp)
+    return objective_value(evp)
 end
 """
     EEV(stochasticprogram::TwoStageStochasticProgram)

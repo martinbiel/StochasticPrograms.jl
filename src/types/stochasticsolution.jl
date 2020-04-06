@@ -35,21 +35,25 @@ end
 
 Approximate solution to a stochastic model to a given level of confidence.
 """
-struct StochasticSolution{T <: AbstractFloat, A <: AbstractVector}
-    x::A
+struct StochasticSolution{T <: AbstractFloat}
+    x::DecisionVariables{T}
     Q::T
     N::Int
-    confidence::ConfidenceInterval{T}
+    interval::ConfidenceInterval{T}
 
-    function StochasticSolution(x::AbstractVector, Q::Real, N::Int, interval::ConfidenceInterval{T}) where T <: AbstractFloat
-        A = typeof(x)
-        return new{T, A}(x, Q, N, interval)
+    function StochasticSolution(x::DecisionVariables{T}, Q::AbstractFloat, N::Int, interval::ConfidenceInterval{T}) where T <: AbstractFloat
+        return new{T}(x, Q, N, interval)
     end
 end
 
 function EmptySolution()
-    return StochasticSolution([], 0.0, 0, ConfidenceInterval(-Inf, Inf, 1.0))
+    return StochasticSolution(DecisionVariables(Float64), 0.0, 0, ConfidenceInterval(-Inf, Inf, 1.0))
 end
+
+function no_solution(solution::StochasticSolution)
+    return ndecisions(solution.x) == 0 && length(solution.interval) == Inf
+end
+
 """
     decision(solution::StochasticSolution)
 
@@ -67,10 +71,10 @@ optimal_value(solution::StochasticSolution) = solution.Q
 
 Return a confidence interval around the optimal value of the approximate `solution` to some stochastic model
 """
-confidence_interval(solution::StochasticSolution) = solution.confidence
+confidence_interval(solution::StochasticSolution) = solution.interval
 function show(io::IO, solution::StochasticSolution)
     println(io, "Stochastic solution")
     println(io, "Optimal value: $(solution.Q)")
-    print(io, solution.confidence)
+    print(io, solution.interval)
     return io
 end
