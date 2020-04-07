@@ -17,7 +17,7 @@ function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP
         for (i,w) in enumerate(workers())
             @async Qs[i] = remotecall_fetch((sp, x)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero{T}
+                isempty(scenarioproblems.scenarios) && return zero(T)
                 update_decision_variables!(decision_variables(scenarioproblems), x)
                 return outcome_mean(scenarioproblems)
             end,

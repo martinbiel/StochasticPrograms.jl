@@ -18,7 +18,7 @@ struct DScenarioProblems{T <: AbstractFloat, S <: AbstractScenario} <: AbstractS
     scenarioproblems::Vector{ScenarioProblemChannel{T,S}}
 
     function DScenarioProblems(scenario_distribution::Vector{Int}, scenarioproblems::Vector{ScenarioProblemChannel{T,S}}) where {T <: AbstractFloat, S <: AbstractScenario}
-        return new{T,S}(JuMP.Model(), scenario_distribution, scenarioproblems)
+        return new{T,S}(scenario_distribution, scenarioproblems)
     end
 end
 function ScenarioProblems(::Type{T}, ::Type{S}, decision_variables::DecisionVariables{T}, procs::Vector{Int}) where {T <: AbstractFloat, S <: AbstractScenario}

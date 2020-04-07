@@ -345,7 +345,11 @@ end
 See also: [`@second_stage`](@ref)
 """
 macro first_stage(arg)
-    return esc(:(@stage 1 $arg))
+    @capture(arg, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
+    return esc(@q begin
+        @stage 1 $arg
+        StochasticPrograms.generate_decision_variables!($sp)
+    end)
 end
 """
     @second_stage(def)
@@ -704,10 +708,6 @@ macro stage(stage, args)
                 $(esc(decisiondefs))
 	            return $(esc(:model))
             end
-            # Generate the decision variable names
-            decision_model = Model()
-            decision_model.ext[:decisionvariables] = decision_variables($(esc(sp)), $stage)
-            $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)](decision_model, stage_parameters($(esc(sp)), $stage))
         end
         # Stage model generation code
         $generatordefs

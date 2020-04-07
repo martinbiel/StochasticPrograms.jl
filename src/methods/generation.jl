@@ -1,3 +1,24 @@
+# Decision variable generation #
+# ========================== #
+function generate_decision_variables!(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
+    1 <= stage <= N || error("Stage $s not in range 1 to $N")
+    # Generate all stages
+    for stage in 1:N-1
+        decision_key = Symbol(:stage_, stage, :_decisions)
+        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
+        generate_decision_variables!(decision_variables(stochasticprogram, stage)) do model
+            generator(stochasticprogram, decision_key)(model, stage_parameters(stochasticprogram, stage))
+        end
+    end
+    return stochasticprogram
+end
+function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) where N
+    # Generate all stages
+    for stage in 1:N-1
+        generate_decision_variables!(stochasticprogram, stage)
+    end
+    return stochasticprogram
+end
 # Stage generation #
 # ========================== #
 """
@@ -25,7 +46,7 @@ function stage_model(stochasticprogram::StochasticProgram{N},
     stage_key = Symbol(:stage_, stage)
     decision_key = Symbol(:stage_, stage - 1, :_decisions)
     has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage")
-    has_generator(stochasticprogram, decision_key) || error("Decision variables for stage problem $(stage-1) not defined in stochastic program. Consider @stage $(stage-1)")
+    has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
     return _stage_model(generator(stochasticprogram, decision_key),
                         stage_parameters(stochasticprogram, stage - 1),
                         generator(stochasticprogram, stage_key),
@@ -114,7 +135,7 @@ function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer
         stage_key = Symbol(:stage_, stage)
         decision_key = Symbol(:stage_, stage - 1, :_decisions)
         has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
-        has_generator(stochasticprogram, decision_key) || error("Decision variables for stage problem $(stage-1) not defined in stochastic program. Consider @stage $(stage-1)")
+        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
         # Sanity check on scenario probabilities
         if nscenarios(stochasticprogram, stage) > 0
             p = stage_probability(stochasticprogram, stage)

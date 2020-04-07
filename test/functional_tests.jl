@@ -38,10 +38,12 @@
     end
     @testset "Sampling" begin
         sampled_sp = sample(simple_model, sampler, 100, optimizer = GLPK.Optimizer)
+        generate!(sampled_sp)
         @test nscenarios(sampled_sp) == 100
         @test nsubproblems(sampled_sp) == 100
         @test isapprox(stage_probability(sampled_sp), 1.0)
         sample!(sampled_sp, sampler, 100)
+        generate!(sampled_sp)
         @test nscenarios(sampled_sp) == 200
         @test nsubproblems(sampled_sp) == 200
         @test isapprox(stage_probability(sampled_sp), 1.0)

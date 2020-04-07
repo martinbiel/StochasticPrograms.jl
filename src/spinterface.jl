@@ -1,32 +1,14 @@
-  # Structured solver interface
+# Structured optimizer interface
 # ========================== #
 """
-    StructuredModel(stochasticprogram::StochasticProgram, solver::AbstractStructuredSolver)
+    optimize_structured!(structuredoptimizer::AbstractStructuredOptimizer)
 
-Return an instance of `AbstractStructuredModel` based on `stochasticprogram` and the given `solver`.
-
-See also: [`optimize_structured!`](@ref), [`fill_solution!`](@ref)
-"""
-function StructuredModel(stochasticprogram::StochasticProgram, solver::AbstractStructuredSolver)
-    throw(MethodError(StructuredModel, (stochasticprogram, solver)))
-end
-"""
-    internal_solver(solver::AbstractStructuredSolver)
-
-Return an `AbstractMathProgSolver`, if available, from `solver`.
-"""
-function internal_solver(solver::AbstractStructuredSolver)
-    throw(MethodError(optimsolver, solver))
-end
-"""
-    optimize_structured!(structuredmodel::AbstractStructuredModel)
-
-Optimize the `AbstractStructuredModel`, which also optimizes the `stochasticprogram` it was instantiated from.
+Optimize the `AbstractStructuredOptimizer`, which also optimizes the `stochasticprogram` it was instantiated from.
 
 See also: [`fill_solution!`](@ref)
 """
-function optimize_structured!(structuredmodel::AbstractStructuredModel)
-    throw(MethodError(optimize_structured!, structuredmodel))
+function optimize_structured!(structuredoptimizer::AbstractStructuredOptimizer)
+    throw(MethodError(optimize_structured!, structuredoptimizer))
 end
 """
     termination_status(structuredoptimizer::AbstractStructuredOptimizer)
@@ -37,14 +19,14 @@ function termination_status(structuredoptimizer::AbstractStructuredOptimizer)
     throw(MethodError(termination_status, structuredoptimizer))
 end
 """
-    fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::AbstractStructuredModel)
+    fill_solution!(stochasticprogram::StochasticProgram, structuredoptimizer::AbstractStructuredOptimizer)
 
 Fill in the optimal solution in `stochasticprogram` after a call to `optimize_structured!`. Should fill in the first stage result and second stage results for each available scenario.
 
 See also: [`optimize_structured!`](@ref)
 """
-function fill_solution!(stochasticprogram::StochasticProgram, structuredmodel::AbstractStructuredModel)
-    throw(MethodError(fill_solution!, stochasticprogram, structuredmodel))
+function fill_solution!(stochasticprogram::StochasticProgram, structuredoptimizer::AbstractStructuredOptimizer)
+    throw(MethodError(fill_solution!, stochasticprogram, structuredoptimizer))
 end
 """
     optimizer_name(optimizer::AbstractStructuredOptimizer)

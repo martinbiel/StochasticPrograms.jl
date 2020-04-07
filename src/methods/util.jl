@@ -132,9 +132,11 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     return dest
 end
 
-function Base.copy(src::TwoStageStochasticProgram{T}; procs = workers()) where T <: AbstractFloat
-    dest = StochasticProgram(stage_parameters(src, 1), stage_parameters(src, 2), T, scenariotype(src), procs, moi_optimizer(src))
+function Base.copy(src::TwoStageStochasticProgram{T}; procs = workers(), optimizer = nothing) where T <: AbstractFloat
+    opt = optimizer == nothing ? moi_optimizer(src) : optimizer
+    dest = StochasticProgram(stage_parameters(src, 1), stage_parameters(src, 2), T, scenariotype(src), procs, opt)
     merge!(dest.generator, src.generator)
+    generate_decision_variables!(dest)
     return dest
 end
 
