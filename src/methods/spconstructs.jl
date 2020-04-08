@@ -104,7 +104,7 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
                          moi_optimizer(stochasticprogram))
                 optimize!(ws)
                 probability(scenario)*objective_value(ws)
-                end for scenario in scenarios(stochasticprogram.scenarioproblems)])
+                end for scenario in scenarios(stochasticprogram)])
 end
 function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: DScenarioProblems}
     partial_ews = Vector{Float64}(undef, nworkers())
@@ -112,7 +112,7 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
         for (i,w) in enumerate(workers())
             @async partial_ews[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,optimizer)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero(T)
+                nscenarios(scenarioproblems) == 0 && return zero(T)
                 return sum([begin
                             ws = _WS(stage_one_generator,
                                      stage_two_generator,
@@ -122,10 +122,10 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
                                      optimizer)
                             optimize!(ws)
                             probability(scenario)*objective_value(ws)
-                            end for scenario in scenarioproblems.scenarios])
+                            end for scenario in scenarios(scenarioproblems)])
                 end,
                 w,
-                stochasticprogram.scenarioproblems[w-1],
+                scenarioproblems(stochasticprogram)[w-1],
                 stochasticprogram.generator[:stage_1],
                 stochasticprogram.generator[:stage_2],
                 stage_parameters(stochasticprogram, 1),
@@ -135,28 +135,28 @@ function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: 
     end
     return sum(partial_ews)
 end
-function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}) where {S, SP <: ScenarioProblems}
+function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: ScenarioProblems}
     ws_models = [WS(stochasticprogram, scenario, moi_optimizer(stochasticprogram)) for senario in scenarios(stochasticprogram)]
     𝔼WS, σ² = welford(ws_models)
     return 𝔼WS, sqrt(σ²)
 end
-function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{S,SP}) where {S, SP <: DScenarioProblems}
+function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: DScenarioProblems}
     partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
             @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,optimizer)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero(eltype(x)), zero(eltype(x))
+                nscenarios(scenarioproblems) == 0 && return zero(T), zero(T)
                 ws_models = [_WS(stage_one_generator,
                                  stage_two_generator,
                                  stage_one_params,
                                  stage_two_params,
                                  scenario,
-                                 optimizer) for scenario in scenarioproblems.scenarios]
-                return (welford(ws_models)..., length(scenarioproblems.scenarios))
+                                 optimizer) for scenario in scenarios(scenarioproblems)]
+                return (welford(ws_models)..., nscenarios(scenarioproblems))
             end,
             w,
-            stochasticprogram.scenarioproblems[w-1],
+            scenarioproblems(stochasticprogram)[w-1],
             stochasticprogram.generator[:stage_1_vars],
             stochasticprogram.generator[:stage_2],
             stage_parameters(stochasticprogram, 1),

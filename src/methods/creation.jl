@@ -569,7 +569,6 @@ macro stage(stage, args)
     # so we first need to extract and save any such lines
     vardefs = Expr(:block)
     decisiondefs = Expr(:block)
-    decisionnames = Expr(:block)
     for line in block(def).args
         if  @capture(line, @variable(m_Symbol, variabledef__)) ||
             @capture(line, @decision(m_Symbol, decisiondef__)) ||
@@ -582,7 +581,6 @@ macro stage(stage, args)
         else
             # Everything else could be required for decision variable construction, and is therefore saved
             push!(decisiondefs.args, line)
-            push!(decisionnames.args, line)
         end
     end
     # Next, handle @decision annotations
@@ -595,7 +593,6 @@ macro stage(stage, args)
             variabledef = @q begin
                 @variable $((args)...)
             end
-            push!(decisionnames.args, variabledef)
             return variabledef
         end
         return x
@@ -613,7 +610,6 @@ macro stage(stage, args)
             end
             # Extracted parameters might be required for decision variable construction
             pushfirst!(decisiondefs.args, code)
-            pushfirst!(decisionnames.args, code)
             return code
         elseif @capture(x, @parameters args__)
             code = Expr(:block)
@@ -622,7 +618,6 @@ macro stage(stage, args)
             end
             # Extracted paremeters might be required for decision variable construction
             pushfirst!(decisiondefs.args, code)
-            pushfirst!(decisionnames.args, code)
             return code
          elseif @capture(x, @uncertain var_Symbol::t_Symbol)
             stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
@@ -703,11 +698,9 @@ macro stage(stage, args)
     # Create definition code
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        if $stage < nstages($(esc(sp)))
-            $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-                $(esc(decisiondefs))
-	            return $(esc(:model))
-            end
+        $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+            $(esc(decisiondefs))
+	        return $(esc(:model))
         end
         # Stage model generation code
         $generatordefs

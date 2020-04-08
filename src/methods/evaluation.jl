@@ -17,12 +17,12 @@ function _eval_second_stages(stochasticprogram::TwoStageStochasticProgram{T,S,SP
         for (i,w) in enumerate(workers())
             @async Qs[i] = remotecall_fetch((sp, x)->begin
                 scenarioproblems = fetch(sp)
-                isempty(scenarioproblems.scenarios) && return zero(T)
+                nscenarios(scenarioproblems) && return zero(T)
                 update_decision_variables!(decision_variables(scenarioproblems), x)
                 return outcome_mean(scenarioproblems)
             end,
             w,
-            stochasticprogram.scenarioproblems[w-1],
+            scenarioproblems(stochasticprogram)[w-1],
             x)
         end
     end
@@ -47,7 +47,7 @@ function _stat_eval_second_stages(stochasticprogram::TwoStageStochasticProgram{S
                 return (welford(scenarioproblems.problems)..., length(scenarioproblems.scenarios))
             end,
             w,
-            stochasticprogram.scenarioproblems[w-1],
+            scenarios(stochasticprogram)[w-1],
             x)
         end
     end
@@ -143,7 +143,7 @@ Evaluate the first-stage `decision` in `stochasticprogram`.
 
 In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::AbstractVector)
+function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Ensure stochastic program has been generated at this point
@@ -158,7 +158,8 @@ function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::Ab
     𝔼Q = _eval_second_stages(stochasticprogram, decision)
     return return cᵀx+𝔼Q
 end
-function evaluate_decision(stochasticprogram::StochasticProgram{2}, decision::DecisionVariables)
+function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::DecisionVariables)
+    # Sanity checks on given decision vector
     decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
     return evaluate_decision(stochasticprogram, decisions(decision))
 end
@@ -170,7 +171,7 @@ end
 
 Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 """
-function evaluate_decision(stochasticprogram::StochasticProgram{2},
+function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
                            decision::AbstractVector,
                            scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
@@ -181,15 +182,23 @@ function evaluate_decision(stochasticprogram::StochasticProgram{2},
     # Generate and solve outcome model
     outcome = outcome_model(stochasticprogram, decision, scenario, moi_optimizer(stochasticprogram))
     optimize!(outcome)
-    if status == :Optimal
-        return _eval_first_stage(stochasticprogram, decision) + objective_value(outcome)
+    status = termination_status(outcome)
+    if status != MOI.OPTIMAL
+        if status == MOI.INFEASIBLE
+            return objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+        elseif status == MOI.DUAL_INFEASIBLE
+            return objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+        else
+            error("Outcome model could not be solved, returned status: $status")
+        end
+    else
+        return objective_value(outcome)
     end
-    error("Outcome model could not be solved, returned status: $status")
 end
-function evaluate_decision(stochasticprogram::StochasticProgram{2},
+function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
                            decision::DecisionVariables,
                            scenario::AbstractScenario)
-    decision_names(decision_variables(stochasticprogram)) .== decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
     return evaluate_decision(stochasticprogram, decisions(decision), scenario)
 end
 """

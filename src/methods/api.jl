@@ -208,7 +208,7 @@ optimize!(sp)
 
 See also: [`VRP`](@ref)
 """
-function JuMP.optimize!(stochasticprogram::StochasticProgram{2}; kwargs...)
+function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Ensure stochastic program has been initialized at this point
@@ -218,14 +218,14 @@ function JuMP.optimize!(stochasticprogram::StochasticProgram{2}; kwargs...)
     # Switch on solver type
     return _optimize!(stochasticprogram, provided_optimizer(stochasticprogram); kwargs...)
 end
-function _optimize!(stochasticprogram::StochasticProgram{2}, ::OptimizerProvided; kwargs...)
+function _optimize!(stochasticprogram::TwoStageStochasticProgram, ::OptimizerProvided; kwargs...)
     # MOI optimizer. Fallback to solving DEP, relying on JuMP.
     dep = DEP(stochasticprogram)
     optimize!(dep)
     status = termination_status(dep)
     return status
 end
-function _optimize!(stochasticprogram::StochasticProgram{2}, ::StructuredOptimizerProvided; kwargs...)
+function _optimize!(stochasticprogram::TwoStageStochasticProgram, ::StructuredOptimizerProvided; kwargs...)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
@@ -258,15 +258,100 @@ end
 
 Return the optimal first stage decision of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
-function optimal_decision(stochasticprogram::StochasticProgram)
+function optimal_decision(stochasticprogram::TwoStageStochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Dispatch on provided optimizer
     return _optimal_decision(stochasticprogram, provided_optimizer(stochasticprogram))
 end
-function _optimal_decision(stochasticprogram::StochasticProgram, ::OptimizerProvided)
+function _optimal_decision(stochasticprogram::TwoStageStochasticProgram, ::OptimizerProvided)
     dep = DEP(stochasticprogram)
+    status = termination_status(dep)
+    if status != MOI.OPTIMAL
+        if status == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        elseif status == MOI.INFEASIBLE
+            @warn "Stochastic program is infeasible"
+        elseif status == MOI.DUAL_INFEASIBLE
+            @warn "Stochastic program is unbounded"
+        else
+            error("Stochastic program could not be solved, returned status: $status")
+        end
+    end
     decision = extract_decision_variables(dep, decision_variables(stochasticprogram, 1))
+    return decision
+end
+"""
+    optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
+
+Return the optimal recourse decision of `stochasticprogram` corresponding to the `i`th scenario, after a call to `optimize!(stochasticprogram)`.
+"""
+function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    # Dispatch on provided optimizer
+    return _optimal_recourse_decision(stochasticprogram, i, provided_optimizer(stochasticprogram))
+end
+function _optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer, ::OptimizerProvided)
+    dep = DEP(stochasticprogram)
+    status = termination_status(dep)
+    if status != MOI.OPTIMAL
+        if status == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        elseif status == MOI.INFEASIBLE
+            @warn "Stochastic program is infeasible"
+        elseif status == MOI.DUAL_INFEASIBLE
+            @warn "Stochastic program is unbounded"
+        else
+            error("Stochastic program model could not be solved, returned status: $status")
+        end
+    end
+    temp = copy(decision_variables(stochasticprogram, 2))
+    for (i,dvar) in enumerate(decision_names(temp))
+        temp.names[i] = add_subscript(dvar, i)
+    end
+    decision = extract_decision_variables(dep, temp)
+    decision.names .= decision_names(decision_variables(stochasticprogram, 2))
+    return decision
+end
+"""
+    optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
+                              decision::Union{AbstractVector, DecisionVariables},
+                              scenario::AbstractScenario)
+
+Return the optimal recourse decision of `stochasticprogram` corresponding to the given `scenario`, after taking the given `decision`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+"""
+function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
+                                   decision::DecisionVariables,
+                                   scenario::AbstractScenario)
+    # Sanity checks on given decision vector
+    decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    return optimal_recourse_decision(stochasticprogram, decisions(decision), scenario)
+end
+function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
+                                   decision::AbstractVector,
+                                   scenario::AbstractScenario)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    # Sanity checks on given decision vector
+    length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
+    all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Generate and solve outcome model
+    outcome = outcome_model(stochasticprogram, decision, scenario; optimizer = moi_optimizer(stochasticprogram))
+    optimize!(outcome)
+    status = termination_status(outcome)
+    if status != MOI.OPTIMAL
+        if status == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        elseif status == MOI.INFEASIBLE
+            @warn "Outcome is infeasible"
+        elseif status == MOI.DUAL_INFEASIBLE
+            @warn "Outcome is unbounded"
+        else
+            error("Outcome model could not be solved, returned status: $status")
+        end
+    end
+    decision = extract_decision_variables(outcome, decision_variables(stochasticprogram, 2))
     return decision
 end
 """
@@ -281,6 +366,18 @@ function optimal_value(stochasticprogram::StochasticProgram)
 end
 function _optimal_value(stochasticprogram::StochasticProgram, ::OptimizerProvided)
     dep = DEP(stochasticprogram)
+    status = termination_status(dep)
+    if status == MOI.OPTIMIZE_NOT_CALLED
+        throw(OptimizeNotCalled())
+    elseif status == MOI.INFEASIBLE
+        @warn "Stochastic program is infeasible"
+        return objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+    elseif status == MOI.DUAL_INFEASIBLE
+        @warn "Stochastic program is unbounded"
+        return objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+    else
+        error("Stochastic program could not be solved, returned status: $status")
+    end
     return objective_value(dep)
 end
 """
@@ -354,60 +451,56 @@ function stage_parameters(stochasticprogram::StochasticProgram{N}, s::Integer) w
     return stochasticprogram.stages[s].parameters
 end
 """
-    decision_variables(stochasticprogram::StochasticProgram, s::Integer)
+    decision_variables(stochasticprogram::StochasticProgram)
 
-Return the decision variables of stage `s` in `stochasticprogram`.
+Return the decision variables of stage `s` in `stochasticprogram`. Defaults to the second stage.
 """
 function decision_variables(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    s == N && error("The final stage does not have decision variables")
     1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
     return stochasticprogram.decision_variables[s]
 end
 """
     decision_variables(stochasticprogram::TwoStageStochasticProgram)
 
-Return the decision variables of `stochasticprogram`.
+Return the first-stage decision variables of the two-stage `stochasticprogram`.
 """
-function decision_variables(stochasticprogram::StochasticProgram{2}, s::Integer = 1) where N
-    s == 2 && error("The second stage does not have decision variables")
-    s == 1 || error("Stage $s not available in two-stage model.")
-    return stochasticprogram.decision_variables[s]
+function decision_variables(stochasticprogram::TwoStageStochasticProgram)
+    return decision_variables(stochasticprogram, 1)
+end
+"""
+    recourse_variables(stochasticprogram::TwoStageStochasticProgram)
+
+Return the second-stage recourse variables of the two-stage `stochasticprogram`.
+"""
+function recourse_variables(stochasticprogram::TwoStageStochasticProgram)
+    return decision_variables(stochasticprogram, 2)
 end
 """
     scenarioproblems(stochasticprogram::StochasticProgram, s::Integer)
 
-Return the scenario problems at stage `s` in `stochasticprogram`.
+Return the scenario problems at stage `s` in `stochasticprogram`. Defaults to the second stage.
 """
-function scenarioproblems(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+function scenarioproblems(stochasticprogram::StochasticProgram{N}, s::Integer = 2) where N
+    s == 1 && error("Stage 1 does not have scenario problems.")
+    N == 2 && (s == 2 || error("Stage $s not available in two-stage model."))
     1 < s <= N || error("Stage $s not in range 2 to $N.")
     return stochasticprogram.scenarioproblems[s-1]
 end
 """
-    scenarioproblems(stochasticprogram::TwoStageStochasticProgram)
-
-Return the scenario problems in `stochasticprogram`.
-"""
-function scenarioproblems(stochasticprogram::StochasticProgram{2}, s::Integer = 2)
-    s == 1 && error("Stage 1 does not have scenario problems.")
-    s == 2 || error("Stage $s not available in two-stage model.")
-    return stochasticprogram.scenarioproblems
-end
-"""
-    decision_length(stochasticprogram::StochasticProgram, s::Integer)
+    decision_length(stochasticprogram::StochasticProgram, s::Integer = 2)
 
 Return the length of the decision at stage `s` in the `stochasticprogram`.
 """
 function decision_length(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 2 to $N.")
-    s == N && return 0
     return ndecisions(decision_variables(stochasticprogram, s))
 end
 """
     decision_length(stochasticprogram::TwoStageStochasticProgram)
 
-Return the number of first-stage decisions in the `stochasticprogram`.
+Return the length of the first-stage decision of `stochasticprogram`.
 """
-function decision_length(stochasticprogram::StochasticProgram{2}) where N
+function decision_length(stochasticprogram::TwoStageStochasticProgram)
     return decision_length(stochasticprogram, 1)
 end
 """
@@ -429,16 +522,6 @@ function first_stage_dims(stochasticprogram::StochasticProgram)
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0, 0
     first_stage = get_stage_one(stochasticprogram)
     return num_constraints(first_stage), num_variables(first_stage)
-end
-"""
-    recourse_length(stochasticprogram::TwoStageStochasticProgram)
-
-Return the length of the second-stage decision in the two-stage `stochasticprogram`.
-"""
-function recourse_length(stochasticprogram::StochasticProgram{2})
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
-    nsubproblems(stochasticprogram) == 0 && return 0
-    return recourse_length(scenarioproblems(stochasticprogram))
 end
 """
     scenario(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
@@ -528,16 +611,6 @@ Return the number of subproblems in the `stochasticprogram` at stage `s`. Defaul
 function nsubproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
     s == 1 && return 0
     return nsubproblems(scenarioproblems(stochasticprogram, s))
-end
-"""
-    masterterms(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-
-Return the first stage terms appearing in scenario `i` in the `stochasticprogram` at stage `s`. Defaults to the second stage.
-
-The master terms are given in sparse format as an array of tuples `(row,col,coeff)` which specify the occurance of master problem variables in the second stage constraints.
-"""
-function masterterms(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return masterterms(scenarioproblems(stochasticprogram, s), i)
 end
 """
     nscenarios(stochasticprogram::StochasticProgram, s::Integer = 2)

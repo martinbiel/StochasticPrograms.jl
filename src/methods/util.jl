@@ -106,8 +106,8 @@ function remove_stages!(stochasticprogram::StochasticProgram{N}, s::Integer) whe
     end
 end
 
-function remove_scenarios!(stochasticprogram::StochasticProgram)
-    remove_scenarios!(stochasticprogram.scenarioproblems)
+function remove_scenarios!(stochasticprogram::StochasticProgram, s::Integer = 2)
+    remove_scenarios!(scenarioproblems(stochasticprogram, s))
     return nothing
 end
 
@@ -116,13 +116,8 @@ function remove_decision_variables!(stochasticprogram::StochasticProgram, s::Int
     return nothing
 end
 
-function remove_subproblems!(stochasticprogram::StochasticProgram, s::Integer)
+function remove_subproblems!(stochasticprogram::StochasticProgram, s::Integer = 2)
     remove_subproblems!(scenarioproblems(stochasticprogram, s))
-    return nothing
-end
-
-function remove_subproblems!(stochasticprogram::StochasticProgram{2}, s::Integer = 2)
-    remove_subproblems!(stochasticprogram.scenarioproblems)
     return nothing
 end
 

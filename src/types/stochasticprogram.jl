@@ -1,8 +1,8 @@
 
-struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: Union{AbstractScenarioProblems, NTuple{M, AbstractScenarioProblems}}}
+struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: NTuple{M, AbstractScenarioProblems}}
     stages::S
     scenarioproblems::SP
-    decision_variables::NTuple{M, DecisionVariables{T}}
+    decision_variables::NTuple{N, DecisionVariables{T}}
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
     optimizer::StochasticProgramOptimizer
@@ -14,8 +14,8 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                procs::Vector{Int},
                                optimizer_constructor) where {T <: AbstractFloat, S <: AbstractScenario}
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
-        decision_variables = (DecisionVariables(T),)
-        scenarioproblems = ScenarioProblems(T, S, decision_variables[1], procs)
+        decision_variables = (DecisionVariables(T), DecisionVariables(T))
+        scenarioproblems = (ScenarioProblems(T, S, decision_variables[1], procs),)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, typeof(stages), SP}(stages,
                                                 scenarioproblems,
@@ -33,8 +33,8 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                optimizer_constructor) where T <: AbstractFloat
         stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
         S = typeof(stages)
-        decision_variables = (DecisionVariables(T),)
-        scenarioproblems = ScenarioProblems(T, scenarios, decision_variables[1], procs)
+        decision_variables = (DecisionVariables(T), DecisionVariables(T))
+        scenarioproblems = (ScenarioProblems(T, scenarios, decision_variables[1], procs),)
         SP = typeof(scenarioproblems)
         return new{2, 1, T, S, SP}(stages,
                                    scenarioproblems,
@@ -54,7 +54,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
             Stage(i, stage_params[i])
         end
         S = typeof(stages)
-        decision_variables = ntuple(Val(M)) do i
+        decision_variables = ntuple(Val(N)) do i
             DecisionVariables(T)
         end
         scenarioproblems = ntuple(Val(M)) do i
@@ -80,7 +80,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
             Stage(i, stage_params[i])
         end
         S = typeof(stages)
-        decision_variables = ntuple(Val(M)) do i
+        decision_variables = ntuple(Val(N)) do i
             DecisionVariables(T)
         end
         scenarioproblems = ntuple(Val(M)) do i
@@ -95,7 +95,7 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                    StochasticProgramOptimizer(optimizer_constructor))
     end
 end
-TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProblems} = StochasticProgram{2, 1, T, S, SP}
+TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProblems} = StochasticProgram{2, 1, T, S, Tuple{SP}}
 
 # Constructors #
 # ========================== #
@@ -221,21 +221,13 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
                 end
             elseif s == 2 && N == 2
                 stype = typename(scenariotype(stochasticprogram))
-                return " * $(n) scenario$(plural(n)) of type $stype"
+                return " * $(xdim) recourse variable$(plural(xdim))\n * $(n) scenario$(plural(n)) of type $stype"
             else
                 stype = typename(scenariotype(stochasticprogram, s))
                 if distributed(stochasticprogram, s)
-                    if s == N
-                        return " * Distributed stage $s:\n   * $(n) scenario$(plural(n)) of type $stype"
-                    else
-                        return " * Distributed stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
-                    end
+                    return " * Distributed stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
                 else
-                    if s == N
-                        return " * Stage $s:\n   * $(n) scenario$(plural(n)) of type $stype"
-                    else
-                        return " * Stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
-                    end
+                    return " * Stage $s:\n   * $(xdim) decision variable$(plural(xdim))\n   * $(n) scenario$(plural(n)) of type $stype"
                 end
             end
         else

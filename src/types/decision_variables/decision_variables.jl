@@ -48,12 +48,6 @@ function set_decision_variables!(decision_variables::DecisionVariables{T}, origi
     return nothing
 end
 
-function generate_decision_variables!(decisiondef::Function, decision_variables::DecisionVariables)
-    m = Model()
-    m.ext[:decisionvariables] = decision_variables
-    decisiondef(m)
-end
-
 function get_decision_variables(model::JuMP.Model)
     !haskey(model.ext, :decisionvariables) && error("No decision variables in model")
     return model.ext[:decisionvariables]

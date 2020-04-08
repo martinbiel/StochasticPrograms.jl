@@ -7,9 +7,11 @@ simple_model = @stochastic_model begin
     end
     @stage 2 begin
         @uncertain q₁ q₂ d₁ d₂
-        @variable(model, 0 <= y₁ <= d₁)
-        @variable(model, 0 <= y₂ <= d₂)
+        @decision(model, y₁ >= 0)
+        @decision(model, y₂ >= 0)
         @objective(model, Min, q₁*y₁ + q₂*y₂)
+        @constraint(model, y₁ <= d₁)
+        @constraint(model, y₂ <= d₂)
         @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
         @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
     end

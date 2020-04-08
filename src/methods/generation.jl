@@ -1,21 +1,14 @@
 # Decision variable generation #
 # ========================== #
-function generate_decision_variables!(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
-    1 <= stage <= N || error("Stage $s not in range 1 to $N")
-    # Generate all stages
-    for stage in 1:N-1
-        decision_key = Symbol(:stage_, stage, :_decisions)
-        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
-        generate_decision_variables!(decision_variables(stochasticprogram, stage)) do model
-            generator(stochasticprogram, decision_key)(model, stage_parameters(stochasticprogram, stage))
-        end
-    end
-    return stochasticprogram
-end
 function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) where N
+    # Auxiliary JuMP model to hold all decisions
+    aux_model = Model()
     # Generate all stages
-    for stage in 1:N-1
-        generate_decision_variables!(stochasticprogram, stage)
+    for stage in 1:N
+        decision_key = Symbol(:stage_, stage, :_decisions)
+        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage $stage.")
+        aux_model.ext[:decisionvariables] = decision_variables(stochasticprogram, stage)
+        generator(stochasticprogram, decision_key)(aux_model, stage_parameters(stochasticprogram, stage))
     end
     return stochasticprogram
 end
@@ -167,7 +160,7 @@ function generate!(stochasticprogram::StochasticProgram{N}) where N
 end
 # Deterministic equivalent generation #
 # ========================== #
-function generate_deterministic_equivalent(stochasticprogram::StochasticProgram{2})
+function generate_deterministic_equivalent(stochasticprogram::TwoStageStochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticprogram))
     # Check that the required generators have been defined
@@ -178,7 +171,7 @@ function generate_deterministic_equivalent(stochasticprogram::StochasticProgram{
     _generate_deterministic_equivalent!(stochasticprogram, dep_model)
     return dep_model
 end
-function _generate_deterministic_equivalent!(stochasticprogram::StochasticProgram{2}, dep_model::JuMP.Model)
+function _generate_deterministic_equivalent!(stochasticprogram::TwoStageStochasticProgram, dep_model::JuMP.Model)
     # Define first-stage problem
     generator(stochasticprogram, :stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
     dep_obj = objective_function(dep_model)
@@ -236,13 +229,21 @@ function _outcome_model!(outcome_model::JuMP.Model,
 end
 """
     outcome_model(stochasticprogram::TwoStageStochasticProgram,
-                  decision::AbstractVector,
+                  decision::Union{AbstractVector, DecisionVariables},
                   scenario::AbstractScenario;
                   optimizer = nothing)
 
-Return the resulting second stage model if `decision` is the first-stage decision in scenario `i`, in `stochasticprogram`. Optionally, supply a capable `optimizer` to the outcome model.
+Return the resulting second stage model if `decision` is the first-stage decision in the provided `scenario`, in `stochasticprogram`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. Optionally, supply a capable `optimizer` to the outcome model.
 """
-function outcome_model(stochasticprogram::StochasticProgram{2},
+function outcome_model(stochasticprogram::TwoStageStochasticProgram,
+                       decision::DecisionVariables,
+                       scenario::AbstractScenario;
+                       optimizer = nothing)
+    # Sanity checks on given decision vector
+    decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
+    return outcome_model(stochasticprogram, decisions(decision), scenario; optimizer = optimizer)
+end
+function outcome_model(stochasticprogram::TwoStageStochasticProgram,
                        decision::AbstractVector,
                        scenario::AbstractScenario;
                        optimizer = nothing)

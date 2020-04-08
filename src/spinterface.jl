@@ -19,16 +19,6 @@ function termination_status(structuredoptimizer::AbstractStructuredOptimizer)
     throw(MethodError(termination_status, structuredoptimizer))
 end
 """
-    fill_solution!(stochasticprogram::StochasticProgram, structuredoptimizer::AbstractStructuredOptimizer)
-
-Fill in the optimal solution in `stochasticprogram` after a call to `optimize_structured!`. Should fill in the first stage result and second stage results for each available scenario.
-
-See also: [`optimize_structured!`](@ref)
-"""
-function fill_solution!(stochasticprogram::StochasticProgram, structuredoptimizer::AbstractStructuredOptimizer)
-    throw(MethodError(fill_solution!, stochasticprogram, structuredoptimizer))
-end
-"""
     optimizer_name(optimizer::AbstractStructuredOptimizer)
 
 Optionally, return a string identifier of `AbstractStructuredOptimizer`.
