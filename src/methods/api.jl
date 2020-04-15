@@ -1,7 +1,7 @@
 # API (Two-stage) #
 # ========================== #
 """
-    instantiate(stochasticmodel::StochasticModel{2},
+    instantiate(stochasticmodel::TwoStageStochasticProgram,
                 scenarios::Vector{<:AbstractScenario};
                 optimizer = nothing;
                 procs::Vector{Int} = workers(),
@@ -11,7 +11,7 @@
 
 Instantiate a new two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel`, and the given collection of `scenarios`.
 """
-function instantiate(sm::StochasticModel{2},
+function instantiate(sm::TwoStageStochasticProgram,
                      scenarios::Vector{<:AbstractScenario};
                      optimizer = nothing,
                      procs::Vector{Int} = workers(),
@@ -35,7 +35,7 @@ function instantiate(sm::StochasticModel{2},
     return sp
 end
 """
-    instantiate(stochasticmodel::StochasticModel{2};
+    instantiate(stochasticmodel::TwoStageStochasticProgram;
                 optimizer = nothing,
                 scenariotype::Type{S} = Scenario,
                 procs::Vector{Int} = workers(),
@@ -45,7 +45,7 @@ end
 
 Instantiate a deferred two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel` over the scenario type `S`.
 """
-function instantiate(sm::StochasticModel{2};
+function instantiate(sm::TwoStageStochasticProgram;
                      optimizer = nothing,
                      scenariotype::Type{S} = Scenario,
                      procs::Vector{Int} = workers(),
@@ -121,7 +121,7 @@ Optionally, a capable `optimizer` can be supplied to `sample`. Otherwise, any pr
 
 See also: [`sample!`](@ref)
 """
-function sample(sm::StochasticModel{2},
+function sample(sm::TwoStageStochasticProgram,
                 sampler::AbstractSampler{S},
                 n::Integer;
                 optimizer = nothing,
@@ -151,7 +151,7 @@ function sample(sm::StochasticModel{2},
     # Return the sample instance
     return sp
 end
-function sample(sm::StochasticModel{2},
+function sample(sm::TwoStageStochasticProgram,
                 sampler::AbstractSampler{S},
                 solution::StochasticSolution;
                 optimizer = nothing,
@@ -230,16 +230,9 @@ function _optimize!(stochasticprogram::TwoStageStochasticProgram, ::StructuredOp
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
-    # # Use structured optimizer
-    # structuredmodel = StructuredModel(stochasticprogram, optimizer)
-    # stochasticprogram.spsolver.internal_model = structuredmodel
-    # status = optimize_structured!(structuredmodel)
-    # if status ∈ [:Optimal, :Infeasible, :Unbounded]
-    #     fill_solution!(stochasticprogram, structuredmodel)
-    # end
-    # # Now safe to generate the objective value of the stochastic program
-    # calculate_objective_value!(stochasticprogram)
-    return status
+    # Structure-exploiting optimizer.
+    optimize_structured!(optimizer(stochasticprogram))
+    return termination_status(optimizer(stochasticprogram))
 end
 function JuMP.termination_status(stochasticprogram::StochasticProgram)
     return _termination_status(stochasticprogram, provided_optimizer(stochasticprogram))
@@ -778,8 +771,11 @@ end
 
 Set the optimizer of the `stochasticprogram`.
 """
-function set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
+function set_optimizer!(stochasticprogram::StochasticProgram, optimizer; defer::Bool = false)
     stochasticprogram.optimizer.optimizer_constructor = optimizer
+    if !defer
+        initialize!(stochasticprogram)
+    end
     nothing
 end
 """

@@ -23,12 +23,12 @@ function initialize!(stochasticprogram::StochasticProgram, ::OptimizerProvided)
     if haskey(cache, :dep)
         # Deterministic equivalent already generated
         stochasticprogram.optimizer.optimizer = backend(cache[:dep])
-        return
+        return nothing
     end
     # Generate and cache deterministic equivalent
     cache[:dep] = generate_deterministic_equivalent(stochasticprogram)
     stochasticprogram.optimizer.optimizer = backend(cache[:dep])
-    return
+    return nothing
 end
 
 function initialize!(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided)
@@ -38,6 +38,9 @@ function initialize!(stochasticprogram::StochasticProgram, ::StructuredOptimizer
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
+    # Initialize optimizer
+    stochasticprogram.optimizer.optimizer = MOI.instantiate(optimizer_constructor(stochasticprogram))
+    return nothing
 end
 
 _check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))
