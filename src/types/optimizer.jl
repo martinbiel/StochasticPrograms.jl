@@ -19,47 +19,6 @@ Abstract supertype for sample-based optimizers.
 """
 abstract type AbstractSampledOptimizer end
 
-# Provided optimizer helper types and functions for dispatch #
-# ========================== #
-abstract type AbstractProvidedOptimizer end
-
-function _check_provided_optimizer(::AbstractProvidedOptimizer) end
-
-struct UnrecognizedOptimizerProvided <: AbstractProvidedOptimizer end
-struct NoOptimizerProvided <: AbstractProvidedOptimizer end
-struct OptimizerProvided <: AbstractProvidedOptimizer end
-struct StructuredOptimizerProvided <: AbstractProvidedOptimizer end
-struct SampledOptimizerProvided <: AbstractProvidedOptimizer end
-
-_check_provided_optimizer(::UnrecognizedOptimizerProvided) = throw(NoOptimizer())
-_check_provided_optimizer(::NoOptimizerProvided) = throw(NoOptimizer())
-
-function provided_optimizer(::Any)
-    # Universal fallback. No functional optimizer recognized
-    @warn "Unrecognized optimizer provided."
-    return UnrecognizedOptimizerProvided()
-end
-function provided_optimizer(::Nothing)
-    # No optimizer attached
-    NoOptimizerProvided()
-end
-function provided_optimizer(optimizer_constructor::Type{Opt}) where Opt <: MOI.AbstractOptimizer
-    return OptimizerProvided()
-end
-function provided_optimizer(optimizer_constructor::Type{Opt}) where Opt <: AbstractStructuredOptimizer
-    return StructuredOptimizerProvided()
-end
-function provided_optimizer(optimizer_constructor::Type{Opt}) where Opt <: AbstractSampledOptimizer
-    return SampledOptimizerProvided()
-end
-function provided_optimizer(optimizer_constructor::MOI.OptimizerWithAttributes) where Opt <: MOI.AbstractOptimizer
-    # Fallback to the inner constructor of OptimizerWithAttributes
-    return provided_optimizer(optimizer_constructor.optimizer_constructor)
-end
-function provided_optimizer(optimizer_constructor::Function)
-    # If the constructor is a function fallback to the first returned type
-    return provided_optimizer(first(Base.return_types(optimizer_constructor)))
-end
 # StochasticProgramOptimizer #
 # ========================== #
 """
@@ -67,31 +26,39 @@ end
 
 Wrapper type around both the optimizer_constructor provided to a stochastic program and the resulting optimizer object. Used to conviently distinguish between standard MOI optimizers and structure-exploiting optimizers when instantiating the stochastic program.
 """
-mutable struct StochasticProgramOptimizer
+mutable struct StochasticProgramOptimizer{}
     optimizer_constructor
     optimizer
 
+    function StochasticProgramOptimizer(::Nothing)
+        universal_fallback = MOIU.UniversalFallback(MOIU.Model{Float64}())
+        caching_optimizer = MOIU.CachingOptimizer(universal_fallback, MOIU.AUTOMATIC)
+        return new(nothing, caching_optimizer)
+    end
+
     function StochasticProgramOptimizer(optimizer_constructor)
-        return new(optimizer_constructor)
+        optimizer = MOI.instantiate(optimizer_constructor)
+        return new(optimizer_constructor, optimizer)
+    end
+end
+
+function _check_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
+    if sp_optimizer.optimizer_constructor == nothing
+        throw(NoOptimizer())
     end
 end
 
 function moi_optimizer(sp_optimizer::StochasticProgramOptimizer)
-    return _moi_optimizer(sp_optimizer, provided_optimizer(sp_optimizer.optimizer_constructor))
+    return moi_optimizer(sp_optimizer, sp_optimizer.optimizer)
 end
 
-function _moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::UnrecognizedOptimizerProvided)
-    throw(NoOptimizer())
-end
-
-function _moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::NoOptimizerProvided)
-    throw(NoOptimizer())
-end
-
-function _moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::OptimizerProvided)
+function moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::MOI.AbstractOptimizer)
+    if sp_optimizer.optimizer_constructor == nothing
+        throw(NoOptimizer())
+    end
     return sp_optimizer.optimizer_constructor
 end
 
-function _moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::StructuredOptimizerProvided)
-    return moi_optimizer(sp_optimizer.optimizer)
+function moi_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
+    return moi_optimizer(optimizer)
 end

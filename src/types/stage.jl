@@ -1,9 +1,16 @@
-struct Stage{P}
-    stage::Int
+struct Stage{P <: Union{Nothing, StageParameters}}
     parameters::P
 
-    function Stage(stage::Integer, parameters::P) where P
-        return new{P}(stage, parameters)
+    function Stage()
+        return new{Nothing}(nothing)
+    end
+
+    function Stage(parameters::StageParameters)
+        if isempty(parameters.names)
+            return new{Nothing}(nothing)
+        end
+        P = typeof(P)
+        return new{P}(parameters)
     end
 end
 parameter_type(stage::Stage{P}) where P = P

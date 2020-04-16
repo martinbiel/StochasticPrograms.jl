@@ -1,8 +1,6 @@
-
-struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: NTuple{M, AbstractScenarioProblems}}
+struct StochasticProgram{N, T <: AbstractFloat, S <: NTuple{N, Stage}, ST <: AbstractStochasticStructure{N,T}}
     stages::S
-    scenarioproblems::SP
-    decision_variables::NTuple{N, DecisionVariables{T}}
+    structure::ST
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
     optimizer::StochasticProgramOptimizer
@@ -11,62 +9,56 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
                                second_stage_params::Any,
                                ::Type{T},
                                ::Type{S},
-                               procs::Vector{Int},
+                               instantiation::StochasticInstantiation,
                                optimizer_constructor) where {T <: AbstractFloat, S <: AbstractScenario}
-        stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
-        decision_variables = (DecisionVariables(T), DecisionVariables(T))
-        scenarioproblems = (ScenarioProblems(T, S, decision_variables[1], procs),)
-        SP = typeof(scenarioproblems)
-        return new{2, 1, T, typeof(stages), SP}(stages,
-                                                scenarioproblems,
-                                                decision_variables,
+        stages = (Stage(first_stage_params), Stage(second_stage_params))
+        optimizer = StochasticProgramOptimizer(optimizer_constructor)
+        structure = StochasticStructure(T, S, default_structure(stochastic_structure, optimizer.optimizer))
+        ST = typeof(structure)
+        return new{2, 1, T, typeof(stages), ST}(stages,
+                                                structure,
                                                 Dict{Symbol, Function}(),
                                                 Dict{Symbol, JuMP.Model}(),
-                                                StochasticProgramOptimizer(optimizer_constructor))
+                                                optimizer)
     end
 
     function StochasticProgram(first_stage_params::Any,
                                second_stage_params::Any,
                                ::Type{T},
                                scenarios::Vector{<:AbstractScenario},
-                               procs::Vector{Int},
+                               instantiation::StochasticInstantiation,
                                optimizer_constructor) where T <: AbstractFloat
-        stages = (Stage(1, first_stage_params), Stage(2, second_stage_params))
+        stages = (Stage(first_stage_params), Stage(second_stage_params))
         S = typeof(stages)
-        decision_variables = (DecisionVariables(T), DecisionVariables(T))
-        scenarioproblems = (ScenarioProblems(T, scenarios, decision_variables[1], procs),)
-        SP = typeof(scenarioproblems)
-        return new{2, 1, T, S, SP}(stages,
-                                   scenarioproblems,
-                                   decision_variables,
+        optimizer = StochasticProgramOptimizer(optimizer_constructor)
+        structure = StochasticStructure(T, scenarios, default_structure(stochastic_structure, optimizer.optimizer))
+        ST = typeof(structure)
+        return new{2, 1, T, S, ST}(stages,
+                                   structure,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
-                                   StochasticProgramOptimizer(optimizer_constructor))
+                                   optimizer)
     end
 
     function StochasticProgram(::Type{T},
                                stage_params::NTuple{N, Any},
                                scenario_types::NTuple{M, DataType},
+                               instantiation::StochasticInstantiation,
                                optimizer_constructor) where {N, M, T <: AbstractFloat}
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         stages = ntuple(Val(N)) do i
-            Stage(i, stage_params[i])
+            Stage(stage_params[i])
         end
         S = typeof(stages)
-        decision_variables = ntuple(Val(N)) do i
-            DecisionVariables(T)
-        end
-        scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(T, scenarios[i], decision_variables[i], procs)
-        end
-        SP = typeof(scenarioproblems)
-        return new{N, M, T, S, SP}(stages,
-                                   scenarioproblems,
-                                   decision_variables,
+        optimizer = StochasticProgramOptimizer(optimizer_constructor)
+        structure = StochasticStructure(T, scenario_types, default_structure(instantiation, optimizer.optimizer))
+        ST = typeof(structure)
+        return new{N, M, T, S, ST}(stages,
+                                   structure,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
-                                   StochasticProgramOptimizer(optimizer_constructor))
+                                   optimizer)
     end
 
     function StochasticProgram(::Type{T},
@@ -80,22 +72,17 @@ struct StochasticProgram{N, M, T <: AbstractFloat, S <: NTuple{N, Stage}, SP <: 
             Stage(i, stage_params[i])
         end
         S = typeof(stages)
-        decision_variables = ntuple(Val(N)) do i
-            DecisionVariables(T)
-        end
-        scenarioproblems = ntuple(Val(M)) do i
-            ScenarioProblems(T, scenarios[i], decision_variables[i], procs)
-        end
-        SP = typeof(scenarioproblems)
-        return new{N, M, T, S, SP}(stages,
-                                   scenarioproblems,
-                                   decision_variables,
+        optimizer = StochasticProgramOptimizer(optimizer_constructor)
+        structure = StochasticStructure(T, scenario_types, default_structure(instantiation, optimizer.optimizer))
+        ST = typeof(structure)
+        return new{N, M, T, S, ST}(stages,
+                                   structure,
                                    Dict{Symbol, Function}(),
                                    Dict{Symbol, JuMP.Model}(),
-                                   StochasticProgramOptimizer(optimizer_constructor))
+                                   optimizer)
     end
 end
-TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, SP <: AbstractScenarioProblems} = StochasticProgram{2, 1, T, S, Tuple{SP}}
+TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, ST <: AbstractStochasticStructure{2,T}} = StochasticProgram{2, 1, T, S, ST}
 
 # Constructors #
 # ========================== #
@@ -105,25 +92,25 @@ TwoStageStochasticProgram{T, S <: Tuple{Stage, Stage}, SP <: AbstractScenarioPro
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
                       ::Type{T},
-                      optimizer_constructor=nothing;
-                      procs = workers()) where T <: AbstractFloat
+                      instantiation::StochasticInstantiation,
+                      optimizer_constructor=nothing) where T <: AbstractFloat
 
 Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `Scenario` can be added through `add_scenario!`. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
 function StochasticProgram(first_stage_params::Any,
                            second_stage_params::Any,
                            ::Type{T},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where T <: AbstractFloat
-    return StochasticProgram(first_stage_params, second_stage_params, T, Scenario, procs, optimizer_constructor)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where T <: AbstractFloat
+    return StochasticProgram(first_stage_params, second_stage_params, T, Scenario, instantiation, optimizer_constructor)
 end
 """
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
                       ::Type{T},
                       ::Type{S},
-                      optimizer_constructor=nothing;
-                      procs = workers()) where {T <: AbstractFloat, S <: AbstractScenario}
+                      instantiation::StochasticInstantiation,
+                      optimizer_constructor=nothing) where {T <: AbstractFloat, S <: AbstractScenario}
 
 Create a new two-stage stochastic program with stage data given by `first_stage_params` and `second_stage_params`. After construction, scenarios of type `S` can be added through `add_scenario!`. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
@@ -131,23 +118,22 @@ function StochasticProgram(first_stage_params::Any,
                            second_stage_params::Any,
                            ::Type{T},
                            ::Type{S},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where {T <: AbstractFloat, S <: AbstractScenario}
-    return StochasticProgram(first_stage_params, second_stage_params, T, S, procs, optimizer_constructor)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where {T <: AbstractFloat, S <: AbstractScenario}
+    return StochasticProgram(first_stage_params, second_stage_params, T, S, instantiation, optimizer_constructor)
 end
 """
-    StochasticProgram(optimizer_constructor=nothing;
-                      procs = workers())
+    StochasticProgram(instantiation::StochasticInstantiation, optimizer_constructor=nothing)
 
 Create a new two-stage stochastic program with scenarios of type `S` and no stage data. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program.
 """
-function StochasticProgram(optimizer_constructor = nothing;
-                           procs = workers()) where S <: AbstractScenario
-    return StochasticProgram(nothing, nothing, Float64, Scenario, optimizer_constructor; procs = procs)
+function StochasticProgram(instantiation::StochasticInstantiation, optimizer_constructor = nothing) where S <: AbstractScenario
+    return StochasticProgram(nothing, nothing, Float64, Scenario, instantiation, optimizer_constructor; procs = procs)
 end
 """
     StochasticProgram(::Type{T},
                       ::Type{S},
+                      instantiation::StochasticInstantiation,
                       optimizer_constructor=nothing;
                       procs = workers()) where {T <: AbstractFloat, S <: AbstractScenario}
 
@@ -155,17 +141,17 @@ Create a new two-stage stochastic program with scenarios of type `S` and no stag
 """
 function StochasticProgram(::Type{T},
                            ::Type{S},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where {T <: AbstractFloat, S <: AbstractScenario}
-    return StochasticProgram(nothing, nothing, T, S, optimizer_constructor; procs = procs)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where {T <: AbstractFloat, S <: AbstractScenario}
+    return StochasticProgram(nothing, nothing, T, S, instantiation, optimizer_constructor; procs = procs)
 end
 """
     StochasticProgram(first_stage_params::Any,
                       second_stage_params::Any,
                       ::Type{T},
                       scenarios::Vector{<:AbstractScenario},
-                      optimizer_constructor = nothing;
-                      procs = workers()) where T <: AbstractFloat
+                      instantiation::StochasticInstantiation,
+                      optimizer_constructor = nothing) where T <: AbstractFloat
 
 Create a new two-stage stochastic program with a given collection of `scenarios`. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
@@ -173,35 +159,35 @@ function StochasticProgram(first_stage_params::Any,
                            second_stage_params::Any,
                            ::Type{T},
                            scenarios::Vector{<:AbstractScenario},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where T <: AbstractFloat
-    return StochasticProgram(first_stage_params, second_stage_params, T, scenarios, procs, optimizer_constructor)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where T <: AbstractFloat
+    return StochasticProgram(first_stage_params, second_stage_params, T, scenarios, instantiation, optimizer_constructor)
 end
 """
     StochasticProgram(::Type{T},
                       scenarios::Vector{<:AbstractScenario},
-                      optimizer_constructor = nothing;
-                      procs = workers()) where {T <: AbstractFloat}
+                      instantiation::StochasticInstantiation,
+                      optimizer_constructor = nothing) where {T <: AbstractFloat}
 
 Create a new two-stage stochastic program with a given collection of `scenarios` and no stage data. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
 function StochasticProgram(::Type{T},
                            scenarios::Vector{<:AbstractScenario},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where T <: AbstractFloat
-    return StochasticProgram(nothing, nothing, T, scenarios, optimizer_constructor; procs = procs)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where T <: AbstractFloat
+    return StochasticProgram(nothing, nothing, T, scenarios, instantiation, optimizer_constructor)
 end
 """
     StochasticProgram(scenarios::Vector{<:AbstractScenario},
-                      optimizer_constructor = nothing;
-                      procs = workers()) where {T <: AbstractFloat}
+                      instantiation::StochasticInstantiation,
+                      optimizer_constructor = nothing) where {T <: AbstractFloat}
 
 Create a new two-stage stochastic program with a given collection of `scenarios` and no stage data. Optionally, a capable `optimizer_constructor` can be supplied to later optimize the stochastic program. If multiple Julia processes are available, the resulting stochastic program will automatically be memory-distributed on these processes. This can be avoided by setting `procs = [1]`.
 """
 function StochasticProgram(scenarios::Vector{<:AbstractScenario},
-                           optimizer_constructor = nothing;
-                           procs = workers()) where T <: AbstractFloat
-    return StochasticProgram(nothing, nothing, Float64, scenarios, optimizer_constructor; procs = procs)
+                           instantiation::StochasticInstantiation,
+                           optimizer_constructor = nothing) where T <: AbstractFloat
+    return StochasticProgram(nothing, nothing, Float64, scenarios, instantiation, optimizer_constructor)
 end
 
 # Printing #
@@ -256,12 +242,14 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
 end
 function Base.print(io::IO, stochasticprogram::StochasticProgram)
     if initialized(stochasticprogram)
-        # Delegate printing according to provided optimizer
-        _print(io, stochasticprogram, provided_optimizer(stochasticprogram))
+        # Delegate printing according to stochastic structure
+        print(io, structure(stochasticprogram))
     else
         # Just give summary if the stochastic program has not been initialized yet
         show(io, stochasticprogram)
     end
+    print(io, "Solver name: ")
+    print(io, optimizer_name(stochasticprogram))
 end
 function _print(io::IO, stochasticprogram::StochasticProgram, ::AbstractProvidedOptimizer)
     # Just give summary if no optimizer has been provided
@@ -270,36 +258,6 @@ end
 function _print(io::IO, stochasticprogram::StochasticProgram, ::OptimizerProvided)
     print(io, "Deterministic equivalent problem\n")
     print(io, DEP(stochasticprogram))
-    print(io, "Solver name: ")
-    print(io, optimizer_name(stochasticprogram))
-end
-function _print(io::IO, stochasticprogram::StochasticProgram{N}, ::StructuredOptimizerProvided) where N
-    print(io, "Stage 1\n")
-    print(io, "============== \n")
-    print(io, get_stage_one(stochasticprogram))
-    for s = 2:N
-        print(io, "\nStage $s\n")
-        print(io, "============== \n")
-        for (id, subproblem) in enumerate(subproblems(stochasticprogram, s))
-            @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(stochasticprogram, id, s)))
-            print(io, subproblem)
-            print(io, "\n")
-        end
-    end
-    print(io, "Solver name: ")
-    print(io, optimizer_name(stochasticprogram))
-end
-function _print(io::IO, stochasticprogram::StochasticProgram{2}, ::StructuredOptimizerProvided)
-    print(io, "First-stage \n")
-    print(io, "============== \n")
-    print(io, get_stage_one(stochasticprogram))
-    print(io, "\nSecond-stage \n")
-    print(io, "============== \n")
-    for (id, subproblem) in enumerate(subproblems(stochasticprogram))
-        @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(stochasticprogram, id)))
-        print(io, subproblem)
-        print(io, "\n")
-    end
     print(io, "Solver name: ")
     print(io, optimizer_name(stochasticprogram))
 end

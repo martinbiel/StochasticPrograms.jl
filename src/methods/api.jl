@@ -210,7 +210,7 @@ See also: [`VRP`](@ref)
 """
 function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been initialized at this point
     if !initialized(stochasticprogram)
         initialize!(stochasticprogram)
@@ -253,7 +253,7 @@ Return the optimal first stage decision of `stochasticprogram`, after a call to 
 """
 function optimal_decision(stochasticprogram::TwoStageStochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     # Dispatch on provided optimizer
     return _optimal_decision(stochasticprogram, provided_optimizer(stochasticprogram))
 end
@@ -281,7 +281,7 @@ Return the optimal recourse decision of `stochasticprogram` corresponding to the
 """
 function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     # Dispatch on provided optimizer
     return _optimal_recourse_decision(stochasticprogram, i, provided_optimizer(stochasticprogram))
 end
@@ -325,7 +325,7 @@ function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
                                    decision::AbstractVector,
                                    scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     # Sanity checks on given decision vector
     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -354,7 +354,7 @@ Return the optimal value of `stochasticprogram`, after a call to `optimize!(stoc
 """
 function optimal_value(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     return _optimal_value(stochasticprogram, provided_optimizer(stochasticprogram))
 end
 function _optimal_value(stochasticprogram::StochasticProgram, ::OptimizerProvided)
@@ -450,7 +450,7 @@ Return the decision variables of stage `s` in `stochasticprogram`. Defaults to t
 """
 function decision_variables(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
-    return stochasticprogram.decision_variables[s]
+    return decision_variables(structure(stochasticprogram), 2)
 end
 """
     decision_variables(stochasticprogram::TwoStageStochasticProgram)
@@ -469,15 +469,12 @@ function recourse_variables(stochasticprogram::TwoStageStochasticProgram)
     return decision_variables(stochasticprogram, 2)
 end
 """
-    scenarioproblems(stochasticprogram::StochasticProgram, s::Integer)
+    structure(stochasticprogram::StochasticProgram)
 
-Return the scenario problems at stage `s` in `stochasticprogram`. Defaults to the second stage.
+Return the underlying structure of the `stochasticprogram`.
 """
-function scenarioproblems(stochasticprogram::StochasticProgram{N}, s::Integer = 2) where N
-    s == 1 && error("Stage 1 does not have scenario problems.")
-    N == 2 && (s == 2 || error("Stage $s not available in two-stage model."))
-    1 < s <= N || error("Stage $s not in range 2 to $N.")
-    return stochasticprogram.scenarioproblems[s-1]
+function structure(stochasticprogram::StochasticProgram)
+    return stochasticprogram.structure
 end
 """
     decision_length(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -495,6 +492,30 @@ Return the length of the first-stage decision of `stochasticprogram`.
 """
 function decision_length(stochasticprogram::TwoStageStochasticProgram)
     return decision_length(stochasticprogram, 1)
+end
+"""
+    first_stage(stochasticprogram::StochasticProgram)
+
+Return the first stage of `stochasticprogram`.
+"""
+function first_stage(stochasticprogram::StochasticProgram; optimizer = nothing)
+    return first_stage(stochasticprogram, structure(stochasticprogram); optimizer = optimizer)
+end
+function first_stage(stochasticprogram::StochasticProgram, ::AbstractStochasticStructure; optimizer = nothing)
+    # Return possibly cached model
+    cache = problemcache(stochasticprogram)
+    if haskey(cache, :stage_1)
+        stage_one = cache[:stage_1]
+        optimizer != nothing && set_optimizer(stage_one, optimizer)
+        return stage_one
+    end
+    # Check that the required generators have been defined
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    # Generate and cache first stage
+    generate_stage_one!(stochasticprogram)
+    stage_one = cache[:stage_1]
+    optimizer != nothing && set_optimizer(stage_one, optimizer)
+    return stage_one
 end
 """
     first_stage_nconstraints(stochasticprogram::StochasticProgram)
@@ -522,7 +543,7 @@ end
 Return the `i`th scenario of stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function scenario(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return scenario(scenarioproblems(stochasticprogram, s), i)
+    return scenario(structure(stochasticprogram), i, s)
 end
 """
     scenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -530,7 +551,7 @@ end
 Return an array of all scenarios of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function scenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return scenarios(scenarioproblems(stochasticprogram, s))
+    return scenarios(structure(stochasticprogram), s)
 end
 """
     expected(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -538,7 +559,7 @@ end
 Return the exected scenario of all scenarios of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function expected(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return expected(scenarioproblems(stochasticprogram, s)).scenario
+    return expected(structure(stochasticprogram), s)
 end
 """
     scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -546,7 +567,7 @@ end
 Return the type of the scenario structure associated with `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return scenariotype(scenarioproblems(stochasticprogram, s))
+    return scenariotype(structure(stochasticprogram), s)
 end
 """
     probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
@@ -562,7 +583,7 @@ end
 Return the probability of any scenario in the `stochasticprogram` at stage `s` occuring. A well defined model should return 1. Defaults to the second stage.
 """
 function stage_probability(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return probability(scenarioproblems(stochasticprogram, s))
+    return probability(structure(stochasticprogram), s)
 end
 """
     has_generator(stochasticprogram::StochasticProgram, key::Symbol)
@@ -586,7 +607,7 @@ end
 Return the `i`th subproblem of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function subproblem(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return subproblem(scenarioproblems(stochasticprogram, s), i)
+    return subproblem(structure(stochasticprogram), s, i)
 end
 """
     subproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -594,7 +615,7 @@ end
 Return an array of all subproblems of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function subproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return subproblems(scenarioproblems(stochasticprogram, s))
+    return subproblems(structure(stochasticprogram), s)
 end
 """
     nsubproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -603,7 +624,7 @@ Return the number of subproblems in the `stochasticprogram` at stage `s`. Defaul
 """
 function nsubproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
     s == 1 && return 0
-    return nsubproblems(scenarioproblems(stochasticprogram, s))
+    return nsubproblems(structure(stochasticprogram), s)
 end
 """
     nscenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -612,7 +633,7 @@ Return the number of scenarios in the `stochasticprogram` at stage `s`. Defaults
 """
 function nscenarios(stochasticprogram::StochasticProgram, s::Integer = 2)
     s == 1 && return 0
-    return nscenarios(scenarioproblems(stochasticprogram, s))
+    return nscenarios(structure(stochasticprogram), s)
 end
 """
     nstages(stochasticprogram::StochasticProgram)
@@ -626,19 +647,6 @@ nstages(::StochasticProgram{N}) where N = N
 Return true if the `stochasticprogram` is memory distributed at stage `s`. Defaults to the second stage.
 """
 distributed(stochasticprogram::StochasticProgram, s::Integer = 2) = distributed(scenarioproblems(stochasticprogram, s))
-"""
-    initialized(stochasticprogram::StochasticProgram)
-
-Return true if `stochasticprogram` has been initialized.
-
-See also: [`initialize!`](@ref)
-"""
-function initialized(stochasticprogram::StochasticProgram)
-    return initialized(stochasticprogram, provided_optimizer(stochasticprogram))
-end
-initialized(stochasticprogram::StochasticProgram, ::AbstractProvidedOptimizer) = false
-initialized(stochasticprogram::StochasticProgram, ::OptimizerProvided) = haskey(problemcache(stochasticprogram), :dep)
-initialized(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided) = !deferred(stochasticprogram)
 """
     deferred(stochasticprogram::StochasticProgram)
 
@@ -656,36 +664,20 @@ function deferred_stage(stochasticprogram::StochasticProgram{N}, s::Integer) whe
     nsubproblems(stochasticprogram, s) < nscenarios(stochasticprogram, s)
 end
 """
-        optimizer_constructor(stochasticmodel::StochasticModel)
+    optimizer_constructor(stochasticmodel::StochasticModel)
 
-    Return any optimizer constructor supplied to the `stochasticmodel`.
-    """
+Return any optimizer constructor supplied to the `stochasticmodel`.
+"""
 function optimizer_constructor(stochasticmodel::StochasticModel)
     return stochasticmodel.optimizer.optimizer_constructor
 end
 """
-        optimizer_constructor(stochasticprogram::StochasticProgram)
+    optimizer_constructor(stochasticprogram::StochasticProgram)
 
-    Return any optimizer constructor supplied to the `stochasticprogram`.
-    """
+Return any optimizer constructor supplied to the `stochasticprogram`.
+"""
 function optimizer_constructor(stochasticprogram::StochasticProgram)
     return stochasticprogram.optimizer.optimizer_constructor
-end
-"""
-    provided_optimizer(stochasticmodel::StochasticModel)
-
-Return the currently provided optimizer type of `stochasticmodel`.
-"""
-function provided_optimizer(stochasticmodel::StochasticModel)
-    return provided_optimizer(optimizer_constructor(stochasticmodel))
-end
-"""
-    provided_optimizer(stochasticprogram::StochasticProgram)
-
-Return the currently provided optimizer type of `stochasticprogram`.
-"""
-function provided_optimizer(stochasticprogram::StochasticProgram)
-    return provided_optimizer(optimizer_constructor(stochasticprogram))
 end
 """
     optimizer_name(stochasticmodel::StochasticModel)
@@ -736,7 +728,7 @@ Return, if any, the optimizer attached to `stochasticprogram`.
 """
 function optimizer(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticprogram))
+    _check_provided_optimizer(stochasticprogram.optimizer)
     if !initialized(stochasticprogram)
         @warn "The stochastic program has not been initialized. Consider `initialize!`"
         return nothing
@@ -764,7 +756,7 @@ Set the optimizer of the `stochasticmodel`.
 """
 function set_optimizer!(stochasticmodel::StochasticModel, optimizer)
     stochasticmodel.optimizer.optimizer_constructor = optimizer
-    nothing
+    return nothing
 end
 """
     set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
@@ -776,7 +768,7 @@ function set_optimizer!(stochasticprogram::StochasticProgram, optimizer; defer::
     if !defer
         initialize!(stochasticprogram)
     end
-    nothing
+    return nothing
 end
 """
     add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2)
@@ -786,7 +778,7 @@ Store the second stage `scenario` in the `stochasticprogram` at `stage`. Default
 If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
 function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2)
-    add_scenario!(scenarioproblems(stochasticprogram, stage), scenario)
+    add_scenario!(structure(stochasticprogram), stage, scenario)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -796,7 +788,7 @@ end
 Store the second stage `scenario` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer, stage::Integer = 2)
-    add_scenario!(scenarioproblems(stochasticprogram, stage), scenario, w)
+    add_scenario!(structure(stochasticprogram), stage, scenario, w)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -806,7 +798,7 @@ end
 Store the second stage scenario returned by `scenariogenerator` in the second stage of the `stochasticprogram`. Defaults to the second stage. If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
 function add_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, stage::Integer = 2)
-    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram, stage))
+    add_scenario!(scenariogenerator, structure(stochasticprogram), stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -816,7 +808,7 @@ end
 Store the second stage scenario returned by `scenariogenerator` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer, stage::Integer = 2)
-    add_scenario!(scenariogenerator, scenarioproblems(stochasticprogram, stage), w)
+    add_scenario!(scenariogenerator, structure(stochasticprogram), stage, w)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -826,7 +818,7 @@ end
 Store the collection of second stage `scenarios` in the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
-    add_scenarios!(scenarioproblems(stochasticprogram, stage), scenarios)
+    add_scenarios!(structure(stochasticprogram), stage, scenarios)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -836,7 +828,7 @@ end
 Store the collection of second stage `scenarios` in in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2)
-    add_scenarios!(scenarioproblems(stochasticprogram, stage), scenarios, w)
+    add_scenarios!(structure(stochasticprogram), stage, scenarios, w)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -846,7 +838,7 @@ end
 Generate `n` second-stage scenarios using `scenariogenerator`and store in the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, stage::Integer = 2)
-    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram, stage), n)
+    add_scenarios!(scenariogenerator, structure(stochasticprogram), stage, n)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -856,7 +848,7 @@ end
 Generate `n` second-stage scenarios using `scenariogenerator`and store them in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer, stage::Integer = 2)
-    add_scenarios!(scenariogenerator, scenarioproblems(stochasticprogram, stage), n, w)
+    add_scenarios!(scenariogenerator, structure(stochasticprogram), stage, n, w)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -866,7 +858,7 @@ end
 Sample `n` scenarios using `sampler` and add to the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer, stage::Integer = 2)
-    sample!(scenarioproblems(stochasticprogram, stage), sampler, n)
+    sample!(structure(stochasticprogram), stage, sampler, n)
     return stochasticprogram
 end
 # ========================== #

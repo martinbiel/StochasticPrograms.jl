@@ -119,6 +119,9 @@ function scenariotext(io::IO, scenario::Scenario)
     end
     return io
 end
+
+Scenarios{S <: AbstractScenario} = Vector{S}
+
 function expected(scenarios::Vector{Scenario{NT}}) where NT <: NamedTuple
     isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{NT}))
     return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s₁, s₂
