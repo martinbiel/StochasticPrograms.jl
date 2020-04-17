@@ -153,6 +153,8 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decisio
     # Sanity checks on given decision vector
     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Dispatch evaluation on stochastic structure
+    return evaluate_decision(structure(stochasticprogram), decision)
     # Evalaute decision stage-wise
     cᵀx = _eval_first_stage(stochasticprogram, decision)
     𝔼Q = _eval_second_stages(stochasticprogram, decision)

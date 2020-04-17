@@ -1,3 +1,17 @@
+# Checkers #
+# ========================== #
+_check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))
+function _check_generators(stochasticprogram::StochasticProgram, ::Val{N}) where N
+    return _check_stage_generator(stochasticprogram, N) && _check_generators(stochasticprogram, Val(N-1))
+end
+function _check_generators(stochasticprogram::StochasticProgram, ::Val{1})
+    return has_generator(stochasticprogram, :stage_1)
+end
+function _check_stage_generator(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    stage_key = Symbol(:stage_, s)
+    return has_generator(stochasticprogram, stage_key)
+end
 # Decision variable generation #
 # ========================== #
 function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) where N
@@ -5,6 +19,7 @@ function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) w
     aux_model = Model()
     # Generate all stages
     for stage in 1:N
+        clear_decision_variables!(decision_variables(stochasticprogram, stage))
         decision_key = Symbol(:stage_, stage, :_decisions)
         has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage $stage.")
         aux_model.ext[:decisionvariables] = decision_variables(stochasticprogram, stage)
@@ -12,7 +27,7 @@ function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) w
     end
     return stochasticprogram
 end
-# Stage generation #
+# Model generation #
 # ========================== #
 """
     stage_one_model(stochasticprogram::StochasticProgram; optimizer = nothing)
@@ -45,7 +60,7 @@ function stage_model(stochasticprogram::StochasticProgram{N},
                         generator(stochasticprogram, stage_key),
                         stage_parameters(stochasticprogram, stage),
                         scenario,
-                        decision_variables(stochasticprogram, stage),
+                        copy(decision_variables(stochasticprogram, stage)),
                         optimizer)
 end
 function _stage_model(decision_generator::Function,
@@ -68,80 +83,17 @@ function generate_stage_one!(stochasticprogram::StochasticProgram)
     generator(stochasticprogram, :stage_1)(stochasticprogram.problemcache[:stage_1], stage_parameters(stochasticprogram, 1))
     return nothing
 end
-function generate!(scenarioproblems::ScenarioProblems,
-                   decision_generator::Function,
-                   generator::Function,
-                   decision_params::Any,
-                   stage_params::Any,
-                   optimizer)
-    for i in nsubproblems(scenarioproblems)+1:nscenarios(scenarioproblems)
-        push!(scenarioproblems.problems, _stage_model(decision_generator,
-                                                      generator,
-                                                      decision_params,
-                                                      stage_params,
-                                                      scenario(scenarioproblems,i),
-                                                      decision_variables(scenarioproblems),
-                                                      optimizer))
-    end
-    return nothing
-end
-function generate!(scenarioproblems::DScenarioProblems,
-                   decision_generator::Function,
-                   generator::Function,
-                   decision_params::Any,
-                   stage_params::Any,
-                   optimizer)
-    @sync begin
-        for w in workers()
-            @async remotecall_fetch((sp,decision_generator,generator,decision_params,params,optimizer)->
-                                    generate!(fetch(sp),
-                                              decision_generator,
-                                              generator,
-                                              decision_params,
-                                              params,
-                                              optimizer),
-                                    w,
-                                    scenarioproblems[w-1],
-                                    decision_generator,
-                                    generator,
-                                    decision_params,
-                                    stage_params,
-                                    optimizer)
-        end
-    end
-    return nothing
-end
-function generate_stage!(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
-    1 <= stage <= N || error("Stage $s not in range 1 to $N")
-    if stage == 1
-        if haskey(stochasticprogram.problemcache, :stage_1)
-            remove_stages!(stochasticprogram, 1)
-            invalidate_cache!(stochasticprogram)
-        end
-        generate_stage_one!(stochasticprogram)
-    else
-        if nsubproblems(stochasticprogram, stage) > 0
-            remove_stages!(stochasticprogram, stage)
-            invalidate_cache!(stochasticprogram)
-        end
-        # Check that the appropriate generators have been defined
-        stage_key = Symbol(:stage_, stage)
-        decision_key = Symbol(:stage_, stage - 1, :_decisions)
-        has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
-        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
-        # Sanity check on scenario probabilities
-        if nscenarios(stochasticprogram, stage) > 0
-            p = stage_probability(stochasticprogram, stage)
-            abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
-        end
-        # Generate
-        generate!(scenarioproblems(stochasticprogram, stage),
-                  generator(stochasticprogram, decision_key),
-                  generator(stochasticprogram, stage_key),
-                  stage_parameters(stochasticprogram, stage - 1),
-                  stage_parameters(stochasticprogram, stage),
-                  moi_optimizer(stochasticprogram))
-    end
+
+"""
+    clear!(stochasticprogram::StochasticProgram)
+
+Clear the `stochasticprogram`, removing all model definitions.
+"""
+function clear!(stochasticprogram::StochasticProgram{N}) where N
+    # Clearing invalidates the cache
+    invalidate_cache!(stochasticprogram)
+    # Dispatch clearup on stochastic structure
+    clear!(stochasticprogram, structure(stochasticprogram))
     return nothing
 end
 """
@@ -150,10 +102,12 @@ end
 Generate the `stochasticprogram` using the model definitions from @stage and available data.
 """
 function generate!(stochasticprogram::StochasticProgram{N}) where N
-    # Generate all stages
-    for stage in 1:N
-        generate_stage!(stochasticprogram, stage)
+    if !deferred(stochasticprogram)
+        # Clear stochasticprogram before re-generation
+        clear!(stochasticprogram)
     end
+    # Dispatch generation on stochastic structure
+    generate!(stochasticprogram, structure(stochasticprogram))
     return stochasticprogram
 end
 # Outcome model generation #

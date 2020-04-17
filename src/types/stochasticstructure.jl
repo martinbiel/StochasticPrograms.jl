@@ -32,3 +32,29 @@ function default_structure(::UnspecifiedInstantiation, optimizer)
         end
     end
 end
+
+# Getters #
+# ========================== #
+function decision_variables(structure::AbstractStochasticStructure{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
+    return structure.decision_variables[s]
+end
+function scenariotype(structure::AbstractStochasticStructure, s::Integer = 2)
+    return _scenariotype(scenarios(structure, s))
+end
+function _scenariotype(::Vector{S}) where S <: AbstractScenario
+    return S
+end
+function probability(structure::AbstractStochasticStructure, i::Integer, s::Integer = 2)
+    return probability(scenario(structure, i, s))
+end
+function stage_probability(structure::StochasticProgram, s::Integer = 2)
+    return probability(scenarios(structure, s))
+end
+function expected(structure::AbstractScenario, s::Integer = 2)
+    return expected(scenarios(dep, s))
+end
+function nscenarios(structure::AbstractScenario, s::Integer = 2)
+    return length(scenarios(structure, s))
+end
+# ========================== #

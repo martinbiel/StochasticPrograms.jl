@@ -169,6 +169,21 @@ function recourse_length(scenarioproblems::DistributedScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     return remotecall_fetch((sp)->recourse_length(fetch(sp)), 2, scenarioproblems[1])
 end
+function probability(scenarioproblems::ScenarioProblems, i::Integer)
+    return probability(scenario(scenarioproblems, i))
+end
+function probability(scenarioproblems::DistributedScenarioProblems, i::Integer)
+    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
+    j = 0
+    for w in workers()
+        n = scenarioproblems.scenario_distribution[w-1]
+        if i <= n+j
+            return remotecall_fetch((sp,i)->probability(fetch(sp).scenarios[i]), w, scenarioproblems[w-1], i-j)
+        end
+        j += n
+    end
+    throw(BoundsError(scenarioproblems, i))
+end
 function probability(scenarioproblems::ScenarioProblems)
     return probability(scenarioproblems.scenarios)
 end
@@ -319,11 +334,11 @@ function add_scenarios!(scenariogenerator::Function, scenarioproblems::Distribut
     scenarioproblems.scenario_distribution[w-1] += n
     return nothing
 end
-function remove_scenarios!(scenarioproblems::ScenarioProblems)
+function clear_scenarios!(scenarioproblems::ScenarioProblems)
     empty!(scenarioproblems.scenarios)
     return nothing
 end
-function remove_scenarios!(scenarioproblems::DistributedScenarioProblems)
+function clear_scenarios!(scenarioproblems::DistributedScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     @sync begin
         for w in workers()
@@ -333,28 +348,17 @@ function remove_scenarios!(scenarioproblems::DistributedScenarioProblems)
     end
     return nothing
 end
-function remove_subproblems!(scenarioproblems::ScenarioProblems)
+function clear!(scenarioproblems::ScenarioProblems)
+    clear_decision_variables!(scenarioproblems.decision_variables)
+    map!(empty!, scenarioproblems.problems)
     empty!(scenarioproblems.problems)
     return nothing
 end
-function remove_subproblems!(scenarioproblems::DistributedScenarioProblems)
+function clear!(scenarioproblems::DistributedScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     @sync begin
         for w in workers()
-            @async remotecall_fetch((sp)->remove_subproblems!(fetch(sp)), w, scenarioproblems[w-1])
-        end
-    end
-    return nothing
-end
-function remove_decision_variables!(scenarioproblems::ScenarioProblems)
-    clear_decision_variables!(scenarioproblems.decision_variables)
-    return nothing
-end
-function remove_decision_variables!(scenarioproblems::DistributedScenarioProblems)
-    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    @sync begin
-        for w in workers()
-            @async remotecall_fetch((sp)->remove_decision_variables!(fetch(sp)), w, scenarioproblems[w-1])
+            @async remotecall_fetch((sp)->clear!(fetch(sp)), w, scenarioproblems[w-1])
         end
     end
     return nothing

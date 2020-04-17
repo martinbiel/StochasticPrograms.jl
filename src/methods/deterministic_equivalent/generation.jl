@@ -4,6 +4,8 @@ function generate!(stochasticprogram::TwoStageStochasticProgram, structure::Dete
     # Check that the required generators have been defined
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
+    # Set the optimizer
+    MOIU.reset_optimizer(structure.model, optimizer(stochasticprogram))
     # Create deterministic equivalent
     _generate_deterministic_equivalent!(stochasticprogram, structure.model)
     return stochasticprogram
@@ -48,4 +50,10 @@ function _generate_deterministic_equivalent!(stochasticprogram::TwoStageStochast
     end
     set_objective_function(dep_model, dep_obj)
     return dep_model
+end
+
+function clear(dep::DeterministicEquivalent)
+    # Clear deterministic equivalent model
+    empty!(dep.model)
+    return nothing
 end

@@ -255,10 +255,4 @@ function _print(io::IO, stochasticprogram::StochasticProgram, ::AbstractProvided
     # Just give summary if no optimizer has been provided
     show(io, stochasticprogram)
 end
-function _print(io::IO, stochasticprogram::StochasticProgram, ::OptimizerProvided)
-    print(io, "Deterministic equivalent problem\n")
-    print(io, DEP(stochasticprogram))
-    print(io, "Solver name: ")
-    print(io, optimizer_name(stochasticprogram))
-end
 # ========================== #

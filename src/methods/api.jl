@@ -50,7 +50,6 @@ function instantiate(sm::TwoStageStochasticProgram;
                      scenariotype::Type{S} = Scenario,
                      procs::Vector{Int} = workers(),
                      float_type::Type{<:AbstractFloat} = Float64,
-                     defer::Bool = false,
                      kw...) where S <: AbstractScenario
     sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
                            parameters(sm.parameters[2]; kw...),
@@ -62,10 +61,6 @@ function instantiate(sm::TwoStageStochasticProgram;
     sm.generator(sp)
     # Generate decision variables using model recipes
     generate_decision_variables!(sp)
-    # Initialize if not deferred
-    if !defer
-        initialize!(sp)
-    end
     return sp
 end
 """
@@ -575,7 +570,7 @@ end
 Return the probability of scenario `i`th scenario in the `stochasticprogram` at stage `s` occuring. Defaults to the second stage.
 """
 function probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return probability(scenario(stochasticprogram, i, s))
+    return probability(structure(stochasticprogram), i, s))
 end
 """
     stage_probability(stochasticprogram::StochasticProgram, s::Integer = 2)
@@ -652,17 +647,7 @@ distributed(stochasticprogram::StochasticProgram, s::Integer = 2) = distributed(
 
 Return true if `stochasticprogram` is not fully generated.
 """
-deferred(stochasticprogram::StochasticProgram{N}) where N = deferred(stochasticprogram, Val(N))
-deferred(stochasticprogram::StochasticProgram, ::Val{1}) = deferred_first_stage(stochasticprogram)
-function deferred(stochasticprogram::StochasticProgram, ::Val{N}) where N
-    return deferred_stage(stochasticprogram, N) || deferred(stochasticprogram, Val(N-1))
-end
-deferred_first_stage(stochasticprogram::StochasticProgram) = has_generator(stochasticprogram, :stage_1) && !haskey(stochasticprogram.problemcache, :stage_1)
-function deferred_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    s == 1 && return deferred_first_stage(stochasticprogram)
-    nsubproblems(stochasticprogram, s) < nscenarios(stochasticprogram, s)
-end
+deferred(stochasticprogram::StochasticProgram) = deferred(structure(stochasticprogram))
 """
     optimizer_constructor(stochasticmodel::StochasticModel)
 
@@ -685,7 +670,7 @@ end
 Return the currently provided optimizer type of `stochasticmodel`.
 """
 function optimizer_name(stochasticmodel::StochasticModel)
-    return _optimizer_name(optimizer(stochasticmodel), provided_optimizer(stochasticmodel))
+    return optimizer_name(optimizer(stochasticmodel))
 end
 """
     optimizer_name(stochasticprogram::StochasticProgram)
@@ -693,17 +678,11 @@ end
 Return the currently provided optimizer type of `stochasticprogram`.
 """
 function optimizer_name(stochasticprogram::StochasticProgram)
-    initialized(stochasticprogram) || return "Uninitialized"
-    return _optimizer_name(stochasticprogram, provided_optimizer(stochasticprogram))
-end
-function _optimizer_name(::StochasticProgram, ::NoOptimizerProvided)
-    return "No optimizer attached."
-end
-function _optimizer_name(stochasticprogram::StochasticProgram, ::OptimizerProvided)
-    return JuMP._try_get_solver_name(optimizer(stochasticprogram))
-end
-function _optimizer_name(stochasticprogram::StochasticProgram, ::StructuredOptimizerProvided)
+    deferred(stochasticprogram) && return "Uninitialized"
     return optimizer_name(optimizer(stochasticprogram))
+end
+function optimizer_name(optimizer::MOI.AbstractOptimizer)
+    return JuMP._try_get_solver_name(optimizer)
 end
 """
     moi_optimizer(stochasticmodel::StochasticModel)
@@ -729,10 +708,6 @@ Return, if any, the optimizer attached to `stochasticprogram`.
 function optimizer(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
-    if !initialized(stochasticprogram)
-        @warn "The stochastic program has not been initialized. Consider `initialize!`"
-        return nothing
-    end
     return stochasticprogram.optimizer.optimizer
 end
 """
@@ -764,9 +739,9 @@ end
 Set the optimizer of the `stochasticprogram`.
 """
 function set_optimizer!(stochasticprogram::StochasticProgram, optimizer; defer::Bool = false)
-    stochasticprogram.optimizer.optimizer_constructor = optimizer
+    set_optimizer!(stochasticprogram.optimizer, optimizer)
     if !defer
-        initialize!(stochasticprogram)
+        generate!(stochasticprogram)
     end
     return nothing
 end

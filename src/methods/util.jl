@@ -86,26 +86,6 @@ function invalidate_cache!(stochasticprogram::StochasticProgram)
     return nothing
 end
 
-function remove_stage!(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    if s == 1
-        haskey(stochasticprogram.problemcache, :stage_1) || return nothing
-        delete!(stochasticprogram.problemcache, :stage_1)
-    else
-        haskey(stochasticprogram.problemcache, :stage_1) || return nothing
-        remove_subproblems!(stochasticprogram, s)
-        remove_decision_variables!(stochasticprogram, s)
-    end
-    return nothing
-end
-
-function remove_stages!(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    for i = s:N
-        remove_stage!(stochasticprogram, i)
-    end
-end
-
 function remove_scenarios!(stochasticprogram::StochasticProgram, s::Integer = 2)
     remove_scenarios!(scenarioproblems(stochasticprogram, s))
     return nothing

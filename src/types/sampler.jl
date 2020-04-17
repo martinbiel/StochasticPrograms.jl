@@ -44,3 +44,27 @@ end
 function (sampler::Sampler)()
     return sampler.sampler()
 end
+
+function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
+    _sample!(scenarios, sampler, n, nscenarios(scenarioproblems), 1/n)
+    return nothing
+end
+function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: AbstractScenario
+    _sample!(scenarios, sampler, n, nscenarios(scenarioproblems), 1/n)
+    return nothing
+end
+
+function _sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{S}, n::Integer, m::Integer, π::AbstractFloat) where S <: AbstractScenario
+    if m > 0
+        # Rescale probabilities of existing scenarios
+        for scenario in scenarios
+            p = probability(scenario) * m / (m+n)
+            set_probability!(scenario, p)
+        end
+        π *= n/(m+n)
+    end
+    for i = 1:n
+        push!(scenarios, sample(sampler, π))
+    end
+    return nothing
+end

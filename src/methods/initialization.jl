@@ -42,16 +42,3 @@ function initialize!(stochasticprogram::StochasticProgram, ::StructuredOptimizer
     stochasticprogram.optimizer.optimizer = MOI.instantiate(optimizer_constructor(stochasticprogram))
     return nothing
 end
-
-_check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))
-function _check_generators(stochasticprogram::StochasticProgram, ::Val{N}) where N
-    return _check_stage_generator(stochasticprogram, N) && _check_generators(stochasticprogram, Val(N-1))
-end
-function _check_generators(stochasticprogram::StochasticProgram, ::Val{1})
-    return has_generator(stochasticprogram, :stage_1)
-end
-function _check_stage_generator(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    stage_key = Symbol(:stage_, s)
-    return has_generator(stochasticprogram, stage_key)
-end
