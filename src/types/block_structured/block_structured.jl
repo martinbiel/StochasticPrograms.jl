@@ -1,6 +1,6 @@
-abstract type AbstractScenarioProblems{T <: AbstractFloat, S <: AbstractScenario} end
+abstract type AbstractScenarioProblems{S <: AbstractScenario} end
 
-abstract type AbstractBlockStructure{N, T} <: AbstractStochasticStructure{N,T} end
+abstract type AbstractBlockStructure{N} <: AbstractStochasticStructure{N} end
 
 # Getters #
 # ========================== #
@@ -9,6 +9,14 @@ function scenarioproblems(structure::AbstractBlockStructure{N}, s::Integer = 2) 
     N == 2 && (s == 2 || error("Stage $s not available in two-stage model."))
     1 < s <= N || error("Stage $s not in range 2 to $N.")
     return structure.scenarioproblems[s-1]
+end
+function all_decisions(structure::AbstractBlockStructure{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    return all_decisions(structure.decisions[s])
+end
+function num_decisions(structure::AbstractBlockStructure{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    return num_decisions(structure.decisions[s])
 end
 function scenario(structure::AbstractBlockStructure, i::Integer, s::Integer = 2)
     scenario(scenarioproblems(structure, s), i)
@@ -34,23 +42,29 @@ end
 function subproblems(structure::AbstractBlockStructure, s::Integer = 2)
     return subproblems(scenarioproblems(structure, s))
 end
-function nsubproblems(structure::AbstractBlockStructure, s::Integer = 2)
-    return nsubproblems(scenarioproblems(structure, s))
+function num_subproblems(structure::AbstractBlockStructure, s::Integer = 2)
+    return num_subproblems(scenarioproblems(structure, s))
 end
-function nscenarios(structure::AbstractBlockStructure, s::Integer = 2)
-    return nscenarios(scenarioproblems(structure, s))
+function num_scenarios(structure::AbstractBlockStructure, s::Integer = 2)
+    return num_scenarios(scenarioproblems(structure, s))
 end
 deferred(structure::AbstractBlockStructure{N}) where N = deferred(structure, Val(N))
 deferred(structure::AbstractBlockStructure, ::Val{1}) = deferred_first_stage(structure)
 function deferred(structure::AbstractBlockStructure, ::Val{N}) where N
     return deferred_stage(structure, N) || deferred(structure, Val(N-1))
 end
-deferred_first_stage(structure::AbstractBlockStructure) = num_variables(first_stage(structure)) == 0
+deferred_first_stage(structure::AbstractBlockStructure) = false
 function deferred_stage(structure::AbstractBlockStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     s == 1 && return deferred_first_stage(structure)
-    nsubproblems(structure, s) < nscenarios(structure, s)
+    num_subproblems(structure, s) < num_scenarios(structure, s)
 end
+function distributed(structure::AbstractBlockStructure{N}, s) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    s == 1 && return false
+    return distributed(scenarioproblems(structure, s))
+end
+
 # ========================== #
 
 # Setters

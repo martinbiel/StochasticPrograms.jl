@@ -1,31 +1,20 @@
 # Checkers #
 # ========================== #
-_check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))
+check_generators(stochasticprogram::StochasticProgram{N}) where N = _check_generators(stochasticprogram, Val(N))
 function _check_generators(stochasticprogram::StochasticProgram, ::Val{N}) where N
-    return _check_stage_generator(stochasticprogram, N) && _check_generators(stochasticprogram, Val(N-1))
+    _check_stage_generator(stochasticprogram, N)
+    _check_generators(stochasticprogram, Val(N-1))
+    return nothing
 end
 function _check_generators(stochasticprogram::StochasticProgram, ::Val{1})
-    return has_generator(stochasticprogram, :stage_1)
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    return nothing
 end
 function _check_stage_generator(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     stage_key = Symbol(:stage_, s)
-    return has_generator(stochasticprogram, stage_key)
-end
-# Decision variable generation #
-# ========================== #
-function generate_decision_variables!(stochasticprogram::StochasticProgram{N}) where N
-    # Auxiliary JuMP model to hold all decisions
-    aux_model = Model()
-    # Generate all stages
-    for stage in 1:N
-        clear_decision_variables!(decision_variables(stochasticprogram, stage))
-        decision_key = Symbol(:stage_, stage, :_decisions)
-        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage $stage.")
-        aux_model.ext[:decisionvariables] = decision_variables(stochasticprogram, stage)
-        generator(stochasticprogram, decision_key)(aux_model, stage_parameters(stochasticprogram, stage))
-    end
-    return stochasticprogram
+    has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
+    return nothing
 end
 # Model generation #
 # ========================== #
@@ -49,31 +38,22 @@ function stage_model(stochasticprogram::StochasticProgram{N},
                      stage::Integer,
                      scenario::AbstractScenario;
                      optimizer = nothing) where N
+
     1 <= stage <= N || error("Stage $stage not in range 1 to $N")
     stage == 1 && return stage_one_model(stochasticprogram, optimizer)
+    # Check generators
     stage_key = Symbol(:stage_, stage)
     decision_key = Symbol(:stage_, stage - 1, :_decisions)
     has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage")
     has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
-    return _stage_model(generator(stochasticprogram, decision_key),
-                        stage_parameters(stochasticprogram, stage - 1),
-                        generator(stochasticprogram, stage_key),
-                        stage_parameters(stochasticprogram, stage),
-                        scenario,
-                        copy(decision_variables(stochasticprogram, stage)),
-                        optimizer)
-end
-function _stage_model(decision_generator::Function,
-                      generator::Function,
-                      decision_params::Any,
-                      stage_params,
-                      scenario::AbstractScenario,
-                      decision_variables::DecisionVariables,
-                      optimizer_constructor)
-    stage_model = optimizer_constructor == nothing ? Model() : Model(optimizer_constructor)
-    stage_model.ext[:decisionvariables] = decision_variables
-    decision_generator(stage_model, decision_params)
-    generator(stage_model, stage_params, scenario)
+    # Create stage model
+    stage_model = optimizer == nothing ? Model() : Model(optimizer)
+    # Prepare decisions
+    stage_model.ext[:decisionvariables] = Decision()
+    add_decision_bridges!(stage_model)
+    # Generate and return the stage model
+    generator(stochasticprogram, decision_key)(stage_model, decision_params)
+    generator(stochasticprogram, stage_key)(stage_model, stage_params, scenario)
     return stage_model
 end
 function generate_stage_one!(stochasticprogram::StochasticProgram)
@@ -106,9 +86,11 @@ function generate!(stochasticprogram::StochasticProgram{N}) where N
         # Clear stochasticprogram before re-generation
         clear!(stochasticprogram)
     end
+    # Check generators
+    check_generators(stochasticprogram::StochasticProgram{N})
     # Dispatch generation on stochastic structure
     generate!(stochasticprogram, structure(stochasticprogram))
-    return stochasticprogram
+    return nothing
 end
 # Outcome model generation #
 # ========================== #
@@ -117,44 +99,43 @@ function _outcome_model!(outcome_model::JuMP.Model,
                          generator::Function,
                          decision_params::Any,
                          stage_params::Any,
-                         decision_variables::DecisionVariables,
-                         decision::AbstractVector,
+                         decisions::AbstractVector,
                          scenario::AbstractScenario)
-    outcome_model.ext[:decisionvariables] = copy(decision_variables)
-    update_decision_variables!(outcome_model, decision)
+    # Prepare decisions
+    outcome_model.ext[:decisions] = Decisions()
+    add_decision_bridges!(outcome_model)
+    # Generate the outcome model
     decision_generator(outcome_model, decision_params)
     generator(outcome_model, stage_params, scenario)
-    return outcome_model
+    # Update the known decision values
+    update_known_decisions!(outcome_model, decision)
+    return nothing
 end
 """
     outcome_model(stochasticprogram::TwoStageStochasticProgram,
-                  decision::Union{AbstractVector, DecisionVariables},
+                  decision::AbstractVector,
                   scenario::AbstractScenario;
                   optimizer = nothing)
 
-Return the resulting second stage model if `decision` is the first-stage decision in the provided `scenario`, in `stochasticprogram`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. Optionally, supply a capable `optimizer` to the outcome model.
+Return the resulting second stage model if `decision` is the first-stage decision in the provided `scenario`, in `stochasticprogram`. The supplied `decision` must match the defined decision variables in `stochasticprogram`. Optionally, supply a capable `optimizer` to the outcome model.
 """
-function outcome_model(stochasticprogram::TwoStageStochasticProgram,
-                       decision::DecisionVariables,
-                       scenario::AbstractScenario;
-                       optimizer = nothing)
-    # Sanity checks on given decision vector
-    decision_names(decision_variables(stochasticprogram)) == decision_names(decision) || error("Given decision does not match decision variables in stochastic program.")
-    return outcome_model(stochasticprogram, decisions(decision), scenario; optimizer = optimizer)
-end
 function outcome_model(stochasticprogram::TwoStageStochasticProgram,
                        decision::AbstractVector,
                        scenario::AbstractScenario;
                        optimizer = nothing)
+    # Check generators
     has_generator(stochasticprogram,:stage_1_decisions) || error("First-stage not defined in stochastic program. Consider @first_stage or @stage 1.")
     has_generator(stochasticprogram,:stage_2) || error("Second-stage problem not defined in stochastic program. Consider @second_stage.")
+    # Sanity checks on given decision vector
+    length(decision) == num_decisions(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(stochasticprogram))
+    all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Create outcome model
     outcome_model = optimizer == nothing ? Model() : Model(optimizer)
     _outcome_model!(outcome_model,
                     generator(stochasticprogram,:stage_1_decisions),
                     generator(stochasticprogram,:stage_2),
                     stage_parameters(stochasticprogram, 1),
                     stage_parameters(stochasticprogram, 2),
-                    decision_variables(stochasticprogram, 1),
                     decision,
                     scenario)
     return outcome_model

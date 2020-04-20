@@ -1,6 +1,20 @@
 # Structured optimizer interface
 # ========================== #
+"""
+    load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure)
+
+Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure`.
+
+See also: [`optimize!`](@ref)
+"""
+function load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure)
+    throw(MethodError(load_structure!, optimizer, structure))
+end
+
+
+
 # API
+# load_structure!
 # [x] optimizer_name
 # [x] optimize!
 # optimal_decision
@@ -8,22 +22,22 @@
 # [x] termination_status
 # optimal_recourse_decision
 """
-    optimize!(structuredoptimizer::AbstractStructuredOptimizer)
+    optimize!(optimizer::AbstractStructuredOptimizer)
 
-Optimize the `AbstractStructuredOptimizer`, which also optimizes the `stochasticprogram` it was instantiated from.
+Start the solution procedure for `optimizer` after a call to [`load_structure!`](@ref).
 
-See also: [`fill_solution!`](@ref)
+See also: [`load_structure!`](@ref)
 """
-function optimize!(structuredoptimizer::AbstractStructuredOptimizer)
-    throw(MethodError(optimize_structured!, structuredoptimizer))
+function optimize!(optimizer::AbstractStructuredOptimizer)
+    throw(MethodError(optimize_structured!, optimizer))
 end
 """
-    termination_status(structuredoptimizer::AbstractStructuredOptimizer)
+    termination_status(optimizer::AbstractStructuredOptimizer)
 
 Return the reason why the solver stopped (i.e., the MathOptInterface model attribute `TerminationStatus`).
 """
-function termination_status(structuredoptimizer::AbstractStructuredOptimizer)
-    throw(MethodError(termination_status, structuredoptimizer))
+function termination_status(optimizer::AbstractStructuredOptimizer)
+    throw(MethodError(termination_status, optimizer))
 end
 """
     optimal_value(optimizer::AbstractStructuredOptimizer)

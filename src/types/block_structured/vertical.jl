@@ -1,52 +1,30 @@
-struct VerticalBlockStructure{N, M, T <: AbstractFloat, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N,T}
-    decision_variables::NTuple{N, DecisionVariables{T}}
+struct VerticalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
+    decisions::NTuple{N, Decisions}
     first_stage::JuMP.Model
     scenarioproblems::SP
 
-    function VerticalBlockStructure(decision_variables::DecisionVariables{T}, scenarioproblems::AbstractScenarioProblems) where {T <: AbstractFloat}
+    function VerticalBlockStructure(scenarioproblems::NTuple{M,AbstractScenarioProblems}) where M
+        N = M + 1
+        decisions = ntuple(Val(N)) do i
+            Decisions()
+        end
         SP = typeof(scenarioproblems)
-        return new{2,1,T,SP}(decision_variables, Model(), scenarioproblems)
-    end
-
-    function VerticalBlockStructure(decision_variables::NTuple{N,DecisionVariables{T}}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M, T <: AbstractFloat}
-        M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
-        SP = typeof(scenarioproblems)
-        return new{N,M,T,SP}(decision_variables, Model(), scenarioproblems)
+        return new{N,M,SP}(decisions, Model(), scenarioproblems)
     end
 end
 
-function StochasticStructure(::Type{T}, ::Type{S}, instantiation::Union{BlockVertical, DistributedBlockVertical})
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    scenarioproblems = (ScenarioProblems(decision_variables[1], S, instantiation),)
-    return VerticalBlockStructure(decision_variables, scenarioproblems)
-end
-
-function StochasticStructure(::Type{T}, scenarios::Scenarios, instantiation::Union{BlockVertical, DistributedBlockVertical})
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    scenarioproblems = (ScenarioProblems(decision_variables[1], scenarios, instantiation),)
-    return VerticalBlockStructure(decision_variables, scenarioproblems)
-end
-
-function StochasticStructure(::Type{T}, scenario_types::NTuple{M, DataType}, instantiation::Union{BlockVertical, DistributedBlockVertical})
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
+function StochasticStructure(scenario_types::NTuple{M, DataType}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
     scenarioproblems = ntuple(Val(M)) do i
-        ScenarioProblems(decision_variables[i], scenario_types[i], instantiation)
+        ScenarioProblems(scenario_types[i], instantiation)
     end
-    return VerticalBlockStructure(decision_variables, scenarioproblems)
+    return VerticalBlockStructure(scenarioproblems)
 end
 
-function StochasticStructure(::Type{T}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{BlockVertical, DistributedBlockVertical})
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
+function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
     scenarioproblems = ntuple(Val(M)) do i
-        ScenarioProblems(decision_variables[i], scenario_types[i], instantiation)
+        ScenarioProblems(scenarios[i], instantiation)
     end
-    return VerticalBlockStructure(decision_variables, scenarioproblems)
+    return VerticalBlockStructure(scenarioproblems)
 end
 
 # Base overloads #
@@ -81,12 +59,16 @@ end
 
 # Getters #
 # ========================== #
-function first_stage(stochasticprogram::StochasticProgram, structure::VerticalBlockStructure; optimizer = nothing)
-    if optimizer == nothing
-        return structure.first_stage
-    end
-    stage_one = copy(structure.first_stage)
-    set_optimizer(stage_one, optimizer)
-    return stage_one
+function structure_name(structure::VerticalBlockStructure)
+    return "Block vertical"
 end
+function all_decision_variables(structure::VerticalBlockStructure{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    if s == 1
+        return all_decision_variables(structure.first_stage)
+    end
+    # TODO: what do at this point? Decisions at later stages are scenario-dependent
+    error("all_decision_variables not yet implemented for later stages")
+end
+deferred_first_stage(structure::VerticalBlockStructure, ::Val{1}) = num_variables(first_stage(structure)) == 0
 # ========================== #

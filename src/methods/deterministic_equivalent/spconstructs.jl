@@ -1,4 +1,4 @@
-function _DEP(stochasticprogram::StochasticProgram{2}, dep::DeterministicEquivalent; optimizer = nothing)
+function DEP(stochasticprogram::StochasticProgram{2}, dep::DeterministicEquivalent; optimizer = nothing)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)

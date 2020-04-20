@@ -9,7 +9,6 @@ using Printf
 
 # External libraries
 using JuMP
-using Distributions
 using MathOptInterface
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
@@ -17,12 +16,12 @@ using Reexport
 using ProgressMeter
 
 import Base: getindex, length, in, issubset, show
-import JuMP: optimize!, termination_status
-import Distributions: sample
+import JuMP: optimize!, termination_status, index, value
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
+const CI = MOI.ConstraintIndex
 
 import MutableArithmetics
 const MA = MutableArithmetics

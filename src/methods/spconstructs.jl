@@ -19,6 +19,7 @@ function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario;
                stage_parameters(stochasticprogram, 1),
                stage_parameters(stochasticprogram, 2),
                scenario,
+               Decisions(),
                optimizer)
 end
 function _WS(stage_one_generator::Function,
@@ -26,17 +27,23 @@ function _WS(stage_one_generator::Function,
              stage_one_params::Any,
              stage_two_params::Any,
              scenario::AbstractScenario,
+             decisions::Decisions,
              optimizer_constructor)
     ws_model = optimizer_constructor == nothing ? Model() : Model(optimizer_constructor)
+    # Prepare decisions
+    ws_model.ext[:decisions] = decisions
+    add_decision_bridges!(ws_model)
+    # Generate first stage and cache objective
     stage_one_generator(ws_model, stage_one_params)
     ws_obj = copy(objective_function(ws_model))
+    # Generate second stage and finalize objective
     stage_two_generator(ws_model, stage_two_params, scenario)
     ws_obj += objective_function(ws_model)
     set_objective_function(ws_model, ws_obj)
     return ws_model
 end
 """
-    WS_decision(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenario, optimizer_constructor = nothing)
+    wait_and_see_decision(stochasticprogram::TwoStageStochasticProgram, scenario::AbstractScenario, optimizer_constructor = nothing)
 
 Calculate the optimizer of the **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
@@ -44,18 +51,14 @@ If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimi
 
 See also: [`WS`](@ref)
 """
-function WS_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario)
+function wait_and_see_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Solve WS model for supplied scenario
     ws_model = WS(stochasticprogram, scenario, optimizer = moi_optimizer(stochasticprogram))
     optimize!(ws_model)
     # Return WS decision
-    decision = ws_model.colVal[1:decision_length(stochasticprogram)]
-    if any(isnan.(decision))
-        warn("Optimal decision not defined. Check that the EVP model was properly solved.")
-    end
-    return decision
+    return JuMP.value.(all_decisions_variables(ws_model))
 end
 """
     EWS(stochasticprogram::StochasticProgram)
@@ -68,11 +71,25 @@ If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimi
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticprogram::StochasticProgram{2})
+function EWS(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Solve all possible WS models and compute EWS
-    return _EWS(stochasticprogram)
+    return EWS(stochasticprogram, structure(stochasticprogram))
+end
+# Default implementation
+function EWS(stochasticprogram::StochasticProgram, structure::AbstractStochasticStructure)
+    return mapreduce(+, scenarios(stochasticprogram)) do scenario
+        ws = _WS(stochasticprogram.generator[:stage_1],
+                 stochasticprogram.generator[:stage_2],
+                 stage_parameters(stochasticprogram, 1),
+                 stage_parameters(stochasticprogram, 2),
+                 scenario,
+                 Decisions(),
+                 moi_optimizer(stochasticprogram))
+        optimize!(ws)
+        probability(scenario)*objective_value(ws)
+    end
 end
 """
     EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler, optimizer_constructor = nothing; confidence = 0.95, N::Integer = 1000)
@@ -87,85 +104,26 @@ function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; conf
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Generate a sample model and statistically evaluate EWS
-    sp = sample(stochasticmodel, sampler, N; optimizer = optimizer_constructor(stochasticprogram))
-    𝔼WS, σ = _stat_EWS(sp, optimizer_factory)
-    z = quantile(Normal(0,1), confidence)
-    L = 𝔼WS - z*σ/sqrt(N)
-    U = 𝔼WS + z*σ/sqrt(N)
-    return ConfidenceInterval(L, U, confidence)
-end
-function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: ScenarioProblems}
-    return sum([begin
-                ws = _WS(stochasticprogram.generator[:stage_1],
-                         stochasticprogram.generator[:stage_2],
-                         stage_parameters(stochasticprogram, 1),
-                         stage_parameters(stochasticprogram, 2),
-                         scenario,
-                         moi_optimizer(stochasticprogram))
-                optimize!(ws)
-                probability(scenario)*objective_value(ws)
-                end for scenario in scenarios(stochasticprogram)])
-end
-function _EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: DScenarioProblems}
-    partial_ews = Vector{Float64}(undef, nworkers())
-    @sync begin
-        for (i,w) in enumerate(workers())
-            @async partial_ews[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,optimizer)->begin
-                scenarioproblems = fetch(sp)
-                nscenarios(scenarioproblems) == 0 && return zero(T)
-                return sum([begin
-                            ws = _WS(stage_one_generator,
-                                     stage_two_generator,
-                                     stage_one_params,
-                                     stage_two_params,
-                                     scenario,
-                                     optimizer)
-                            optimize!(ws)
-                            probability(scenario)*objective_value(ws)
-                            end for scenario in scenarios(scenarioproblems)])
-                end,
-                w,
-                scenarioproblems(stochasticprogram)[w-1],
-                stochasticprogram.generator[:stage_1],
-                stochasticprogram.generator[:stage_2],
-                stage_parameters(stochasticprogram, 1),
-                stage_parameters(stochasticprogram, 2),
-                moi_optimizer(stochasticprogram))
-        end
+    let eval_model = sample(stochasticmodel, sampler, N; optimizer = moi_optimizer(stochasticmodel), kw...)
+        𝔼WS, σ = statistical_EWS(eval_model, structure(eval_model))
+        z = quantile(Normal(0,1), confidence)
+        L = 𝔼WS - z*σ/sqrt(N)
+        U = 𝔼WS + z*σ/sqrt(N)
+        return ConfidenceInterval(L, U, confidence)
     end
-    return sum(partial_ews)
 end
-function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: ScenarioProblems}
-    ws_models = [WS(stochasticprogram, scenario, moi_optimizer(stochasticprogram)) for senario in scenarios(stochasticprogram)]
-    𝔼WS, σ² = welford(ws_models)
-    return 𝔼WS, sqrt(σ²)
-end
-function _stat_EWS(stochasticprogram::TwoStageStochasticProgram{T,S,SP}) where {T <: AbstractFloat, S, SP <: DScenarioProblems}
-    partial_welfords = Vector{Tuple{Float64,Float64,Int}}(undef, nworkers())
-    @sync begin
-        for (i,w) in enumerate(workers())
-            @async partial_welfords[i] = remotecall_fetch((sp,stage_one_generator,stage_two_generator,stage_one_params,stage_two_params,optimizer)->begin
-                scenarioproblems = fetch(sp)
-                nscenarios(scenarioproblems) == 0 && return zero(T), zero(T)
-                ws_models = [_WS(stage_one_generator,
-                                 stage_two_generator,
-                                 stage_one_params,
-                                 stage_two_params,
-                                 scenario,
-                                 optimizer) for scenario in scenarios(scenarioproblems)]
-                return (welford(ws_models)..., nscenarios(scenarioproblems))
-            end,
-            w,
-            scenarioproblems(stochasticprogram)[w-1],
-            stochasticprogram.generator[:stage_1_vars],
-            stochasticprogram.generator[:stage_2],
-            stage_parameters(stochasticprogram, 1),
-            stage_parameters(stochasticprogram, 2),
-            moi_optimizer(stochasticprogram))
-        end
+# Default implementation
+function statistical_EWS(stochasticprogram::StochasticProgram, structure::AbstractStochasticStructure)
+    ws_models = reduce(scenarios(stochasticprogram)) do scenario
+        ws = _WS(stochasticprogram.generator[:stage_1],
+                 stochasticprogram.generator[:stage_2],
+                 stage_parameters(stochasticprogram, 1),
+                 stage_parameters(stochasticprogram, 2),
+                 scenario,
+                 Decisions(),
+                 moi_optimizer(stochasticprogram))
     end
-    𝔼WS, σ², _ = reduce(aggregate_welford, partial_welfords)
-    return 𝔼WS, sqrt(σ²)
+    return welford(ws_models, probability.(scenarios(stochasticprogram)))
 end
 """
     DEP(stochasticprogram::TwoStageStochasticProgram; optimizer = nothing)
@@ -177,9 +135,9 @@ In other words, generate the extended form the `stochasticprogram` as a single J
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
 function DEP(stochasticprogram::StochasticProgram{2}; optimizer = nothing)
-    return _DEP(stochasticprogram, structure(stochasticprogram); optimizer = optimizer)
+    return DEP(stochasticprogram, structure(stochasticprogram); optimizer = optimizer)
 end
-function _DEP(stochasticprogram::StochasticProgram{2}, ::AbstractStochasticStructure; optimizer = nothing)
+function DEP(stochasticprogram::StochasticProgram{2}, ::AbstractStochasticStructure; optimizer = nothing)
     # Return possibly cached model
     cache = problemcache(stochasticprogram)
     if haskey(cache, :dep)
@@ -214,7 +172,7 @@ function VRP(stochasticprogram::StochasticProgram)
     # Solve DEP
     optimize!(stochasticprogram)
     # Return optimal value
-    return optimal_value(stochasticprogram)
+    return objective_value(stochasticprogram)
 end
 """
     VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence = 0.95)
@@ -247,7 +205,7 @@ function EVPI(stochasticprogram::StochasticProgram{2})
     # Calculate VRP
     vrp = VRP(stochasticprogram)
     # Solve all possible WS models and calculate EWS
-    ews = _EWS(stochasticprogram)
+    ews = EWS(stochasticprogram)
     # Return EVPI = EWS-VRP
     return abs(ews-vrp)
 end
@@ -286,7 +244,7 @@ Generate the **expected value problem** (`EVP`) of the two-stage `stochasticprog
 
 In other words, generate a wait-and-see model corresponding to the expected scenario over all available scenarios in `stochasticprogram`. Optionally, a capable `optimizer` can be supplied to `WS`.
 
-See also: [`EVP_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
+See also: [`expected_value_decision`](@ref), [`EEV`](@ref), [`EV`](@ref), [`WS`](@ref)
 """
 function EVP(stochasticprogram::StochasticProgram{2}; optimizer = nothing)
     # Return possibly cached model
@@ -304,7 +262,7 @@ function EVP(stochasticprogram::StochasticProgram{2}; optimizer = nothing)
     return ev_model
 end
 """
-    EVP_decision(stochasticprogram::TwoStageStochasticProgram)
+    expected_value_decision(stochasticprogram::TwoStageStochasticProgram)
 
 Calculate the optimizer of the `EVP` of the two-stage `stochasticprogram`.
 
@@ -312,18 +270,14 @@ If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimi
 
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
-function EVP_decision(stochasticprogram::StochasticProgram{2})
+function expected_value_decision(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP
     evp = EVP(stochasticprogram, optimizer = moi_optimizer(stochasticprogram))
     optimize!(evp)
     # Return EVP decision
-    decision = extract_decision_variables(evp, decision_variables(stochasticprogram, 1))
-    if any(isnan.(decisions(decision)))
-        warn("Optimal decision not defined. Check that the EVP model was properly solved.")
-    end
-    return decision
+    return JuMP.value.(all_decisions_variables(evp))
 end
 """
     EV(stochasticprogram::TwoStageStochasticProgram)
@@ -332,7 +286,7 @@ Calculate the optimal value of the `EVP` of the two-stage `stochasticprogram`.
 
 If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
-See also: [`EVP`](@ref), [`EVP_decision`](@ref), [`EEV`](@ref)
+See also: [`EVP`](@ref), [`expected_value_decision`](@ref), [`EEV`](@ref)
 """
 function EV(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
@@ -356,7 +310,7 @@ function EEV(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP model
-    evp_decision = EVP_decision(stochasticprogram)
+    evp_decision = expected_value_decision(stochasticprogram)
     # Calculate EEV by evaluating the EVP decision
     eev = evaluate_decision(stochasticprogram, evp_decision)
     # Return EEV
@@ -377,7 +331,7 @@ function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; conf
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     sp = sample(stochasticmodel, sampler, N)
-    x̄ = EVP_decision(sp, optimizer_factory)
+    x̄ = expected_value_decision(sp, optimizer_factory)
     return evaluate_decision(stochasticmodel, x̄, sampler, optimizer_factory; confidence = confidence, Ñ = Ñ)
 end
 """

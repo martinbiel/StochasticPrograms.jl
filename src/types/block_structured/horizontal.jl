@@ -1,51 +1,29 @@
-struct HorizontalBlockStructure{N, M, T <: AbstractFloat, S <: AbstractScenario, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N,T,S}
-    decision_variables::NTuple{N, DecisionVariables{T}}
+struct HorizontalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
+    decisions::NTuple{M, Decisions}
     scenarioproblems::SP
 
-    function HorizontalBlockStructure(decision_variables::DecisionVariables{T}, scenarioproblems::AbstractScenarioProblems) where {T <: AbstractFloat}
+    function HorizontalBlockStructure(scenarioproblems::NTuple{M,AbstractScenarioProblems}) where M
+        N = M + 1
+        decisions = ntuple(Val(M)) do i
+            Decisions()
+        end
         SP = typeof(scenarioproblems)
-        return new{2,1,T,SP}(decision_variables, Model(), scenarioproblems)
-    end
-
-    function HorizontalBlockStructure(decision_variables::NTuple{N,DecisionVariables{T}}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M, T <: AbstractFloat}
-        M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
-        SP = typeof(scenarioproblems)
-        return new{N,M,T,SP}(decision_variables, Model(), scenarioproblems)
+        return new{N,M,SP}(decisions, scenarioproblems)
     end
 end
 
-function StochasticStructure(::Type{T}, ::Type{S}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal})
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    scenarioproblems = (ScenarioProblems(decision_variables[1], S, instantiation),)
-    return HorizontalBlockStructure(decision_variables, scenarioproblems)
-end
-
-function StochasticStructure(::Type{T}, scenarios::Scenarios, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal})
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    scenarioproblems = (ScenarioProblems(decision_variables[1], scenarios, instantiation),)
-    return HorizontalBlockStructure(decision_variables, scenarioproblems)
-end
-
-function StochasticStructure(::Type{T}, scenario_types::NTuple{M, DataType}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal})
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
+function StochasticStructure(scenario_types::NTuple{M, DataType}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal}) where M
     scenarioproblems = ntuple(Val(M)) do i
-        ScenarioProblems(decision_variables[i], scenario_types[i], instantiation)
+        ScenarioProblems(scenario_types[i], instantiation)
     end
-    return HorizontalBlockStructure(decision_variables, scenarioproblems)
+    return HorizontalBlockStructure(scenarioproblems)
 end
 
-function StochasticStructure(::Type{T}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal})
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
+function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal}) where M
     scenarioproblems = ntuple(Val(M)) do i
-        ScenarioProblems(decision_variables[i], scenario_types[i], instantiation)
+        ScenarioProblems(scenarios[i], instantiation)
     end
-    return HorizontalBlockStructure(decision_variables, scenarioproblems)
+    return HorizontalBlockStructure(scenarioproblems)
 end
 
 # Base overloads #
@@ -59,4 +37,37 @@ function Base.print(io::IO, structure::HorizontalBlockStructure{2})
         print(io, "\n")
     end
 end
+
+# Getters #
 # ========================== #
+function structure_name(structure::HorizontalBlockStructure)
+    return "Block horizontal"
+end
+function all_decision_variables(structure::HorizontalBlockStructure{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    # TODO: what do at this point? Decisions at later stages are scenario-dependent
+    error("all_decision_variables not yet implemented for later stages")
+end
+
+# Setters #
+# ========================== #
+function untake_decisions!(structure::HorizontalBlockStructure{2,1,SP}) where SP <: ScenarioProblems
+    if untake_decisions!(structure.decisions[1])
+        update_decisions!(scenarioproblems(structure), DecisionsStateChange())
+    end
+    return nothing
+end
+function untake_decisions!(structure::HorizontalBlockStructure{2,1,SP}) where SP <: DistributedScenarioProblems
+    sp = scenarioproblems(structure)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, sp[w-1], sp.decisions[w-1]) do (sp, d)
+                    if untake_decisions!(fetch(d))
+                        update_decisions!(fetch(sp), DecisionsStateChange())
+                    end
+                end
+        end
+    end
+    return nothing
+end

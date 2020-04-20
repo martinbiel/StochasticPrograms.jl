@@ -1,47 +1,33 @@
-struct DeterministicEquivalent{N, M, T <: AbstractFloat, S <: NTuple{M, Scenarios}} <: AbstractStochasticStructure{N, T}
-    decision_variables::NTuple{N, DecisionVariables{T}}
+struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStochasticStructure{N}
+    decisions::Decisions
+    decision_variables::NTuple{M, Vector{DecisionRef}}
     scenarios::S
     model::JuMP.Model
 
-    function DeterministicEquivalent(decision_variables::DecisionVariables{T}, ::Type{S}) where {T <: AbstractFloat, S <: AbstractScenario}
-        scenarios = (Vector{S}(),)
-        return new{2,1,T,typeof(scenarios)}(decision_variables, scenarios, Model())
-    end
-
-    function DeterministicEquivalent(decision_variables::DecisionVariables{T}, ::Type{S}) where {T <: AbstractFloat, S <: AbstractScenario}
-        scenarios = (Vector{S}(),)
-        return new{2,1,T,typeof(scenarios)}(decision_variables, scenarios, Model())
+    function DeterministicEquivalent(scenarios::NTuple{M, Scenarios}) where M
+        N = M + 1
+        decisions = Decisions()
+        decision_variables = ntuple(Val(M)) do i
+            Vector{DecisionRef}()
+        end
+        S = typeof(scenarios)
+        return new{N,M,S}(decisions, decision_variables, scenarios, Model())
     end
 end
 
-function StochasticStructure(::Type{T}, ::Type{S}, ::Deterministic)
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    scenarios = (Vector{S}(),)
-    return DeterministicEquivalent(decision_variables, scenarios)
-end
-
-function StochasticStructure(::Type{T}, scenarios::Scenarios, ::Deterministic)
-    decision_variables = (DecisionVariables(T), DecisionVariables(T))
-    return DeterministicEquivalent(decision_variables, (scenarios,))
-end
-
-function StochasticStructure(::Type{T}, scenario_types::NTuple{M, DataType}, ::Deterministic)
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
+function StochasticStructure(scenario_types::NTuple{M, DataType}, ::Deterministic) where M
     scenarios = ntuple(Val(M)) do i
         Vector{scenario_types[i]}()
     end
-    return DeterministicEquivalent(decision_variables, scenarios)
+    return DeterministicEquivalent(scenarios)
 end
 
-function StochasticStructure(::Type{T}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, ::Deterministic)
-    N = M + 1
-    decision_variables = ntuple(Val(N)) do i
-        DecisionVariables(T)
-    end
-    return DeterministicEquivalent(decision_variables, scenarios)
+function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, ::Deterministic) where M
+    return DeterministicEquivalent(scenarios)
+end
+
+function supports_structure(::MOI.AbstractOptimizer, ::DeterministicEquivalent)
+    return true
 end
 
 # Base overloads #
@@ -54,15 +40,48 @@ end
 
 # Getters #
 # ========================== #
+function structure_name(structure::DeterministicEquivalent)
+    return "Deterministic equivalent"
+end
+function decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    return [decision(dref) for dref in dep.decision_variables[s]]
+end
+function decision_variables(dep::DeterministicEquivalent{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    return dep.decision_variables[s]
+end
+function all_decisions(dep::DeterministicEquivalent)
+    return all_decisions(dep.model)
+end
+function all_decision_variables(dep::DeterministicEquivalent, s::Integer)
+    return dep.decision_variables[s]
+end
+function num_decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
+    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
+    return length(dep.decision_variables[s])
+end
+function all_known_decisions(dep::DeterministicEquivalent)
+    # There are never any known decisions in the deterministically equivalent problem
+    return KnownDecisions[]
+end
+function all_known_decision_variables(dep::DeterministicEquivalent)
+    # There are never any known decisions in the deterministically equivalent problem
+    return KnownRef[]
+end
+function num_known_decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
+    # There are never any known decisions in the deterministically equivalent problem
+    return 0
+end
 function scenario(dep::DeterministicEquivalent{N}, i::Integer, s::Integer = 2) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
     s == 1 && error("The first stage does not have scenarios.")
-    return dep.scenarios[s][i]
+    return dep.scenarios[s-1][i]
 end
 function scenarios(dep::DeterministicEquivalent{N}, s::Integer = 2) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
     s == 1 && error("The first stage does not have scenarios.")
-    return dep.scenarios[s]
+    return dep.scenarios[s-1]
 end
 function subproblem(dep::DeterministicEquivalent, i::Integer, s::Integer = 2)
     return subproblem(scenarioproblems(dep, s), i)
@@ -70,11 +89,11 @@ end
 function subproblems(dep::DeterministicEquivalent, s::Integer = 2)
     return subproblems(scenarioproblems(dep, s))
 end
-function nsubproblems(dep::DeterministicEquivalent, s::Integer = 2)
+function num_subproblems(dep::DeterministicEquivalent, s::Integer = 2)
     return 0
 end
 function deferred(dep::DeterministicEquivalent)
-    return num_variables(dep.model) = 0
+    return num_variables(dep.model) == 0
 end
 # ========================== #
 

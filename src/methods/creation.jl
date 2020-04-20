@@ -346,10 +346,7 @@ See also: [`@second_stage`](@ref)
 """
 macro first_stage(arg)
     @capture(arg, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
-    return esc(@q begin
-        @stage 1 $arg
-        StochasticPrograms.generate_decision_variables!($sp)
-    end)
+    return esc(:(@stage 1 $arg))
 end
 """
     @second_stage(def)
@@ -587,13 +584,12 @@ macro stage(stage, args)
     def = postwalk(def) do x
         if @capture(x, @decision args__)
             decisiondef = @q begin
-                @variable $((args)...) StochasticPrograms.Decision()
+                @variable $((args)...) StochasticPrograms.AsKnown()
             end
             push!(decisiondefs.args, decisiondef)
-            variabledef = @q begin
-                @variable $((args)...)
+            return @q begin
+                @variable $((args)...) set = StochasticPrograms.DecisionSet()
             end
-            return variabledef
         end
         return x
     end

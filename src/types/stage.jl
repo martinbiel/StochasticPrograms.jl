@@ -1,15 +1,11 @@
-struct Stage{P <: Union{Nothing, StageParameters}}
+struct Stage{P}
     parameters::P
 
     function Stage()
         return new{Nothing}(nothing)
     end
 
-    function Stage(parameters::StageParameters)
-        if isempty(parameters.names)
-            return new{Nothing}(nothing)
-        end
-        P = typeof(P)
+    function Stage(parameters::P) where P
         return new{P}(parameters)
     end
 end

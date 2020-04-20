@@ -36,18 +36,18 @@ end
 Approximate solution to a stochastic model to a given level of confidence.
 """
 struct StochasticSolution{T <: AbstractFloat}
-    x::DecisionVariables{T}
+    x::Vector{Decision}
     Q::T
     N::Int
     interval::ConfidenceInterval{T}
 
-    function StochasticSolution(x::DecisionVariables{T}, Q::AbstractFloat, N::Int, interval::ConfidenceInterval{T}) where T <: AbstractFloat
+    function StochasticSolution(x::Vector{Decision}, Q::T, N::Int, interval::ConfidenceInterval{T}) where T <: AbstractFloat
         return new{T}(x, Q, N, interval)
     end
 end
 
 function EmptySolution()
-    return StochasticSolution(DecisionVariables(Float64), 0.0, 0, ConfidenceInterval(-Inf, Inf, 1.0))
+    return StochasticSolution(Vector{Decision}(), 0.0, 0, ConfidenceInterval(-Inf, Inf, 1.0))
 end
 
 function no_solution(solution::StochasticSolution)

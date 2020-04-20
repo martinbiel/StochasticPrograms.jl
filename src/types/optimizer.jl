@@ -5,7 +5,7 @@
 
 Abstract supertype for structure-exploiting optimizers.
 """
-abstract type AbstractStructuredOptimizer end
+abstract type AbstractStructuredOptimizer <: MOI.ModelLike end
 """
     AbstractStructuredOptimizerAttribute
 
@@ -38,15 +38,26 @@ mutable struct StochasticProgramOptimizer{Opt <: StochasticProgramOptimizerType}
         return new{StochasticProgramOptimizerType}(nothing, caching_optimizer)
     end
 
-    function StochasticProgramOptimizer(optimizer_constructor)
-        optimizer = MOI.instantiate(optimizer_constructor)
-        Opt = typeof(optimizer)
-        return new{Opt}(optimizer_constructor, optimizer)
+    function StochasticProgramOptimizer(optimizer_constructor, optimizer::MOI.AbstractOptimizer)
+        universal_fallback = MOIU.UniversalFallback(MOIU.Model{Float64}())
+        caching_optimizer = MOIU.CachingOptimizer(universal_fallback, MOIU.AUTOMATIC)
+        MOIU.reset_optimizer(caching_optimizer, optimizer)
+        Opt = MOI.AbstractOptimizer
+        return new{Opt}(optimizer_constructor, caching_optimizer)
     end
 end
 
+function StochasticProgramOptimizer(optimizer_constructor)
+    optimizer = MOI.instantiate(optimizer_constructor, with_bridge_type=Float64)
+    return StochasticProgramOptimizer(optimizer_constructor, optimizer)
+end
+
+function has_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
+    return !isnothing(sp_optimizer.optimizer_constructor)
+end
+
 function _check_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
-    if sp_optimizer.optimizer_constructor == nothing
+    if !has_provided_optimizer(sp_optimizer)
         throw(NoOptimizer())
     end
 end
@@ -76,8 +87,14 @@ function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{Opt}, optimiz
     return nothing
 end
 
+function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{StochasticProgramOptimizerType}, optimizer::MOI.AbstractOptimizer)
+    MOIU.reset_optimizer!(sp_optimizer.optimizer, optimizer)
+    return nothing
+end
+
 function set_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer_constructor)
     optimizer = MOI.instantiate(optimizer_constructor)
-    reset_optimizer!(sp_optimizer, optimizer_constructor)
+    reset_optimizer!(sp_optimizer, optimizer)
+    sp_optimizer.optimizer_constructor = optimizer_constructor
     return nothing
 end
