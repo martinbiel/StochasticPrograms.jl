@@ -1,12 +1,12 @@
-function iterate!(ph::AbstractProgressiveHedgingSolver, ::AbstractExecution)
+function iterate!(ph::AbstractProgressiveHedging, ::AbstractExecution)
     # Resolve all subproblems at the current optimal solution
     Q = resolve_subproblems!(ph)
-    if Q == Inf
-        return :Infeasible
-    elseif Q == -Inf
-        return :Unbounded
+    if Q.status != MOI.OPTIMAL
+        # Early termination log
+        log!(ph; status = Q.status)
+        return Q.status
     end
-    ph.data.Q = Q
+    ph.data.Q = Q.value
     # Update iterate
     update_iterate!(ph)
     # Update subproblems
@@ -17,22 +17,24 @@ function iterate!(ph::AbstractProgressiveHedgingSolver, ::AbstractExecution)
     update_penalty!(ph)
     # Update progress
     @unpack δ₁, δ₂ = ph.data
-    ph.data.δ = sqrt(δ₁ + δ₂)/(1e-10+norm(ph.ξ,2))
+    ph.data.δ = sqrt(δ₁ + δ₂) / (1e-10 + norm(ph.ξ, 2))
     # Log progress
     log!(ph)
     # Check optimality
     if check_optimality(ph)
+        # Final log
+        log!(ph; optimal = true)
         # Optimal
-        return :Optimal
+        return MOI.OPTIMAL
     end
-    # Just return a valid status for this iteration
-    return :Valid
-end
-
-function start_workers!(::AbstractProgressiveHedgingSolver, ::AbstractExecution)
+    # Dont return a status as procedure should continue
     return nothing
 end
 
-function close_workers!(::AbstractProgressiveHedgingSolver, ::AbstractExecution)
+function start_workers!(::AbstractProgressiveHedging, ::AbstractExecution)
+    return nothing
+end
+
+function close_workers!(::AbstractProgressiveHedging, ::AbstractExecution)
     return nothing
 end

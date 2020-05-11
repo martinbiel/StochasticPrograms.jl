@@ -15,6 +15,8 @@ using JuMP
 using LinearAlgebra
 using GLPK
 
+@everywhere using Distributions
+
 @everywhere import StochasticPrograms: probability, expected
 
 include("../problems/problem_load.jl")

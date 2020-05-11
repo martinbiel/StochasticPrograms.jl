@@ -37,13 +37,19 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
         end
         # Cache current objective
         dep_obj = objective_function(dep_model)
+        obj_sense = objective_sense(dep_model)
         # Define second-stage problems, renaming variables according to scenario.
         stage_two_params = stage_parameters(stochasticprogram, 2)
         visited_objs = collect(keys(object_dictionary(dep_model)))
         for (i, scenario) in enumerate(scenarios(stochasticprogram))
             stage_key = Symbol(:stage_, stage)
             generator(stochasticprogram, stage_key)(dep_model, stage_parameters(stochasticprogram, stage), scenario)
-            dep_obj += probability(scenario)*objective_function(dep_model)
+            sub_sense = objective_sense(dep_model)
+            if obj_sense == sub_sense
+                dep_obj += probability(scenario)*objective_function(dep_model)
+            else
+                dep_obj -= probability(scenario)*objective_function(dep_model)
+            end
             for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
                 newkey = if isa(obj, VariableRef) || isa(obj, DecisionRef)
                     varname = if N > 2
@@ -92,11 +98,12 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
             end
         end
         set_objective_function(dep_model, dep_obj)
+        set_objective_sense(dep_model, obj_sense)
     end
     return nothing
 end
 
-function clear(dep::DeterministicEquivalent)
+function clear!(dep::DeterministicEquivalent)
     # Clear deterministic equivalent model
     empty!(dep.model)
     return nothing

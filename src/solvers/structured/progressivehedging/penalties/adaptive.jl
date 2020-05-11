@@ -45,16 +45,16 @@ struct AdaptivePenalization{T <: AbstractFloat} <: AbstractPenalization
         return new{T}(AdaptiveData{T}(; r = r), AdaptiveParameters{T}(;kw...))
     end
 end
-function penalty(::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
+function penalty(::AbstractProgressiveHedging, penalty::AdaptivePenalization)
     return penalty.data.r
 end
-function initialize_penalty!(ph::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
+function initialize_penalty!(ph::AbstractProgressiveHedging, penalty::AdaptivePenalization)
     update_dual_gap!(ph)
     @unpack δ₂ = ph.data
     @unpack ζ = penalty.parameters
     penalty.data.r = max(1., 2*ζ*abs(calculate_objective_value(ph)))/max(1., δ₂)
 end
-function update_penalty!(ph::AbstractProgressiveHedgingSolver, penalty::AdaptivePenalization)
+function update_penalty!(ph::AbstractProgressiveHedging, penalty::AdaptivePenalization)
     @unpack δ₁, δ₂ = ph.data
     @unpack r = penalty.data
     @unpack γ₁, γ₂, γ₃, σ, α, θ, ν, β, η = penalty.parameters

@@ -34,33 +34,63 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: P
     data::RDData{T}
     parameters::RDParameters{T}
 
-    ξ::A
+    decisions::Decisions
+    projection_targets::Vector{MOI.VariableIndex}
+    ξ::Vector{Decision{T}}
+
     Q̃_history::A
     σ_history::A
     incumbents::Vector{Int}
 
     penaltyterm::PT
 
-    function RegularizedDecomposition(ξ₀::AbstractVector, penaltyterm::PenaltyTerm; kw...)
+    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::PenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
-        ξ₀_ = convert(AbstractVector{T}, copy(ξ₀))
-        A = typeof(ξ₀_)
+        A = Vector{T}
+        ξ = map(ξ₀) do val
+            Decision(val, T)
+        end
         PT = typeof(penaltyterm)
-        return new{T, A, PT}(RDData{T}(), RDParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}(), penaltyterm)
+        return new{T, A, PT}(RDData{T}(),
+                             RDParameters{T}(; kw...),
+                             decisions,
+                             Vector{MOI.VariableIndex}(undef, length(ξ₀)),
+                             ξ,
+                             A(),
+                             A(),
+                             Vector{Int}(),
+                             penaltyterm)
     end
 end
 
-function initialize_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
+function initialize_regularization!(lshaped::AbstractLShaped, rd::RegularizedDecomposition{T}) where T <: AbstractFloat
+    # Add projection targets
+    add_projection_targets!(rd, lshaped.master)
+    # Prepare penalty constant
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)
-    # Initialize and update penalty
-    initialize_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, lshaped.x)
-    c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
-    update_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
+    @unpack σ = rd.data
+    # Initialize penalty
+    initialize_penaltyterm!(rd.penaltyterm,
+                            lshaped.master,
+                            1 / (2 * σ),
+                            rd.decisions.undecided,
+                            rd.projection_targets)
     return nothing
 end
 
-function log_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
+function restore_regularized_master!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
+    # Delete penalty-term
+    remove_penalty!(rd.penaltyterm, lshaped.master)
+    # Delete projection targets
+    for var in rd.projection_targets
+        MOI.delete(lshaped.master, var)
+    end
+    empty!(rd.projection_targets)
+    return nothing
+end
+
+function log_regularization!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
     @unpack Q̃,σ,incumbent = rd.data
     push!(rd.Q̃_history, Q̃)
     push!(rd.σ_history, σ)
@@ -68,7 +98,7 @@ function log_regularization!(lshaped::AbstractLShapedSolver, rd::RegularizedDeco
     return nothing
 end
 
-function log_regularization!(lshaped::AbstractLShapedSolver, t::Integer, rd::RegularizedDecomposition)
+function log_regularization!(lshaped::AbstractLShaped, t::Integer, rd::RegularizedDecomposition)
     @unpack Q̃,σ,incumbent = rd.data
     rd.Q̃_history[t] = Q̃
     rd.σ_history[t] = σ
@@ -76,7 +106,7 @@ function log_regularization!(lshaped::AbstractLShapedSolver, t::Integer, rd::Reg
     return nothing
 end
 
-function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition)
+function take_step!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
     @unpack Q,θ = lshaped.data
     @unpack τ = lshaped.parameters
     @unpack σ = rd.data
@@ -86,34 +116,33 @@ function take_step!(lshaped::AbstractLShapedSolver, rd::RegularizedDecomposition
     Q̃ = incumbent_objective(lshaped, t, rd)
     need_update = false
     if abs(θ-Q) <= τ*(1+abs(θ)) || Q <= Q̃ + τ || rd.data.major_iterations == 0
-        rd.ξ .= current_decision(lshaped)
-        rd.data.Q̃ = copy(Q)
         need_update = true
+        x = current_decision(lshaped)
+        for i in eachindex(rd.ξ)
+            rd.ξ[i].value = x[i]
+        end
+        rd.data.Q̃ = copy(Q)
         rd.data.incumbent = t
         rd.data.major_iterations += 1
     else
         rd.data.minor_iterations += 1
     end
-    new_σ = if Q + τ <= (1-γ)*Q̃ + γ*θ
+    rd.data.σ = if Q + τ <= (1-γ)*Q̃ + γ*θ
         max(σ, min(σ̅, 2*σ))
     elseif Q - τ >= γ*Q̃ + (1-γ)*θ
         min(σ, max(σ̲, 0.5*σ))
     else
         σ
     end
-    if abs(new_σ - σ) > τ
-        need_update = true
-    end
-    rd.data.σ = new_σ
+    need_update |= abs(rd.data.σ - σ) > τ
     if need_update
-        c = vcat(get_obj(lshaped), active_model_objectives(lshaped))
-        update_penaltyterm!(rd.penaltyterm, lshaped.mastersolver, c, 1/rd.data.σ, rd.ξ)
+        @unpack σ = rd.data
+        update_penaltyterm!(rd.penaltyterm,
+                            lshaped.master,
+                            1 / (2 * σ),
+                            rd.decisions.undecided,
+                            rd.projection_targets)
     end
-    return nothing
-end
-
-function solve_regularized_master!(lshaped::AbstractLShapedSolver, solver::LQSolver, rd::RegularizedDecomposition)
-    solve_penalized!(rd.penaltyterm, lshaped.mastersolver, lshaped.mastervector, lshaped.x, rd.ξ)
     return nothing
 end
 
@@ -145,8 +174,8 @@ function add_regularization_params!(regularizer::RD; kwargs...)
     return nothing
 end
 
-function (rd::RD)(x::AbstractVector)
-    return RegularizedDecomposition(x, rd.penaltyterm; rd.parameters...)
+function (rd::RD)(decisions::Decisions, x::AbstractVector)
+    return RegularizedDecomposition(decisions, x, rd.penaltyterm; rd.parameters...)
 end
 
 function str(::RD)

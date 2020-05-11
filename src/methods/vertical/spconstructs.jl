@@ -10,7 +10,7 @@ function EWS(stochasticprogram::StochasticProgram,
                 stochasticprogram.generator[:stage_2],
                 stage_parameters(stochasticprogram, 1),
                 stage_parameters(stochasticprogram, 2),
-                moi_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
+                sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return zero(T)
                     return mapreduce(+, scenarios(scenarioproblems)) do scenario
@@ -42,7 +42,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram,
                 stochasticprogram.generator[:stage_2],
                 stage_parameters(stochasticprogram, 1),
                 stage_parameters(stochasticprogram, 2),
-                moi_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
+                sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
                     ws_models = reduce(scenarios(scenarioproblems)) do scenario

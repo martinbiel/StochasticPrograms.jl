@@ -584,7 +584,7 @@ macro stage(stage, args)
     def = postwalk(def) do x
         if @capture(x, @decision args__)
             decisiondef = @q begin
-                @variable $((args)...) StochasticPrograms.AsKnown()
+                @variable $((args)...) set = StochasticPrograms.KnownSet()
             end
             push!(decisiondefs.args, decisiondef)
             return @q begin

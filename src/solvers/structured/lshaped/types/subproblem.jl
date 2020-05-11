@@ -1,206 +1,250 @@
-struct SubProblem{F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
+struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
     id::Int
-    π::T
-
-    solver::S
-    feasibility_solver::S
-
-    h::Tuple{A,A}
-    x::A
-    y::A
-    masterterms::Vector{Tuple{Int,Int,T}}
+    probability::T
+    tolerance::T
+    optimizer::S
+    feasibility_handler::H
+    linking_constraints::Vector{MOI.ConstraintIndex}
+    masterterms::Vector{Vector{Tuple{Int, T}}}
 
     function SubProblem(model::JuMP.Model,
                         id::Integer,
                         π::AbstractFloat,
-                        x::AbstractVector,
-                        y₀::AbstractVector,
-                        masterterms::Vector{Tuple{Int,Int,R}},
-                        optimsolver::MPB.AbstractMathProgSolver,
-                        ::Type{F}) where {R <: AbstractFloat, F <: AbstractFeasibility}
-        T = promote_type(eltype(x), eltype(y₀), R, Float32)
-        x_ = convert(AbstractVector{T}, x)
-        y₀_ = convert(AbstractVector{T}, y₀)
-        masterterms_ = convert(Vector{Tuple{Int,Int,T}}, masterterms)
-        A = typeof(x_)
-        solver = LQSolver(model, optimsolver)
-        subproblem = new{F,T,A,typeof(solver)}(id,
-                                               π,
-                                               solver,
-                                               FeasibilitySolver(model, optimsolver, F),
-                                               (convert(A, MPB.getconstrLB(solver.lqmodel)),
-                                                convert(A, MPB.getconstrUB(solver.lqmodel))),
-                                               x_,
-                                               y₀_,
-                                               masterterms_)
-        return subproblem
-    end
-
-    function SubProblem(model::JuMP.Model,
-                        parent::JuMP.Model,
-                        id::Integer,
-                        π::AbstractFloat,
-                        x::AbstractVector,
-                        y₀::AbstractVector,
-                        optimsolver::MPB.AbstractMathProgSolver,
-                        ::Type{F}) where F <: AbstractFeasibility
-        T = promote_type(eltype(x), eltype(y₀), Float32)
-        x_ = convert(AbstractVector{T}, x)
-        y₀_ = convert(AbstractVector{T}, y₀)
-        A = typeof(x_)
-
-        solver = LQSolver(model, optimsolver)
-
-        subproblem = new{F,T,A,typeof(solver)}(id,
-                                               π,
-                                               solver,
-                                               FeasibilitySolver(model, optimsolver, F),
-                                               (convert(A, MPB.getconstrLB(solver.lqmodel)),
-                                                convert(A, MPB.getconstrUB(solver.lqmodel))),
-                                               x_,
-                                               y₀_,
-                                               Vector{Tuple{Int,Int,T}}())
-        parse_subproblem!(subproblem, model, parent)
-        return subproblem
+                        τ::AbstractFloat,
+                        master_indices::Vector{MOI.VariableIndex},
+                        ::Type{H}) where H <: AbstractFeasibilityHandler
+        T = typeof(π)
+        # Get optimizer backend
+        optimizer = backend(model)
+        S = typeof(optimizer)
+        # Instantiate feasibility handler if requested
+        feasibility_handler = H(optimizer)
+        # Collect all constraints with known decision occurances
+        constraints, terms =
+            collect_linking_constraints(model,
+                                        master_indices,
+                                        T)
+        return new{H,T,S}(id,
+                          π,
+                          τ,
+                          optimizer,
+                          feasibility_handler,
+                          constraints,
+                          terms)
     end
 end
 
-function FeasibilitySolver(model::JuMP.Model, optimsolver::MPB.AbstractMathProgSolver, ::Type{IgnoreFeasibility})
-    return LQSolver(model, optimsolver; load = false)
+# Feasibility handlers #
+# ========================== #
+struct FeasibilityIgnorer <: AbstractFeasibilityHandler end
+FeasibilityIgnorer(::MOI.ModelLike) = FeasibilityIgnorer()
+
+restore!(::MOI.ModelLike, ::FeasibilityIgnorer) = nothing
+
+
+mutable struct FeasibilityHandler <: AbstractFeasibilityHandler
+    objective::MOI.AbstractScalarFunction
+    feasibility_variables::Vector{MOI.VariableIndex}
 end
 
-function FeasibilitySolver(model::JuMP.Model, optimsolver::MPB.AbstractMathProgSolver, ::Type{<:HandleFeasibility})
-    solver = LQSolver(model, optimsolver)
-    feasibility_problem!(solver)
-    return solver
+HandlerType(::Type{IgnoreFeasibility}) = FeasibilityIgnorer
+HandlerType(::Type{<:HandleFeasibility}) = FeasibilityHandler
+
+function FeasibilityHandler(model::MOI.ModelLike)
+    # Cache objective
+    func_type = MOI.get(model, MOI.ObjectiveFunctionType())
+    obj = MOI.get(model, MOI.ObjectiveFunction{func_type}())
+    return FeasibilityHandler(obj, Vector{MOI.VariableIndex}())
 end
 
-function parse_subproblem!(subproblem::SubProblem, model::JuMP.Model, parent::JuMP.Model)
-    for (i, constr) in enumerate(model.linconstr)
-        for (j, var) in enumerate(constr.terms.vars)
-            if var.m == parent
-                # var is a first stage variable
-                push!(subproblem.masterterms, (i,var.col,-constr.terms.coeffs[j]))
+prepared(handler::FeasibilityHandler) = length(handler.feasibility_variables) > 0
+
+function prepare!(model::MOI.ModelLike, handler::FeasibilityHandler)
+    # Set objective to zero
+    G = MOI.ScalarAffineFunction{Float64}
+    MOI.set(model, MOI.ObjectiveFunction{G}(), zero(MOI.ScalarAffineFunction{Float64}))
+    i = 1
+    # Create auxiliary feasibility variables
+    for (F, S) in MOI.get(model, MOI.ListOfConstraints())
+        if F <: AffineDecisionFunction
+            for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
+                # Positive feasibility variable
+                pos_aux_var = MOI.add_variable(model)
+                name = add_subscript(:v⁺, i)
+                MOI.set(model, MOI.VariableName(), pos_aux_var, name)
+                push!(handler.feasibility_variables, pos_aux_var)
+                # Nonnegativity constraint
+                MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+                           MOI.GreaterThan{Float64}(0.0))
+                # Add to objective
+                MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                           MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+                # Add to constraint
+                MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+                # Negative feasibility variable
+                neg_aux_var = MOI.add_variable(model)
+                name = add_subscript(:v⁻, i)
+                MOI.set(model, MOI.VariableName(), neg_aux_var, name)
+                push!(handler.feasibility_variables, neg_aux_var)
+                # Nonnegativity constraint
+                MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+                           MOI.GreaterThan{Float64}(0.0))
+                # Add to objective
+                MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                           MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
+                # Add to constraint
+                MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
+                # Update identification index
+                i += 1
             end
         end
     end
-end
-
-function update_subproblem!(subproblem::SubProblem, x::AbstractVector)
-    lb = MPB.getconstrLB(subproblem.solver.lqmodel)
-    ub = MPB.getconstrUB(subproblem.solver.lqmodel)
-    for i in [term[1] for term in unique(term -> term[1], subproblem.masterterms)]
-        lb[i] = subproblem.h[1][i]
-        ub[i] = subproblem.h[2][i]
-    end
-    for (i,j,coeff) in subproblem.masterterms
-        lb[i] += coeff*x[j]
-        ub[i] += coeff*x[j]
-    end
-    MPB.setconstrLB!(subproblem.solver.lqmodel, lb)
-    MPB.setconstrUB!(subproblem.solver.lqmodel, ub)
-    update_feasibility_solver!(subproblem, lb, ub)
-    subproblem.x[:] = x
     return nothing
 end
-function update_feasibility_solver!(::SubProblem{IgnoreFeasibility}, ::AbstractVector, ::AbstractVector)
+
+function restore!(model::MOI.ModelLike, handler::FeasibilityHandler)
+    # Delete any feasibility variables
+    if !isempty(handler.feasibility_variables)
+        MOI.delete(model, handler.feasibility_variables)
+    end
+    empty!(handler.feasibility_variables)
+    # Restore objective
+    F = typeof(handler.objective)
+    MOI.set(model, MOI.ObjectiveFunction{F}(), handler.objective)
     return nothing
 end
-function update_feasibility_solver!(subproblem::SubProblem{<:HandleFeasibility}, lb::AbstractVector, ub::AbstractVector)
-    MPB.setconstrLB!(subproblem.feasibility_solver.lqmodel, lb)
-    MPB.setconstrUB!(subproblem.feasibility_solver.lqmodel, ub)
-end
-update_subproblems!(subproblems::Vector{<:SubProblem}, x::AbstractVector) = map(prob -> update_subproblem!(prob,x), subproblems)
 
-function get_solution(subproblem::SubProblem)
-    return copy(subproblem.y), getredcosts(subproblem.solver), getduals(subproblem.solver), getobjval(subproblem.solver)
+# Subproblem methods #
+# ========================== #
+function collect_linking_constraints(model::JuMP.Model,
+                                     master_indices::Vector{MOI.VariableIndex},
+                                     ::Type{T}) where T <: AbstractFloat
+    linking_constraints = Vector{MOI.ConstraintIndex}()
+    masterterms = Vector{Vector{Tuple{Int,T}}}()
+    F = CombinedAffExpr{Float64}
+    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
+        for cref in all_constraints(model, F, S)
+            push!(linking_constraints, cref.index)
+            coeffs = Vector{Tuple{Int,T}}()
+            aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::CombinedAffExpr
+            for (coef, kvar) in linear_terms(aff.knowns)
+                # Map known decisions to master decision,
+                # assuming sorted order
+                idx = master_indices[index(kvar).value].value
+                push!(coeffs, (idx, T(coef)))
+            end
+            push!(masterterms, coeffs)
+        end
+    end
+    return linking_constraints, masterterms
 end
 
-function solve(subproblem::SubProblem)
-    subproblem.solver(subproblem.y)
-    solvestatus = status(subproblem.solver)
-    if solvestatus == :Optimal
-        subproblem.y[:] = getsolution(subproblem.solver)
-        return OptimalityCut(subproblem)
-    elseif solvestatus == :Infeasible
+function update_subproblem!(subproblem::SubProblem, change::KnownModification)
+    func_type = MOI.get(subproblem.optimizer, MOI.ObjectiveFunctionType())
+    if func_type <: AffineDecisionFunction
+        # Only need to update if there are known decisions in objective
+        MOI.modify(subproblem.optimizer,
+                   MOI.ObjectiveFunction{func_type}(),
+                   change)
+    end
+    for cref in subproblem.linking_constraints
+        update_decision_constraint!(subproblem.optimizer, cref, change)
+    end
+    return nothing
+end
+
+function restore_subproblem!(subproblem::SubProblem)
+    restore!(subproblem.optimizer, subproblem.feasibility_handler)
+end
+
+function solve(subproblem::SubProblem, x::AbstractVector)
+    MOI.optimize!(subproblem.optimizer)
+    status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
+    if status == MOI.OPTIMAL
+        return OptimalityCut(subproblem, x)
+    elseif status == MOI.INFEASIBLE
         return Infeasible(subproblem)
-    elseif solvestatus == :Unbounded
+    elseif status == MOI.DUAL_INFEASIBLE
         return Unbounded(subproblem)
     else
-        error(@sprintf("Subproblem %d was not solved properly, returned status code: %s", subproblem.id,string(solvestatus)))
+        error("Subproblem $(subproblem.id) was not solved properly, returned status code: $status")
     end
 end
 
-function (subproblem::SubProblem{<:HandleFeasibility})()
-    subproblem.feasibility_solver(vcat(subproblem.y, rand(2*MPB.numconstr(subproblem.feasibility_solver.lqmodel))))
-    w = getobjval(subproblem.feasibility_solver)
-    if w > 0
-        return FeasibilityCut(subproblem)
+function (subproblem::SubProblem{FeasibilityHandler})(x::AbstractVector)
+    model = subproblem.optimizer
+    if !prepared(subproblem.feasibility_handler)
+        prepare!(model, subproblem.feasibility_handler)
     end
-    return solve(subproblem)
-end
-function (subproblem::SubProblem{IgnoreFeasibility})()
-    return solve(subproblem)
-end
-
-function (subproblem::SubProblem)(x::AbstractVector)
-    update_subproblem!(subproblem, x)
-    subproblem.solver(subproblem.y)
-    solvestatus = status(subproblem.solver)
-    if solvestatus == :Optimal
-        subproblem.y[:] = getsolution(subproblem.solver)
-        return getobjval(subproblem.solver)
-    elseif solvestatus == :Infeasible
-        return Inf
-    elseif solvestatus == :Unbounded
-        return -Inf
-    else
-        error(@sprintf("Subproblem %d was not solved properly, returned status code: %s", subproblem.id, string(solvestatus)))
+    # Optimize auxiliary problem
+    MOI.optimize!(model)
+    # Sanity check that aux problem could be solved
+    status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
+    if status != MOI.OPTIMAL
+        error("Subproblem $(subproblem.id) was not solved properly during feasibility check, returned status code: $status")
     end
+    if MOI.get(model, MOI.ObjectiveValue()) > subproblem.tolerance
+        # Subproblem is infeasible, create feasibility cut
+        return FeasibilityCut(subproblem, x)
+    end
+    # Restore subproblem
+    restore_subproblem!(subproblem)
+    return solve(subproblem, x)
+end
+function (subproblem::SubProblem{FeasibilityIgnorer})(x::AbstractVector)
+    return solve(subproblem, x)
 end
 
-function OptimalityCut(subproblem::SubProblem)
-    λ = getduals(subproblem.solver)
-    π = subproblem.π
-    cols = zeros(length(subproblem.masterterms))
-    vals = zeros(length(subproblem.masterterms))
-    for (s,(i,j,coeff)) in enumerate(subproblem.masterterms)
-        cols[s] = j
-        vals[s] = -π*λ[i]*coeff
+# Cuts #
+# ========================== #
+function OptimalityCut(subproblem::SubProblem, x::AbstractVector)
+    π = subproblem.probability
+    nterms = mapreduce(+, subproblem.masterterms) do terms
+        length(terms)
     end
-    δQ = sparsevec(cols, vals, length(subproblem.x))
-    q = π*getobjval(subproblem.solver)+δQ⋅subproblem.x
-
+    cols = zeros(nterms)
+    vals = zeros(nterms)
+    j = 1
+    for (i, ci) in enumerate(subproblem.linking_constraints)
+        λ = MOI.get(subproblem.optimizer, MOI.ConstraintDual(), ci)
+        for (idx, coeff) in subproblem.masterterms[i]
+            cols[j] = idx
+            vals[j] = π*λ*coeff
+            j += 1
+        end
+    end
+    # Get sense
+    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    # Create sense-corrected optimality cut
+    δQ = sparsevec(cols, vals, length(x))
+    q = correction * π * MOI.get(subproblem.optimizer, MOI.ObjectiveValue()) + δQ⋅x
     return OptimalityCut(δQ, q, subproblem.id)
 end
 
-function FeasibilityCut(subproblem::SubProblem)
-    λ = getduals(subproblem.feasibility_solver)
-    cols = zeros(length(subproblem.masterterms))
-    vals = zeros(length(subproblem.masterterms))
-    for (s, (i,j,coeff)) in enumerate(subproblem.masterterms)
-        cols[s] = j
-        vals[s] = -λ[i]*coeff
+function FeasibilityCut(subproblem::SubProblem, x::AbstractVector)
+    nterms = mapreduce(+, subproblem.masterterms) do terms
+        length(terms)
     end
-    G = sparsevec(cols,vals,length(subproblem.x))
-    g = getobjval(subproblem.feasibility_solver)+G⋅subproblem.x
-
+    cols = zeros(nterms)
+    vals = zeros(nterms)
+    j = 1
+    for (i, ci) in enumerate(subproblem.linking_constraints)
+        λ = MOI.get(subproblem.optimizer, MOI.ConstraintDual(), ci)
+        for (idx, coeff) in subproblem.masterterms[i]
+            cols[j] = idx
+            vals[j] = λ*coeff
+            j += 1
+        end
+    end
+    # Get sense
+    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    # Create sense-corrected optimality cut
+    G = sparsevec(cols, vals, length(x))
+    g = correction * MOI.get(subproblem.optimizer, MOI.ObjectiveValue()) + G⋅x
     return FeasibilityCut(G, g, subproblem.id)
 end
 
 Infeasible(subprob::SubProblem) = Infeasible(subprob.id)
 Unbounded(subprob::SubProblem) = Unbounded(subprob.id)
-
-function fill_submodel!(submodel::JuMP.Model, subproblem::SubProblem)
-    fill_submodel!(submodel, get_solution(subproblem)...)
-    return nothing
-end
-
-function fill_submodel!(submodel::JuMP.Model, x::AbstractVector, μ::AbstractVector, λ::AbstractVector, C::AbstractFloat)
-    submodel.colVal = x
-    submodel.redCosts = μ
-    submodel.linconstrDuals = λ
-    submodel.objVal = C
-    submodel.objVal *= submodel.objSense == :Min ? 1 : -1
-    return nothing
-end

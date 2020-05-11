@@ -19,7 +19,7 @@ mutable struct SelectUniform <: SelectionRule
 end
 
 function select(rule::SelectUniform, aggregates::Vector{<:AggregatedOptimalityCut}, ::HyperPlane{OptimalityCut})
-    if nsubproblems(aggregates[1]) == rule.n - 1
+    if num_subproblems(aggregates[1]) == rule.n - 1
         return 1, true
     end
     return 1, false
@@ -51,7 +51,7 @@ mutable struct SelectDecaying <: SelectionRule
 end
 
 function select(rule::SelectDecaying, aggregates::Vector{<:AggregatedOptimalityCut}, ::HyperPlane{OptimalityCut})
-    if nsubproblems(aggregates[1]) == rule.n - 1
+    if num_subproblems(aggregates[1]) == rule.n - 1
         return 1, true
     end
     return 1, false
@@ -81,10 +81,10 @@ SelectRandom(; max = Inf) = SelectRandom(max)
 
 function select(rule::SelectRandom, aggregates::Vector{<:AggregatedOptimalityCut}, ::HyperPlane{OptimalityCut})
     idx = rand(eachindex(aggregates))
-    while nsubproblems(aggregates[idx]) > rule.max
+    while num_subproblems(aggregates[idx]) > rule.max
         idx = rand(eachindex(aggregates))
     end
-    return idx, (nsubproblems(aggregates[idx]) == rule.max-1)
+    return idx, (num_subproblems(aggregates[idx]) == rule.max-1)
 end
 
 function str(rule::SelectRandom)
@@ -167,7 +167,8 @@ function select(rule::SelectClosestToReference, aggregates::Vector{<:AggregatedO
         for i = 2:length(aggregates)
             agg = aggregates[i]
             dist = rule.distance(cut, agg)
-            if iszero(agg) || dist <= rule.τ/(nsubproblems(rule.reference) - nsubproblems(agg) + 1)
+            if iszero(agg) || dist <= rule.τ / (num_subproblems(rule.reference) -
+                                                num_subproblems(agg) + 1)
                 if i == length(aggregates)
                     # Last position operates as multicut
                     return i, true

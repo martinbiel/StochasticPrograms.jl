@@ -9,6 +9,7 @@ using Printf
 
 # External libraries
 using JuMP
+using OrderedCollections
 using MathOptInterface
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
@@ -38,18 +39,15 @@ export
     Sampler,
     ConfidenceInterval,
     StochasticSolution,
-    AbstractStructuredSolver,
-    AbstractStructuredModel,
-    AbstractSampledSolver,
-    AbstractSampledModel,
-    StructuredModel,
-    SampledModel,
-    optimize_structured!,
-    optimize_sampled!,
-    fill_solution!,
-    stochastic_solution,
-    solverstr,
-    internal_solver,
+    AbstractStructuredOptimizer,
+    optimizer_name,
+    optimizer_constructor,
+    AbstractStochasticStructure,
+    Deterministic,
+    BlockVertical,
+    BlockHorizontal,
+    DistributedBlockVertical,
+    DistributedBlockHorizontal,
     Crash,
     CrashMethod,
     spsolver,
@@ -62,12 +60,26 @@ export
     add_scenario!,
     add_scenarios!,
     scenarioproblems,
-    DecisionVariables,
-    decision_variables,
-    recourse_variables,
-    decision_length,
+    Decision,
+    Decisions,
+    SingleDecision,
+    VectorOfDecisions,
+    SingleKnown,
+    VectorOfKnowns,
+    AffineDecisionFunction,
+    QuadraticDecisionFunction,
+    VectorAffineDecisionFunction,
+    DecisionRef,
+    KnownRef,
+    CombinedAffExpr,
+    CombinedQuadExpr,
+    SingleDecision,
+    VectorOfDecisions,
+    AffineDecisionFunction,
+    VectorAffineDecisionFunction,
+    decision,
     decisions,
-    ndecisions,
+    num_decisions,
     decision_names,
     recourse_length,
     first_stage_nconstraints,
@@ -86,10 +98,10 @@ export
     generator,
     subproblem,
     subproblems,
-    nsubproblems,
+    num_subproblems,
     masterterms,
     transfer_model!,
-    nscenarios,
+    num_scenarios,
     AbstractSampler,
     sample,
     sampler,
@@ -129,17 +141,18 @@ export
     @parameters,
     @uncertain,
     WS,
-    WS_decision,
+    wait_and_see_decision,
     EWS,
     SAA,
     DEP,
     VRP,
     EVPI,
     EVP,
-    EVP_decision,
+    expected_value_decision,
     EV,
     EEV,
-    VSS
+    VSS,
+    LShaped
 
 macro exportJuMP()
     Expr(:export, names(JuMP)...)
@@ -149,7 +162,7 @@ end
 include("types/types.jl")
 include("methods/methods.jl")
 include("optimizer_interface.jl")
-#include("crash.jl")
+include("crash.jl")
 include("solvers/solvers.jl")
 
 end # module

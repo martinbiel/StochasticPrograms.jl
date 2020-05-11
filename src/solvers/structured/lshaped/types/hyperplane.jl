@@ -86,7 +86,7 @@ function satisfied(cut::HyperPlane{OptimalityCut}, x::AbstractVector, θ::Abstra
     Q = cut(x)
     return θ > -Inf && θ >= Q - τ
 end
-function gap(hyperplane::AbstractHyperPlane,x::AbstractVector)
+function gap(hyperplane::AbstractHyperPlane, x::AbstractVector)
     if length(hyperplane.δQ) != length(x)
         throw(ArgumentError(@sprintf("Dimensions of the cut (%d)) and the given optimization vector (%d) does not match", length(hyperplane.δQ), length(x))))
     end
@@ -99,52 +99,57 @@ function gap(cut::AnyOptimalityCut, x::AbstractVector, θ::AbstractFloat)
         return Inf
     end
 end
-function nsubproblems(::AbstractHyperPlane)
+function num_subproblems(::AbstractHyperPlane)
     return 1
 end
-function nsubproblems(cut::AggregatedOptimalityCut)
+function num_subproblems(cut::AggregatedOptimalityCut)
     return length(cut.ids)
 end
-lowlevel(hyperplane::AbstractHyperPlane) = lowlevel(hyperplane, 1.)
-function lowlevel(hyperplane::HyperPlane{H,T,SparseVector{T,Int}}, scaling::T) where {H <: HyperPlaneType, T <: AbstractFloat}
-    return hyperplane.δQ.nzind, hyperplane.δQ.nzval, hyperplane.q, Inf
-end
-function lowlevel(cut::HyperPlane{OptimalityCut,T,SparseVector{T,Int}}, scaling::T) where T <: AbstractFloat
-    nzind = copy(cut.δQ.nzind)
-    nzval = scaling.*copy(cut.δQ.nzval)
-    push!(nzind, length(cut.δQ)+cut.id)
-    push!(nzval, scaling)
-    return nzind, nzval, scaling*cut.q, Inf
-end
-function lowlevel(cut::SparseAggregatedOptimalityCut, scaling::T) where T <: AbstractFloat
-    nzind = copy(cut.δQ.nzind)
-    nzval = scaling.*copy(cut.δQ.nzval)
-    append!(nzind, length(cut.δQ) .+ cut.ids)
-    append!(nzval, fill(scaling, length(cut.ids)))
-    return nzind, nzval, scaling*cut.q, Inf
-end
 
-ArtificialCut(val::AbstractFloat, dim::Int, id::Int) = OptimalityCut(sparsevec(zeros(dim)), val, id)
-
-function LinearConstraint(constraint::JuMP.LinearConstraint, i::Integer)
-    sense = JuMP.sense(constraint)
-    if sense == :range
-        throw(ArgumentError("Cannot handle range constraints"))
+moi_constraint(hyperplane::AbstractHyperPlane, master_variables::Vector{MOI.VariableIndex}) = moi_constraint(hyperplane, master_variables, 1.)
+function moi_constraint(hyperplane::HyperPlane{H,T,SparseVector{T,Int}}, ::Vector{MOI.VariableIndex}, scaling::T) where {H <: HyperPlaneType, T <: AbstractFloat}
+    terms = map(zip(hyperplane.δQ.nzval, hyperplane.δQ.nzind)) do (coeff, idx)
+        MOI.ScalarAffineTerm(scaling * coeff, MOI.VariableIndex(idx))
     end
-    cols = map(v->v.col, constraint.terms.vars)
-    vals = constraint.terms.coeffs * (sense == :(>=) ? 1 : -1)
-    G = sparsevec(cols, vals, constraint.terms.vars[1].m.numCols)
-    g = JuMP.rhs(constraint) * (sense == :(>=) ? 1 : -1)
-
-    return LinearConstraint(G, g, i)
+    f = MOI.ScalarAffineFunction{Float64}(terms, 0.0)
+    set = MOI.GreaterThan{Float64}(scaling * hyperplane.q)
+    return f, set
 end
-
-function linearconstraints(m::JuMP.Model)
-    constraints = Vector{HyperPlane{LinearConstraint}}(length(m.linconstr))
-    for (i, c) in enumerate(m.linconstr)
-        constraints[i] = LinearConstraint(c, i)
+function moi_constraint(cut::HyperPlane{FeasibilityCut,T,SparseVector{T,Int}}, ::Vector{MOI.VariableIndex}, scaling::T) where T <: AbstractFloat
+    terms = map(zip(cut.δQ.nzval, cut.δQ.nzind)) do (coeff, idx)
+        MOI.ScalarAffineTerm(scaling * coeff, MOI.VariableIndex(idx))
     end
-    return constraints
+    f = StochasticPrograms.AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                                                  MOI.ScalarAffineFunction(terms, 0.0),
+                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    set = MOI.GreaterThan{Float64}(scaling * cut.q)
+    return f, set
+end
+function moi_constraint(cut::HyperPlane{OptimalityCut,T,SparseVector{T,Int}}, master_variables::Vector{MOI.VariableIndex}, scaling::T) where T <: AbstractFloat
+    terms = map(zip(cut.δQ.nzval, cut.δQ.nzind)) do (coeff, idx)
+        MOI.ScalarAffineTerm(scaling * coeff, MOI.VariableIndex(idx))
+    end
+    # Add model term
+    model_terms = [MOI.ScalarAffineTerm(scaling, master_variables[cut.id])]
+    f = StochasticPrograms.AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, 0.0),
+                                                  MOI.ScalarAffineFunction(terms, 0.0),
+                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    set = MOI.GreaterThan{Float64}(scaling * cut.q)
+    return f, set
+end
+function moi_constraint(cut::SparseAggregatedOptimalityCut, master_variables::Vector{MOI.VariableIndex}, scaling::T) where T <: AbstractFloat
+    terms = map(zip(cut.δQ.nzval, cut.δQ.nzind)) do (coeff, idx)
+        MOI.ScalarAffineTerm(scaling * coeff, MOI.VariableIndex(idx))
+    end
+    # Add model terms
+    model_terms = map(cut.ids) do idx
+        MOI.ScalarAffineTerm(scaling, master_variables[idx])
+    end
+    f = StochasticPrograms.AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, 0.0),
+                                                  MOI.ScalarAffineFunction(terms, 0.0),
+                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    set = MOI.GreaterThan{Float64}(scaling * cut.q)
+    return f, set
 end
 
 function aggregate(cuts::Vector{HyperPlane{OptimalityCut,T,A}}, id::Integer) where {T <: AbstractFloat, A <: AbstractVector}
@@ -163,11 +168,11 @@ length(::ZeroVector) = 0
 size(::ZeroVector) = 0
 ZeroOptimalityCut{T <: AbstractFloat} = AggregatedOptimalityCut{T, ZeroVector{T}}
 
-function zero(::Type{AggregatedOptimalityCut{T}}) where T <: AbstractFloat
+function Base.zero(::Type{AggregatedOptimalityCut{T}}) where T <: AbstractFloat
     return AggregatedOptimalityCut(ZeroVector{T}(), zero(T), Int[])
 end
-iszero(::AggregatedOptimalityCut) = false
-iszero(::AggregatedOptimalityCut{T,ZeroVector{T}}) where T <: AbstractFloat = true
+Base.iszero(::AggregatedOptimalityCut) = false
+Base.iszero(::AggregatedOptimalityCut{T,ZeroVector{T}}) where T <: AbstractFloat = true
 
 function +(c₁::AggregatedOptimalityCut{T,ZeroVector{T}}, c₂::AggregatedOptimalityCut{T,ZeroVector{T}}) where T <: AbstractFloat
     return c₁

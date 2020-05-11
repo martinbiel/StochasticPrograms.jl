@@ -1,8 +1,10 @@
 # Trust-region
 # ------------------------------------------------------------
+const TRConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
 @with_kw mutable struct TRData{T <: AbstractFloat}
     Q̃::T = 1e10
-    Δ::T = 1.0
+    Δ::MOI.VariableIndex = MOI.VariableIndex(0)
+    constraint::TRConstraint = TRConstraint(0)
     cΔ::Int = 0
     incumbent::Int = 1
     major_iterations::Int = 0
@@ -31,42 +33,92 @@ struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegulariz
     data::TRData{T}
     parameters::TRParameters{T}
 
-    ξ::A
+    decisions::Decisions
+    projection_targets::Vector{MOI.VariableIndex}
+    ξ::Vector{Decision{T}}
+
     Q̃_history::A
     Δ_history::A
     incumbents::Vector{Int}
 
-    function TrustRegion(ξ₀::AbstractVector; kw...)
+    function TrustRegion(decisions::Decisions, ξ₀::AbstractVector; kw...)
         T = promote_type(eltype(ξ₀), Float32)
-        ξ₀_ = convert(AbstractVector{T}, copy(ξ₀))
-        A = typeof(ξ₀_)
-        return new{T, A}(TRData{T}(), TRParameters{T}(;kw...), ξ₀_, A(), A(), Vector{Int}())
+        A = Vector{T}
+        ξ = map(ξ₀) do val
+            Decision(val, T)
+        end
+        return new{T, A}(TRData{T}(),
+                         TRParameters{T}(; kw...),
+                         decisions,
+                         Vector{MOI.VariableIndex}(undef, length(ξ₀)),
+                         ξ,
+                         A(),
+                         A(),
+                         Vector{Int}())
     end
 end
 
-function initialize_regularization!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
-    tr.data.Δ = tr.parameters.Δ
-    set_trustregion!(lshaped, tr)
+function initialize_regularization!(lshaped::AbstractLShaped, tr::TrustRegion{T}) where T <: AbstractFloat
+    n = length(tr.ξ) + 1
+    # Add projection targets
+    add_projection_targets!(tr, lshaped.master)
+
+    # Add trust region
+    name = string(:Δ)
+    trust_region = Decision(tr.parameters.Δ, T)
+    tr.data.Δ, _ =
+        MOI.add_constrained_variable(lshaped.master,
+                                     SingleKnownSet(trust_region))
+    set_known_decision!(tr.decisions, tr.data.Δ, trust_region)
+    MOI.set(lshaped.master, MOI.VariableName(), tr.data.Δ, name)
+    x = VectorOfDecisions(tr.decisions.undecided)
+    ξ = VectorOfKnowns(tr.projection_targets)
+    Δ = SingleKnown(tr.data.Δ)
+    # Add trust-region constraint
+    f = MOIU.operate(vcat, T, Δ, x) -
+        MOIU.operate(vcat, T, zero(tr.parameters.Δ), ξ)
+    tr.data.constraint =
+        MOI.add_constraint(lshaped.master, f,
+                           MOI.NormInfinityCone(n))
     return nothing
 end
 
-function log_regularization!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
-    @unpack Q̃,Δ,incumbent = tr.data
+function restore_regularized_master!(lshaped::AbstractLShaped, tr::TrustRegion)
+    # Delete trust region constraint
+    if !iszero(tr.data.constraint.value)
+        MOI.delete(lshaped.master, tr.data.constraint)
+        tr.data.constraint = TRConstraint(0)
+    end
+    # Delete trust region
+    if !iszero(tr.data.Δ.value)
+        MOI.delete(lshaped.master, tr.data.Δ)
+        tr.data.Δ = MOI.VariableIndex(0)
+    end
+    # Delete projection targets
+    for var in tr.projection_targets
+        MOI.delete(lshaped.master, var)
+    end
+    empty!(tr.projection_targets)
+    return nothing
+end
+
+function log_regularization!(lshaped::AbstractLShaped, tr::TrustRegion)
+    @unpack Q̃, Δ, incumbent = tr.data
     push!(tr.Q̃_history, Q̃)
-    push!(tr.Δ_history, Δ)
+    push!(tr.Δ_history, StochasticPrograms.decision(tr.decisions, Δ).value)
     push!(tr.incumbents, incumbent)
     return nothing
 end
 
-function log_regularization!(lshaped::AbstractLShapedSolver, t::Integer, tr::TrustRegion)
+function log_regularization!(lshaped::AbstractLShaped, t::Integer, tr::TrustRegion)
     @unpack Q̃,Δ,incumbent = tr.data
     tr.Q̃_history[t] = Q̃
-    tr.Δ_history[t] = Δ
+    tr.Δ_history[t] = known_decision(tr.decisions, Δ).value
     tr.incumbents[t] = incumbent
     return nothing
 end
 
-function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
+function take_step!(lshaped::AbstractLShaped, tr::TrustRegion)
     @unpack Q,θ = lshaped.data
     @unpack τ = lshaped.parameters
     @unpack Q̃ = tr.data
@@ -78,7 +130,10 @@ function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
         need_update = true
         enlarge_trustregion!(lshaped, tr)
         tr.data.cΔ = 0
-        tr.ξ .= current_decision(lshaped)
+        x = current_decision(lshaped)
+        for i in eachindex(tr.ξ)
+            tr.ξ[i].value = x[i]
+        end
         tr.data.Q̃ = Q
         tr.data.incumbent = timestamp(lshaped)
         tr.data.major_iterations += 1
@@ -87,36 +142,33 @@ function take_step!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
         tr.data.minor_iterations += 1
     end
     if need_update
-        set_trustregion!(lshaped, tr)
+        update_trustregion!(lshaped, tr)
     end
     return nothing
 end
 
-function process_cut!(lshaped::AbstractLShapedSolver, cut::HyperPlane{FeasibilityCut}, tr::TrustRegion)
+function process_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, tr::TrustRegion)
     @unpack τ = lshaped.parameters
-    if !satisfied(cut, tr.ξ, τ)
+    if !satisfied(cut, decision(lshaped), τ)
+        # Project decision to ensure prevent master infeasibility
         A = [I cut.δQ; cut.δQ' 0*I]
-        b = [zeros(length(tr.ξ)); -gap(cut, tr.ξ)]
+        b = [zeros(length(tr.ξ)); -gap(cut, decision(lshaped))]
         t = A\b
-        tr.ξ .= tr.ξ + t[1:length(tr.ξ)]
-        set_trustregion!(lshaped, tr)
+        for i in eachindex(tr.ξ)
+            tr.ξ[i].value += t[i]
+        end
+        update_trustregion!(lshaped, tr)
     end
     return nothing
 end
 
-function set_trustregion!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
-    @unpack Δ = tr.data
-    nt = nthetas(lshaped)
-    l = max.(StochasticPrograms.get_stage_one(lshaped.stochasticprogram).colLower, tr.ξ .- Δ)
-    append!(l, fill(-Inf,nt))
-    u = min.(StochasticPrograms.get_stage_one(lshaped.stochasticprogram).colUpper, tr.ξ .+ Δ)
-    append!(u, fill(Inf,nt))
-    MPB.setvarLB!(lshaped.mastersolver.lqmodel, l)
-    MPB.setvarUB!(lshaped.mastersolver.lqmodel, u)
+function update_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
+    @unpack Δ, constraint = tr.data
+    MOI.modify(lshaped.master, constraint, KnownValuesChange())
     return nothing
 end
 
-function enlarge_trustregion!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
+function enlarge_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
     @unpack Q,θ = lshaped.data
     @unpack τ, = lshaped.parameters
     @unpack Δ = tr.data
@@ -125,16 +177,17 @@ function enlarge_trustregion!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
     Δ̃ = incumbent_trustregion(lshaped, t, tr)
     ξ = incumbent_decision(lshaped, t, tr)
     Q̃ = incumbent_objective(lshaped, t, tr)
-    if Q̃ - Q >= 0.5*(Q̃-θ) && abs(norm(ξ-lshaped.x,Inf) - Δ̃) <= τ
+    if Q̃ - Q >= 0.5*(Q̃-θ) && abs(norm(ξ - lshaped.x, Inf) - Δ̃) <= τ
         # Enlarge the trust-region radius
-        tr.data.Δ = max(Δ, min(Δ̅, 2*Δ̃))
+        Δ = StochasticPrograms.decision(tr.decisions, tr.data.Δ)
+        Δ.value = max(Δ.value, min(Δ̅, 2*Δ̃))
         return true
     else
         return false
     end
 end
 
-function reduce_trustregion!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
+function reduce_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
     @unpack Q,θ = lshaped.data
     @unpack Q̃,Δ,cΔ = tr.data
     t = timestamp(lshaped)
@@ -147,7 +200,8 @@ function reduce_trustregion!(lshaped::AbstractLShapedSolver, tr::TrustRegion)
     if ρ > 3 || (cΔ >= 3 && 1 < ρ <= 3)
         # Reduce the trust-region radius
         tr.data.cΔ = 0
-        tr.data.Δ = min(Δ, (1/min(ρ,4))*Δ̃)
+        Δ = StochasticPrograms.decision(tr.decisions, tr.data.Δ)
+        Δ.value = min(Δ.value, (1/min(ρ,4))*Δ̃)
         return true
     else
         return false
@@ -170,8 +224,8 @@ WithTR(; kw...) = TR(Dict{Symbol,Any}(kw))
 TrustRegion(; kw...) = TR(Dict{Symbol,Any}(kw))
 WithTrustRegion(; kw...) = TR(Dict{Symbol,Any}(kw))
 
-function (tr::TR)(x::AbstractVector)
-    return TrustRegion(x; tr.parameters...)
+function (tr::TR)(decisions::Decisions, x::AbstractVector)
+    return TrustRegion(decisions, x; tr.parameters...)
 end
 
 function str(::TR)

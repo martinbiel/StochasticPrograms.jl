@@ -15,7 +15,7 @@ struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStoch
     end
 end
 
-function StochasticStructure(scenario_types::NTuple{M, DataType}, ::Deterministic) where M
+function StochasticStructure(scenario_types::ScenarioTypes{M}, ::Deterministic) where M
     scenarios = ntuple(Val(M)) do i
         Vector{scenario_types[i]}()
     end
@@ -47,17 +47,17 @@ function decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
     1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
     return [decision(dref) for dref in dep.decision_variables[s]]
 end
-function decision_variables(dep::DeterministicEquivalent{N}, s::Integer) where N
+function decision_variables(dep::DeterministicEquivalent{N}, s::Integer = 1) where N
     1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
     return dep.decision_variables[s]
 end
 function all_decisions(dep::DeterministicEquivalent)
     return all_decisions(dep.model)
 end
-function all_decision_variables(dep::DeterministicEquivalent, s::Integer)
+function all_decision_variables(dep::DeterministicEquivalent, s::Integer = 1)
     return dep.decision_variables[s]
 end
-function num_decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
+function num_decisions(dep::DeterministicEquivalent{N}, s::Integer = 1) where N
     1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
     return length(dep.decision_variables[s])
 end
@@ -115,8 +115,8 @@ function add_worker_scenario!(scenariogenerator::Function, dep::DeterministicEqu
     add_scenario!(scenariogenerator, dep, stage)
     return nothing
 end
-function add_scenarios!(dep::DeterministicEquivalent, scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
-    append!(scenarios(dep, stage), scenarios)
+function add_scenarios!(dep::DeterministicEquivalent, _scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
+    append!(scenarios(dep, stage), _scenarios)
     return nothing
 end
 function add_worker_scenarios!(dep::DeterministicEquivalent, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2)

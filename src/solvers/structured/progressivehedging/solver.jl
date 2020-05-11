@@ -15,7 +15,7 @@ end
 end
 
 """
-    ProgressiveHedging
+    ProgressiveHedgingAlgorithm
 
 Functor object for the progressive-hedging algorithm. Create using the `ProgressiveHedgingSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
@@ -25,14 +25,14 @@ Functor object for the progressive-hedging algorithm. Create using the `Progress
 - `log::Bool = true`: Specifices if progressive-hedging procedure should be logged on standard output or not.
 ...
 """
-struct ProgressiveHedging{T <: AbstractFloat,
-                          A <: AbstractVector,
-                          SP <: StochasticProgram,
-                          S <: LQSolver,
-                          PT <: PenaltyTerm,
-                          E <: AbstractExecution,
-                          P <: AbstractPenalization} <: AbstractProgressiveHedgingSolver
-    stochasticprogram::SP
+struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
+                                   A <: AbstractVector,
+                                   ST <: HorizontalBlockStructure,
+                                   S <: MOI.AbstractOptimizer,
+                                   E <: AbstractExecution,
+                                   P <: AbstractPenalization,
+                                   PT <: PenaltyTerm} <: AbstractProgressiveHedging
+    structure::ST
     data::ProgressiveHedgingData{T}
     parameters::ProgressiveHedgingParameters{T}
 
@@ -40,9 +40,6 @@ struct ProgressiveHedging{T <: AbstractFloat,
     ξ::A
     Q_history::A
     dual_gaps::A
-
-    # Subproblems
-    nscenarios::Int
 
     # Execution
     execution::E
@@ -52,12 +49,11 @@ struct ProgressiveHedging{T <: AbstractFloat,
     # Params
     progress::ProgressThresh{T}
 
-    function ProgressiveHedging(stochasticprogram::StochasticProgram,
-                                x₀::AbstractVector,
-                                subsolver::MPB.AbstractMathProgSolver,
-                                executer::Execution,
-                                penalizer::AbstractPenalizer,
-                                penaltyterm::PenaltyTerm; kw...)
+    function ProgressiveHedgingAlgorithm(structure::HorizontalBlockStructure,
+                                         x₀::AbstractVector,
+                                         executer::Execution,
+                                         penalizer::AbstractPenalizer,
+                                         penaltyterm::PenaltyTerm; kw...)
         if nworkers() > 1 && executer isa Serial
             @warn "There are worker processes, consider using distributed version of algorithm"
         end
@@ -67,49 +63,56 @@ struct ProgressiveHedging{T <: AbstractFloat,
         else
             executer
         end
-        first_stage = StochasticPrograms.get_stage_one(stochasticprogram)
-        length(x₀) != first_stage.numCols && error("Incorrect length of starting guess, has ", length(x₀), " should be ", first_stage.numCols)
-
+        # Sanity checks
+        length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
+        num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run progressive-hedging procedure.")
+        n = num_subproblems(structure)
+        # Float types
         T = promote_type(eltype(x₀), Float32)
         x₀_ = convert(AbstractVector{T}, copy(x₀))
         A = typeof(x₀_)
-        SP = typeof(stochasticprogram)
-        S = LQSolver{typeof(MPB.LinearQuadraticModel(subsolver)), typeof(subsolver)}
+        # Structure
+        ST = typeof(structure)
+        S = typeof(backend(subproblem(structure, 1)))
+        # Penalty term
         PT = typeof(penaltyterm)
-        n = StochasticPrograms.nscenarios(stochasticprogram)
+        # Execution policy
         execution = executer(T,A,S,PT)
         E = typeof(execution)
+        # Penalization policy
         penalization = penalizer()
         P = typeof(penalization)
+        # Algorithm parameters
         params = ProgressiveHedgingParameters{T}(; kw...)
 
-        ph = new{T,A,SP,S,PT,E,P}(stochasticprogram,
+        ph = new{T,A,ST,S,E,P,PT}(structure,
                                   ProgressiveHedgingData{T}(),
                                   params,
                                   x₀_,
                                   A(),
                                   A(),
-                                  n,
                                   execution,
                                   penalization,
-                                  ProgressThresh(1.0, 0.0, "$(indentstr(params.indent))Progressive Hedging"))
+                                  ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))Progressive Hedging"))
         # Initialize solver
-        initialize!(ph, subsolver, penaltyterm)
+        initialize!(ph, penaltyterm)
         return ph
     end
 end
-ProgressiveHedging(stochasticprogram::StochasticProgram,
-                   subsolver::MPB.AbstractMathProgSolver,
-                   execution::Execution,
-                   penalizer::AbstractPenalizer,
-                   penaltyterm::PenaltyTerm; kw...) = ProgressiveHedging(stochasticprogram,
-                                                                         rand(decision_length(stochasticprogram)),
-                                                                         subsolver,
-                                                                         execution,
-                                                                         penalizer,
-                                                                         penaltyterm; kw...)
 
-function (ph::ProgressiveHedging)()
+function show(io::IO, ph::ProgressiveHedgingAlgorithm)
+    println(io, typeof(ph).name.name)
+    println(io, "State:")
+    show(io, ph.data)
+    println(io, "Parameters:")
+    show(io, ph.parameters)
+end
+
+function show(io::IO, ::MIME"text/plain", ph::ProgressiveHedgingAlgorithm)
+    show(io, ph)
+end
+
+function (ph::ProgressiveHedgingAlgorithm)()
     # Reset timer
     ph.progress.tfirst = ph.progress.tlast = time()
     # Start workers (if any)
@@ -117,7 +120,7 @@ function (ph::ProgressiveHedging)()
     # Start procedure
     while true
         status = iterate!(ph)
-        if status != :Valid
+        if status !== nothing
             close_workers!(ph)
             return status
         end

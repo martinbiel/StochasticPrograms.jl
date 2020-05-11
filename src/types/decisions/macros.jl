@@ -1,35 +1,22 @@
 # Variables #
 # ========================== #
-# Helper struct to dispatch known decision variable construction
-struct AsKnown end
-
-function JuMP.build_variable(_error::Function, info::JuMP.VariableInfo, ::AsKnown)
-    return KnownDecision{Float64}(info)
-end
-
 function JuMP.build_variable(_error::Function, variable::JuMP.ScalarVariable, ::DecisionSet)
-    return VariableConstrainedOnCreation(variable, SingleDecisionSet(Decision{Float64}(variable.info)))
+    return VariableConstrainedOnCreation(variable, SingleDecisionSet(Decision(variable.info, Float64)))
 end
 
 function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVariable}, ::DecisionSet)
-    return VariablesConstrainedOnCreation(variables, MultipleDecisionsSet([Decision{Float64}(variable.info) for variable in variables]))
+    return VariablesConstrainedOnCreation(variables, MultipleDecisionSet([Decision(variable.info, Float64) for variable in variables]))
 end
 
-function JuMP.add_variable(model::Model, known::KnownDecision, name::String = "")
-    decisions = get_decisions(model)
-    if decisions isa IgnoreDecisions
-        # Create a regular JuMP variable if decisions are not handled
-        return JuMP.add_variable(model, known.scalar_variable, name)
-    end
-    # Set the name (if any)
-    known.name = name
-    # Add known decision
-    index = add_known!(decisions, known, name)
-    # Return created known decision as KnownRef
-    return KnownRef(model, index)
+function JuMP.build_variable(_error::Function, variable::JuMP.ScalarVariable, ::KnownSet)
+    return VariableConstrainedOnCreation(variable, SingleKnownSet(KnownDecision(variable.info, Float64)))
 end
 
-function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:SingleDecisionSet}, name::String)
+function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVariable}, ::KnownSet)
+    return VariablesConstrainedOnCreation(variables, MultipleKnownSet([KnownDecision(variable.info, Float64) for variable in variables]))
+end
+
+function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:Union{SingleDecisionSet, SingleKnownSet}}, name::String)
     decisions = get_decisions(model)
     if decisions isa IgnoreDecisions
         # Create a regular JuMP variable if decisions are not handled
@@ -39,26 +26,29 @@ function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation
     # Map to model decisions after indices are known
     if !has_decision(decisions, var_index)
         # Store decision if is seen for the first time
-        set_decision!(decisions, var_index, variable.set.decision)
+        set_decision!(decisions, var_index, variable.set)
     else
         # Reuse if decision has been created already
-        MOI.set(backend(model), MOI.ConstraintSet(), con_index, SingleDecisionSet(decision(decisions, var_index)))
+        set_type = typeof(variable.set)
+        MOI.set(backend(model), MOI.ConstraintSet(), con_index, set_type(decision(decisions, var_index)))
     end
     # Add any given decision constraints
-    _moi_constrain_decision(backend(model), var_index, variable.scalar_variable.info)
+    _moi_constrain_decision(backend(model), var_index, variable.scalar_variable.info, variable.set)
     # Finally, set any given name
     if !isempty(name)
         MOI.set(backend(model), MOI.VariableName(), var_index, name)
     end
-    # Return created decision as DecisionRef
-    return DecisionRef(model, var_index)
+    # Return created decision as DecisionRef/KnownRef
+    return VariableRef(model, var_index, variable.set)
 end
 
-function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreation{<:MultipleDecisionsSet}, names)
+function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreation{<:Union{MultipleDecisionSet, MultipleKnownSet}}, names)
     decisions = get_decisions(model)
     if decisions isa IgnoreDecisions
         # Create regular JuMP variables if decisions are not handled
-        var_refs = [JuMP.add_variable(model, scalar_variable, name) for scalar_variable in variable.scalar_variables]
+        var_refs = map(zip(variable.scalar_variables, names)) do (scalar_variable, name)
+            JuMP.add_variable(model, scalar_variable, name)
+        end
         return reshape_vector(var_refs, variable.shape)
     end
     var_indices, con_index = MOI.add_constrained_variables(backend(model), variable.set)
@@ -67,7 +57,7 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
     for (i,var_index) in enumerate(var_indices)
         if !has_decision(decisions, var_index)
             # Store decision if is seen for the first time
-            set_decision!(decisions, var_index, variable.set.decisions[i])
+            set_decision!(decisions, var_index, i, variable.set)
         else
             # Reuse if decision has been created already
             push!(seen_decisions, decision(decisions, var_index))
@@ -77,11 +67,12 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
         # Sanity check
         length(seen_decisions) == length(decision.scalar_variables) || error("Inconsistency in number of seen decisions and created variables.")
         # Update decision set for reuse
-        MOI.set(backend(model), MOI.ConstraintSet(), con_index, MultipleDecisions(seen_decisions))
+        set_type = typeof(variable.set)
+        MOI.set(backend(model), MOI.ConstraintSet(), con_index, set_type(seen_decisions))
     end
     # Add any given decision constraints
-    for (index, decision, scalar_variable) in zip(var_indices, variable.set.decisions, variable.scalar_variables)
-        _moi_constrain_decision(backend(model), index, scalar_variable.info)
+    for (index, scalar_variable) in zip(var_indices, variable.scalar_variables)
+        _moi_constrain_decision(backend(model), index, scalar_variable.info, variable.set)
     end
     # Finally, set any given names
     for (var_index, name) in zip(var_indices, JuMP.vectorize(names, variable.shape))
@@ -89,12 +80,92 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
             MOI.set(backend(model), MOI.VariableName(), var_index, name)
         end
     end
-    # Return created decisions as DecisionRefs
-    drefs = [DecisionRef(model, var_index) for var_index in var_indices]
-    return reshape_vector(drefs, variable.shape)
+    # Return created decisions as DecisionRefs/KnownRefs
+    refs = map(var_indices) do index
+        VariableRef(model, index, variable.set)
+    end
+    return reshape_vector(refs, variable.shape)
 end
 
-function _moi_constrain_decision(backend::MOI.ModelLike, index, info)
+# Containers #
+# ========================== #
+const DenseAxisArray = JuMP.Containers.DenseAxisArray
+const SparseAxisArray = JuMP.Containers.SparseAxisArray
+
+struct DecisionDenseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: DenseAxisArray}
+    array::A
+
+    function DecisionDenseAxisArray{V}(array::DenseAxisArray) where V <: Union{DecisionRef, KnownRef}
+        A = typeof(array)
+        return new{V, A}(array)
+    end
+end
+
+struct DecisionSparseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: SparseAxisArray}
+    array::A
+
+    function DecisionSparseAxisArray{V}(array::SparseAxisArray) where V <: Union{DecisionRef, KnownRef}
+        A = typeof(array)
+        return new{V, A}(array)
+    end
+end
+
+function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, ::DecisionSet)
+    return DecisionDenseAxisArray{DecisionRef}(variables)
+end
+
+function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, ::KnownSet)
+    return DecisionDenseAxisArray{KnownRef}(variables)
+end
+
+function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, ::DecisionSet)
+    return DecisionSparseAxisArray{DecisionRef}(variables)
+end
+
+function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, ::KnownSet)
+    return DecisionSpareAxisArray{KnownRef}(variables)
+end
+
+function JuMP.add_variable(model::Model, variable::DecisionDenseAxisArray{V}, names::DenseAxisArray{String}) where V <: Union{DecisionRef, KnownRef}
+    array = variable.array
+    refs = DenseAxisArray{V}(undef, array.axes...)
+    for idx in eachindex(array)
+        var = array[idx]
+        refs[idx] = JuMP.add_variable(model,
+                                      VariableConstrainedOnCreation(var, set(var, V)),
+                                      names[idx])
+    end
+    return refs
+end
+
+function JuMP.add_variable(model::Model,
+                           variable::DecisionSparseAxisArray{V, SparseAxisArray{T,N,K}},
+                           names::SparseAxisArray{String}) where {V <: Union{DecisionRef, KnownRef}, T, N, K}
+    refs = SparseAxisArray(Dict{K,V}())
+    for (idx, var) in variable.array.data
+        refs[idx] = JuMP.add_variable(model,
+                                      VariableConstrainedOnCreation(var, set(var, V)),
+                                      names[idx])
+    end
+    return refs
+end
+
+# Constraints #
+# ========================== #
+function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, set::S) where S <: Union{MOI.LessThan,MOI.GreaterThan,MOI.EqualTo}
+    offset = constant(aff.variables)
+    JuMP.add_to_expression!(aff.variables, -offset)
+    shifted_set = MOIU.shift_constant(set, -offset)
+    return JuMP.ScalarConstraint(aff, shifted_set)
+end
+
+function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, lb, ub)
+    JuMP.build_constraint(_error, aff, MOI.Interval(lb, ub))
+end
+
+# Helper function #
+# ========================== #
+function _moi_constrain_decision(backend::MOI.ModelLike, index, info, ::Union{SingleDecisionSet, MultipleDecisionSet})
     # We don't call the _moi* versions (e.g., _moi_set_lower_bound) because they
     # have extra checks that are not necessary for newly created variables.
     if info.has_lb
@@ -122,15 +193,7 @@ function _moi_constrain_decision(backend::MOI.ModelLike, index, info)
     end
 end
 
-# Constraints #
-# ========================== #
-function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, set::S) where S <: Union{MOI.LessThan,MOI.GreaterThan,MOI.EqualTo}
-    offset = constant(aff.variables)
-    add_to_expression!(aff.variables, -offset)
-    shifted_set = MOIU.shift_constant(set, -offset)
-    return JuMP.ScalarConstraint(aff, shifted_set)
-end
-
-function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, lb, ub)
-    JuMP.build_constraint(_error, aff, MOI.Interval(lb, ub))
+function _moi_constrain_decision(backend::MOI.ModelLike, index, info, ::Union{SingleKnownSet, MultipleKnownSet})
+    # Known decisions are not constrained, just return
+    return nothing
 end

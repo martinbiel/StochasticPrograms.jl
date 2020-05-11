@@ -8,16 +8,16 @@ struct SPResult
     EEV::Float64
 end
 
-problems = Vector{Tuple{StochasticProgram,SPResult,String}}()
+problems = Vector{Tuple{StochasticModel,Vector{<:AbstractScenario},SPResult,String}}()
 @info "Loading test problems..."
 @info "Loading simple..."
-include("simple.jl")
+#include("simple.jl")
 @info "Loading instant simple..."
-include("instant_simple.jl")
+#include("instant_simple.jl")
 @info "Loading infeasible..."
 include("infeasible.jl")
 @info "Loading farmer..."
-include("farmer.jl")
+#include("farmer.jl")
 @info "Loading sampler..."
-include("sampler.jl")
+#include("sampler.jl")
 @info "Test problems loaded. Starting test sequence."

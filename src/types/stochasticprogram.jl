@@ -6,7 +6,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
     optimizer::StochasticProgramOptimizer
 
     function StochasticProgram(stages::NTuple{N, Stage},
-                               scenario_types::NTuple{M, DataType},
+                               scenario_types::ScenarioTypes{M},
                                instantiation::StochasticInstantiation,
                                optimizer_constructor) where {N, M}
         N >= 2 || error("Stochastic program needs at least two stages.")
@@ -58,7 +58,7 @@ function StochasticProgram(first_stage_params::Any,
                            instantiation::StochasticInstantiation,
                            optimizer_constructor = nothing)
     stages = (Stage(first_stage_params), Stage(second_stage_params))
-    return StochasticProgram(stages, Scenario, instantiation, optimizer_constructor)
+    return StochasticProgram(stages, (Scenario,), instantiation, optimizer_constructor)
 end
 """
     StochasticProgram(first_stage_params::Any,
@@ -119,6 +119,18 @@ function StochasticProgram(scenarios::Vector{<:AbstractScenario},
                            optimizer_constructor = nothing)
     stages = (Stage(nothing), Stage(nothing))
     return StochasticProgram(stages, (scenarios,), instantiation, optimizer_constructor)
+end
+
+function Base.copy(src::StochasticProgram{N}; instantiation = UnspecifiedInstantiation(), optimizer = nothing) where N
+    stages = ntuple(Val(N)) do i
+        Stage(stage_parameters(src, i))
+    end
+    scenario_types = ntuple(Val(N-1)) do i
+        scenariotype(src, i+1)
+    end
+    dest = StochasticProgram(stages, scenario_types, instantiation, optimizer)
+    merge!(dest.generator, src.generator)
+    return dest
 end
 
 # Printing #

@@ -1,9 +1,9 @@
-reference_solver = GLPKSolverLP()
+subsolver = GLPK.Optimizer
 
 regularizers = [DontRegularize(),
                 RegularizedDecomposition(penaltyterm = Linearized()),
                 TrustRegion(),
-                LevelSet(penaltyterm = InfNorm(), projectionsolver = reference_solver)]
+                LevelSet(penaltyterm = InfNorm())]
 
 aggregators = [DontAggregate(),
                PartialAggregate(2),
@@ -14,40 +14,51 @@ consolidators = [Consolidate(), DontConsolidate()]
 
 @testset "Structured Solvers" begin
     @info "Running L-shaped tests..."
-    @testset "L-shaped: simple problems" begin
-        @testset "$(solverstr(ls)): $name" for ls in [LShapedSolver(reference_solver,
-                                                                    crash = Crash.EVP(),
-                                                                    regularize = regularizer,
-                                                                    aggregate = aggregator,
-                                                                    consolidate = consolidator,
-                                                                    log = false)
-                                                      for regularizer in regularizers, aggregator in aggregators, consolidator in consolidators], (sp,res,name) in problems
-            tol = 1e-5
-            optimize!(sp, solver=reference_solver)
-            x̄ = optimal_decision(sp)
-            Q̄ = optimal_value(sp)
-            if name == "Infeasible"
-                with_logger(NullLogger()) do
-                    @test optimize!(infeasible, solver=ls) == :Infeasible
-                    add_params!(ls, feasibility_cuts = true)
-                end
-            end
-            @test optimize!(sp, solver=ls) == :Optimal
-            @test isapprox(optimal_value(sp), Q̄, rtol = tol)
-            @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
-        end
-    end
+    # @testset "L-shaped: simple problems" begin
+    #     for (model,scenarios,res,name) in problems
+    #         tol = 1e-5
+    #         sp = instantiate(model,
+    #                          scenarios,
+    #                          instantiation = BlockVertical())
+    #         for regularizer in regularizers, aggregator in aggregators, consolidator in consolidators
+    #             set_optimizer!(sp, () -> LShaped.Optimizer(subsolver,
+    #                                                        regularize = regularizer,
+    #                                                        aggregate = aggregator,
+    #                                                        consolidate = consolidator,
+    #                                                        log = false))
+    #             @testset "$(optimizer_name(sp)): $name" begin
+    #                 if name == "Infeasible"
+    #                     with_logger(NullLogger()) do
+    #                         sp.optimizer.optimizer.feasibility_cuts = false
+    #                         optimize!(sp, crash = Crash.EVP())
+    #                         @test termination_status(sp) == MOI.INFEASIBLE
+    #                         sp.optimizer.optimizer.feasibility_cuts = true
+    #                     end
+    #                 end
+    #                 optimize!(sp, crash = Crash.EVP())
+    #                 @test termination_status(sp) == MOI.OPTIMAL
+    #                 @test isapprox(objective_value(sp), res.VRP, rtol = tol)
+    #                 @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+    #             end
+    #         end
+    #     end
+    # end
     @info "Running progressive-hedging tests..."
     @testset "Progressive-hedging: simple problems" begin
-        @testset "Progressive-hedging: $name" for (sp,res,name) in problems
+        for (model,scenarios,res,name) in problems
             tol = 1e-2
-            ph = ProgressiveHedgingSolver(reference_solver, penaltyterm = Linearized(nbreakpoints=30), log = false)
-            optimize!(sp, solver=reference_solver)
-            x̄ = optimal_decision(sp)
-            Q̄ = optimal_value(sp)
-            @test optimize!(sp, solver=ph) == :Optimal
-            @test isapprox(optimal_value(sp), Q̄, rtol = tol)
-            @test isapprox(optimal_decision(sp), x̄, rtol = sqrt(tol))
+            sp = instantiate(model,
+                             scenarios,
+                             optimizer = () -> ProgressiveHedging.Optimizer(subsolver,
+                                                                            penaltyterm = Linearized(num_breakpoints = 200, spacing = 0.5),
+                                                                            τ = 1e-3,
+                                                                            log = false))
+            @testset "$(optimizer_name(sp)): $name" begin
+                optimize!(sp)
+                @test termination_status(sp) == MOI.OPTIMAL
+                @test isapprox(objective_value(sp), res.VRP, rtol = tol)
+                @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+            end
         end
     end
 end

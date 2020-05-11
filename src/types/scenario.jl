@@ -121,11 +121,13 @@ function scenariotext(io::IO, scenario::Scenario)
 end
 
 Scenarios{S <: AbstractScenario} = Vector{S}
+ScenarioTypes{N} = NTuple{N, Union{DataType, UnionAll}}
 
 function expected(scenarios::Vector{Scenario{NT}}) where NT <: NamedTuple
     isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{NT}))
-    return StochasticPrograms.ExpectedScenario(reduce(scenarios) do s₁, s₂
-                                                   keys(s₁.data) == keys(s₂.data) || error("Iconsistent scenarios. $(keys(s₁)) and $(keys(s₂)) do not match.")
-                                                   Scenario(NamedTuple{Tuple(keys(s₁.data))}([probability(s₁)*x + probability(s₂)*y for (x,y) in zip(values(s₁.data), values(s₂.data))]); probability = 1.0)
-                                               end)
+    expected = reduce(scenarios) do s₁, s₂
+        keys(s₁.data) == keys(s₂.data) || error("Iconsistent scenarios. $(keys(s₁)) and $(keys(s₂)) do not match.")
+        Scenario(NamedTuple{Tuple(keys(s₁.data))}([probability(s₁)*x + probability(s₂)*y for (x,y) in zip(values(s₁.data), values(s₂.data))]); probability = 1.0)
+    end
+    return StochasticPrograms.ExpectedScenario(expected)
 end

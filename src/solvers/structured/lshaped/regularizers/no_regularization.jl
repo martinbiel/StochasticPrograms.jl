@@ -8,31 +8,35 @@ Empty functor object for running an L-shaped algorithm without regularization.
 """
 struct NoRegularization <: AbstractRegularization end
 
-function initialize_regularization!(::AbstractLShapedSolver, ::NoRegularization)
+function initialize_regularization!(::AbstractLShaped, ::NoRegularization)
     return nothing
 end
 
-function log_regularization!(::AbstractLShapedSolver, ::NoRegularization)
+function restore_regularized_master!(::AbstractLShaped, ::NoRegularization)
     return nothing
 end
 
-function log_regularization!(::AbstractLShapedSolver, ::Integer, ::NoRegularization)
+function log_regularization!(::AbstractLShaped, ::NoRegularization)
     return nothing
 end
 
-function take_step!(::AbstractLShapedSolver, ::NoRegularization)
+function log_regularization!(::AbstractLShaped, ::Integer, ::NoRegularization)
     return nothing
 end
 
-function decision(lshaped::AbstractLShapedSolver, ::NoRegularization)
+function take_step!(::AbstractLShaped, ::NoRegularization)
+    return nothing
+end
+
+function decision(lshaped::AbstractLShaped, ::NoRegularization)
     return lshaped.x
 end
 
-function objective(lshaped::AbstractLShapedSolver, ::NoRegularization)
+function objective_value(lshaped::AbstractLShaped, ::NoRegularization)
     return lshaped.data.Q
 end
 
-function gap(lshaped::AbstractLShapedSolver, ::NoRegularization)
+function gap(lshaped::AbstractLShaped, ::NoRegularization)
     @unpack Q,θ = lshaped.data
     return abs(θ-Q)/(abs(Q)+1e-10)
 end
@@ -51,7 +55,7 @@ Factory object for [`NoRegularization`](@ref). Passed by default to `regularize 
 """
 struct DontRegularize <: AbstractRegularizer end
 
-function (::DontRegularize)(::AbstractVector)
+function (::DontRegularize)(::Decisions, ::AbstractVector)
     return NoRegularization()
 end
 

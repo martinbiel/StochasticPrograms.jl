@@ -39,7 +39,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
     end
 end
 
-function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::AsynchronousExecution{T,A,S,PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+function initialize_subproblems!(ph::AbstractProgressiveHedging, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::AsynchronousExecution{T,A,S,PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
     # Create subproblems on worker processes
     m = ph.stochasticprogram
     @sync begin
@@ -88,7 +88,7 @@ function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver
     return ph
 end
 
-function iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution{T}) where T <: AbstractFloat
+function iterate!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution{T}) where T <: AbstractFloat
     wait(execution.progressqueue)
     while isready(execution.progressqueue)
         # Add new cuts from subworkers
@@ -138,7 +138,7 @@ function iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousE
     return :Valid
 end
 
-function start_workers!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function start_workers!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     # Load initial decision
     put!(execution.decisions, 1, ph.ξ)
     put!(execution.r, 1, penalty(ph))
@@ -157,18 +157,18 @@ function start_workers!(ph::AbstractProgressiveHedgingSolver, execution::Asynchr
     return nothing
 end
 
-function close_workers!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function close_workers!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     t = ph.data.iterations-1
     map((w,aw)->!isready(aw) && put!(w,t), execution.finalize, execution.active_workers)
     map((w,aw)->!isready(aw) && put!(w,-1), execution.work, execution.active_workers)
     map(wait, execution.active_workers)
 end
 
-function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function resolve_subproblems!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     return nothing
 end
 
-function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function update_iterate!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     ξ_prev = copy(ph.ξ)
     ph.ξ .= sum(fetch.(execution.x̄))
     # Update δ₁
@@ -176,24 +176,24 @@ function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::Asynch
     return nothing
 end
 
-function update_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function update_subproblems!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     return nothing
 end
 
-function update_dual_gap!(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function update_dual_gap!(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     ph.data.δ₂ = sum(fetch.(execution.δ))
     return nothing
 end
 
-function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, execution::AsynchronousExecution)
+function calculate_objective_value(ph::AbstractProgressiveHedging, execution::AsynchronousExecution)
     return calculate_objective_value(ph, execution.subworkers)
 end
 
-function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::AsynchronousExecution)
+function fill_first_stage!(ph::AbstractProgressiveHedging, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::AsynchronousExecution)
     return fill_first_stage!(ph, stochasticprogram, execution.subworkers, nrows, ncols)
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems, nrows::Integer, ncols::Integer, execution::AsynchronousExecution)
+function fill_submodels!(ph::AbstractProgressiveHedging, scenarioproblems, nrows::Integer, ncols::Integer, execution::AsynchronousExecution)
     return fill_submodels!(ph, scenarioproblems, execution.subworkers, nrows, ncols)
 end
 

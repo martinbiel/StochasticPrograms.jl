@@ -28,9 +28,12 @@ L-Shaped Gap  Time: 0:00:00 (8 iterations)
 module Crash
 
 using StochasticPrograms
-using MathProgBase
+using StochasticPrograms: AbstractCrash
+using MathOptInterface
 
-abstract type CrashMethod end
+const MOI = MathOptInterface
+
+
 
 """
     None
@@ -38,10 +41,10 @@ abstract type CrashMethod end
 Randomize the initial decision (default).
 
 """
-struct None <: CrashMethod end
+struct None <: AbstractCrash end
 
-function (::None)(stochasticprogram::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
-    return rand(decision_length(stochasticprogram))
+function (::None)(stochasticprogram::StochasticProgram)
+    return rand(num_decisions(stochasticprogram))
 end
 
 """
@@ -50,13 +53,10 @@ end
 Solve the expected value problem corresponding to the stochastic program and use the expected value solution as initial decision.
 
 """
-struct EVP <: CrashMethod end
+struct EVP <: AbstractCrash end
 
-function (::EVP)(sp::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
-    evp = StochasticPrograms.EVP(sp; solver = solver)
-    status = solve(evp)
-    status != :Optimal && error("Could not solve EVP model during crash procedure. Aborting.")
-    return evp.colVal[1:decision_length(sp)]
+function (::EVP)(stochasticprogram::StochasticProgram)
+    return expected_value_decision(stochasticprogram)
 end
 
 """
@@ -65,7 +65,7 @@ end
 Solve the wait-and-see problem corresponding a supplied scenario and use the optimal solution as initial decision.
 
 """
-struct Scenario{S <: AbstractScenario} <: CrashMethod
+struct Scenario{S <: AbstractScenario} <: AbstractCrash
     scenario::S
 
     function Scenario(scenario::S) where S <: AbstractScenario
@@ -73,11 +73,8 @@ struct Scenario{S <: AbstractScenario} <: CrashMethod
     end
 end
 
-function (crash::Scenario)(so::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
-    ws = WS(sp, crash.scenario; solver = solver)
-    status = solve(ws)
-    status != :Optimal && error("Could not solve wait-and-see model during crash procedure. Aborting.")
-    return ws.colVal[1:decision_length(sp)]
+function (crash::Scenario)(stochasticprogram::StochasticProgram)
+    return wait_and_see_decision(stochasticprogram, crash.scenario)
 end
 
 """
@@ -86,7 +83,7 @@ end
 Use the user-supplied `x₀` as initial decision.
 
 """
-struct Custom{T <: AbstractFloat} <: CrashMethod
+struct Custom{T <: AbstractFloat} <: AbstractCrash
     x₀::Vector{T}
 
     function Custom(x₀::Vector{T}) where T <: AbstractFloat
@@ -94,10 +91,8 @@ struct Custom{T <: AbstractFloat} <: CrashMethod
     end
 end
 
-function (crash::Custom)(sp::StochasticProgram, solver::MathProgBase.AbstractMathProgSolver)
-    return crash.x₀[1:decision_length(sp)]
+function (crash::Custom)(stochasticprogram::StochasticProgram)
+    return crash.x₀[1:num_decisions(stochasticprogram)]
 end
 
 end
-
-CrashMethod = Crash.CrashMethod

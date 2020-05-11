@@ -1,11 +1,11 @@
 @sampler SimpleSampler = begin
-    N::StochasticPrograms.MvNormal
+    N::MvNormal
 
-    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
+    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
 
     @sample Scenario begin
         x = rand(sampler.N)
-        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = StochasticPrograms.pdf(sampler.N, x))
+        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = pdf(sampler.N, x))
     end
 end
 

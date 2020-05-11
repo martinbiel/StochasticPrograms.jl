@@ -191,18 +191,23 @@ optimize!(sp)
 
 See also: [`VRP`](@ref)
 """
-function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; kwargs...)
+function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been initialized at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
+    # Crash initial decision
+    x₀ = crash(stochasticprogram)
     # Switch on solver type
-    return optimize!(structure(stochasticprogram), optimizer(stochasticprogram); kwargs...)
+    return optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kwargs...)
 end
 function JuMP.termination_status(stochasticprogram::StochasticProgram)
     return MOI.get(optimizer(stochasticprogram), MOI.TerminationStatus())::MOI.TerminationStatusCode
+end
+function JuMP.objective_sense(stochasticprogram::StochasticProgram)
+    return MOI.get(optimizer(stochasticprogram), MOI.ObjectiveSense())::MOI.OptimizationSense
 end
 """
     optimal_decision(stochasticprogram::StochasticProgram)
@@ -210,7 +215,7 @@ end
 Return the optimal first stage decision of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
 function optimal_decision(stochasticprogram::TwoStageStochasticProgram)
-    return JuMP.value.(first_stage_decisions(stochasticprogram))
+    return JuMP.value.(all_decision_variables(stochasticprogram))
 end
 """
     optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
@@ -295,10 +300,10 @@ function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int 
             throw(OptimizeNotCalled())
         elseif status == MOI.INFEASIBLE
             @warn "Stochastic program is infeasible"
-            return objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+            return objective_sense(stochasticprogram) == MOI.MAX_SENSE ? -Inf : Inf
         elseif status == MOI.DUAL_INFEASIBLE
             @warn "Stochastic program is unbounded"
-            return objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+            return objective_sense(stochasticprogram) == MOI.MAX_SENSE ? Inf : -Inf
         else
             error("Stochastic program could not be solved, returned status: $status")
         end
@@ -671,20 +676,20 @@ function optimizer_name(optimizer::MOI.AbstractOptimizer)
     return JuMP._try_get_solver_name(optimizer)
 end
 """
-    moi_optimizer(stochasticmodel::StochasticModel)
+    master_optimizer(stochasticprogram::StochasticProgram)
 
-Return a MOI capable optimizer using the currently provided optimizer of `stochasticmodel`.
+Return a MOI optimizer using the currently provided optimizer of `stochasticprogram`.
 """
-function moi_optimizer(stochasticmodel::StochasticModel)
-    return moi_optimizer(stochasticmodel.optimizer)
+function master_optimizer(stochasticprogram::StochasticProgram)
+    return master_optimizer(stochasticprogram.optimizer)
 end
 """
-    moi_optimizer(stochasticprogram::StochasticProgram)
+    sub_optimizer(stochasticprogram::StochasticProgram)
 
-Return a MOI capable optimizer using the currently provided optimizer of `stochasticprogram`.
+Return a MOI optimizer for solving subproblems using the currently provided optimizer of `stochasticprogram`.
 """
-function moi_optimizer(stochasticprogram::StochasticProgram)
-    return moi_optimizer(stochasticprogram.optimizer)
+function sub_optimizer(stochasticprogram::StochasticProgram)
+    return sub_optimizer(stochasticprogram.optimizer)
 end
 """
     optimizer(stochasticprogram::StochasticProgram)
@@ -720,11 +725,14 @@ end
 
 Set the optimizer of the `stochasticprogram`.
 """
-function set_optimizer!(stochasticprogram::StochasticProgram, optimizer; defer::Bool = false)
-    set_optimizer!(stochasticprogram.optimizer, optimizer)
-    if !defer
-        generate!(stochasticprogram)
+function set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
+    if stochasticprogram.optimizer.optimizer isa LShaped.Optimizer
+        if stochasticprogram.optimizer.optimizer.lshaped != nothing
+            LShaped.restore_master!(stochasticprogram.optimizer.optimizer.lshaped)
+        end
     end
+    set_optimizer!(stochasticprogram.optimizer, optimizer)
+    set_optimizer!(stochasticprogram.structure, stochasticprogram.optimizer.optimizer)
     return nothing
 end
 """
@@ -775,7 +783,7 @@ end
 Store the collection of second stage `scenarios` in the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function add_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
-    add_scenarios!(structure(stochasticprogram), stage, scenarios)
+    add_scenarios!(structure(stochasticprogram), scenarios, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -795,7 +803,7 @@ end
 Generate `n` second-stage scenarios using `scenariogenerator`and store in the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function add_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, stage::Integer = 2)
-    add_scenarios!(scenariogenerator, structure(stochasticprogram), stage, n)
+    add_scenarios!(scenariogenerator, structure(stochasticprogram), n, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -805,7 +813,7 @@ end
 Generate `n` second-stage scenarios using `scenariogenerator`and store them in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenarios!(scenariogenerator::Function, stochasticprogram::StochasticProgram, n::Integer, w::Integer, stage::Integer = 2)
-    add_scenarios!(scenariogenerator, structure(stochasticprogram), stage, n, w)
+    add_scenarios!(scenariogenerator, structure(stochasticprogram), n, w, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -815,7 +823,7 @@ end
 Sample `n` scenarios using `sampler` and add to the `stochasticprogram` at `stage`. Defaults to the second stage. If the `stochasticprogram` is distributed, scenarios will be distributed evenly across workers.
 """
 function sample!(stochasticprogram::StochasticProgram, sampler::AbstractSampler, n::Integer, stage::Integer = 2)
-    sample!(structure(stochasticprogram), stage, sampler, n)
+    sample!(structure(stochasticprogram), sampler, n, stage)
     return stochasticprogram
 end
 # ========================== #

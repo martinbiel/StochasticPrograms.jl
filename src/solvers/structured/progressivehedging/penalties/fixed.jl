@@ -18,13 +18,13 @@ struct FixedPenalization{T <: AbstractFloat} <: AbstractPenalization
         return new{T}(r)
     end
 end
-function penalty(::AbstractProgressiveHedgingSolver, penalty::FixedPenalization)
+function penalty(::AbstractProgressiveHedging, penalty::FixedPenalization)
     return penalty.r
 end
-function initialize_penalty!(::AbstractProgressiveHedgingSolver, ::FixedPenalization)
+function initialize_penalty!(::AbstractProgressiveHedging, ::FixedPenalization)
     nothing
 end
-function update_penalty!(::AbstractProgressiveHedgingSolver, ::FixedPenalization)
+function update_penalty!(::AbstractProgressiveHedging, ::FixedPenalization)
     nothing
 end
 

@@ -1,26 +1,25 @@
 # Structured optimizer interface
 # ========================== #
 """
-    load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure)
+    load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure, x₀::AbstractVector)
 
-Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure`.
+Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure` and inital decision `x₀`.
 
 See also: [`optimize!`](@ref)
 """
-function load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure)
-    throw(MethodError(load_structure!, optimizer, structure))
+function load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure, x₀::AbstractVector)
+    throw(MethodError(load_structure!, optimizer, structure, x₀))
 end
+"""
+    restore_structure!(optimizer::AbstractStructuredOptimizer)
 
+Restore the stochastic program to the state it was in before a call to `optimize!`
 
-
-# API
-# load_structure!
-# [x] optimizer_name
-# [x] optimize!
-# optimal_decision
-# optimal_value
-# [x] termination_status
-# optimal_recourse_decision
+See also: [`load_structure!`](@ref)
+"""
+function restore_structure!(optimizer::AbstractStructuredOptimizer)
+    throw(MethodError(restore_structure!, optimizer))
+end
 """
     optimize!(optimizer::AbstractStructuredOptimizer)
 
@@ -40,20 +39,28 @@ function termination_status(optimizer::AbstractStructuredOptimizer)
     throw(MethodError(termination_status, optimizer))
 end
 """
-    optimal_value(optimizer::AbstractStructuredOptimizer)
-
-Optionally, return a string identifier of `AbstractStructuredOptimizer`.
-"""
-function optimal_value(::AbstractStructuredOptimizer)
-    return "SolverName() attribute not implemented by the optimizer."
-end
-"""
     optimizer_name(optimizer::AbstractStructuredOptimizer)
 
 Optionally, return a string identifier of `AbstractStructuredOptimizer`.
 """
 function optimizer_name(::AbstractStructuredOptimizer)
     return "SolverName() attribute not implemented by the optimizer."
+end
+"""
+    master_optimizer(optimizer::AbstractStructuredOptimizer)
+
+Return a MOI optimizer constructor
+"""
+function master_optimizer(optimizer::AbstractStructuredOptimizer)
+    return throw(MethodError(master_optimizer, optimizer))
+end
+"""
+    master_optimizer(optimizer::AbstractStructuredOptimizer)
+
+Return a MOI optimizer constructor for solving subproblems
+"""
+function sub_optimizer(optimizer::AbstractStructuredOptimizer)
+    return throw(MethodError(sub_optimizer, optimizer))
 end
 # # Sample-based solver interface
 # # ========================== #

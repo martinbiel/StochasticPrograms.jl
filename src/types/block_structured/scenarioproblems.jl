@@ -246,6 +246,23 @@ function update_decisions!(scenarioproblems::DistributedScenarioProblems, change
     end
     return nothing
 end
+function set_optimizer!(scenarioproblems::ScenarioProblems, optimizer)
+    map(subproblems(scenarioproblems)) do subprob
+        set_optimizer(subprob, optimizer)
+    end
+    return nothing
+end
+function set_optimizer!(scenarioproblems::DistributedScenarioProblems, optimizer)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], optimizer) do (sp, opt)
+                    set_optimizer!(fetch(sp), opt)
+                end
+        end
+    end
+    return nothing
+end
 function add_scenario!(scenarioproblems::ScenarioProblems{S}, scenario::S) where S <: AbstractScenario
     push!(scenarioproblems.scenarios, scenario)
     return nothing
@@ -406,10 +423,10 @@ end
 # Sampling #
 # ========================== #
 function sample!(scenarioproblems::ScenarioProblems{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
-    _sample!(scenarioproblems, sampler, n, nscenarios(scenarioproblems), 1/n)
+    _sample!(scenarioproblems, sampler, n, num_scenarios(scenarioproblems), 1/n)
 end
 function sample!(scenarioproblems::ScenarioProblems{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: AbstractScenario
-    _sample!(scenarioproblems, sampler, n, nscenarios(scenarioproblems), 1/n)
+    _sample!(scenarioproblems, sampler, n, num_scenarios(scenarioproblems), 1/n)
 end
 function sample!(scenarioproblems::DistributedScenarioProblems{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")

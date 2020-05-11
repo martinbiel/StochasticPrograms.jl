@@ -20,27 +20,28 @@ function all_decisions(model::JuMP.Model)
     return all_decisions(decisions)
 end
 
-function all_decision_variables(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
-    dvars = [DecisionRef(model, index) for index in keys(decisions.decisions)]
-    # Sort the decision variables
-    sort!(dvars; by = dref -> index(dref).value)
-    return dvars
-end
-
-function num_decisions(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
-    return num_decisions(decisions)
-end
-
 function all_known_decisions(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return all_known_decisions(decisions)
 end
 
+function all_decision_variables(model::JuMP.Model)
+    decisions = get_decisions(model)::Decisions
+    return map(decisions.undecided) do index
+        DecisionRef(model, index)
+    end
+end
+
 function all_known_decision_variables(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
-    return [KnownRef(model, index) for index in keys(decisions.known_decisions)]
+    return map(decisions.knowns) do index
+        KnownRef(model, index)
+    end
+end
+
+function num_decisions(model::JuMP.Model)
+    decisions = get_decisions(model)::Decisions
+    return num_decisions(decisions)
 end
 
 function num_known_decisions(model::JuMP.Model)
@@ -59,18 +60,13 @@ function get_decisions(kref::KnownRef)
     return get_decisions(kref.model)
 end
 
-function decision(dref::DecisionRef)
+function decision(dref::Union{DecisionRef, KnownRef})
     decisions = get_decisions(dref)::Decisions
     return decision(decisions, index(dref))
 end
 
 function state(dref::DecisionRef)
     return decision(dref).state
-end
-
-function decision(kref::KnownRef)
-    decisions = get_decisions(kref)::Decisions
-    return known_decision(decisions, index(kref))
 end
 
 # Setters #
@@ -123,7 +119,7 @@ function update_known_decisions!(model::JuMP.Model)
         return nothing
     end
     # Update states
-    update_decisions!(model, KnownValuesChange(decisions.known_decisions))
+    update_decisions!(model, KnownValuesChange())
     return nothing
 end
 
@@ -139,13 +135,13 @@ function update_known_decisions!(model::JuMP.Model, krefs::Vector{KnownRef}, val
     # Check decision length
     length(krefs) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of defined known decision variables $(length(krefs)).")
     # Update decisions
-    for (kref, val) in zip(drefs, vals)
-        d = known_decision(kref)
+    for (kref, val) in zip(krefs, vals)
+        d = decision(kref)
         # Update value
         d.value = val
     end
     # Update states
-    update_decisions!(model, KnownValuesChange(decisions.known_decisions))
+    update_decisions!(model, KnownValuesChange())
     return nothing
 end
 
@@ -159,14 +155,14 @@ function update_known_decisions!(model::JuMP.Model, vals::AbstractVector)
     # Update values
     update_known_decisions!(decisions, vals)
     # Update states
-    update_decisions!(model, KnownValuesChange(decisions.known_decisions))
+    update_decisions!(model, KnownValuesChange())
     return nothing
 end
 
 # JuMP variable interface #
 # ========================== #
 function MOI.get(model::JuMP.Model, attr::MOI.AbstractVariableAttribute,
-                 dref::DecisionRef)
+                 dref::Union{DecisionRef, KnownRef})
     check_belongs_to_model(dref, model)
     if MOI.is_set_by_optimize(attr)
         return JuMP._moi_get_result(backend(model), attr, index(dref))
@@ -176,23 +172,19 @@ function MOI.get(model::JuMP.Model, attr::MOI.AbstractVariableAttribute,
 end
 
 function MOI.set(model::Model, attr::MOI.AbstractVariableAttribute,
-                 dref::DecisionRef, value)
+                 dref::Union{DecisionRef, KnownRef}, value)
     check_belongs_to_model(dref, model)
     MOI.set(backend(model), attr, index(dref), value)
 end
 
 JuMP.name(dref::DecisionRef) = MOI.get(JuMP.owner_model(dref), MOI.VariableName(), dref)::String
-function JuMP.name(kref::KnownRef)
-    decisions = get_decisions(kref)::Decisions
-    return name(known_decision(decisions, index(kref)))
-end
+JuMP.name(kref::KnownRef) = MOI.get(JuMP.owner_model(kref), MOI.VariableName(), kref)::String
 
 function JuMP.set_name(dref::DecisionRef, name::String)
     return MOI.set(JuMP.owner_model(dref), MOI.VariableName(), dref, name)
 end
 function JuMP.set_name(kref::KnownRef, name::String)
-    decisions = get_decisions(kref)::Decisions
-    return known_decision(decisions, index(kref)).name = name
+    return MOI.set(JuMP.owner_model(dref), MOI.VariableName(), kref, name)
 end
 
 function decision_by_name(model::Model, name::String)
@@ -205,12 +197,12 @@ function decision_by_name(model::Model, name::String)
 end
 
 function known_decision_by_name(model::Model, name::String)
-    decisions = get_decisions(kref)::Decisions
-    if haskey(decisions.name_index, name)
-        index = decisions.name_index[name]
+    index = MOI.get(backend(model), MOI.VariableIndex, name)
+    if index isa Nothing
+        return nothing
+    else
         return KnownRef(model, index)
     end
-    return nothing
 end
 
 JuMP.index(dref::DecisionRef) = dref.index
@@ -228,7 +220,7 @@ end
 
 function JuMP.value(kref::KnownRef)::Float64
     decisions = get_decisions(kref)::Decisions
-    return known_value(decisions, index(kref))
+    return decision_value(decisions, index(kref))
 end
 
 function JuMP.is_fixed(dref::DecisionRef)
@@ -247,9 +239,9 @@ function JuMP.unfix(dref::DecisionRef)
     end
     d = decision(dref)
     # Update state
-    MOI.set(owner_model(dref), DecisionStateAttribute(), dref, NotTaken)
+    d.state = NotTaken
     # Prepare modification
-    change = DecisionStateChange(index(dref), NotTaken, -value(d))
+    change = DecisionStateChange(index(dref), NotTaken, -value(dref))
     # Update objective and constraints
     update_decisions!(JuMP.owner_model(dref), change)
     return nothing
@@ -282,11 +274,11 @@ end
 function JuMP.fix(kref::KnownRef, val::Number)
     d = decision(kref)
     # Prepare modification
-    change = KnownValueChange(index(kref), val - known_value(d))
+    change = KnownValueChange(index(kref), val - decision_value(d))
     # Update known value
     d.value = val
     # Update objective and constraints
-    update_decisions!(JuMP.owner_model(dref), change)
+    update_decisions!(JuMP.owner_model(kref), change)
     return nothing
 end
 
@@ -476,15 +468,42 @@ function Base.hash(kref::KnownRef, h::UInt)
     return hash(objectid(owner_model(kref)), hash(kref.index, h))
 end
 
+JuMP.isequal_canonical(d::DecisionRef, other::DecisionRef) = isequal(d, other)
 function Base.isequal(dref::DecisionRef, other::DecisionRef)
     return owner_model(dref) === owner_model(other) && dref.index == other.index
 end
+JuMP.isequal_canonical(k::KnownRef, other::KnownRef) = isequal(k, other)
 function Base.isequal(kref::KnownRef, other::KnownRef)
     return owner_model(kref) === owner_model(other) && kref.index == other.index
 end
 
 Base.iszero(::DecisionRef) = false
 Base.copy(dref::DecisionRef) = DecisionRef(dref.model, dref.index)
+Base.broadcastable(dref::DecisionRef) = Ref(dref)
 
 Base.iszero(::KnownRef) = false
 Base.copy(kref::KnownRef) = KnownRef(dref.model, dref.index)
+Base.broadcastable(kref::KnownRef) = Ref(kref)
+
+# JuMP copy interface #
+# ========================== #
+function JuMP.copy_extension_data(decisions::Decisions, dest::Model, src::Model)
+    new_decisions = Decisions()
+    for dref in all_decision_variables(src)
+        set_decision!(new_decisions, index(dref), decision(dref))
+    end
+    for kref in all_known_decision_variables(src)
+        set_known_decision!(new_decisions, index(kref), decision(kref))
+    end
+    return new_decisions
+end
+
+function Base.getindex(reference_map::JuMP.ReferenceMap, dref::DecisionRef)
+    return DecisionRef(reference_map.model,
+                       reference_map.index_map[index(dref)])
+end
+
+function Base.getindex(reference_map::JuMP.ReferenceMap, kref::KnownRef)
+    return DecisionRef(reference_map.model,
+                       reference_map.index_map[index(kref)])
+end

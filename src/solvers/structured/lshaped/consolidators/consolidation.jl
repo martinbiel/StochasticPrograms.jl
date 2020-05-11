@@ -11,15 +11,15 @@ Empty functor object for running the L-shaped algorithm without consolidation.
 """
 struct NoConsolidation <: AbstractConsolidation end
 
-function consolidate!(::AbstractLShapedSolver, ::NoConsolidation)
+function consolidate!(::AbstractLShaped, ::NoConsolidation)
     return nothing
 end
 
-function add_cut!(::AbstractLShapedSolver, ::NoConsolidation, ::AbstractHyperPlane)
+function add_cut!(::AbstractLShaped, ::NoConsolidation, ::AbstractHyperPlane)
     return nothing
 end
 
-function add_cut!(::AbstractLShapedSolver, ::NoConsolidation, ::Integer, ::AbstractHyperPlane)
+function add_cut!(::AbstractLShaped, ::NoConsolidation, ::Integer, ::AbstractHyperPlane)
     return nothing
 end
 # Consolidation
@@ -54,15 +54,15 @@ struct Consolidation{T <: AbstractFloat} <: AbstractConsolidation
     end
 end
 
-function consolidate!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T}) where T <: AbstractFloat
+function consolidate!(lshaped::AbstractLShaped, consolidation::Consolidation{T}) where T <: AbstractFloat
     for i in findall(map(!,consolidation.consolidated))
-        nc = sum(nsubproblems.(consolidation.cuts[i]))
+        nc = sum(num_subproblems.(consolidation.cuts[i]))
         nc == 0 && continue
         count = 0
         for cut in consolidation.cuts[i]
             # Check for redundance
             if !active(lshaped, cut)
-                count += nsubproblems(cut)
+                count += num_subproblems(cut)
             end
         end
         if count/nc >= consolidation.redundance_treshold
@@ -98,61 +98,44 @@ function consolidate!(lshaped::AbstractLShapedSolver, consolidation::Consolidati
     return nothing
 end
 
-function add_cut!(::AbstractLShapedSolver, ::Consolidation, ::AbstractHyperPlane)
+function add_cut!(::AbstractLShaped, ::Consolidation, ::AbstractHyperPlane)
     return nothing
 end
 
-function add_cut!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T}, cut::HyperPlane{FeasibilityCut}) where T <: AbstractFloat
+function add_cut!(lshaped::AbstractLShaped, consolidation::Consolidation{T}, cut::HyperPlane{FeasibilityCut}) where T <: AbstractFloat
     push!(consolidation.feasibility_cuts[timestamp(lshaped)], cut)
     return nothing
 end
 
-function add_cut!(lshaped::AbstractLShapedSolver, consolidation::Consolidation{T}, cut::AnySparseOptimalityCut) where T <: AbstractFloat
+function add_cut!(lshaped::AbstractLShaped, consolidation::Consolidation{T}, cut::AnySparseOptimalityCut) where T <: AbstractFloat
     push!(consolidation.cuts[timestamp(lshaped)], cut)
     return nothing
 end
 
-function rebuild_master!(lshaped::AbstractLShapedSolver, consolidation::Consolidation)
-    ncuts = ncutconstraints(lshaped)
-    cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lshaped.mastersolver.lqmodel)
-    MPB.delconstrs!(lshaped.mastersolver.lqmodel, collect(cut_indices))
-    if lshaped.regularization isa LevelSet
-        # Reset projection problem if using level sets
-        lv = lshaped.regularization
-        MPB.delconstrs!(lv.projectionsolver.lqmodel, [lv.data.levelindex])
-        cut_indices = first_stage_nconstraints(lshaped.stochasticprogram)+1:MPB.numconstr(lv.projectionsolver.lqmodel)
-        MPB.delconstrs!(lv.projectionsolver.lqmodel, collect(cut_indices))
-        lv.data.levelindex = -1
-        if :index ∈ fieldnames(typeof(lv.penaltyterm))
-            lv.penaltyterm.index = -1
-        end
-    elseif lshaped.regularization isa RegularizedDecomposition
-        rd = lshaped.regularization
-        if :index ∈ fieldnames(typeof(rd.penaltyterm))
-            rd.penaltyterm.index = -1
-        end
-    end
-    lshaped.data.ncuts -= ncuts
+function rebuild_master!(lshaped::AbstractLShaped, consolidation::Consolidation)
+    # Remove all cutsa
+    remove_cut_constraints!(lshaped)
+    # Readd consolidated cuts
     readd_cuts!(lshaped, consolidation)
     return nothing
 end
 
-noptimalitycuts(consolidation::Consolidation) = sum(length.(consolidation.cuts))
-nfeasibilitycuts(consolidation::Consolidation) = sum(length.(consolidation.feasibility_cuts))
-function ncutconstraints(consolidation::Consolidation)
-    return noptimalitycuts(consolidation) + nfeasibilitycuts(consolidation)
+num_optimalitycuts(consolidation::Consolidation) = sum(length.(consolidation.cuts))
+num_feasibilitycuts(consolidation::Consolidation) = sum(length.(consolidation.feasibility_cuts))
+function num_cutconstraints(consolidation::Consolidation)
+    return num_optimalitycuts(consolidation) + num_feasibilitycuts(consolidation)
 end
 
-function ncutconstraints(lshaped::AbstractLShapedSolver)
-    return MPB.numconstr(lshaped.mastersolver.lqmodel)-first_stage_nconstraints(lshaped.stochasticprogram)
+function num_cutconstraints(lshaped::AbstractLShaped)
+    return length(lshaped.cut_constraints)
 end
 # Rebuild functions
 # ------------------------------------------------------------
-function minimum_requirements(lshaped::AbstractLShapedSolver, consolidation::Consolidation)
-    return (noptimalitycuts(consolidation) > 0 &&
+function minimum_requirements(lshaped::AbstractLShaped, consolidation::Consolidation)
+    return (num_optimalitycuts(consolidation) > 0 &&
         count(consolidation.consolidated) > 0) ||
-        (nfeasibilitycuts(consolidation) > 0 &&
-         nfeasibilitycuts(consolidation)/ncutconstraints(lshaped) <= 0.1)
+        (num_feasibilitycuts(consolidation) > 0 &&
+         num_feasibilitycuts(consolidation)/num_cutconstraints(lshaped) <= 0.1)
 end
 """
     at_tolerance(τ = 0.4, miniter = 0)
@@ -163,7 +146,7 @@ Rebuild master when at least nconsolidations*`miniter` iterations has passed and
 at_tolerance() = at_tolerance(0.4, 0)
 function at_tolerance(τ, miniter)
     return (lshaped, consolidation) -> begin
-        return lshaped.data.iterations >= (lshaped.data.consolidations+1)*miniter && ncutconstraints(consolidation)/ncutconstraints(lshaped) <= τ
+        return lshaped.data.iterations >= (lshaped.data.consolidations+1)*miniter && num_cutconstraints(consolidation)/num_cutconstraints(lshaped) <= τ
     end
 end
 

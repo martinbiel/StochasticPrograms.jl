@@ -59,7 +59,7 @@ function ClusterByReference(τ::AbstractFloat; distance::Function = absolute_dis
 end
 
 function cluster(rule::ClusterByReference, cuts::Vector{<:HyperPlane{OptimalityCut,T}}) where T <: AbstractFloat
-    clusters::Vector{AggregatedOptimalityCut} = fill(zero(AggregatedOptimalityCut{T}), length(cuts)+1)
+    clusters::Vector{AggregatedOptimalityCut} = fill(zero(AggregatedOptimalityCut{T}), length(cuts) + 1)
     reference = zero(AggregatedOptimalityCut{T})
     for cut in cuts
         reference += cut

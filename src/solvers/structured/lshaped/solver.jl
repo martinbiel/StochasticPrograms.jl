@@ -1,7 +1,8 @@
 @with_kw mutable struct LShapedData{T <: AbstractFloat}
     Q::T = 1e10
     θ::T = -1e10
-    ncuts::Int = 0
+    master_objective::AffineDecisionFunction{T} = zero(AffineDecisionFunction{T})
+    num_cuts::Int = 0
     iterations::Int = 1
     consolidations::Int = 0
 end
@@ -17,7 +18,7 @@ end
 end
 
 """
-    LShaped
+    LShapedAlgorithm
 
 Functor object for the L-shaped algorithm. Create using the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
@@ -29,28 +30,25 @@ Functor object for the L-shaped algorithm. Create using the `LShapedSolver` fact
 - `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
 ...
 """
-struct LShaped{T <: AbstractFloat,
-               A <: AbstractVector,
-               SP <: StochasticProgram,
-               M <: LQSolver,
-               S <: LQSolver,
-               E <: AbstractExecution,
-               F <: AbstractFeasibility,
-               R <: AbstractRegularization,
-               Agg <: AbstractAggregation,
-               C <: AbstractConsolidation} <: AbstractLShapedSolver
-    stochasticprogram::SP
+struct LShapedAlgorithm{T <: AbstractFloat,
+                        A <: AbstractVector,
+                        ST <: VerticalBlockStructure,
+                        M <: MOI.AbstractOptimizer,
+                        S <: MOI.AbstractOptimizer,
+                        E <: AbstractExecution,
+                        F <: AbstractFeasibility,
+                        R <: AbstractRegularization,
+                        Agg <: AbstractAggregation,
+                        C <: AbstractConsolidation} <: AbstractLShaped
+    structure::ST
     data::LShapedData{T}
     parameters::LShapedParameters{T}
 
     # Master
-    mastersolver::M
-    mastervector::A
+    master::M
+    decisions::Decisions
     x::A
     Q_history::A
-
-    # Subproblems
-    nscenarios::Int
 
     # Execution
     execution::E
@@ -62,7 +60,8 @@ struct LShaped{T <: AbstractFloat,
     regularization::R
 
     # Cuts
-    θs::A
+    master_variables::Vector{MOI.VariableIndex}
+    cut_constraints::Vector{CutConstraint}
     cuts::Vector{AnySparseOptimalityCut{T}}
     aggregation::Agg
     consolidation::C
@@ -70,15 +69,13 @@ struct LShaped{T <: AbstractFloat,
 
     progress::ProgressThresh{T}
 
-    function LShaped(stochasticprogram::StochasticProgram,
-                     x₀::AbstractVector,
-                     mastersolver::MPB.AbstractMathProgSolver,
-                     subsolver::MPB.AbstractMathProgSolver,
-                     feasibility_cuts::Bool,
-                     executer::Execution,
-                     regularizer::AbstractRegularizer,
-                     aggregator::AbstractAggregator,
-                     consolidator::AbstractConsolidator; kw...)
+    function LShapedAlgorithm(structure::VerticalBlockStructure,
+                              x₀::AbstractVector,
+                              feasibility_cuts::Bool,
+                              executer::Execution,
+                              regularizer::AbstractRegularizer,
+                              aggregator::AbstractAggregator,
+                              consolidator::AbstractConsolidator; kw...)
         if nworkers() > 1 && executer isa Serial
             @warn "There are worker processes, consider using distributed version of algorithm"
         end
@@ -88,26 +85,26 @@ struct LShaped{T <: AbstractFloat,
         else
             executer
         end
-        first_stage = StochasticPrograms.get_stage_one(stochasticprogram)
-        length(x₀) != first_stage.numCols && error("Incorrect length of starting guess, has ", length(x₀), " should be ", first_stage.numCols)
-
+        # Sanity checks
+        length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
+        num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run L-shaped procedure.")
+        n = num_subproblems(structure)
+        # Float types
         T = promote_type(eltype(x₀), Float32)
         x₀_ = convert(AbstractVector{T}, copy(x₀))
-        mastervector = convert(AbstractVector{T}, copy(x₀))
         A = typeof(x₀_)
-        SP = typeof(stochasticprogram)
-        msolver = LQSolver(first_stage, mastersolver)
-        M = typeof(msolver)
-        S = LQSolver{typeof(MPB.LinearQuadraticModel(subsolver)),typeof(subsolver)}
-        n = StochasticPrograms.nscenarios(stochasticprogram)
+        # Structure
+        ST = typeof(structure)
+        M = typeof(backend(structure.first_stage))
+        S = typeof(backend(subproblem(structure, 1)))
         # Feasibility
         feasibility = feasibility_cuts ? HandleFeasibility(T) : IgnoreFeasibility()
         F = typeof(feasibility)
         # Execution policy
-        execution = executer(n,F,T,A,S)
+        execution = executer(structure,F,T,A,S)
         E = typeof(execution)
         # Regularization policy
-        regularization = regularizer(x₀_)
+        regularization = regularizer(structure.decisions[1], x₀_)
         R = typeof(regularization)
         # Aggregation policy
         aggregation = aggregator(n, T)
@@ -118,46 +115,30 @@ struct LShaped{T <: AbstractFloat,
         # Algorithm parameters
         params = LShapedParameters{T}(; kw...)
 
-        lshaped = new{T,A,SP,M,S,E,F,R,Agg,C}(stochasticprogram,
+        lshaped = new{T,A,ST,M,S,E,F,R,Agg,C}(structure,
                                               LShapedData{T}(),
                                               params,
-                                              msolver,
-                                              mastervector,
+                                              backend(structure.first_stage),
+                                              structure.decisions[1],
                                               x₀_,
                                               A(),
-                                              n,
                                               execution,
                                               feasibility,
                                               regularization,
-                                              A(),
+                                              Vector{MOI.VariableIndex}(),
+                                              Vector{CutConstraint}(),
                                               Vector{SparseOptimalityCut{T}}(),
                                               aggregation,
                                               consolidation,
                                               A(),
                                               ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))L-Shaped Gap "))
         # Initialize solver
-        initialize!(lshaped, subsolver)
+        initialize!(lshaped)
         return lshaped
     end
 end
-LShaped(stochasticprogram::StochasticProgram,
-        mastersolver::MPB.AbstractMathProgSolver,
-        subsolver::MPB.AbstractMathProgSolver,
-        feasibility_cuts::Bool,
-        executer::Execution,
-        regularizer::AbstractRegularizer,
-        aggregator::AbstractAggregator,
-        consolidator::AbstractConsolidator; kw...) = LShaped(stochasticprogram,
-                                                             rand(decision_length(stochasticprogram)),
-                                                             mastersolver,
-                                                             subsolver,
-                                                             feasibility_cuts,
-                                                             executer,
-                                                             regularizer,
-                                                             aggregator,
-                                                             consolidator; kw...)
 
-function show(io::IO, lshaped::LShaped)
+function show(io::IO, lshaped::LShapedAlgorithm)
     println(io, typeof(lshaped).name.name)
     println(io, "State:")
     show(io, lshaped.data)
@@ -165,11 +146,11 @@ function show(io::IO, lshaped::LShaped)
     show(io, lshaped.parameters)
 end
 
-function show(io::IO, ::MIME"text/plain", lshaped::LShaped)
+function show(io::IO, ::MIME"text/plain", lshaped::LShapedAlgorithm)
     show(io, lshaped)
 end
 
-function (lshaped::LShaped)()
+function (lshaped::LShapedAlgorithm)()
     # Reset timer
     lshaped.progress.tfirst = lshaped.progress.tlast = time()
     # Start workers (if any)
@@ -177,7 +158,7 @@ function (lshaped::LShaped)()
     # Start procedure
     while true
         status = iterate!(lshaped)
-        if status != :Valid
+        if status !== nothing
             close_workers!(lshaped)
             return status
         end

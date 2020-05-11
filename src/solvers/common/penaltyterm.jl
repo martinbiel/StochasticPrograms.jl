@@ -1,4 +1,9 @@
 abstract type PenaltyTerm end
+const L2NormConstraint = CI{QuadraticDecisionFunction{Float64,QuadraticPart{Float64}}, MOI.LessThan{Float64}}
+const SOCConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.SecondOrderCone}
+const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64,LinearPart{Float64}}, MOI.LessThan{Float64}}
+const InfNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
+const ManhattanNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormOneCone}
 
 Base.copy(::PT) where PT <: PenaltyTerm = PT()
 
@@ -8,40 +13,101 @@ Base.copy(::PT) where PT <: PenaltyTerm = PT()
 Functor object for using a quadratic 2-norm penalty term. Requires an `AbstractMathProgSolver` capable of solving QP problems. Passed by default through `penalty` where applicable.
 
 """
-mutable struct Quadratic <: PenaltyTerm end
+mutable struct Quadratic <: PenaltyTerm
+    t::MOI.VariableIndex
+    constraint::Union{L2NormConstraint, SOCConstraint}
 
-function initialize_penaltyterm!(penalty::Quadratic, solver::LQSolver, ::AbstractVector)
-    # Get model handle
-    model = solver.lqmodel
-    # Check if quadratic objectives can be set
-    if !applicable(MPB.setquadobj!, model, Int[], Int[], Float64[])
-        error("Using a quadratic penalty term requires a solver that can handle quadratic objectives")
+    Quadratic() = new(MOI.VariableIndex(0), L2NormConstraint(0))
+end
+
+function initialize_penaltyterm!(penalty::Quadratic,
+                                 model::MOI.AbstractOptimizer,
+                                 α::AbstractFloat,
+                                 x::Vector{MOI.VariableIndex},
+                                 ξ::Vector{MOI.VariableIndex})
+    T = typeof(α)
+    n = length(x) + 1
+    # Get current objective
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    f = MOI.get(model, MOI.ObjectiveFunction{F}())
+    # Check if SecondOrderCone is supported
+    soc_support = MOI.supports_constraint(model, MOI.VectorAffineFunction{Float64}, MOI.SecondOrderCone)
+    # Check if quadratic constraint is supported
+    F = MOI.ScalarQuadraticFunction{Float64}
+    quad_support = MOI.supports_constraint(model, MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64})
+    if !quad_support
+        if !(soc_support && iszero(f))
+            throw(MOI.UnsupportedAttribute(MOI.ConstraintFunction(), "Using a quadratic penalty term requires an optimizer that supports quadratic constraints"))
+        end
     end
+    # Add ℓ₂-norm auxilliary variable
+    penalty.t = MOI.add_variable(model)
+    t = MOI.SingleVariable(penalty.t)
+    # Prepare variable vectors
+    x = VectorOfDecisions(x)
+    ξ = VectorOfKnowns(ξ)
+    # Prefer SecondOrderCone if objective is zero
+    # because minimizing ‖x - ξ‖₂ and ‖x - ξ‖₂² are
+    # then equivalent
+    if soc_support && iszero(f)
+        MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂")
+        # Add ℓ₂-norm constraint
+        f = MOIU.operate(vcat, T, t, x) -
+            MOIU.operate(vcat, T, zero(α), ξ)
+        penalty.constraint =
+            MOI.add_constraint(model, f,
+                               MOI.SecondOrderCone(n))
+    elseif quad_support
+        MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂²")
+        # Add quadratic ℓ₂-norm constraint
+        g = MOIU.operate(-, T, x, ξ)
+        g = LinearAlgebra.dot(g, g)
+        MOIU.operate!(-, T, g, t)
+        penalty.constraint =
+            MOI.add_constraint(model, g,
+                               MOI.LessThan(0.0))
+    end
+    # Add sense-corrected aux term to objective
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
     return nothing
 end
 
-function update_penaltyterm!(penalty::Quadratic, solver::LQSolver, c::AbstractVector, α::AbstractFloat, ξ::AbstractVector)
-    # Get model handle
-    model = solver.lqmodel
-    # Cache current linear cost
-    c_ = copy(c)
-    # Linear part
-    c_[1:length(ξ)] -= α*ξ
-    MPB.setobj!(model, c_)
-    # Quadratic part
-    qidx = collect(1:length(c))
-    qval = fill(α, length(c))
-    qval[length(ξ)+1:end] .= zero(α)
-    if applicable(MPB.setquadobj!, model, qidx, qidx, qval)
-        MPB.setquadobj!(model, qidx, qidx, qval)
-    else
-        error("Using a quadratic penalty term requires a solver that can handle quadratic objectives")
-    end
+function update_penaltyterm!(penalty::Quadratic,
+                             model::MOI.AbstractOptimizer,
+                             α::AbstractFloat,
+                             x::Vector{MOI.VariableIndex},
+                             ξ::Vector{MOI.VariableIndex})
+    # Update penalty parameter
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
+    # Update projection targets
+    MOI.modify(model,
+               penalty.constraint,
+               KnownValuesChange())
     return nothing
 end
 
-function solve_penalized!(::Quadratic, solver::LQSolver, X::AbstractVector, ::AbstractVector, ::AbstractVector)
-    solver(X)
+function remove_penalty!(penalty::Quadratic,
+                         model::MOI.AbstractOptimizer)
+    # Delete ℓ₂-norm constraint
+    if !iszero(penalty.constraint.value)
+        MOI.delete(model, penalty.constraint)
+        penalty.constraint = L2NormConstraint(0)
+    end
+    # Delete aux variable
+    if !iszero(penalty.t.value)
+        MOI.delete(model, penalty.t)
+        penalty.t = MOI.VariableIndex(0)
+    end
     return nothing
 end
 
@@ -56,67 +122,121 @@ Functor object for using an approximately quadratic penalty term, through linear
 ...
 """
 mutable struct Linearized <: PenaltyTerm
-    index::Int
-    nbreakpoints::Int
+    num_breakpoints::Int
+    spacing::Float64
+    auxilliary_variables::Vector{MOI.VariableIndex}
+    constraints::Vector{LinearizationConstraint}
 
-    function Linearized(index::Integer, nbreakpoints::Integer)
-        n = nbreakpoints >= 3 ? nbreakpoints : 3
-        new(index, n)
+    function Linearized(num_breakpoints::Integer, spacing::Float64)
+        n = num_breakpoints >= 3 ? num_breakpoints : 3
+        spacing = spacing >= eps() ? spacing : 1.0
+        return new(num_breakpoints,
+                   spacing,
+                   MOI.VariableIndex[],
+                   LinearizationConstraint[])
     end
 end
-Linearized(; nbreakpoints = 3) = Linearized(-1, nbreakpoints)
-Base.copy(linearized::Linearized) = Linearized(-1, linearized.nbreakpoints)
+Linearized(; num_breakpoints = 3, spacing = 1.0) = Linearized(num_breakpoints, spacing)
+Base.copy(linearized::Linearized) = Linearized(linearized.num_breakpoints, linearized.spacing)
 
-function initialize_penaltyterm!(penalty::Linearized, solver::LQSolver, ξ::AbstractVector)
-    # Set constraint index to -1 to indicate that ∞-norm terms have not yet been added
-    penalty.index = -1
-    # Get model handle
-    model = solver.lqmodel
+function initialize_penaltyterm!(penalty::Linearized,
+                                 model::MOI.AbstractOptimizer,
+                                 α::AbstractFloat,
+                                 x::Vector{MOI.VariableIndex},
+                                 ξ::Vector{MOI.VariableIndex})
+    T = typeof(α)
+    n = length(x)
+    m = penalty.num_breakpoints
+    resize!(penalty.auxilliary_variables, n)
+    resize!(penalty.constraints, n * m)
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
     # Add auxilliary cost variables
-    ncols = length(ξ)
-    for i in 1:ncols
-        MPB.addvar!(model, 0.0, Inf, 1.0)
+    for i in eachindex(x)
+        penalty.auxilliary_variables[i] = MOI.add_variable(model)
+        var = penalty.auxilliary_variables[i]
+        MOI.add_constraint(model, MOI.SingleVariable(var), MOI.GreaterThan(0.0))
+        name = add_subscript("‖x - ξ‖₂²", i)
+        MOI.set(model, MOI.VariableName(), var, name)
     end
-    return nothing
-end
-
-function update_penaltyterm!(penalty::Linearized, solver::LQSolver, c::AbstractVector, α::AbstractFloat, ξ::AbstractVector)
-    # Get model handle
-    model = solver.lqmodel
-    # Cache current linear cost
-    c_ = copy(c)
-    # Get number of master variables
-    ncols = length(ξ)
-    # The aux cost variable is the last variable
-    tidx = length(c)+1
-    # Linear part
-    c_[1:length(ξ)] -= α*ξ
-    MPB.setobj!(solver.lqmodel, vcat(c_, fill(1.0, length(ξ))))
-    # Get current position of linearization constraints
-    j = penalty.index
-    if j != -1
-        # Delete previous constraints (if they exist)
-        MPB.delconstrs!(model, collect(j:j+ncols*penalty.nbreakpoints-1))
-    end
-    x = MPB.getsolution(model)[1:ncols]
-    # Add new (or first) set of linearized cost constraints
-    for i in 1:ncols
-        breakpoints = LinRange(0.0, 2*ξ[i], penalty.nbreakpoints)
-        for x in breakpoints
-            f = 0.5*α*x^2
-            g = α*x
-            MPB.addconstr!(model, [i,tidx+(i-1)], [-g,1.], f-g*x, Inf)
+    # Add `num_breakpoints` linearization constraints
+    # as tangent planes placed uniform around `penalty.spacing`
+    # multiplied by the current incumbent `ξ`
+    breakpoints = map(1:m) do i
+        2*penalty.spacing*(i-1)/(m-1)
+    end .- (penalty.spacing - 1)
+    k = 1
+    for i in eachindex(x)
+        tᵢ = MOI.SingleVariable(penalty.auxilliary_variables[i])
+        xᵢ = SingleDecision(x[i])
+        ξᵢ = SingleKnown(ξ[i])
+        for (j,r) in enumerate(breakpoints)
+            # Add linearization constraint
+            g = MOIU.operate(-, T, xᵢ, r * ξᵢ)
+            ∇f = MOIU.operate(*, T, 2*(r - 1), ξᵢ)
+            g = MOIU.operate(*, T, ∇f, g)
+            f = MOIU.operate(*, T, r - 1, ξᵢ)
+            f = MOIU.operate(*, T, f, f)
+            MOIU.operate!(+, T, g, f)
+            MOIU.operate!(-, T, g, tᵢ)
+            penalty.constraints[k] =
+                MOI.add_constraint(model,
+                                   g,
+                                   MOI.LessThan(0.0))
+            k += 1
         end
     end
-    # Update the position of the constraints
-    penalty.index = MPB.numconstr(model)-(ncols*penalty.nbreakpoints-1)
+    # Add sense-corrected aux term to objective
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    for i in eachindex(x)
+        MOI.modify(model,
+                   MOI.ObjectiveFunction{F}(),
+                   MOI.ScalarCoefficientChange(penalty.auxilliary_variables[i],
+                                               correction * α))
+    end
     return nothing
 end
 
-function solve_penalized!(penalty::Linearized, solver::LQSolver, X::AbstractVector, x::AbstractVector, ξ::AbstractVector)
-    push!(X, norm(x-ξ, 2)^2)
-    solver(X)
-    pop!(X)
+function update_penaltyterm!(penalty::Linearized,
+                             model::MOI.AbstractOptimizer,
+                             α::AbstractFloat,
+                             x::Vector{MOI.VariableIndex},
+                             ξ::Vector{MOI.VariableIndex})
+    # Update penalty parameter
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    for i in eachindex(x)
+        MOI.modify(model,
+                   MOI.ObjectiveFunction{F}(),
+                   MOI.ScalarCoefficientChange(penalty.auxilliary_variables[i], correction * α))
+    end
+    # Update projection target
+    for constraint in penalty.constraints
+        MOI.modify(model,
+                   constraint,
+                   KnownValuesChange())
+    end
+    return nothing
+end
+
+function remove_penalty!(penalty::Linearized,
+                         model::MOI.AbstractOptimizer)
+    # Delete linearization constraints
+    for (i,constraint) in enumerate(penalty.constraints)
+        if !iszero(constraint.value)
+            MOI.delete(model, constraint)
+            penalty.constraints[i] = LinearizationConstraint(0)
+        end
+    end
+    # Delete aux variables
+    for (i,var) in enumerate(penalty.auxilliary_variables)
+        if !iszero(var.value)
+            MOI.delete(model, var)
+            penalty.auxilliary_variables[i] = MOI.VariableIndex(0)
+        end
+    end
     return nothing
 end
 
@@ -127,50 +247,72 @@ Functor object for using a linear ∞-norm penalty term. Pass through `penalty` 
 
 """
 mutable struct InfNorm <: PenaltyTerm
-    index::Int
+    t::MOI.VariableIndex
+    constraint::InfNormConstraint
 
-    InfNorm() = new(-1)
+    InfNorm() = new(MOI.VariableIndex(0), InfNormConstraint(0))
 end
 
-function initialize_penaltyterm!(penalty::InfNorm, solver::LQSolver, ::AbstractVector)
-    # Set constraint index to -1 to indicate that ∞-norm terms have not yet been added
-    penalty.index = -1
-    # Get model handle
-    model = solver.lqmodel
+function initialize_penaltyterm!(penalty::InfNorm,
+                                 model::MOI.AbstractOptimizer,
+                                 α::AbstractFloat,
+                                 x::Vector{MOI.VariableIndex},
+                                 ξ::Vector{MOI.VariableIndex})
+    T = typeof(α)
+    n = length(x) + 1
     # Add ∞-norm auxilliary variable
-    MPB.addvar!(model, -Inf, Inf, 1.0)
+    penalty.t = MOI.add_variable(model)
+    MOI.set(model, MOI.VariableName(), penalty.t, "||x - ξ||_∞")
+    x = VectorOfDecisions(x)
+    ξ = VectorOfKnowns(ξ)
+    t = MOI.SingleVariable(penalty.t)
+    # Add ∞-norm constraint
+    f = MOIU.operate(vcat, T, t, x) -
+        MOIU.operate(vcat, T, zero(α), ξ)
+    penalty.constraint =
+        MOI.add_constraint(model, f,
+                           MOI.NormInfinityCone(n))
+    # Add sense-corrected aux term to objective
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
     return nothing
 end
 
-function update_penaltyterm!(penalty::InfNorm, solver::LQSolver, c::AbstractVector, α::AbstractFloat, ξ::AbstractVector)
-    # Get model handle
-    model = solver.lqmodel
-    # Get number of master variables
-    ncols = length(ξ)
-    # The ∞-norm aux variable is the last variable
-    tidx = length(c)+1
-    # Linear part
-    MPB.setobj!(solver.lqmodel, vcat(c,1.0))
-    # Get current position of ∞-norm constraints
-    j = penalty.index
-    if j != -1
-        # Delete previous constraints (if they exist)
-        MPB.delconstrs!(model, collect(j:j+2*ncols-1))
-    end
-    # Add new (or first) set of ∞-norm constraints
-    for i in 1:ncols
-        MPB.addconstr!(model, [i,tidx], [-α,1], -α*ξ[i], Inf)
-        MPB.addconstr!(model, [i,tidx], [-α,-1], -Inf, -α*ξ[i])
-    end
-    # Update the position of the constraints
-    penalty.index = MPB.numconstr(model)-(2*ncols-1)
+function update_penaltyterm!(penalty::InfNorm,
+                             model::MOI.AbstractOptimizer,
+                             α::AbstractFloat,
+                             x::Vector{MOI.VariableIndex},
+                             ξ::Vector{MOI.VariableIndex})
+    # Update penalty parameter
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
+    # Update projection targets
+    MOI.modify(model,
+               penalty.constraint,
+               KnownValuesChange())
     return nothing
 end
 
-function solve_penalized!(penalty::InfNorm, solver::LQSolver, X::AbstractVector, x::AbstractVector, ξ::AbstractVector)
-    push!(X, norm(x-ξ, Inf))
-    solver(X)
-    pop!(X)
+function remove_penalty!(penalty::InfNorm,
+                         model::MOI.AbstractOptimizer)
+    # Delete ∞-norm constraint
+    if !iszero(penalty.constraint.value)
+        MOI.delete(model, penalty.constraint)
+        penalty.constraint = InfNormConstraint(0)
+    end
+    # Delete aux variable
+    if !iszero(penalty.t.value)
+        MOI.delete(model, penalty.t)
+        penalty.t = MOI.VariableIndex(0)
+    end
     return nothing
 end
 
@@ -181,53 +323,71 @@ Functor object for using a linear 1-norm penalty term. Pass through `penalty` wh
 
 """
 mutable struct ManhattanNorm <: PenaltyTerm
-    index::Int
+    t::MOI.VariableIndex
+    constraint::ManhattanNormConstraint
 
-    ManhattanNorm() = new(-1)
+    ManhattanNorm() = new(MOI.VariableIndex(0), ManhattanNormConstraint(0))
 end
 
-function initialize_penaltyterm!(penalty::ManhattanNorm, solver::LQSolver, ξ::AbstractVector)
-    # Set constraint index to -1 to indicate that 1-norm terms have not yet been added
-    penalty.index = -1
-    # Get model handle
-    model = solver.lqmodel
-    # Add 1-norm auxilliary variables
-    ncols = length(ξ)
-    for i in 1:ncols
-        MPB.addvar!(model, -Inf, Inf, 1.0)
-    end
+function initialize_penaltyterm!(penalty::ManhattanNorm,
+                                 model::MOI.AbstractOptimizer,
+                                 α::AbstractFloat,
+                                 x::Vector{MOI.VariableIndex},
+                                 ξ::Vector{MOI.VariableIndex})
+    T = typeof(α)
+    n = length(x) + 1
+    # Add ∞-norm auxilliary variable
+    penalty.t = MOI.add_variable(model)
+    MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₁")
+    x = VectorOfDecisions(x)
+    ξ = VectorOfKnowns(ξ)
+    t = MOI.SingleVariable(penalty.t)
+    # Add ∞-norm constraint
+    f = MOIU.operate(vcat, T, t, x) -
+        MOIU.operate(vcat, T, zero(α), ξ)
+    penalty.constraint =
+        MOI.add_constraint(model, f,
+                           MOI.NormOneCone(n))
+    # Add sense-corrected aux term to objective
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
     return nothing
 end
 
-function update_penaltyterm!(penalty::ManhattanNorm, solver::LQSolver, c::AbstractVector, α::AbstractFloat, ξ::AbstractVector)
-    # Get model handle
-    model = solver.lqmodel
-    # Get number of master variables
-    ncols = length(ξ)
-    # The 1-norm aux variables are the last variables
-    tidx = length(c)+1
-    # Linear part
-    MPB.setobj!(solver.lqmodel, vcat(c, fill(1.0, length(ξ))))
-    # Get current position of ∞-norm constraints
-    j = penalty.index
-    if j != -1
-        # Delete previous constraints (if they exist)
-        MPB.delconstrs!(model, collect(j:j+2*ncols-1))
-    end
-    # Add new (or first) set of 1-norm constraints
-    for i in 1:ncols
-        MPB.addconstr!(model, [i,tidx+(i-1)], [-α,1], -α*ξ[i], Inf)
-        MPB.addconstr!(model, [i,tidx+(i-1)], [-α,-1], -Inf, -α*ξ[i])
-    end
-    # Update the position of the constraints
-    penalty.index = MPB.numconstr(model)-(2*ncols-1)
+function update_penaltyterm!(penalty::ManhattanNorm,
+                             model::MOI.AbstractOptimizer,
+                             α::AbstractFloat,
+                             x::Vector{MOI.VariableIndex},
+                             ξ::Vector{MOI.VariableIndex})
+    # Update penalty parameter
+    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    sense = MOI.get(model, MOI.ObjectiveSense())
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    MOI.modify(model,
+               MOI.ObjectiveFunction{F}(),
+               MOI.ScalarCoefficientChange(penalty.t, correction * α))
+    # Update projection targets
+    MOI.modify(model,
+               penalty.constraint,
+               KnownValuesChange())
     return nothing
 end
 
-function solve_penalized!(penalty::ManhattanNorm, solver::LQSolver, X::AbstractVector, x::AbstractVector, ξ::AbstractVector)
-    ts = map(abs, x .- ξ)
-    append!(X, ts)
-    solver(X)
-    [pop!(X) for _ in ts]
+function remove_penalty!(penalty::ManhattanNorm,
+                         model::MOI.AbstractOptimizer)
+    # Delete ∞-norm constraint
+    if !iszero(penalty.constraint.value)
+        MOI.delete(model, penalty.constraint)
+        penalty.constraint = ManhattanNormConstraint(0)
+    end
+    # Delete aux variable
+    if !iszero(penalty.t.value)
+        MOI.delete(model, penalty.t)
+        penalty.t = MOI.VariableIndex(0)
+    end
     return nothing
 end

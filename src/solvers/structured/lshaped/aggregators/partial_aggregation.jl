@@ -10,12 +10,12 @@ Functor object for using partial aggregation in an L-shaped algorithm. Create by
 """
 struct PartialAggregation{T <: AbstractFloat} <: AbstractAggregation
     size::Int
-    nscenarios::Int
+    num_subproblems::Int
     start_id::Int
     collection::CutCollection{T}
 
-    function PartialAggregation(size::Integer, start_id::Integer, nscenarios::Integer, ::Type{T}) where T <: AbstractFloat
-        return new{T}(min(size, nscenarios), nscenarios, start_id, CutCollection(T, start_id))
+    function PartialAggregation(size::Integer, start_id::Integer, num_subproblems::Integer, ::Type{T}) where T <: AbstractFloat
+        return new{T}(min(size, num_subproblems), num_subproblems, start_id, CutCollection(T, start_id))
     end
 end
 """
@@ -24,9 +24,9 @@ end
 Functor object for using complete aggregation in an L-shaped algorithm. Create by supplying an [`Aggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 """
-FullAggregation(start_id::Integer, nscenarios::Integer, ::Type{T}) where T <: AbstractFloat = PartialAggregation(nscenarios, start_id, nscenarios, T)
+FullAggregation(start_id::Integer, num_subproblems::Integer, ::Type{T}) where T <: AbstractFloat = PartialAggregation(num_subproblems, start_id, num_subproblems, T)
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation, cut::HyperPlane)
+function aggregate_cut!(lshaped::AbstractLShaped, aggregation::PartialAggregation, cut::HyperPlane)
     added = passthrough!(lshaped, aggregation, cut)
     add_to_collection!(aggregation.collection, cut, lshaped.x)
     if considered(aggregation.collection) == aggregation.size
@@ -34,16 +34,16 @@ function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::PartialAggr
             aggregated_cut = aggregate(aggregation.collection)
             added |= add_cut!(lshaped, aggregated_cut)
         end
-        renew!(aggregation.collection, aggregation.collection.id % nthetas(lshaped) + 1)
+        renew!(aggregation.collection, aggregation.collection.id % num_thetas(lshaped) + 1)
     end
     return added
 end
 
-function passthrough!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation, cut::HyperPlane{H}) where H <: HyperPlaneType
+function passthrough!(lshaped::AbstractLShaped, aggregation::PartialAggregation, cut::HyperPlane{H}) where H <: HyperPlaneType
     return add_cut!(lshaped, HyperPlane(cut.δQ, cut.q, aggregation.collection.id, H))
 end
 
-function passthrough!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation, cut::HyperPlane{OptimalityCut})
+function passthrough!(lshaped::AbstractLShaped, aggregation::PartialAggregation, cut::HyperPlane{OptimalityCut})
     return false
 end
 
@@ -55,7 +55,7 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::PartialAggregation, ::M
             aggregated_cut = aggregate(aggregation.collection)
             put!(cutqueue, (t, aggregated_cut))
         end
-        new_id = aggregation.start_id + (aggregation.collection.id - aggregation.start_id + 1) % ceil(Int, aggregation.nscenarios/aggregation.size)
+        new_id = aggregation.start_id + (aggregation.collection.id - aggregation.start_id + 1) % ceil(Int, aggregation.num_subproblems/aggregation.size)
         renew!(aggregation.collection, new_id)
     end
     return nothing
@@ -70,23 +70,23 @@ function passthrough!(::CutQueue, ::PartialAggregation, ::HyperPlane{OptimalityC
     return nothing
 end
 
-function nthetas(nscenarios::Integer, aggregation::PartialAggregation)
-    return ceil(Int, nscenarios/aggregation.size)
+function num_thetas(num_subproblems::Integer, aggregation::PartialAggregation)
+    return ceil(Int, num_subproblems / aggregation.size)
 end
 
-function nthetas(nscenarios::Integer, aggregation::PartialAggregation, sp::StochasticPrograms.ScenarioProblems)
-    jobsize = ceil(Int, nscenarios/nworkers())
+function num_thetas(num_subproblems::Integer, aggregation::PartialAggregation, sp::StochasticPrograms.ScenarioProblems)
+    jobsize = ceil(Int, num_subproblems / nworkers())
     n = ceil(Int, jobsize/aggregation.size)
-    remainder = nscenarios-(nworkers()-1)*jobsize
+    remainder = num_subproblems - (nworkers() - 1) * jobsize
     aggregationem = ceil(Int, remainder/aggregation.size)
-    return n*(nworkers()-1)+aggregationem
+    return n * (nworkers() - 1) + aggregationem
 end
 
-function nthetas(::Integer, aggregation::PartialAggregation, sp::DScenarioProblems)
+function nthetas(::Integer, aggregation::PartialAggregation, sp::DistributedScenarioProblems)
     return sum([ceil(Int, nscen/aggregation.size) for nscen in sp.scenario_distribution])
 end
 
-function flush!(lshaped::AbstractLShapedSolver, aggregation::PartialAggregation)
+function flush!(lshaped::AbstractLShaped, aggregation::PartialAggregation)
     added = false
     if collection_size(aggregation.collection) > 0 && collection_size(aggregation.collection) == considered(aggregation.collection)
         aggregated_cut = aggregate(aggregation.collection)
@@ -126,24 +126,26 @@ struct PartialAggregate <: AbstractAggregator
     end
 end
 
-function (aggregator::PartialAggregate)(nscenarios::Integer, ::Type{T}) where T <: AbstractFloat
+function (aggregator::PartialAggregate)(num_subproblems::Integer, ::Type{T}) where T <: AbstractFloat
     aggregator.size == 1 && return NoAggregation()
-    aggregator.size == nscenarios && return FullAggregation(1, nscenarios, T)
-    return PartialAggregation(aggregator.size, aggregator.start_id, nscenarios, T)
+    aggregator.size == num_subproblems && return FullAggregation(1, num_subproblems, T)
+    return PartialAggregation(aggregator.size, aggregator.start_id, num_subproblems, T)
 end
 
 function remote_aggregator(aggregation::PartialAggregation, sp::ScenarioProblems, w::Integer)
-    (nscen, extra) = divrem(StochasticPrograms.nscenarios(sp), nworkers())
-    prev = [begin
-            jobsize = nscen + (extra + 2 - p > 0)
-            ceil(Int, jobsize/aggregation.size)
-            end for p in 2:(w-1)]
+    (nscen, extra) = divrem(num_subproblems(sp), nworkers())
+    prev = map(2:(w - 1)) do p
+        jobsize = nscen + (extra + 2 - p > 0)
+        ceil(Int, jobsize / aggregation.size)
+    end
     start_id = isempty(prev) ? 1 : sum(prev) + 1
     return PartialAggregate(aggregation.size, start_id)
 end
 
-function remote_aggregator(aggregation::PartialAggregation, sp::DScenarioProblems, w::Integer)
-    prev = [ceil(Int,sp.scenario_distribution[p-1]/aggregation.size) for p in 2:(w-1)]
+function remote_aggregator(aggregation::PartialAggregation, sp::DistributedScenarioProblems, w::Integer)
+    prev = map(2:(w - 1)) do p
+        ceil(Int, sp.scenario_distribution[p-1] / aggregation.size)
+    end
     start_id = isempty(prev) ? 1 : sum(prev) + 1
     nscen = sp.scenario_distribution[w-1]
     return PartialAggregate(aggregation.size, start_id)
@@ -161,8 +163,8 @@ Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in the `LShape
 """
 struct Aggregate <: AbstractAggregator end
 
-function (::Aggregate)(nscenarios::Integer, ::Type{T}) where T
-    return FullAggregation(1, nscenarios, T)
+function (::Aggregate)(num_subproblems::Integer, ::Type{T}) where T
+    return FullAggregation(1, num_subproblems, T)
 end
 
 function str(::Aggregate)

@@ -13,7 +13,7 @@ struct VerticalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <
     end
 end
 
-function StochasticStructure(scenario_types::NTuple{M, DataType}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
+function StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end

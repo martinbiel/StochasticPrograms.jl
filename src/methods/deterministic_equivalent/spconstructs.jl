@@ -1,12 +1,12 @@
-function DEP(stochasticprogram::StochasticProgram{2}, dep::DeterministicEquivalent; optimizer = nothing)
+function DEP(stochasticprogram::StochasticProgram{2}, structure::DeterministicEquivalent; optimizer = nothing)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
     if optimizer == nothing
-        return dep.model
+        return structure.model
     end
-    dep_model = copy(dep.model)
-    set_optimizer(dep_model, optimizer)
-    return dep_model
+    structure_model = copy(structure.model)
+    set_optimizer(structure_model, optimizer)
+    return structure_model
 end

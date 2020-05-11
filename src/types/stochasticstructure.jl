@@ -20,15 +20,17 @@ end
 # Otherwise, switch on provided optimizer
 function default_structure(::UnspecifiedInstantiation, optimizer)
     if optimizer isa MOI.AbstractOptimizer
-        # Default to DEP structure if standard MOI optimizer is given
-        return Deterministic()
-    else
-        # In other cases, default to block-vertical structure
-        if nworkers() > 1
-            # Distribute in memory if Julia processes are available
-            return DistributedBlockVertical()
+        if optimizer isa AbstractStructuredOptimizer
+            # default to block-vertical structure
+            if nworkers() > 1
+                # Distribute in memory if Julia processes are available
+                return DistributedBlockVertical()
+            else
+                return BlockVertical()
+            end
         else
-            return BlockVertical()
+            # Default to DEP structure if standard MOI optimizer is given
+            return Deterministic()
         end
     end
 end
@@ -39,6 +41,12 @@ struct UnsupportedStructure{Opt <: StochasticProgramOptimizerType, S <: Abstract
 
 function Base.showerror(io::IO, err::UnsupportedStructure{Opt, S}) where {Opt <: StochasticProgramOptimizerType, S <: AbstractStochasticStructure}
     print(io, "The stochastic structure $S is not supported by the optimizer $Opt")
+end
+
+struct UnloadedStructure{Opt <: StochasticProgramOptimizerType} <: Exception end
+
+function Base.showerror(io::IO, err::UnloadedStructure{Opt}) where Opt <: StochasticProgramOptimizerType
+    print(io, "The optimizer $Opt has no loaded structure. Consider `load_structure!`")
 end
 
 """
@@ -71,7 +79,7 @@ function stage_probability(structure::AbstractStochasticStructure, s::Integer = 
     return probability(scenarios(structure, s))
 end
 function expected(structure::AbstractStochasticStructure, s::Integer = 2)
-    return expected(scenarios(dep, s))
+    return expected(scenarios(structure, s))
 end
 function distributed(structure::AbstractStochasticStructure, s)
     return false

@@ -46,11 +46,11 @@ function (sampler::Sampler)()
 end
 
 function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{S}, n::Integer) where S <: AbstractScenario
-    _sample!(scenarios, sampler, n, nscenarios(scenarioproblems), 1/n)
+    _sample!(scenarios, sampler, n, length(scenarios), 1/n)
     return nothing
 end
 function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: AbstractScenario
-    _sample!(scenarios, sampler, n, nscenarios(scenarioproblems), 1/n)
+    _sample!(scenarios, sampler, n, length(scenarios), 1/n)
     return nothing
 end
 

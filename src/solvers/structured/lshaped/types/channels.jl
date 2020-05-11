@@ -30,7 +30,7 @@ function wait(channel::DecisionChannel, t)
     end
 end
 
-Decisions{A} = RemoteChannel{DecisionChannel{A}}
+RemoteDecisions{A} = RemoteChannel{DecisionChannel{A}}
 
 mutable struct MetaChannel <: AbstractChannel{Any}
     metadata::Dict{Tuple{Int,Symbol},Any}

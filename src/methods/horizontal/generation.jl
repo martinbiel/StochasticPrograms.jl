@@ -26,7 +26,7 @@ function generate!(stochasticprogram::TwoStageStochasticProgram, structure::Hori
                          stage_parameters(stochasticprogram, 1),
                          stage_parameters(stochasticprogram, 2),
                          structure.decisions[stage - 1],
-                         moi_optimizer(stochasticprogram))
+                         sub_optimizer(stochasticprogram))
     return nothing
 end
 

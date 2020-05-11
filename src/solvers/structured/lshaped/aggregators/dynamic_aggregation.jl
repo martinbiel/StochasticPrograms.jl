@@ -12,7 +12,7 @@ The following selection rules are available
 
 ...
 # Parameters
-- `naggregates::Int`: Number of aggregates
+- `num_aggregates::Int`: Number of aggregates
 - `rule::SelectionRule`: Rule that determines which aggregate an incoming cut should be placed in
 - `lock_after::Function = (τ,n)->false`: Function that determines if the current aggregation scheme should be fixed, based on the current optimality gap `τ` and the number of iterations `n`
 ...
@@ -23,19 +23,19 @@ struct DynamicAggregation{T <: AbstractFloat, S <: SelectionRule} <: AbstractAgg
     partitioning::Dict{Int,Int}
     lock::Function
 
-    function DynamicAggregation(naggregates::Integer, rule::SelectionRule, lock::Function, ::Type{T}) where T <: AbstractFloat
+    function DynamicAggregation(num_aggregates::Integer, rule::SelectionRule, lock::Function, ::Type{T}) where T <: AbstractFloat
         S = typeof(rule)
-        aggregates = [zero(AggregatedOptimalityCut{T}) for _ = 1:naggregates]
+        aggregates = [zero(AggregatedOptimalityCut{T}) for _ = 1:num_aggregates]
         return new{T,S}(aggregates, rule, Dict{Int,Int}(), lock)
     end
 end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, ::DynamicAggregation, cut::HyperPlane)
+function aggregate_cut!(lshaped::AbstractLShaped, ::DynamicAggregation, cut::HyperPlane)
     return add_cut!(lshaped, cut)
 end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::DynamicAggregation{T}, cut::HyperPlane{OptimalityCut}) where T <: AbstractFloat
-    if aggregation.lock(gap(lshaped),niterations(lshaped)) && haskey(aggregation.partitioning, cut.id)
+function aggregate_cut!(lshaped::AbstractLShaped, aggregation::DynamicAggregation{T}, cut::HyperPlane{OptimalityCut}) where T <: AbstractFloat
+    if aggregation.lock(gap(lshaped), num_iterations(lshaped)) && haskey(aggregation.partitioning, cut.id)
         aggregation.aggregates[aggregation.partitioning[cut.id]] += cut
         return false
     end
@@ -72,15 +72,15 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::DynamicAggregation{T}, 
     return nothing
 end
 
-function nthetas(nscenarios::Integer, ::DynamicAggregation)
+function num_thetas(nscenarios::Integer, ::DynamicAggregation)
     return nscenarios
 end
 
-function nthetas(nscenarios::Integer, ::DynamicAggregation, ::AbstractScenarioProblems)
+function num_thetas(nscenarios::Integer, ::DynamicAggregation, ::AbstractScenarioProblems)
     return nscenarios
 end
 
-function flush!(lshaped::AbstractLShapedSolver, aggregation::DynamicAggregation{T}) where T <: AbstractFloat
+function flush!(lshaped::AbstractLShaped, aggregation::DynamicAggregation{T}) where T <: AbstractFloat
     added = false
     for (i,aggregate) in enumerate(aggregation.aggregates)
         if !iszero(aggregate)
@@ -106,19 +106,19 @@ end
 # API
 # ------------------------------------------------------------
 """
-    DynamicAggregate(naggregates::Integer, rule::SelectionRule; lock_after::Function = (τ,n)->false)
+    DynamicAggregate(num_aggregates::Integer, rule::SelectionRule; lock_after::Function = (τ,n)->false)
 
 Factory object for [`DynamicAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?DynamicAggregation for parameter descriptions.
 
 """
 struct DynamicAggregate{S <: SelectionRule} <: AbstractAggregator
-    naggregates::Int
+    num_aggregates::Int
     rule::S
     lock::Function
 
-    function DynamicAggregate(naggregates::Integer, rule::SelectionRule; lock_after = (τ,n)->false)
+    function DynamicAggregate(num_aggregates::Integer, rule::SelectionRule; lock_after = (τ,n)->false)
         S = typeof(rule)
-        return new{S}(naggregates, rule, lock_after)
+        return new{S}(num_aggregates, rule, lock_after)
     end
 end
 
@@ -126,7 +126,7 @@ function (aggregator::DynamicAggregate)(nscenarios::Integer, T::Type{<:AbstractF
     if aggregator.rule isa SelectRandom && aggregator.rule.max == 1
         return NoAggregation()
     end
-    return DynamicAggregation(aggregator.naggregates, aggregator.rule, aggregator.lock, T)
+    return DynamicAggregation(aggregator.num_aggregates, aggregator.rule, aggregator.lock, T)
 end
 
 function remote_aggregator(aggregation::DynamicAggregation, ::AbstractScenarioProblems, ::Integer)

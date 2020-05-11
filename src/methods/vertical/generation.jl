@@ -13,8 +13,10 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalB
     if stage == 1
         # Check generators
         has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
-        # Set the optimizer
-        set_optimizer(structure.first_stage, moi_optimizer(stochasticprogram))
+        # Set the optimizer (if any)
+        if has_provided_optimizer(stochasticprogram.optimizer)
+            set_optimizer(structure.first_stage, master_optimizer(stochasticprogram))
+        end
         # Prepare decisions
         structure.first_stage.ext[:decisions] = structure.decisions[1]
         add_decision_bridges!(structure.first_stage)
@@ -38,7 +40,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalB
                            stage_parameters(stochasticprogram, stage - 1),
                            stage_parameters(stochasticprogram, stage),
                            structure.decisions[stage],
-                           moi_optimizer(stochasticprogram))
+                           sub_optimizer(stochasticprogram))
     end
     return nothing
 end
@@ -81,13 +83,13 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
                 stage_params,
                 scenarioproblems.decisions[w-1],
                 optimizer) do (sp,dgenerator,generator,dparams,params,decisions,opt)
-                    generate!(fetch(sp),
-                              dgenerator,
-                              generator,
-                              dparams,
-                              params,
-                              decisions,
-                              opt)
+                    generate_vertical!(fetch(sp),
+                                       dgenerator,
+                                       generator,
+                                       dparams,
+                                       params,
+                                       decisions,
+                                       opt)
                 end
         end
     end

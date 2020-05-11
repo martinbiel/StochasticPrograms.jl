@@ -58,18 +58,6 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     return dest
 end
 
-function Base.copy(src::StochasticProgram{N}; optimizer = nothing) where N
-    stages = ntuple(Val(N)) do i
-        Stage(stage_parameters(src, i))
-    end
-    scenario_types = ntuple(Val(N-1)) do i
-        scenariotype(src, i+1)
-    end
-    dest = StochasticProgram(stages, scenario_types, UnspecifiedInstantiation(), optimizer)
-    merge!(dest.generator, src.generator)
-    return dest
-end
-
 function supports_zero(types::Vector, provided_def::Bool)
     for vartype in types
         if !hasmethod(zero, (Type{vartype}, ))
@@ -108,17 +96,6 @@ function get_stage(stochasticprogram::StochasticProgram, stage::Integer)
     haskey(stochasticprogram.problemcache, stage_key) || error("Stage problem $stage not generated.")
     return stochasticprogram.problemcache[stage_key]
 end
-
-function pick_optimizer(stochasticprogram::StochasticProgram, supplied_optimizer)
-    if supplied_optimizer == nothing
-        return moi_optimizer(stochasticprogram)
-    end
-    return supplied_optimizer
-end
-
-internal_optimizer(optimizer::MOI.AbstractOptimizer) = optimizer
-
-optimizerstr(optimizer::MOI.AbstractOptimizer) = JuMP._try_get_solver_name(optimizer)
 
 typename(dtype::UnionAll) = dtype.body.name.name
 typename(dtype::DataType) = dtype.name.name

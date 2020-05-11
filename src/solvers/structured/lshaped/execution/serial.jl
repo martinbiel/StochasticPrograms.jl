@@ -4,81 +4,67 @@
 Functor object for using serial execution in a lshaped algorithm. Create by supplying a [`Serial`](@ref) object through `execution` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 """
-struct SerialExecution{F <: AbstractFeasibility,
+struct SerialExecution{H <: AbstractFeasibilityHandler,
                        T <: AbstractFloat,
                        A <: AbstractVector,
-                       S <: LQSolver} <: AbstractExecution
-    subproblems::Vector{SubProblem{F,T,A,S}}
+                       S <: MOI.AbstractOptimizer} <: AbstractExecution
+    subproblems::Vector{SubProblem{H,T,S}}
+    decisions::Tuple{Decisions, Decisions}
     subobjectives::A
     model_objectives::A
 
-    function SerialExecution(::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-        return new{F,T,A,S}(Vector{SubProblem{F,T,A,S}}(), A(), A())
+    function SerialExecution(structure::VerticalBlockStructure{2}, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer}
+        H = HandlerType(F)
+        return new{H,T,A,S}(Vector{SubProblem{H,T,S}}(), structure.decisions, A(), A())
     end
 end
 
-function nthetas(lshaped::AbstractLShapedSolver, ::SerialExecution)
-    return nthetas(lshaped.nscenarios, lshaped.aggregation)
+function num_thetas(lshaped::AbstractLShaped, ::SerialExecution)
+    return num_thetas(num_subproblems(lshaped), lshaped.aggregation)
 end
 
-function initialize_subproblems!(execution::SerialExecution{F,T,A,S},
+function initialize_subproblems!(execution::SerialExecution{H,T},
                                  scenarioproblems::ScenarioProblems,
-                                 x::AbstractVector,
-                                 subsolver::MPB.AbstractMathProgSolver) where {F <: AbstractFeasibility,
-                                                                               T <: AbstractFloat,
-                                                                               A <: AbstractVector,
-                                                                               S <: LQSolver}
-    for i = 1:StochasticPrograms.nscenarios(scenarioproblems)
-        m = subproblem(scenarioproblems, i)
-        y₀ = convert(A, rand(m.numCols))
-        push!(execution.subproblems, SubProblem(m,
-                                                parentmodel(scenarioproblems),
-                                                i,
-                                                probability(scenario(scenarioproblems,i)),
-                                                copy(x),
-                                                y₀,
-                                                subsolver,
-                                                F))
+                                 tolerance::AbstractFloat) where {H <: AbstractFeasibilityHandler,
+                                                                  T <: AbstractFloat}
+    # Assume sorted order
+    master_indices = sort!(collect(keys(execution.decisions[1].decisions)),
+                           by = idx -> idx.value)
+    for i = 1:num_subproblems(scenarioproblems)
+        push!(execution.subproblems, SubProblem(
+            subproblem(scenarioproblems, i),
+            i,
+            T(probability(scenario(scenarioproblems, i))),
+            T(tolerance),
+            master_indices,
+            H))
     end
     return nothing
 end
 
-function initialize_subproblems!(execution::SerialExecution{F,T,A,S},
-                                 scenarioproblems::DScenarioProblems,
-                                 x::AbstractVector,
-                                 subsolver::MPB.AbstractMathProgSolver) where {F <: AbstractFeasibility,
-                                                                               T <: AbstractFloat,
-                                                                               A <: AbstractVector,
-                                                                               S <: LQSolver}
-    for i = 1:StochasticPrograms.nscenarios(scenarioproblems)
-        m = subproblem(scenarioproblems, i)
-        y₀ = convert(A, rand(m.numCols))
-        push!(execution.subproblems,SubProblem(m,
-                                               i,
-                                               probability(scenario(scenarioproblems,i)),
-                                               copy(x),
-                                               y₀,
-                                               masterterms(scenarioproblems,i),
-                                               subsolver,
-                                               F))
+function finish_initilization!(lshaped::AbstractLShaped, execution::SerialExecution)
+    append!(execution.subobjectives, fill(1e10, num_thetas(lshaped)))
+    append!(execution.model_objectives, fill(-1e10, num_thetas(lshaped)))
+    return nothing
+end
+
+function restore_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution)
+    for subproblem in execution.subproblems
+        restore_subproblem!(subproblem)
     end
     return nothing
 end
 
-function finish_initilization!(lshaped::AbstractLShapedSolver, execution::SerialExecution)
-    append!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
-    append!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
-    return nothing
-end
-
-function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::SerialExecution{F,T}) where {F <: AbstractFeasibility, T <: AbstractFloat}
+function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     # Update subproblems
-    update_subproblems!(execution.subproblems, lshaped.x)
+    update_known_decisions!(execution.decisions[2], lshaped.x)
+    change = KnownValuesChange()
     # Assume no cuts are added
     added = false
-    # Solve subproblems
-    for subproblem ∈ execution.subproblems
-        cut::SparseHyperPlane{T} = subproblem()
+    # Update and solve subproblems
+    for subproblem in execution.subproblems
+        update_subproblem!(subproblem, change)
+        cut::SparseHyperPlane{T} = subproblem(lshaped.x)
         added |= aggregate_cut!(lshaped, lshaped.aggregation, cut)
     end
     added |= flush!(lshaped, lshaped.aggregation)
@@ -86,42 +72,14 @@ function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::SerialE
     return current_objective_value(lshaped), added
 end
 
-function calculate_objective_value(lshaped::AbstractLShapedSolver, execution::SerialExecution)
-    return get_obj(lshaped)⋅decision(lshaped) + sum([subproblem.π*subproblem(decision(lshaped)) for subproblem in execution.subproblems])
-end
-
-function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems::ScenarioProblems, execution::SerialExecution)
-    for (i, submodel) in enumerate(scenarioproblems.problems)
-        execution.subproblems[i](decision(lshaped))
-        fill_submodel!(submodel, execution.subproblems[i])
-    end
-    return nothing
-end
-
-function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems::DScenarioProblems, execution::SerialExecution)
-    j = 0
-    @sync begin
-        for w in workers()
-            n = remotecall_fetch((sp)->length(fetch(sp).problems), w, scenarioproblems[w-1])
-            for i in 1:n
-                k = i+j
-                execution.subproblems[k](decision(lshaped))
-                @async remotecall_fetch((sp,i,x,μ,λ,C) -> fill_submodel!(fetch(sp).problems[i],x,μ,λ,C),
-                                        w,
-                                        scenarioproblems[w-1],
-                                        i,
-                                        get_solution(execution.subproblems[k])...)
-            end
-            j += n
-        end
-    end
-    return nothing
-end
+# function calculate_objective_value(lshaped::AbstractLShaped, execution::SerialExecution)
+#     return get_obj(lshaped)⋅decision(lshaped) + sum([subproblem.π*subproblem(decision(lshaped)) for subproblem in execution.subproblems])
+# end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(::Integer, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-    return SerialExecution(F, T, A, S)
+function (execution::Serial)(structure::VerticalBlockStructure, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer}
+    return SerialExecution(structure, F, T, A, S)
 end
 
 function str(::Serial)

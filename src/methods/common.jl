@@ -1,13 +1,14 @@
 # Mean/variance calculations #
 # ========================== #
-function outcome_mean(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector)
+function outcome_mean(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector, sense::Union{MOI.OptimizationSense, Nothing} = nothing)
     # Sanity check
     length(subproblems) == length(probabilities) || error("Inconsistent number of subproblems and probabilities")
     N = length(subproblems)
     N == 0 && return 0.0
+    sense === nothing ? sense = objective_sense(subproblems[1]) : sense
     return mapreduce(+, 1:N) do k
         outcome = subproblems[k]
-        try
+        val = try
             optimize!(outcome)
             status = termination_status(outcome)
             if status != MOI.OPTIMAL
@@ -30,13 +31,15 @@ function outcome_mean(subproblems::Vector{JuMP.Model}, probabilities::AbstractVe
                 rethrow(error)
             end
         end
+        val = sense == objective_sense(outcome) ? val : -val
     end
 end
-function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector)
+function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector, sense::Union{MOI.OptimizationSense, Nothing} = nothing)
     # Sanity check
     length(subproblems) == length(probabilities) || error("Inconsistent number of subproblems and probabilities")
     N = num_subproblems(scenarioproblems)
     N == 0 && return 0.0, 0.0, 0.0, N
+    sense === nothing ? sense = objective_sense(subproblems[1]) : sense
     Q̄ₖ = Sₖ = wₖ = w²ₖ = 0
     for k = 1:N
         π = probabilities[k]
@@ -48,15 +51,16 @@ function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector)
             status = termination_status(problem)
             Q = if status != MOI.OPTIMAL
                 Q = if status == MOI.INFEASIBLE
-                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+                    objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
                 elseif status == MOI.DUAL_INFEASIBLE
-                    Qs[i] = objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+                    objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
                 else
                     error("Outcome model could not be solved, returned status: $status")
                 end
             else
                 Q = objective_value(problem)
             end
+            Q = sense == objective_sense(outcome) ? Q : -Q
             Q̄ₖ = Q̄ₖ + (π / wₖ) * (Q - Q̄ₖ)
             Sₖ = Sₖ + π * (Q - Q̄ₖ) * (Q - Q̄ₖ₋₁)
         catch error

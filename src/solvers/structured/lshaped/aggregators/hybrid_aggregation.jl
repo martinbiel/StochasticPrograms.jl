@@ -50,7 +50,7 @@ function activate_final!(aggregation::HybridAggregation)
     return nothing
 end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::HybridAggregation, cut::HyperPlane)
+function aggregate_cut!(lshaped::AbstractLShaped, aggregation::HybridAggregation, cut::HyperPlane)
     return aggregate_cut!(lshaped, active(aggregation), cut)
 end
 
@@ -58,15 +58,15 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::HybridAggregation, meta
     return aggregate_cut!(cutqueue, active(aggregation), metadata, t, cut, x)
 end
 
-function nthetas(nscenarios::Integer, aggregation::HybridAggregation)
-    return nthetas(nscenarios, active(aggregation))
+function num_thetas(num_subproblems::Integer, aggregation::HybridAggregation)
+    return num_thetas(num_subproblems, active(aggregation))
 end
 
-function nthetas(nscenarios::Integer, aggregation::HybridAggregation, sp::DScenarioProblems)
-    return nthetas(nscenarios, active(aggregation), sp)
+function num_thetas(num_subproblems::Integer, aggregation::HybridAggregation, sp::DistributedScenarioProblems)
+    return num_thetas(num_subproblems, active(aggregation), sp)
 end
 
-function flush!(lshaped::AbstractLShapedSolver, aggregation::HybridAggregation)
+function flush!(lshaped::AbstractLShaped, aggregation::HybridAggregation)
     added = flush!(lshaped, active(aggregation))
     if shift(gap(lshaped), aggregation.τ)
         activate_final!(aggregation)
@@ -103,11 +103,11 @@ struct HybridAggregate{T <: AbstractFloat, Agg1 <: AbstractAggregator, Agg2 <: A
     end
 end
 
-function (aggregator::HybridAggregate)(nscenarios::Integer, T::Type{<:AbstractFloat})
-    initial = aggregator.initial(nscenarios, T)
-    final = aggregator.final(nscenarios, T)
-    n₁ = nthetas(nscenarios, initial)
-    n₂ = nthetas(nscenarios, final)
+function (aggregator::HybridAggregate)(num_subproblems::Integer, T::Type{<:AbstractFloat})
+    initial = aggregator.initial(num_subproblems, T)
+    final = aggregator.final(num_subproblems, T)
+    n₁ = num_thetas(num_subproblems, initial)
+    n₂ = num_thetas(num_subproblems, final)
     n₁ == n₂|| error("Inconsistent number of theta variables in hybrid aggregation: $n₁ ≠ $n₂")
     return HybridAggregation(initial, final, convert(T, aggregator.τ))
 end

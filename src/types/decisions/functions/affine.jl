@@ -6,10 +6,22 @@ struct AffineDecisionFunction{T} <: MOI.AbstractScalarFunction
     known_part::MOI.ScalarAffineFunction{T}
 end
 
+function AffineDecisionFunction{T}(f::MOI.SingleVariable) where T
+    AffineDecisionFunction(MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(one(T), f.variable)], zero(T)),
+                           convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                           convert(MOI.ScalarAffineFunction{T}, zero(T)))
+end
+
 function AffineDecisionFunction{T}(f::SingleDecision) where T
     AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, zero(T)),
                            MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(one(T), f.decision)], zero(T)),
                            convert(MOI.ScalarAffineFunction{T}, zero(T)))
+end
+
+function AffineDecisionFunction{T}(f::SingleKnown) where T
+    AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                           convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                           MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(one(T), f.known)], T(f.value)))
 end
 
 # Affine decision vector function #
@@ -49,10 +61,22 @@ function Base.convert(::Type{AffineDecisionFunction{T}},
 end
 
 function Base.convert(::Type{AffineDecisionFunction{T}},
+                      f::SingleKnown) where T
+    return AffineDecisionFunction{T}(f)
+end
+
+function Base.convert(::Type{AffineDecisionFunction{T}},
                       f::MOI.ScalarAffineFunction{T}) where T
     return AffineDecisionFunction(f,
                                   convert(MOI.ScalarAffineFunction{T}, zero(T)),
                                   convert(MOI.ScalarAffineFunction{T}, zero(T)))
+end
+
+function Base.convert(::Type{MOI.SingleVariable}, f::AffineDecisionFunction)
+    if !iszero(f.variable_part.constant) || !isone(length(f.variable_part.terms)) || !isone(f.variable_part.terms[1].coefficient)
+        throw(InexactError(:convert, MOI.SingleVariable, f))
+    end
+    return MOI.SingleVariable(f.variable_part.terms[1].variable_index)
 end
 
 function Base.convert(::Type{SingleDecision}, f::AffineDecisionFunction)
@@ -60,6 +84,13 @@ function Base.convert(::Type{SingleDecision}, f::AffineDecisionFunction)
         throw(InexactError(:convert, SingleDecision, f))
     end
     return SingleDecision(f.decision_part.terms[1].variable_index)
+end
+
+function Base.convert(::Type{SingleKnown}, f::AffineDecisionFunction)
+    if !iszero(f.known_part.constant) || !isone(length(f.known_part.terms)) || !isone(f.known_part.terms[1].coefficient)
+        throw(InexactError(:convert, SingleKnown, f))
+    end
+    return SingleKnownn(f.known_part.terms[1].variable_index, f.known_part.constant)
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}}, α::T) where T
@@ -85,23 +116,53 @@ function Base.convert(::Type{VectorAffineDecisionFunction{T}},
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}},
+                      f::SingleKnown) where T
+    return VectorAffineDecisionFunction(
+        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]),
+        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]),
+        MOI.VectorAffineFunction{T}([MOI.VectorAffineTerm{T}(1, MOI.ScalarAffineTerm(one(T), f.known))], [zero(T)]))
+end
+
+function Base.convert(::Type{VectorAffineDecisionFunction{T}},
                       f::MOI.VectorOfVariables) where T
+    n = length(f.variables)
+    terms = map(1:n) do i
+        MOI.VectorAffineTerm{T}(i, MOI.ScalarAffineTerm(one(T), f.variables[i]))
+    end
     variable_part = MOI.VectorAffineFunction{T}(
-        [MOI.VectorAffineTerm{T}(1, MOI.ScalarAffineTerm(one(T), v)) for v in f.variables],
-        [zero(T)])
+        terms,
+        zeros(T, n))
     return VectorAffineDecisionFunction(variable_part,
-                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]),
-                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]))
+                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)),
+                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)))
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}},
                       f::VectorOfDecisions) where T
+    n = length(f.decisions)
+    terms = map(1:n) do i
+        MOI.VectorAffineTerm{T}(i, MOI.ScalarAffineTerm(one(T), f.decisions[i]))
+    end
     decision_part = MOI.VectorAffineFunction{T}(
-        [MOI.VectorAffineTerm{T}(1, MOI.ScalarAffineTerm(one(T), d)) for d in f.decisions],
-        [zero(T)])
-    return VectorAffineDecisionFunction(MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]),
+        terms,
+        zeros(T, n))
+    return VectorAffineDecisionFunction(MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)),
                                         decision_part,
-                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]))
+                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)))
+end
+
+function Base.convert(::Type{VectorAffineDecisionFunction{T}},
+                      f::VectorOfKnowns) where T
+    n = length(f.knowns)
+    terms = map(1:n) do i
+        MOI.VectorAffineTerm{T}(i, MOI.ScalarAffineTerm(one(T), f.knowns[i]))
+    end
+    known_part = MOI.VectorAffineFunction{T}(
+        terms,
+        zeros(T, n))
+    return VectorAffineDecisionFunction(MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)),
+                                        MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], zeros(T, n)),
+                                        known_part)
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}},
@@ -139,41 +200,34 @@ function Base.zero(F::Type{AffineDecisionFunction{T}}) where T
 end
 
 function Base.iszero(f::AffineDecisionFunction)
-    return iszero(f.variable_part) && iszero(f.decision_part) && iszero(f.known_part)
+    return iszero(MOI.constant(f)) && MOIU._is_constant(MOIU.canonical(f))
 end
 
 function Base.isone(f::AffineDecisionFunction)
-    return isone(f.variable_part) && isone(f.decision_part) && isone(f.known_part)
+    return isone(MOI.constant(f)) && MOIU._is_constant(MOIU.canonical(f))
+end
+
+function Base.one(F::Type{AffineDecisionFunction{T}}) where T
+    return convert(F, one(T))
 end
 
 # JuMP overrides #
 # ========================== #
-function JuMP.moi_function(kref::KnownRef)
-    return AffineDecisionFunction(convert(MOI.ScalarAffineFunction{Float64}, 0.0),
-                                  convert(MOI.ScalarAffineFunction{Float64}, 0.0),
-                                  MOI.ScalarAffineFunction([ScalarAffineTerm(1.0, index(kref))], 0.0))
-end
-function JuMP.moi_function_type(::Type{KnownRef})
-    return AffineDecisionFunction{Float64}
-end
-
 function AffineDecisionFunction(aff::CAE)
     JuMP._assert_isfinite(aff)
     decision_terms = Vector{MOI.ScalarAffineTerm{Float64}}()
     for (coef, dvar) in linear_terms(aff.decisions)
-        push!(decision_terms, MOI.ScalarAffineTerm(coef, index(dvar)))
         # Any fixed decision value is set in the decision bridge
+        push!(decision_terms, MOI.ScalarAffineTerm(coef, index(dvar)))
     end
     known_terms = Vector{MOI.ScalarAffineTerm{Float64}}()
-    known_value = 0.0
     for (coef, kvar) in linear_terms(aff.knowns)
+        # Any known decision is set in the known bridge bridges
         push!(known_terms, MOI.ScalarAffineTerm(coef, index(kvar)))
-        # We give the known values directly
-        known_value += coef * JuMP.value(kvar)
     end
     return AffineDecisionFunction(JuMP.moi_function(aff.variables),
                                   MOI.ScalarAffineFunction(decision_terms, 0.0),
-                                  MOI.ScalarAffineFunction(known_terms, known_value))
+                                  MOI.ScalarAffineFunction(known_terms, 0.0))
 end
 JuMP.moi_function(aff::CAE) = AffineDecisionFunction(aff)
 function JuMP.moi_function_type(::Type{CombinedAffExpr{T}}) where T
@@ -194,21 +248,18 @@ function VectorAffineDecisionFunction(affs::Vector{CAE})
     # Known part
     klength = sum(aff -> length(linear_terms(aff.knowns)), affs)
     decision_terms = Vector{MOI.VectorAffineTerm{Float64}}(undef, klength)
-    known_values = Vector{Float64}(undef, length(affs))
     offset = 0
     for (i, aff) in enumerate(affs)
         j = 1
         for (coef, kvar) in linear_terms(aff.knowns)
+            # Any known decision is set in the known bridge
             known_terms[offset+j] = MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(coef, index(kvar)))
-            j += 1
-            # We give the known values directly
-            known_values[i] += coef * JuMP.value(kvar)
         end
         offset += length(linear_terms(aff))
     end
     VectorAffineDecisionFunction(JuMP.moi_function([aff.variables for aff in affs],
                                                    MOI.VectorAffineFunction(decision_terms, zeros(length(affs))),
-                                                   MOI.VectorAffineFunction(known_terms, known_values)))
+                                                   MOI.VectorAffineFunction(known_terms, zeros(length(affs)))))
 end
 JuMP.moi_function(affs::Vector{<:CombinedAffExpr}) = VectorAffineDecisionFunction(affs)
 function JuMP.moi_function_type(::Type{<:Vector{<:CombinedAffExpr{T}}}) where {T}
@@ -228,18 +279,18 @@ end
 function DecisionAffExpr(m::Model, f::MOI.ScalarAffineFunction)
     aff = DAE()
     for t in f.terms
-        add_to_expression!(aff, t.coefficient, DecisionRef(m, t.variable_index))
+        JuMP.add_to_expression!(aff, t.coefficient, DecisionRef(m, t.variable_index))
     end
-    # There should be any constants in the decision terms
+    # There should be not any constants in the decision terms
     return aff
 end
 
 function KnownAffExpr(m::Model, f::MOI.ScalarAffineFunction)
     aff = KAE()
     for t in f.terms
-        add_to_expression!(aff, t.coefficient, KnownRef(m, t.variable_index))
+        JuMP.add_to_expression!(aff, t.coefficient, KnownRef(m, t.variable_index))
     end
-    # There should be any constants in the known terms
+    # There should not be any constants in the known terms
     return aff
 end
 
@@ -269,34 +320,42 @@ end
 # MOI Function interface #
 # ========================== #
 MOI.constant(f::AffineDecisionFunction) = MOI.constant(f.variable_part)
+MOI.constant(f::AffineDecisionFunction, T::DataType) = MOI.constant(f)
 MOI.constant(f::VectorAffineDecisionFunction) = MOI.constant(f.variable_part)
+MOI.constant(f::VectorAffineDecisionFunction, T::DataType) = MOI.constant(f)
 
 function MOIU.eval_variables(varval::Function, f::AffineDecisionFunction)
     var_value = MOIU.eval_variables(varval, f.variable_part)
-    dvar_value = MOIU.eval_variables(dvarval, f.decision_part)
-    known_value = f.known_part.constant
+    dvar_value = MOIU.eval_variables(varval, f.decision_part)
+    known_value = MOIU.eval_variables(varval, f.known_part)
     return var_value + dvar_value + known_value
 end
 function MOIU.eval_variables(varval::Function, f::VectorAffineDecisionFunction)
     var_value = MOIU.eval_variables(varval, f.variable_part)
-    dvar_value = MOIU.eval_variables(dvarval, f.decision_part)
-    known_value = f.known_part.constant
+    dvar_value = MOIU.eval_variables(varval, f.decision_part)
+    known_value = MOIU.eval_variables(varval, f.known_part)
     return var_value + dvar_value + known_value
 end
 
 function MOIU.map_indices(index_map::Function, f::Union{AffineDecisionFunction, VectorAffineDecisionFunction})
-    # Only map variable part and decision part
     return typeof(f)(MOIU.map_indices(index_map, f.variable_part),
                      MOIU.map_indices(index_map, f.decision_part),
-                     copy(f.known_part))
+                     MOIU.map_indices(index_map, f.known_part))
 end
 
 Base.eltype(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}) where T = AffineDecisionFunction{T}
 
 function Base.getindex(it::MOIU.ScalarFunctionIterator{<:VectorAffineDecisionFunction}, i::Integer)
-    AffineDecisionFunction(MOIU.scalar_terms_at_index(it.f.variable_part.terms, i), it.f.variable_part.constants[i],
-                           MOIU.scalar_terms_at_index(it.f.decision_part.terms, i), it.f.variable_part.constants[i],
-                           MOIU.scalar_terms_at_index(it.f.known_part.terms, i), it.f.variable_part.constants[i])
+    AffineDecisionFunction(
+        MOI.ScalarAffineFunction(
+            MOIU.scalar_terms_at_index(it.f.variable_part.terms, i),
+            it.f.variable_part.constants[i]),
+        MOI.ScalarAffineFunction(
+            MOIU.scalar_terms_at_index(it.f.decision_part.terms, i),
+            it.f.decision_part.constants[i]),
+        MOI.ScalarAffineFunction(
+            MOIU.scalar_terms_at_index(it.f.known_part.terms, i),
+            it.f.known_part.constants[i]))
 end
 function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}, I::AbstractVector) where T
     variable_terms = MOI.VectorAffineTerm{T}[]
@@ -314,9 +373,9 @@ function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunct
         decision_constant[i] = g.decision_part.constant
         known_constant[i] = g.known_part.constant
     end
-    return VectorAffineDecisionFunction(MOI.VAF(variable_terms, variable_constant),
-                                        MOI.VAF(decision_terms, decision_constant),
-                                        MOI.VAF(known_terms, known_constant))
+    return VectorAffineDecisionFunction(MOIU.VAF(variable_terms, variable_constant),
+                                        MOIU.VAF(decision_terms, decision_constant),
+                                        MOIU.VAF(known_terms, known_constant))
 end
 
 
@@ -328,55 +387,59 @@ end
 
 function MOIU.substitute_variables(variable_map::Function, f::AffineDecisionFunction{T}) where T
     g = AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, MOI.constant(f.variable_part)),
-                               convert(MOI.ScalarAffineFunction{T}, MOI.constant(f.decision_part)),
-                               copy(f.known_part))
+                               convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                               MOI.ScalarAffineFunction{T}(f.known_part.terms, zero(T)))
     # Substitute variables
     for term in f.variable_part.terms
-        new_term = convert(typeof(f),
-                           MOIU.operate(*, T, term.coefficient,
-                                        variable_map(term.variable_index)))
-        MOIU.operate!(+, T, g, convert(typeof(f), new_term))::typeof(f)
+        new_term = MOIU.substitute_variables(variable_map, term)
+        MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarAffineFunction{T}
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        new_term = MOIU.operate(*, T, term.coefficient,
-                                variable_map(term.variable_index))
-        if new_term isa MOI.ScalarAffineFunction{T}
-            MOIU.operate!(+, T, g.decision_part, new_term)::MOI.ScalarAffineFunction{T}
+        new_term = MOIU.substitute_variables(variable_map, term)
+        if iszero(new_term.constant) && term != new_term.terms[1]
+            # If there is no fixed value, the decision has been mapped to a variable
+            MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarAffineFunction{T}
+            # Otherwise, decision has been fixed and is added to decision part constant below
         end
-        if new_term isa AffineDecisionFunction
-            MOIU.operate!(+, T, g, new_term)::typeof(f)
-        end
+        # Always keep the full term in order to properly unbridge and handle modifications
+        MOIU.operate!(+, T, g.decision_part, new_term)::MOI.ScalarAffineFunction{T}
     end
-    # Do not substitute any known values
+    # Substitute knowns
+    for term in f.known_part.terms
+        # Known value acquired during substitution
+        new_term = MOIU.substitute_variables(variable_map, term)
+        # Add the known value to the constant of the known part
+        MOIU.operate!(+, T, g.known_part, new_term)::MOI.ScalarAffineFunction{T}
+    end
     return g
 end
 
 function MOIU.substitute_variables(variable_map::Function, f::VectorAffineDecisionFunction{T}) where T
+    n = MOI.output_dimension(f)
     g = VectorAffineDecisionFunction(MOI.VectorAffineFunction(MOI.VectorAffineTerm{T}[], copy(MOI.constant(f.variable_part))),
-                                     MOI.VectorAffineFunction(MOI.VectorAffineTerm{T}[], copy(MOI.constant(f.decision_part))),
-                                     copy(f.known_part))
+                                     MOI.VectorAffineFunction(MOI.VectorAffineTerm{T}[], zeros(T, n)),
+                                     MOI.VectorAffineFunction(f.known_part.terms, zeros(T, n)))
     # Substitute variables
     for term in f.variable_part.terms
-        scalar_term = term.scalar_term
-        new_term = convert(typeof(f),
-                           MOIU.operate(*, T, scalar_term.coefficient,
-                                        variable_map(scalar_term.variable_index)))
-        MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::typeof(func)
+        new_term = MOIU.substitute_variables(variable_map, term.scalar_term)
+        MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::typeof(g)
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        scalar_term = term.scalar_term
-        new_term = MOIU.operate(*, T, scalar_term.coefficient,
-                                variable_map(scalar_term.variable_index))
-        if new_term isa MOI.ScalarAffineFunction{T}
-            MOIU.operate_output_index!(+, T, term.output_index, g.decision_part, new_term)::MOI.ScalarAffineFunction{T}
+        new_term = MOIU.substitute_variables(variable_map, term.scalar_term)
+        if iszero(new_term.constant) && term.scalar_term != new_term.terms[1]
+            # If there is no fixed value, the decision has been mapped to a variable
+            MOIU.operate_output_index!(+, T, term.output_index, g.variable_part, new_term)::MOI.VectorAffineFunction{T}
+            # Otherwise, decision has been fixed and is added to decision part constant below
         end
-        if new_term isa AffineDecisionFunction
-            MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::typeof(func)
-        end
+        MOIU.operate_output_index!(+, T, term.output_index, g.decision_part, new_term)::MOI.VectorAffineFunction{T}
     end
-    # Do not substitute any known values
+    # Substitute knowns
+    for term in f.known_part.terms
+        new_term = MOIU.substitute_variables(variable_map, term.scalar_term)
+        MOIU.operate_output_index!(+, T, term.output_index, g.known_part, new_term)::MOI.VectorAffineFunction{T}
+    end
     return g
 end
 
@@ -389,9 +452,7 @@ MOIU.is_canonical(f::Union{AffineDecisionFunction, VectorAffineDecisionFunction}
     MOIU.is_canonical(f.decision_part) &&
     MOIU.is_canonical(f.known_part)
 
-MOIU.canonical(f::Union{AffineDecisionFunction, VectorAffineDecisionFunction}) = AffineDecisionFunction(MOIU.canonical(f.variable_part),
-                                                                                                        MOIU.canonical(f.decision_part),
-                                                                                                        MOIU.canonical(f.known_part))
+MOIU.canonical(f::Union{AffineDecisionFunction, VectorAffineDecisionFunction}) = MOIU.canonicalize!(copy(f))
 
 function MOIU.canonicalize!(f::Union{AffineDecisionFunction, VectorAffineDecisionFunction})
     MOIU.canonicalize!(f.variable_part)
@@ -400,15 +461,18 @@ function MOIU.canonicalize!(f::Union{AffineDecisionFunction, VectorAffineDecisio
     return f
 end
 
-MOIU._is_constant(f::AffineDecisionFunction) = MOIU._is_constant(f.variable_part) &&
+MOIU._is_constant(f::AffineDecisionFunction) =
+    MOIU._is_constant(f.variable_part) &&
     MOIU._is_constant(f.decision_part) &&
     MOIU._is_constant(f.known_part)
 
-MOIU.all_coefficients(p::Function, f::AffineDecisionFunction) = MOIU.all_coefficients(p, f.variable_part) &&
+MOIU.all_coefficients(p::Function, f::AffineDecisionFunction) =
+    MOIU.all_coefficients(p, f.variable_part) &&
     MOIU.all_coefficients(p, f.decision_part) &&
     MOIU.all_coefficients(p, f.known_part)
 
-MOIU.isapprox_zero(f::AffineDecisionFunction, tol) = MOIU.isapprox_zero(f.variable_part, tol) &&
+MOIU.isapprox_zero(f::AffineDecisionFunction, tol) =
+    MOIU.isapprox_zero(f.variable_part, tol) &&
     MOIU.isapprox_zero(f.decision_part, tol) &&
     MOIU.isapprox_zero(f.known_part, tol)
 
@@ -416,7 +480,7 @@ function MOIU.filter_variables(keep::Function, f::Union{AffineDecisionFunction, 
     # Only filter variable part and decision part
     return typeof(f)(MOIU.filter_variables(keep, f.variable_part),
                      MOIU.filter_variables(keep, f.decision_part),
-                     copy(f.known_part))
+                     MOIU.filter_variables(keep, f.known_part))
 end
 
 function MOIU.vectorize(funcs::AbstractVector{AffineDecisionFunction{T}}) where T
@@ -427,7 +491,106 @@ function MOIU.vectorize(funcs::AbstractVector{AffineDecisionFunction{T}}) where 
 end
 
 function MOIU.scalarize(f::VectorAffineDecisionFunction{T}, ignore_constants::Bool = false) where T
-    return AffineDecisionFunction{T}(MOIU.scalarize(f.variable_part),
-                                     MOIU.scalarize(f.decision_part),
-                                     MOIU.scalarize(f.known_part))
+    variable_part = MOIU.scalarize(f.variable_part, ignore_constants)
+    decision_part = MOIU.scalarize(f.decision_part, ignore_constants)
+    known_part = MOIU.scalarize(f.known_part, false) # Keep any known values
+    return map(zip(variable_part, decision_part, known_part)) do (var_part, dvar_part, kvar_part)
+        AffineDecisionFunction(var_part, dvar_part, kvar_part)
+    end
+end
+
+function modify_coefficient!(terms::Vector{MOI.ScalarAffineTerm{T}},
+                             index::MOI.VariableIndex,
+                             new_coefficient::Number) where T
+    i = something(findfirst(t -> t.variable_index == index,
+                            terms), 0)
+    if iszero(i)
+        # The variable was not already included in the terms
+        if !iszero(new_coefficient)
+            # Add it
+            push!(terms,
+                  MOI.ScalarAffineTerm(T(new_coefficient), index))
+        end
+    else
+        # The variable is included in the terms
+        if iszero(new_coefficient)
+            # Remove it
+            deleteat!(terms, i)
+        else
+            # Update coefficient
+            terms[i] = MOI.ScalarAffineTerm(T(new_coefficient), index)
+        end
+    end
+    return nothing
+end
+
+function modify_coefficients!(terms::Vector{MOI.VectorAffineTerm{T}},
+                              index::MOI.VariableIndex,
+                              new_coefficients::AbstractVector) where T
+    rowmap = Dict(c[1]=>i for (i,c) in enumerate(new_coefficients))
+    del = Int[]
+    for i in findall(t -> t.variable_index == index, terms)
+        row = terms[i].output_index
+        j = Base.get(rowmap, row, 0)
+        if !iszero(j)
+            if iszero(new_coefficients[j][2])
+                push!(del, i)
+            else
+                terms[i] = MOI.VectorAffineTerm(row, MOI.ScalarAffineTerm(new_coefficients[j][2], index))
+            end
+            rowmap[row] = 0
+        end
+    end
+    deleteat!(terms, del)
+    for (row, j) in rowmap
+        new_coefficient = new_coefficients[j][2]
+        if !iszero(j) && !iszero(new_coefficient)
+            push!(terms, MOI.VectorAffineTerm(row, MOI.ScalarAffineTerm(new_coefficient, index)))
+        end
+    end
+    return nothing
+end
+
+function add_term!(terms::Vector{MOI.ScalarAffineTerm{T}},
+                   term::MOI.ScalarAffineTerm{T}) where T
+    index = term.variable_index
+    coefficient = term.coefficient
+    i = something(findfirst(t -> t.variable_index == index,
+                            terms), 0)
+    if iszero(i)
+        if !iszero(coefficient)
+            # The variable was not already included in the terms
+            push!(terms, MOI.ScalarAffineTerm(coefficient, index))
+        end
+    else
+        # Variable already included, increment the coefficient
+        new_coeff = terms[i].coefficient + coefficient
+        if iszero(new_coeff)
+            deleteat!(terms, i)
+        else
+            terms[i] = MOI.ScalarAffineTerm(new_coeff, index)
+        end
+    end
+    return nothing
+end
+
+function remove_term!(terms::Vector{MOI.ScalarAffineTerm{T}},
+                      term::MOI.ScalarAffineTerm{T}) where T
+    index = term.variable_index
+    coefficient = term.coefficient
+    i = something(findfirst(t -> t.variable_index == index,
+                            terms), 0)
+    if iszero(i) && !iszero(coefficient)
+        # The variable was not already included in the terms
+        push!(terms, MOI.ScalarAffineTerm(-coefficient, index))
+    else
+        # Variable already included, increment the coefficient
+        new_coeff = terms[i].coefficient - coefficient
+        if iszero(new_coeff)
+            deleteat!(terms, i)
+        else
+            terms[i] = MOI.ScalarAffineTerm(new_coeff, index)
+        end
+    end
+    return nothing
 end

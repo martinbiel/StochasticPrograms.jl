@@ -61,7 +61,7 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
     # Generate and solve outcome model
-    outcome = outcome_model(stochasticprogram, decision, scenario, moi_optimizer(stochasticprogram))
+    outcome = outcome_model(stochasticprogram, decision, scenario, sub_optimizer(stochasticprogram))
     optimize!(outcome)
     status = termination_status(outcome)
     if status != MOI.OPTIMAL
@@ -101,7 +101,7 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
     # Throw NoOptimizer error if no recognized optimizer has been provided
     _check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Calculate confidence interval using provided optimizer
-    CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), kw...)
+    CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = optimizer_constructor(stochasticmodel), kw...)
         # Sanity checks on given decision vector
         length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
         all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -235,7 +235,7 @@ function upper_bound(stochasticmodel::StochasticModel{2},
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:T
-        let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = moi_optimizer(stochasticmodel), defer = true, kw...)
+        let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = optimizer_constructor(stochasticmodel), defer = true, kw...)
             # Sanity checks on given decision vector
             length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
             all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")

@@ -15,11 +15,11 @@ struct SynchronousExecution{T <: AbstractFloat,
     end
 end
 
-function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::SynchronousExecution)
+function initialize_subproblems!(ph::AbstractProgressiveHedging, subsolver::QPSolver, penaltyterm::PenaltyTerm, execution::SynchronousExecution)
     return initialize_subproblems!(ph, subsolver, penaltyterm, execution.subworkers)
 end
 
-function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution{T}) where T <: AbstractFloat
+function resolve_subproblems!(ph::AbstractProgressiveHedging, execution::SynchronousExecution{T}) where T <: AbstractFloat
     partial_objectives = Vector{T}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -29,7 +29,7 @@ function resolve_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::S
     return sum(partial_objectives)
 end
 
-function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution{T,A}) where {T <: AbstractFloat, A <: AbstractVector}
+function update_iterate!(ph::AbstractProgressiveHedging, execution::SynchronousExecution{T,A}) where {T <: AbstractFloat, A <: AbstractVector}
     partial_primals = Vector{A}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -43,7 +43,7 @@ function update_iterate!(ph::AbstractProgressiveHedgingSolver, execution::Synchr
     return nothing
 end
 
-function update_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution)
+function update_subproblems!(ph::AbstractProgressiveHedging, execution::SynchronousExecution)
     # Update dual prices
     @sync begin
         for w in workers()
@@ -62,19 +62,19 @@ function update_subproblems!(ph::AbstractProgressiveHedgingSolver, execution::Sy
     return nothing
 end
 
-function update_dual_gap!(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution)
+function update_dual_gap!(ph::AbstractProgressiveHedging, execution::SynchronousExecution)
     return update_dual_gap!(ph, execution.subworkers)
 end
 
-function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, execution::SynchronousExecution)
+function calculate_objective_value(ph::AbstractProgressiveHedging, execution::SynchronousExecution)
     return calculate_objective_value(ph, execution.subworkers)
 end
 
-function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
+function fill_first_stage!(ph::AbstractProgressiveHedging, stochasticprogram::StochasticProgram, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
     return fill_first_stage!(ph, stochasticprogram, execution.subworkers, nrows, ncols)
 end
 
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
+function fill_submodels!(ph::AbstractProgressiveHedging, scenarioproblems, nrows::Integer, ncols::Integer, execution::SynchronousExecution)
     return fill_submodels!(ph, scenarioproblems, execution.subworkers, nrows, ncols)
 end
 # API

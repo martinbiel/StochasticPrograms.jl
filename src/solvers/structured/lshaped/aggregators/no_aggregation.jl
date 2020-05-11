@@ -8,7 +8,7 @@ Empty functor object for running an L-shaped algorithm without aggregation (mult
 """
 struct NoAggregation <: AbstractAggregation end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, ::NoAggregation, cut::HyperPlane)
+function aggregate_cut!(lshaped::AbstractLShaped, ::NoAggregation, cut::HyperPlane)
     return add_cut!(lshaped, cut)
 end
 
@@ -17,15 +17,15 @@ function aggregate_cut!(cutqueue::CutQueue, ::NoAggregation, ::MetaData, t::Inte
     return nothing
 end
 
-function nthetas(nscenarios::Integer, ::NoAggregation)
-    return nscenarios
+function num_thetas(num_subproblems::Integer, ::NoAggregation)
+    return num_subproblems
 end
 
-function nthetas(nscenarios::Integer, ::NoAggregation, ::AbstractScenarioProblems)
-    return nscenarios
+function num_thetas(num_subproblems::Integer, ::NoAggregation, ::AbstractScenarioProblems)
+    return num_subproblems
 end
 
-function flush!(::AbstractLShapedSolver, ::NoAggregation)
+function flush!(::AbstractLShaped, ::NoAggregation)
     return false
 end
 

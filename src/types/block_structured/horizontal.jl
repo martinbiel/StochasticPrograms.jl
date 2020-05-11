@@ -12,7 +12,7 @@ struct HorizontalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}}
     end
 end
 
-function StochasticStructure(scenario_types::NTuple{M, DataType}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal}) where M
+function StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::Union{BlockHorizontal, DistributedBlockHorizontal}) where M
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end
@@ -51,13 +51,13 @@ end
 
 # Setters #
 # ========================== #
-function untake_decisions!(structure::HorizontalBlockStructure{2,1,SP}) where SP <: ScenarioProblems
+function untake_decisions!(structure::HorizontalBlockStructure{2,1,NTuple{1,SP}}) where SP <: ScenarioProblems
     if untake_decisions!(structure.decisions[1])
         update_decisions!(scenarioproblems(structure), DecisionsStateChange())
     end
     return nothing
 end
-function untake_decisions!(structure::HorizontalBlockStructure{2,1,SP}) where SP <: DistributedScenarioProblems
+function untake_decisions!(structure::HorizontalBlockStructure{2,1,NTuple{1,SP}}) where SP <: DistributedScenarioProblems
     sp = scenarioproblems(structure)
     @sync begin
         for (i,w) in enumerate(workers())

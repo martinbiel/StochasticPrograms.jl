@@ -5,7 +5,7 @@
 
 Abstract supertype for structure-exploiting optimizers.
 """
-abstract type AbstractStructuredOptimizer <: MOI.ModelLike end
+abstract type AbstractStructuredOptimizer <: MOI.AbstractOptimizer end
 """
     AbstractStructuredOptimizerAttribute
 
@@ -18,6 +18,13 @@ abstract type AbstractStructuredOptimizerAttribute end
 Abstract supertype for sample-based optimizers.
 """
 abstract type AbstractSampledOptimizer end
+
+"""
+    AbstractCrash
+
+Abstract supertype for crash methods.
+"""
+abstract type AbstractCrash end
 
 StochasticProgramOptimizerType = Union{MOI.AbstractOptimizer, AbstractStructuredOptimizer}
 
@@ -45,15 +52,25 @@ mutable struct StochasticProgramOptimizer{Opt <: StochasticProgramOptimizerType}
         Opt = MOI.AbstractOptimizer
         return new{Opt}(optimizer_constructor, caching_optimizer)
     end
+
+    function StochasticProgramOptimizer(optimizer_constructor, optimizer::AbstractStructuredOptimizer)
+        Opt = AbstractStructuredOptimizer
+        return new{Opt}(optimizer_constructor, optimizer)
+    end
 end
 
 function StochasticProgramOptimizer(optimizer_constructor)
-    optimizer = MOI.instantiate(optimizer_constructor, with_bridge_type=Float64)
+    optimizer = MOI.instantiate(optimizer_constructor; with_bridge_type = bridge_type(optimizer_constructor))
     return StochasticProgramOptimizer(optimizer_constructor, optimizer)
 end
 
+bridge_type(optimizer::Type{<:AbstractStructuredOptimizer}) = nothing
+bridge_type(optimizer::Type{<:MOI.AbstractOptimizer}) = Float64
+bridge_type(optimizer::MOI.OptimizerWithAttributes) = bridge_type(optimizer.optimizer_constructor)
+bridge_type(optimizer::Function) = bridge_type(first(Base.return_types(optimizer)))
+
 function has_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
-    return !isnothing(sp_optimizer.optimizer_constructor)
+    return sp_optimizer.optimizer_constructor !== nothing
 end
 
 function _check_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
@@ -62,19 +79,28 @@ function _check_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
     end
 end
 
-function moi_optimizer(sp_optimizer::StochasticProgramOptimizer)
-    return moi_optimizer(sp_optimizer, sp_optimizer.optimizer)
+function master_optimizer(sp_optimizer::StochasticProgramOptimizer)
+    return master_optimizer(sp_optimizer, sp_optimizer.optimizer)
 end
 
-function moi_optimizer(sp_optimizer::StochasticProgramOptimizer, ::MOI.AbstractOptimizer)
-    if sp_optimizer.optimizer_constructor == nothing
-        throw(NoOptimizer())
-    end
+function sub_optimizer(sp_optimizer::StochasticProgramOptimizer)
+    return sub_optimizer(sp_optimizer, sp_optimizer.optimizer)
+end
+
+function master_optimizer(sp_optimizer::StochasticProgramOptimizer, ::MOI.AbstractOptimizer)
     return sp_optimizer.optimizer_constructor
 end
 
-function moi_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
-    return moi_optimizer(optimizer)
+function sub_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::MOI.AbstractOptimizer)
+    return master_optimizer(sp_optimizer, optimizer)
+end
+
+function master_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
+    return master_optimizer(optimizer)
+end
+
+function sub_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
+    return sub_optimizer(optimizer)
 end
 
 function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{Opt}, optimizer) where Opt <: StochasticProgramOptimizerType
@@ -82,18 +108,21 @@ function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{Opt}, optimiz
     return nothing
 end
 
-function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{Opt}, optimizer::Opt) where Opt <: StochasticProgramOptimizerType
+function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer::MOI.AbstractOptimizer)
+    MOIU.reset_optimizer(sp_optimizer.optimizer, optimizer)
+    return nothing
+end
+
+function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
+    if sp_optimizer.optimizer != nothing && sp_optimizer.optimizer isa AbstractStructuredOptimizer
+        restore_structure!(sp_optimizer.optimizer)
+    end
     sp_optimizer.optimizer = optimizer
     return nothing
 end
 
-function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{StochasticProgramOptimizerType}, optimizer::MOI.AbstractOptimizer)
-    MOIU.reset_optimizer!(sp_optimizer.optimizer, optimizer)
-    return nothing
-end
-
 function set_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer_constructor)
-    optimizer = MOI.instantiate(optimizer_constructor)
+    optimizer = MOI.instantiate(optimizer_constructor; with_bridge_type = bridge_type(optimizer_constructor))
     reset_optimizer!(sp_optimizer, optimizer)
     sp_optimizer.optimizer_constructor = optimizer_constructor
     return nothing

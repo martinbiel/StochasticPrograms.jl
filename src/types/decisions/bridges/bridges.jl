@@ -3,10 +3,10 @@
 include("variable.jl")
 # Objective #
 # ========================== #
-include("objective.jl")
+include("objectives/objective.jl")
 # Constraint #
 # ========================== #
-include("constraint.jl")
+include("constraints/constraints.jl")
 # SingleDecision #
 # ========================== #
 # SingleDecision support is achieved by adding a few methods to MathOptInterface
@@ -35,7 +35,7 @@ end
 
 function MOIB.is_variable_bridged(
     b::MOIB.AbstractBridgeOptimizer,
-    ci::MOI.ConstraintIndex{<:Union{SingleDecision, MOI.VectorOfVariables}})
+    ci::MOI.ConstraintIndex{<:Union{SingleDecision, VectorOfDecisions}})
     return ci.value < 0 && !haskey(MOIB.Constraint.bridges(b), ci)
 end
 
@@ -70,9 +70,10 @@ function MOI.add_constraint(b::MOIB.AbstractBridgeOptimizer,
                   " on the same decision $(f.decision).")
         end
         BridgeType = MOIB.Constraint.concrete_bridge_type(
-            FunctionizeDecisionConstraintBridge{Float64}, typeof(f), typeof(s))
+            SingleDecisionConstraintBridge{Float64}, typeof(f), typeof(s))
         return MOIB.add_bridged_constraint(b, BridgeType, f, s)
     end
+    error("`SingleDecision`-in-`$(typeof(s))` is only supported through variable bridging.")
 end
 
 function MOI.add_constraint(b::MOIB.AbstractBridgeOptimizer,
@@ -92,10 +93,11 @@ function MOI.add_constraint(b::MOIB.AbstractBridgeOptimizer,
                   " which some decisions are bridged but not the",
                   " first one `$(first(f.decisions))`.")
         end
-        BridgeType = Constraint.concrete_bridge_type(
-            constraint_vector_functionize_bridge(b), typeof(f), typeof(s))
-        return add_bridged_constraint(b, BridgeType, f, s)
+        BridgeType = MOIB.Constraint.concrete_bridge_type(
+            VectorDecisionConstraintBridge{Float64}, typeof(f), typeof(s))
+        return MOIB.add_bridged_constraint(b, BridgeType, f, s)
     end
+    error("`VectorOfDecisions`-in-`$(typeof(s))` is only supported through variable bridging.")
 end
 
 function MOI.add_constraints(b::MOIB.AbstractBridgeOptimizer,
@@ -136,8 +138,11 @@ end
 function add_decision_bridges!(model::JuMP.Model)
     add_bridge(model, DecisionBridge)
     add_bridge(model, DecisionsBridge)
-    add_bridge(model, DecisionObjectiveBridge)
-    add_bridge(model, DecisionConstraintBridge)
+    add_bridge(model, KnownBridge)
+    add_bridge(model, AffineDecisionObjectiveBridge)
+    add_bridge(model, QuadraticDecisionObjectiveBridge)
+    add_bridge(model, AffineDecisionConstraintBridge)
+    add_bridge(model, QuadraticDecisionConstraintBridge)
+    add_bridge(model, VectorAffineDecisionConstraintBridge)
     add_bridge(model, FunctionizeDecisionObjectiveBridge)
-    add_bridge(model, FunctionizeDecisionConstraintBridge)
 end

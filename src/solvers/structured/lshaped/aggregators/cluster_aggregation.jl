@@ -29,12 +29,12 @@ struct ClusterAggregation{T <: AbstractFloat, C <: ClusterRule} <: AbstractAggre
     end
 end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, ::ClusterAggregation, cut::HyperPlane)
+function aggregate_cut!(lshaped::AbstractLShaped, ::ClusterAggregation, cut::HyperPlane)
     return add_cut!(lshaped, cut)
 end
 
-function aggregate_cut!(lshaped::AbstractLShapedSolver, aggregation::ClusterAggregation{T}, cut::HyperPlane{OptimalityCut}) where T <: AbstractFloat
-    if aggregation.lock(gap(lshaped),niterations(lshaped)) && haskey(aggregation.partitioning, cut.id)
+function aggregate_cut!(lshaped::AbstractLShaped, aggregation::ClusterAggregation{T}, cut::HyperPlane{OptimalityCut}) where T <: AbstractFloat
+    if aggregation.lock(gap(lshaped), num_iterations(lshaped)) && haskey(aggregation.partitioning, cut.id)
         aggregation.aggregates[aggregation.partitioning[cut.id]] += cut
         return false
     end
@@ -57,17 +57,17 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, 
     return nothing
 end
 
-function nthetas(nscenarios::Integer, ::ClusterAggregation)
-    return nscenarios
+function num_thetas(num_subproblems::Integer, ::ClusterAggregation)
+    return num_subproblems
 end
 
-function nthetas(nscenarios::Integer, ::ClusterAggregation, ::AbstractScenarioProblems)
-    return nscenarios
+function num_thetas(num_subproblems::Integer, ::ClusterAggregation, ::AbstractScenarioProblems)
+    return num_subproblems
 end
 
-function flush!(lshaped::AbstractLShapedSolver, aggregation::ClusterAggregation{T}) where T <: AbstractFloat
+function flush!(lshaped::AbstractLShaped, aggregation::ClusterAggregation{T}) where T <: AbstractFloat
     added = false
-    if aggregation.lock(gap(lshaped),niterations(lshaped)) && !isempty(aggregation.partitioning)
+    if aggregation.lock(gap(lshaped), num_iterations(lshaped)) && !isempty(aggregation.partitioning)
         for (idx,aggregate) in enumerate(aggregation.aggregates)
             if !iszero(aggregate)
                 added |= add_cut!(lshaped, aggregate)
@@ -143,7 +143,7 @@ struct ClusterAggregate{C <: ClusterRule} <: AbstractAggregator
     end
 end
 
-function (aggregator::ClusterAggregate)(nscenarios::Integer, T::Type{<:AbstractFloat})
+function (aggregator::ClusterAggregate)(num_subproblems::Integer, T::Type{<:AbstractFloat})
     return ClusterAggregation(aggregator.rule, aggregator.lock, T)
 end
 
