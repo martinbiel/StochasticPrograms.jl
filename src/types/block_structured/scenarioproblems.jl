@@ -72,6 +72,59 @@ end
 Base.getindex(sp::DistributedScenarioProblems, i::Integer) = sp.scenarioproblems[i]
 # ========================== #
 
+# MOI #
+# ========================== #
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractModelAttribute, value)
+    for problem in subproblems(scenarioproblems)
+        MOI.set(backend(problem), attr, value)
+    end
+end
+function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractModelAttribute, value)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], attr, value) do (sp, attr, value)
+                    MOI.set(fetch(sp), attr, value)
+                end
+        end
+    end
+end
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    for problem in subproblems(scenarioproblems)
+        MOI.set(backend(problem), attr, index, value)
+    end
+    return nothing
+end
+function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], attr, index, value) do (sp, attr, index, value)
+                    MOI.set(fetch(sp), attr, index, value)
+                end
+        end
+    end
+end
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex, value)
+    for problem in subproblems(scenarioproblems)
+        MOI.set(backend(problem), attr, index, value)
+    end
+    return nothing
+end
+function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractConstraintAttribute,
+                 cindex::MOI.ConstraintIndex, value)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], attr, index, value) do (sp, attr, index, value)
+                    MOI.set(fetch(sp), attr, index, value)
+                end
+        end
+    end
+end
+
 # Getters #
 # ========================== #
 function scenario(scenarioproblems::ScenarioProblems, i::Integer)

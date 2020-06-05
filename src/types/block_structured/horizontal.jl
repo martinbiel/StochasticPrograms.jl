@@ -1,5 +1,6 @@
 struct HorizontalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
     decisions::NTuple{M, Decisions}
+    proxy::JuMP.Model
     scenarioproblems::SP
 
     function HorizontalBlockStructure(scenarioproblems::NTuple{M,AbstractScenarioProblems}) where M
@@ -8,7 +9,7 @@ struct HorizontalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}}
             Decisions()
         end
         SP = typeof(scenarioproblems)
-        return new{N,M,SP}(decisions, scenarioproblems)
+        return new{N,M,SP}(decisions, Model(), scenarioproblems)
     end
 end
 
@@ -38,15 +39,55 @@ function Base.print(io::IO, structure::HorizontalBlockStructure{2})
     end
 end
 
+# MOI #
+# ========================== #
+function MOI.get(structure::HorizontalBlockStructure, attr::MOI.AbstractModelAttribute)
+    return MOI.get(backend(structure.proxy), attr)
+end
+function MOI.get(structure::HorizontalBlockStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
+    return MOI.get(backend(structure.proxy), attr, index)
+end
+function MOI.get(structure::HorizontalBlockStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
+    return MOI.get(backend(structure.proxy), attr, cindex)
+end
+
+function MOI.set(structure::HorizontalBlockStructure, attr::MOI.AbstractModelAttribute, value)
+    MOI.set(scenarioproblems(structure), attr, value)
+    MOI.set(backend(structure.proxy), attr, value)
+end
+function MOI.set(structure::HorizontalBlockStructure, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    MOI.set(scenarioproblems(structure), attr, index, value)
+    MOI.set(backend(structure.proxy), attr, index, value)
+    return nothing
+end
+function MOI.set(structure::HorizontalBlockStructure, attr::MOI.AbstractConstraintAttribute,
+                 cindex::MOI.ConstraintIndex, value)
+    MOI.set(scenarioproblems(structure), attr, index, value)
+    MOI.set(backend(structure.proxy), attr, cindex, value)
+    return nothing
+end
+
+function MOI.is_valid(structure::HorizontalBlockStructure, index::MOI.VariableIndex)
+    return MOI.is_valid(backend(structure.proxy), index)
+end
+
+function MOI.add_constraint(structure::HorizontalBlockStructure, f::MOI.AbstractFunction, s::MOI.AbstractSet)
+    MOI.add_constraint(scenarioproblems(structure), f, s)
+    return MOI.add_constraint(backend(structure.proxy), f, s)
+end
+
+function MOI.delete(structure::HorizontalBlockStructure, index::MOI.Index)
+    # TODO: more to do if index is decision
+    MOI.delete(scenarioproblems(structure), index)
+    MOI.delete(backend(structure.proxy), index)
+    return nothing
+end
+
 # Getters #
 # ========================== #
 function structure_name(structure::HorizontalBlockStructure)
     return "Block horizontal"
-end
-function all_decision_variables(structure::HorizontalBlockStructure{N}, s::Integer) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    # TODO: what do at this point? Decisions at later stages are scenario-dependent
-    error("all_decision_variables not yet implemented for later stages")
 end
 
 # Setters #

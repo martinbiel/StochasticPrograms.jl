@@ -57,18 +57,54 @@ function Base.print(io::IO, structure::VerticalBlockStructure{2})
 end
 # ========================== #
 
+# MOI #
+# ========================== #
+function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractModelAttribute)
+    return MOI.get(backend(structure.first_stage), attr)
+end
+function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
+    return MOI.get(backend(structure.first_stage), attr, index)
+end
+function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
+    return MOI.get(backend(structure.first_stage), attr, cindex)
+end
+
+MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractModelAttribute, value) = MOI.set(backend(structure.first_stage), attr, value)
+function MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    MOI.set(backend(structure.first_stage), attr, index, value)
+    return nothing
+end
+function MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractConstraintAttribute,
+                 cindex::MOI.ConstraintIndex, value)
+    MOI.set(backend(structure.first_stage), attr, cindex, value)
+    return nothing
+end
+
+function MOI.is_valid(structure::VerticalBlockStructure, index::MOI.VariableIndex)
+    return MOI.is_valid(backend(structure.first_stage), index)
+end
+
+function MOI.add_constraint(structure::VerticalBlockStructure, f::MOI.AbstractFunction, s::MOI.AbstractSet)
+    return MOI.add_constraint(backend(structure.first_stage), f, s)
+end
+
+function MOI.delete(structure::VerticalBlockStructure, index::MOI.Index)
+    # TODO: more to do if index is decision
+    MOI.delete(backend(structure.first_stage), index)
+    return nothing
+end
+
 # Getters #
 # ========================== #
 function structure_name(structure::VerticalBlockStructure)
     return "Block vertical"
 end
-function all_decision_variables(structure::VerticalBlockStructure{N}, s::Integer) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    if s == 1
-        return all_decision_variables(structure.first_stage)
-    end
-    # TODO: what do at this point? Decisions at later stages are scenario-dependent
-    error("all_decision_variables not yet implemented for later stages")
-end
 deferred_first_stage(structure::VerticalBlockStructure, ::Val{1}) = num_variables(first_stage(structure)) == 0
 # ========================== #
+
+# Setters
+# ========================== #
+function update_decisions!(structure::VerticalBlockStructure, change::DecisionModification)
+    update_decisions!(structure.first_stage, change)
+end

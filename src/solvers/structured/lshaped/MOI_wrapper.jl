@@ -153,9 +153,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
 end
 
+function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.VariableIndex)
+    if optimizer.lshaped === nothing
+        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+    end
+    return decision(optimizer.lshaped, index)
+end
+
 function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
-    if optimizer.status == MOI.OPTIMIZE_NOT_CALLED
-        throw(OptimizeNotCalled())
+    if optimizer.lshaped === nothing
+        throw(StochasticProgram.UnloadedStructure{Optimizer}())
     end
     return objective_value(optimizer.lshaped)
 end

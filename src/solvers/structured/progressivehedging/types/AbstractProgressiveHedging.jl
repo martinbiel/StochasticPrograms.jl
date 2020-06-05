@@ -27,6 +27,18 @@ function set_params!(ph::AbstractProgressiveHedging; kwargs...)
     end
 end
 
+function decision(ph::AbstractProgressiveHedging)
+    return ph.ξ
+end
+
+function decision(ph::AbstractProgressiveHedging, index::MOI.VariableIndex)
+    i = something(findfirst(i -> i == index, ph.decisions.undecided), 0)
+    if iszero(i)
+        throw(MOI.InvalidIndex(index))
+    end
+    return decision(ph)[i]
+end
+
 function get_obj(ph::AbstractProgressiveHedging)
     first_stage = StochasticPrograms.get_stage_one(ph.stochasticprogram)
     c = JuMP.prepAffObjective(first_stage)

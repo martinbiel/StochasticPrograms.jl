@@ -10,9 +10,14 @@ function scenarioproblems(structure::AbstractBlockStructure{N}, s::Integer = 2) 
     1 < s <= N || error("Stage $s not in range 2 to $N.")
     return structure.scenarioproblems[s-1]
 end
-function all_decisions(structure::AbstractBlockStructure{N}, s::Integer = 1) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    return all_decisions(structure.decisions[s])
+function decision(structure::AbstractBlockStructure, index::MOI.VariableIndex)
+    return decision(structure.decisions[1], index)
+end
+function decisions(structure::AbstractBlockStructure)
+    return structure.decisions[1]
+end
+function all_decisions(structure::AbstractBlockStructure)
+    return structure.decisions[1].undecided
 end
 function num_decisions(structure::AbstractBlockStructure{N}, s::Integer = 1) where N
     1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")

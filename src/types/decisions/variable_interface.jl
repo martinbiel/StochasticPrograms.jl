@@ -75,7 +75,7 @@ function take_decisions!(model::JuMP.Model, drefs::Vector{DecisionRef}, vals::Ab
     # Check that all given decisions are in model
     map(dref -> check_belongs_to_model(dref, model), drefs)
     # Check decision length
-    length(drefs) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of defined decision variables $(length(drefs)).")
+    length(drefs) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of decision variables $(length(drefs)).")
     # Update decisions
     for (dref, val) in zip(drefs, vals)
         d = decision(dref)
@@ -175,16 +175,17 @@ function MOI.set(model::Model, attr::MOI.AbstractVariableAttribute,
                  dref::Union{DecisionRef, KnownRef}, value)
     check_belongs_to_model(dref, model)
     MOI.set(backend(model), attr, index(dref), value)
+    return nothing
 end
 
-JuMP.name(dref::DecisionRef) = MOI.get(JuMP.owner_model(dref), MOI.VariableName(), dref)::String
-JuMP.name(kref::KnownRef) = MOI.get(JuMP.owner_model(kref), MOI.VariableName(), kref)::String
+JuMP.name(dref::DecisionRef) = MOI.get(owner_model(dref), MOI.VariableName(), dref)::String
+JuMP.name(kref::KnownRef) = MOI.get(owner_model(kref), MOI.VariableName(), kref)::String
 
 function JuMP.set_name(dref::DecisionRef, name::String)
-    return MOI.set(JuMP.owner_model(dref), MOI.VariableName(), dref, name)
+    return MOI.set(owner_model(dref), MOI.VariableName(), dref, name)
 end
 function JuMP.set_name(kref::KnownRef, name::String)
-    return MOI.set(JuMP.owner_model(dref), MOI.VariableName(), kref, name)
+    return MOI.set(owner_model(dref), MOI.VariableName(), kref, name)
 end
 
 function decision_by_name(model::Model, name::String)
@@ -212,8 +213,7 @@ function JuMP.value(dref::DecisionRef; result::Int = 1)::Float64
     if state(dref) == Taken
         # If decision has been fixed the value can be fetched
         # directly
-        decisions = get_decisions(dref)::Decisions
-        return decision_value(decisions, index(dref))
+        decision(dref).value
     end
     return MOI.get(owner_model(dref), MOI.VariablePrimal(result), dref)
 end
@@ -282,6 +282,22 @@ function JuMP.fix(kref::KnownRef, val::Number)
     return nothing
 end
 
+function JuMP.delete(model::JuMP.Model, dref::DecisionRef)
+    if model !== owner_model(dref)
+        error("The decision you are trying to delete does not " *
+              "belong to the model.")
+    end
+    # TODO What to do here?
+end
+
+function JuMP.delete(model::JuMP.Model, kref::KnownRef)
+    if model !== owner_model(kref)
+        error("The known decision you are trying to delete does not " *
+              "belong to the model.")
+    end
+    # TODO What to do here?
+end
+
 JuMP.owner_model(dref::DecisionRef) = dref.model
 JuMP.owner_model(kref::KnownRef) = kref.model
 
@@ -330,14 +346,14 @@ function JuMP.set_lower_bound(dref::Decision, lower::Number)
         cindex = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
         MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), cindex, new_set)
     else
-        MOI.add_constraint(backend, SingleDecision(index(dref)), new_set)
+        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
     end
     return nothing
 end
-function JuMP.delete_lower_bound(dref::Decision)
+function JuMP.delete_lower_bound(dref::DecisionRef)
     JuMP.delete(owner_model(dref), LowerBoundRef(dref))
 end
-function JuMP.lower_bound(dref::Decision)
+function JuMP.lower_bound(dref::DecisionRef)
     if !has_lower_bound(dref)
         error("Decision $(dref) does not have a lower bound.")
     end
@@ -363,7 +379,7 @@ function JuMP.set_upper_bound(dref::DecisionRef, lower::Number)
         cindex = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
         MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), cindex, new_set)
     else
-        MOI.add_constraint(backend, SingleDecision(index(dref)), new_set)
+        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
     end
     return nothing
 end
@@ -389,12 +405,12 @@ function JuMP.set_integer(dref::DecisionRef)
     elseif is_binary(dref)
         error("Cannot set the decision $(dref) to integer as it is already binary.")
     else
-        MOI.add_constraint(backend, SingleDecision(index(dref)), MOI.Integer())
+        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.Integer())
     end
 end
 function unset_integer(dref::DecisionRef)
     JuMP.delete(owner_model(dref), IntegerRef(dref))
-    return
+    return nothing
 end
 function JuMP.IntegerRef(dref::DecisionRef)
     moi_int =  MOI.ConstraintIndex{SingleDecision, MOI.Integer}
@@ -414,12 +430,12 @@ function JuMP.set_binary(dref::DecisionRef)
     elseif is_integer(dref)
         error("Cannot set the decision $(dref) to binary as it is already integer.")
     else
-        MOI.add_constraint(backend, SingleDecision(index(dref)), MOI.ZeroOne())
+        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.ZeroOne())
     end
 end
 function unset_binary(dref::DecisionRef)
     JuMP.delete(owner_model(dref), BinaryRef(dref))
-    return
+    return nothing
 end
 function JuMP.BinaryRef(dref::DecisionRef)
     moi_bin =  MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}
@@ -432,8 +448,8 @@ end
 function JuMP.start_value(dref::DecisionRef)
     return MOI.get(owner_model(dref), MOI.VariablePrimalStart(), dref)
 end
-function JuMP.set_start_value(dref::Decision, value::Number)
-    MOI.set(dref, MOI.VariablePrimalStart(), dref, Float64(value))
+function JuMP.set_start_value(dref::DecisionRef, value::Number)
+    MOI.set(owner_model(dref), MOI.VariablePrimalStart(), dref, Float64(value))
 end
 
 JuMP.has_lower_bound(kref::KnownRef) = false

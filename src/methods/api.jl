@@ -28,7 +28,7 @@ function instantiate(sm::StochasticModel{2},
     if direct_model
         optimizer(sp) isa MOI.AbstractOptimizer || error("MOI optimizer required to create direct model.")
         model = direct_model(optimizer_constructor(sp))
-        model.ext[:decisionvariables] = IgnoreDecisionVariables()
+        model.ext[:decisions] = IgnoreDecisionS()
         _generate_deterministic_equivalent!(sp, model)
         return model
     end
@@ -204,10 +204,10 @@ function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::Abs
     return optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kwargs...)
 end
 function JuMP.termination_status(stochasticprogram::StochasticProgram)
-    return MOI.get(optimizer(stochasticprogram), MOI.TerminationStatus())::MOI.TerminationStatusCode
+    return MOI.get(stochasticprogram, MOI.TerminationStatus())::MOI.TerminationStatusCode
 end
 function JuMP.objective_sense(stochasticprogram::StochasticProgram)
-    return MOI.get(optimizer(stochasticprogram), MOI.ObjectiveSense())::MOI.OptimizationSense
+    return MOI.get(stochasticprogram, MOI.ObjectiveSense())::MOI.OptimizationSense
 end
 """
     optimal_decision(stochasticprogram::StochasticProgram)
@@ -215,6 +215,9 @@ end
 Return the optimal first stage decision of `stochasticprogram`, after a call to `optimize!(stochasticprogram)`.
 """
 function optimal_decision(stochasticprogram::TwoStageStochasticProgram)
+    if termination_status(stochasticprogram) == MOI.OPTIMIZE_NOT_CALLED
+        throw(OptimizeNotCalled())
+    end
     return JuMP.value.(all_decision_variables(stochasticprogram))
 end
 """
@@ -294,6 +297,8 @@ Return the objective value associated with result index result of the most-recen
 """
 function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
     # Throw NoOptimizer error if no recognized optimizer has been provided
+    _check_provided_optimizer(stochasticprogram.optimizer)
+    # Switch on termination status
     status = JuMP.termination_status(stochasticprogram)
     if status != MOI.OPTIMAL
         if status == MOI.OPTIMIZE_NOT_CALLED
@@ -381,48 +386,32 @@ function stage_parameters(stochasticprogram::StochasticProgram{N}, s::Integer) w
     return stochasticprogram.stages[s].parameters
 end
 """
-    all_decisions(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    decision(stochasticprogram::StochasticProgram, index::MOI.VariableIndex)
 
-Return the decisions of stage `s` in `stochasticprogram`. Defaults to the first stage.
+Return the current value of the first-stage decision at `index` of `stochasticprogram`.
 """
-function all_decisions(stochasticprogram::StochasticProgram{N}, s::Integer = 1) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
-    return decisions(structure(stochasticprogram), s)
+function decision(stochasticprogram::StochasticProgram, index::MOI.VariableIndex)
+    return decision(structure(stochasticprogram), index)
 end
 """
-    all_decision_variables(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    decision(stochasticprogram::StochasticProgram)
 
-Return the decision variables of stage `s` in `stochasticprogram`. Defaults to the first stage.
+Return the current first-stage decision values of `stochasticprogram`.
 """
-function all_decision_variables(stochasticprogram::StochasticProgram{N}, s::Integer = 1) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
-    return all_decision_variables(structure(stochasticprogram), s)
+function decision(stochasticprogram::StochasticProgram)
+    return JuMP.value(all_decision_variables(stochasticprogram))
 end
 """
-    all_decisions(stochasticprogram::TwoStageStochasticProgram)
+    all_decision_variables(stochasticprogram::StochasticProgram{N}) where N
 
-Return the first-stage decisions of the two-stage `stochasticprogram`.
+Returns a list of all decisions currently in the `stochasticprogram`. The decisions are
+ordered by creation time.
 """
-function all_decisions(stochasticprogram::TwoStageStochasticProgram)
-    return decisions(stochasticprogram, 1)
+function all_decision_variables(stochasticprogram::StochasticProgram)
+    return map(all_decisions(structure(stochasticprogram))) do index
+        DecisionVariable(stochasticprogram, index)
+    end
 end
-"""
-    all_decision_variables(stochasticprogram::TwoStageStochasticProgram)
-
-Return the first-stage decision variables of the two-stage `stochasticprogram`.
-"""
-function all_decision_variables(stochasticprogram::TwoStageStochasticProgram)
-    return all_decision_variables(stochasticprogram, 1)
-end
-# """
-#     recourse_variables(stochasticprogram::StochasticProgram)
-
-# Return the recourse variables in the final stage of the `stochasticprogram`.
-# """
-# function recourse_variables(stochasticprogram::StochasticProgram)
-#     1 <= s <= N || error("Stage $s not in range 1 to $(N - 1).")
-#     return recourse_variables(structure(stochasticprogram), s)
-# end
 """
     structure(stochasticprogram::StochasticProgram)
 
@@ -457,24 +446,6 @@ Return the number of first-stage decision of `stochasticprogram`.
 """
 function num_decisions(stochasticprogram::TwoStageStochasticProgram)
     return num_decisions(stochasticprogram, 1)
-end
-"""
-    num_known_decisions(stochasticprogram::StochasticProgram, s::Integer = 2)
-
-Return the number of known decisions at stage `s` in the `stochasticprogram`.
-"""
-function num_known_decisions(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 2 to $N.")
-    s == 1 && return 0
-    return num_known_decisions(structure(stochasticprogram), s)
-end
-"""
-    num_known_decisions(stochasticprogram::TwoStageStochasticProgram)
-
-Return the number of known decisions at stage two of `stochasticprogram`.
-"""
-function num_known_decisions(stochasticprogram::TwoStageStochasticProgram)
-    return num_known_decisions(stochasticprogram, 2)
 end
 """
     first_stage(stochasticprogram::StochasticProgram)

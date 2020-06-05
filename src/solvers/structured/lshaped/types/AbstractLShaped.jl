@@ -108,6 +108,14 @@ function update_solution!(lshaped::AbstractLShaped)
     return nothing
 end
 
+function decision(lshaped::AbstractLShaped, index::MOI.VariableIndex)
+    i = something(findfirst(i -> i == index, lshaped.decisions.undecided), 0)
+    if iszero(i)
+        throw(MOI.InvalidIndex(index))
+    end
+    return decision(lshaped)[i]
+end
+
 function evaluate_first_stage(lshaped::AbstractLShaped, x::AbstractVector)
     model = lshaped.master
     # Get objective

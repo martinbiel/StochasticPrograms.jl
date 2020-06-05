@@ -199,3 +199,32 @@ function Base.print(io::IO, stochasticprogram::StochasticProgram)
     end
 end
 # ========================== #
+
+# MOI #
+# ========================== #
+function MOI.get(stochasticprogram::StochasticProgram, attr::Union{MOI.TerminationStatus, MOI.PrimalStatus, MOI.DualStatus})
+    return MOI.get(optimizer(stochasticprogram), attr)
+end
+function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractModelAttribute)
+    if MOI.is_set_by_optimize(attr)
+        _check_provided_optimizer(stochasticprogram.optimizer)
+        if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        end
+        return MOI.get(optimizer(stochasticprogram), attr)
+    else
+        return MOI.get(structure(stochasticprogram), attr)
+    end
+end
+function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
+    MOI.get(optimizer(stochasticprogram), attr)
+end
+
+MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(spa), attr, value)
+MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value) = MOI.set(structure(sp), attr, value)
+
+function JuMP.check_belongs_to_model(con_ref::ConstraintRef{<:StochasticProgram}, stochasticprogram::StochasticProgram)
+    if owner_model(con_ref) !== model
+        throw(ConstraintNotOwned(con_ref))
+    end
+end

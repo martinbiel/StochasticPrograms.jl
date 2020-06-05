@@ -9,24 +9,33 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Horizonta
 end
 
 function generate!(stochasticprogram::TwoStageStochasticProgram, structure::HorizontalBlockStructure{2}, stage::Integer)
-    stage == 1 && return nothing
-    stage == 2 || error("Stage $stage not available in two-stage model.")
-    # Check generators
-    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
-    has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
-    # Sanity check on scenario probabilities
-    if num_scenarios(structure, stage) > 0
-        p = stage_probability(structure, stage)
-        abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
+    if stage == 1
+        # Check generators
+        has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+        # Prepare decisions
+        structure.proxy.ext[:decisions] = structure.decisions[1]
+        add_decision_bridges!(structure.proxy)
+        # Generate first stage
+        generator(stochasticprogram, :stage_1)(structure.proxy, stage_parameters(stochasticprogram, 1))
+    else
+        stage == 2 || error("Stage $stage not available in two-stage model.")
+        # Check generators
+        has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+        has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
+        # Sanity check on scenario probabilities
+        if num_scenarios(structure, stage) > 0
+            p = stage_probability(structure, stage)
+            abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
+        end
+        # Generate
+        generate_horizontal!(scenarioproblems(structure, stage),
+                             generator(stochasticprogram, :stage_1),
+                             generator(stochasticprogram, :stage_2),
+                             stage_parameters(stochasticprogram, 1),
+                             stage_parameters(stochasticprogram, 2),
+                             structure.decisions[stage - 1],
+                             sub_optimizer(stochasticprogram))
     end
-    # Generate
-    generate_horizontal!(scenarioproblems(structure, stage),
-                         generator(stochasticprogram, :stage_1),
-                         generator(stochasticprogram, :stage_2),
-                         stage_parameters(stochasticprogram, 1),
-                         stage_parameters(stochasticprogram, 2),
-                         structure.decisions[stage - 1],
-                         sub_optimizer(stochasticprogram))
     return nothing
 end
 

@@ -32,111 +32,137 @@ end
 
 # Base overloads #
 # ========================== #
-function Base.print(io::IO, dep::DeterministicEquivalent)
+function Base.print(io::IO, structure::DeterministicEquivalent)
     print(io, "Deterministic equivalent problem\n")
-    print(io, dep.model)
+    print(io, structure.model)
 end
 # ========================== #
+
+# MOI #
+# ========================== #
+function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute)
+    return MOI.get(backend(structure.model), attr)
+end
+function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
+    return MOI.get(backend(structure.model), attr, index)
+end
+function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
+    return MOI.get(backend(structure.model), attr, cindex)
+end
+
+MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute, value) = MOI.set(backend(structure.model), attr, value)
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    MOI.set(backend(structure.model), attr, index, value)
+    return nothing
+end
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute,
+                 cindex::MOI.ConstraintIndex, value)
+    MOI.set(backend(structure.model), attr, cindex, value)
+    return nothing
+end
+
+function MOI.is_valid(structure::DeterministicEquivalent, index::MOI.VariableIndex)
+    return MOI.is_valid(backend(structure.model), index)
+end
+
+function MOI.add_constraint(structure::DeterministicEquivalent, f::MOI.AbstractFunction, s::MOI.AbstractSet)
+    return MOI.add_constraint(backend(structure.model), f, s)
+end
+
+function MOI.delete(structure::DeterministicEquivalent, index::MOI.Index)
+    # TODO: more to do if index is decision
+    MOI.delete(backend(structure.model), index)
+    return nothing
+end
 
 # Getters #
 # ========================== #
 function structure_name(structure::DeterministicEquivalent)
     return "Deterministic equivalent"
 end
-function decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    return [decision(dref) for dref in dep.decision_variables[s]]
+function decision(structure::DeterministicEquivalent, index::MOI.VariableIndex)
+    return decision(structure.decisions, index)
 end
-function decision_variables(dep::DeterministicEquivalent{N}, s::Integer = 1) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    return dep.decision_variables[s]
+function decisions(structure::DeterministicEquivalent)
+    return structure.decisions
 end
-function all_decisions(dep::DeterministicEquivalent)
-    return all_decisions(dep.model)
+function all_decisions(structure::DeterministicEquivalent)
+    return structure.decisions.undecided
 end
-function all_decision_variables(dep::DeterministicEquivalent, s::Integer = 1)
-    return dep.decision_variables[s]
+function num_decisions(structure::DeterministicEquivalent{N}, s::Integer = 2) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    s == N && error("The final stage does not have decisions.")
+    return length(structure.decision_variables[s])
 end
-function num_decisions(dep::DeterministicEquivalent{N}, s::Integer = 1) where N
-    1 <= s < N || error("Stage $s not in range 1 to $(N - 1).")
-    return length(dep.decision_variables[s])
-end
-function all_known_decisions(dep::DeterministicEquivalent)
-    # There are never any known decisions in the deterministically equivalent problem
-    return KnownDecisions[]
-end
-function all_known_decision_variables(dep::DeterministicEquivalent)
-    # There are never any known decisions in the deterministically equivalent problem
-    return KnownRef[]
-end
-function num_known_decisions(dep::DeterministicEquivalent{N}, s::Integer) where N
-    # There are never any known decisions in the deterministically equivalent problem
-    return 0
-end
-function scenario(dep::DeterministicEquivalent{N}, i::Integer, s::Integer = 2) where N
+function scenario(structure::DeterministicEquivalent{N}, i::Integer, s::Integer = 2) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     s == 1 && error("The first stage does not have scenarios.")
-    return dep.scenarios[s-1][i]
+    return structure.scenarios[s-1][i]
 end
-function scenarios(dep::DeterministicEquivalent{N}, s::Integer = 2) where N
+function scenarios(structure::DeterministicEquivalent{N}, s::Integer = 2) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     s == 1 && error("The first stage does not have scenarios.")
-    return dep.scenarios[s-1]
+    return structure.scenarios[s-1]
 end
-function subproblem(dep::DeterministicEquivalent, i::Integer, s::Integer = 2)
-    return subproblem(scenarioproblems(dep, s), i)
+function subproblem(structure::DeterministicEquivalent, i::Integer, s::Integer = 2)
+    return subproblem(scenarioproblems(structure, s), i)
 end
-function subproblems(dep::DeterministicEquivalent, s::Integer = 2)
-    return subproblems(scenarioproblems(dep, s))
+function subproblems(structure::DeterministicEquivalent, s::Integer = 2)
+    return subproblems(scenarioproblems(structure, s))
 end
-function num_subproblems(dep::DeterministicEquivalent, s::Integer = 2)
+function num_subproblems(structure::DeterministicEquivalent, s::Integer = 2)
     return 0
 end
-function deferred(dep::DeterministicEquivalent)
-    return num_variables(dep.model) == 0
+function deferred(structure::DeterministicEquivalent)
+    return num_variables(structure.model) == 0
 end
 # ========================== #
 
 # Setters
 # ========================== #
-function add_scenario!(dep::DeterministicEquivalent, scenario::AbstractScenario, stage::Integer = 2)
-    push!(scenarios(dep, stage), scenario)
+function update_decisions!(structure::DeterministicEquivalent, change::DecisionModification)
+    update_decisions!(structure.model, change)
+end
+
+function add_scenario!(structure::DeterministicEquivalent, scenario::AbstractScenario, stage::Integer = 2)
+    push!(scenarios(structure, stage), scenario)
     return nothing
 end
-function add_worker_scenario!(dep::DeterministicEquivalent, scenario::AbstractScenario, w::Integer, stage::Integer = 2)
-    add_scenario!(dep, scenario, stage)
+function add_worker_scenario!(structure::DeterministicEquivalent, scenario::AbstractScenario, w::Integer, stage::Integer = 2)
+    add_scenario!(structure, scenario, stage)
     return nothing
 end
-function add_scenario!(scenariogenerator::Function, dep::DeterministicEquivalent, stage::Integer = 2)
-    add_scenario!(dep, scenariogenerator(), stage)
+function add_scenario!(scenariogenerator::Function, structure::DeterministicEquivalent, stage::Integer = 2)
+    add_scenario!(structure, scenariogenerator(), stage)
     return nothing
 end
-function add_worker_scenario!(scenariogenerator::Function, dep::DeterministicEquivalent, w::Integer, stage::Integer = 2)
-    add_scenario!(scenariogenerator, dep, stage)
+function add_worker_scenario!(scenariogenerator::Function, structure::DeterministicEquivalent, w::Integer, stage::Integer = 2)
+    add_scenario!(scenariogenerator, structure, stage)
     return nothing
 end
-function add_scenarios!(dep::DeterministicEquivalent, _scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
-    append!(scenarios(dep, stage), _scenarios)
+function add_scenarios!(structure::DeterministicEquivalent, _scenarios::Vector{<:AbstractScenario}, stage::Integer = 2)
+    append!(scenarios(structure, stage), _scenarios)
     return nothing
 end
-function add_worker_scenarios!(dep::DeterministicEquivalent, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2)
-    add_scenarios!(dep, scenarios, stasge)
+function add_worker_scenarios!(structure::DeterministicEquivalent, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2)
+    add_scenarios!(structure, scenarios, stasge)
     return nothing
 end
-function add_scenarios!(scenariogenerator::Function, dep::DeterministicEquivalent, n::Integer, stage::Integer = 2)
+function add_scenarios!(scenariogenerator::Function, structure::DeterministicEquivalent, n::Integer, stage::Integer = 2)
     for i = 1:n
-        add_scenario!(dep, stage) do
+        add_scenario!(structure, stage) do
             return scenariogenerator()
         end
     end
     return nothing
 end
-function add_worker_scenarios!(scenariogenerator::Function, dep::DeterministicEquivalent, n::Integer, w::Integer, stage::Integer = 2)
-    add_scenarios!(scenariogenerator, dep, n, stage)
+function add_worker_scenarios!(scenariogenerator::Function, structure::DeterministicEquivalent, n::Integer, w::Integer, stage::Integer = 2)
+    add_scenarios!(scenariogenerator, structure, n, stage)
     return nothing
 end
-function sample!(dep::DeterministicEquivalent, sampler::AbstractSampler, n::Integer, stage::Integer = 2)
-    sample!(scenarios(dep, stage), sampler, n)
+function sample!(structure::DeterministicEquivalent, sampler::AbstractSampler, n::Integer, stage::Integer = 2)
+    sample!(scenarios(structure, stage), sampler, n)
     return nothing
 end
 # ========================== #
