@@ -193,21 +193,38 @@ function log!(lshaped::AbstractLShaped; optimal = false, status = nothing)
     return nothing
 end
 
-function log!(lshaped::AbstractLShaped, t::Integer; optimal = false)
+function log!(lshaped::AbstractLShaped, t::Integer; optimal = false, status = nothing)
     @unpack Q,θ,iterations = lshaped.data
     @unpack keep, offset, indent = lshaped.parameters
     lshaped.Q_history[t] = Q
     lshaped.θ_history[t] = θ
-
+    if status != nothing && lshaped.parameters.log
+        lshaped.progress.thresh = Inf
+        lshaped.progress.printed = true
+        val = if status == MOI.INFEASIBLE
+            Inf
+        elseif status == MOI.DUAL_INFEASIBLE
+            -Inf
+        else
+            0.0
+        end
+        ProgressMeter.update!(lshaped.progress, val,
+                              showvalues = [
+                                  ("$(indentstr(indent))Objective", val),
+                                  ("$(indentstr(indent))Early termination", status),
+                                  ("$(indentstr(indent))Number of cuts", num_cuts(lshaped)),
+                                  ("$(indentstr(indent))Iterations", iterations)
+                              ], keep = keep, offset = offset)
+        return nothing
+    end
     log_regularization!(lshaped,t)
-
     if lshaped.parameters.log
         current_gap = optimal ? 0.0 : gap(lshaped)
         ProgressMeter.update!(lshaped.progress, current_gap,
                               showvalues = [
                                   ("$(indentstr(indent))Objective", objective_value(lshaped)),
                                   ("$(indentstr(indent))Gap", current_gap),
-                                  ("$(indentstr(indent))Number of cuts", ncuts(lshaped)),
+                                  ("$(indentstr(indent))Number of cuts", num_cuts(lshaped)),
                                   ("$(indentstr(indent))Iterations", iterations)
                               ], keep = keep, offset = offset)
     end

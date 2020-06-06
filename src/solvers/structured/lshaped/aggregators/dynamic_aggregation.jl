@@ -17,13 +17,13 @@ The following selection rules are available
 - `lock_after::Function = (τ,n)->false`: Function that determines if the current aggregation scheme should be fixed, based on the current optimality gap `τ` and the number of iterations `n`
 ...
 """
-struct DynamicAggregation{T <: AbstractFloat, S <: SelectionRule} <: AbstractAggregation
+struct DynamicAggregation{T <: AbstractFloat, S <: AbstractSelectionRule} <: AbstractAggregation
     aggregates::Vector{AggregatedOptimalityCut{T}}
     rule::S
     partitioning::Dict{Int,Int}
     lock::Function
 
-    function DynamicAggregation(num_aggregates::Integer, rule::SelectionRule, lock::Function, ::Type{T}) where T <: AbstractFloat
+    function DynamicAggregation(num_aggregates::Integer, rule::AbstractSelectionRule, lock::Function, ::Type{T}) where T <: AbstractFloat
         S = typeof(rule)
         aggregates = [zero(AggregatedOptimalityCut{T}) for _ = 1:num_aggregates]
         return new{T,S}(aggregates, rule, Dict{Int,Int}(), lock)
@@ -106,20 +106,29 @@ end
 # API
 # ------------------------------------------------------------
 """
-    DynamicAggregate(num_aggregates::Integer, rule::SelectionRule; lock_after::Function = (τ,n)->false)
+    DynamicAggregate(num_aggregates::Integer, rule::AbstractSelectionRule; lock_after::Function = (τ,n)->false)
 
 Factory object for [`DynamicAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?DynamicAggregation for parameter descriptions.
 
 """
-struct DynamicAggregate{S <: SelectionRule} <: AbstractAggregator
+mutable struct DynamicAggregate <: AbstractAggregator
     num_aggregates::Int
-    rule::S
+    rule::AbstractSelectionRule
     lock::Function
 
-    function DynamicAggregate(num_aggregates::Integer, rule::SelectionRule; lock_after = (τ,n)->false)
-        S = typeof(rule)
-        return new{S}(num_aggregates, rule, lock_after)
+    function DynamicAggregate(num_aggregates::Integer, rule::AbstractSelectionRule; lock_after = (τ,n)->false)
+        return new(num_aggregates, rule, lock_after)
     end
+end
+
+struct SelectionRule <: AggregationParameter end
+
+function MOI.get(aggregator::DynamicAggregate, ::SelectionRule)
+    return aggregator.rule
+end
+
+function MOI.set(aggregator::DynamicAggregate, ::SelectionRule, rule::AbstractSelectionRule)
+    return aggregator.rule = rule
 end
 
 function (aggregator::DynamicAggregate)(nscenarios::Integer, T::Type{<:AbstractFloat})

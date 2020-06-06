@@ -15,14 +15,14 @@ The following cluster rules are available
 - `lock_after::Function = (τ,n)->false`: Function that determines if the current aggregation scheme should be fixed, based on the current optimality gap `τ` and the number of iterations `n`
 ...
 """
-struct ClusterAggregation{T <: AbstractFloat, C <: ClusterRule} <: AbstractAggregation
+struct ClusterAggregation{T <: AbstractFloat, C <: AbstractClusterRule} <: AbstractAggregation
     buffer::Vector{SparseOptimalityCut{T}}
     rule::C
     partitioning::Dict{Int,Int}
     lock::Function
     aggregates::Vector{AggregatedOptimalityCut{T}}
 
-    function ClusterAggregation(rule::ClusterRule, lock::Function, ::Type{T}) where T <: AbstractFloat
+    function ClusterAggregation(rule::AbstractClusterRule, lock::Function, ::Type{T}) where T <: AbstractFloat
         C = typeof(rule)
         aggregates = [zero(AggregatedOptimalityCut{T}) for _ = 1:5]
         return new{T,C}(Vector{SparseOptimalityCut{T}}(), rule, Dict{Int,Int}(), lock, aggregates)
@@ -128,19 +128,28 @@ end
 # API
 # ------------------------------------------------------------
 """
-    ClusterAggregate(rule::ClusterRule; lock_after::Function = (τ,n)->false)
+    ClusterAggregate(rule::AbstractClusterRule; lock_after::Function = (τ,n)->false)
 
 Factory object for [`ClusterAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?ClusterAggregation for parameter descriptions.
 
 """
-struct ClusterAggregate{C <: ClusterRule} <: AbstractAggregator
-    rule::C
+mutable struct ClusterAggregate <: AbstractAggregator
+    rule::AbstractClusterRule
     lock::Function
 
-    function ClusterAggregate(rule::ClusterRule; lock_after = (τ,n) -> false)
-        C = typeof(rule)
-        return new{C}(rule, lock_after)
+    function ClusterAggregate(rule::AbstractClusterRule; lock_after = (τ,n) -> false)
+        return new(rule, lock_after)
     end
+end
+
+struct ClusterRule <: AggregationParameter end
+
+function MOI.get(aggregator::ClusterAggregate, ::ClusterRule)
+    return aggregator.rule
+end
+
+function MOI.set(aggregator::ClusterAggregate, ::ClusterRule, rule::AbstractClusterRule)
+    return aggregator.rule = rule
 end
 
 function (aggregator::ClusterAggregate)(num_subproblems::Integer, T::Type{<:AbstractFloat})

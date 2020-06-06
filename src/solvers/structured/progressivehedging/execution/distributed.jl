@@ -1,254 +1,187 @@
 SubWorker{T,A,S,PT} = RemoteChannel{Channel{Vector{SubProblem{T,A,S,PT}}}}
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
-
 Work = RemoteChannel{Channel{Int}}
-Progress{T <: AbstractFloat} = Tuple{Int,Int,T}
+Progress{T <: AbstractFloat} = Tuple{Int,Int,SubproblemSolution{T}}
 ProgressQueue{T <: AbstractFloat} = RemoteChannel{Channel{Progress{T}}}
 
-function initialize_subproblems!(ph::AbstractProgressiveHedgingSolver, subsolver::QPSolver, penaltyterm::PenaltyTerm, subworkers::Vector{SubWorker{T,A,S,PT}}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+function initialize_subproblems!(ph::AbstractProgressiveHedging,
+                                 subworkers::Vector{SubWorker{T,A,S,PT}},
+                                 scenarioproblems::DistributedScenarioProblems,
+                                 penaltyterm::AbstractPenaltyterm) where {T <: AbstractFloat,
+                                                                          A <: AbstractVector,
+                                                                          S <: MOI.AbstractOptimizer,
+                                                                          PT <: AbstractPenaltyterm}
     # Create subproblems on worker processes
-    m = ph.stochasticprogram
     @sync begin
         for w in workers()
             subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,A,S,PT}}}(1), w)
-            @async load_worker!(scenarioproblems(m), m, w, subworkers[w-1], subsolver, penaltyterm)
+            prev = map(2:(w-1)) do p
+                scenarioproblems.scenario_distribution[p-1]
+            end
+            start_id = isempty(prev) ? 0 : sum(prev)
+            @async remotecall_fetch(initialize_subworker!,
+                                    w,
+                                    subworkers[w-1],
+                                    scenarioproblems[w-1],
+                                    penaltyterm,
+                                    start_id)
         end
-        # Prepare memory
-        log_val = ph.parameters.log
-        ph.parameters.log = false
-        log!(ph)
-        ph.parameters.log = log_val
     end
-    update_iterate!(ph)
-    return ph
+    return nothing
 end
 
-function update_dual_gap!(ph::AbstractProgressiveHedgingSolver, subworkers::Vector{SubWorker{T,A,S,PT}}) where {T <: AbstractFloat, A <: AbstractVector, S <: LQSolver, PT <: PenaltyTerm}
+function update_dual_gap!(ph::AbstractProgressiveHedging,
+                          subworkers::Vector{SubWorker{T,A,S,PT}}) where {T <: AbstractFloat,
+                                                                          A <: AbstractVector,
+                                                                          S <: MOI.AbstractOptimizer,
+                                                                          PT <: AbstractPenaltyterm}
     # Update δ₂
     partial_δs = Vector{Float64}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
-            @async partial_δs[i] = remotecall_fetch((sw,ξ)->begin
-                subproblems = fetch(sw)
-                if length(subproblems) > 0
-                    return sum([s.π*norm(s.x-ξ,2)^2 for s in subproblems])
-                else
-                    return zero(T)
+            @async partial_δs[i] = remotecall_fetch(
+                w,
+                subworkers[w-1],
+                ph.ξ) do sw, ξ
+                    subproblems = fetch(sw)
+                    return mapreduce(+, subproblems, init = zero(T)) do subproblem
+                        π = subproblem.probability
+                        x = subproblem.x
+                        π * norm(x - ph.ξ, 2)^2
+                    end
                 end
-            end,
-            w,
-            subworkers[w-1],
-            ph.ξ)
         end
     end
     ph.data.δ₂ = sum(partial_δs)
     return nothing
 end
 
-function calculate_objective_value(ph::AbstractProgressiveHedgingSolver, subworkers::Vector{<:SubWorker{T}}) where T <: AbstractFloat
+function initialize_subworker!(subworker::SubWorker{T,A,S,PT},
+                               scenarioproblems::ScenarioProblemChannel,
+                               penaltyterm::AbstractPenaltyterm,
+                               start_id::Integer) where {T <: AbstractFloat,
+                                                         A <: AbstractArray,
+                                                         S <: MOI.AbstractOptimizer,
+                                                         PT <: AbstractPenaltyterm}
+    sp = fetch(scenarioproblems)
+    subproblems = Vector{SubProblem{T,A,S,PT}}(undef, num_subproblems(sp))
+    for i = 1:num_subproblems(sp)
+        subproblems[i] = SubProblem(
+            subproblem(sp, i),
+            start_id + i,
+            T(probability(sp, i)),
+            copy(penaltyterm))
+    end
+    put!(subworker, subproblems)
+    return nothing
+end
+
+function restore_subproblems!(subworkers::Vector{<:SubWorker})
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(w, subworkers[w-1]) do sw
+                for subproblem in fetch(sw)
+                    restore_subproblem!(subproblem)
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+function resolve_subproblems!(subworker::SubWorker{T,A,S,PT},
+                              ξ::AbstractVector,
+                              r::AbstractFloat) where {T <: AbstractFloat,
+                                                       A <: AbstractArray,
+                                                       S <: MOI.AbstractOptimizer,
+                                                       PT <: AbstractPenaltyterm}
+    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
+    Qs = Vector{SubproblemSolution{T}}(undef, length(subproblems))
+    # Reformulate and solve sub problems
+    for (i,subproblem) in enumerate(subproblems)
+        reformulate_subproblem!(subproblem, ξ, r)
+        Qs[i] = subproblem(ξ)
+    end
+    # Return current objective value
+    return sum(Qs)
+end
+
+function collect_primals(subworker::SubWorker{T,A,S,PT}, n::Integer) where {T <: AbstractFloat,
+                                                                            A <: AbstractArray,
+                                                                            S <: MOI.AbstractOptimizer,
+                                                                            PT <: AbstractPenaltyterm}
+    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
+    return mapreduce(+, subproblems, init = zeros(T, n)) do subproblem
+        π = subproblem.probability
+        x = subproblem.x
+        π * x
+    end
+end
+
+function calculate_objective_value(subworkers::Vector{<:SubWorker{T}}) where T <: AbstractFloat
     partial_objectives = Vector{Float64}(undef, nworkers())
     @sync begin
-        for (i,w) in enumerate(workers())
-            @async partial_objectives[i] = remotecall_fetch((sw)->begin
-                subproblems = fetch(sw)
-                if length(subproblems) > 0
-                    return sum([get_objective_value(s) for s in subproblems])
-                else
-                    return zero(T)
+        for (i, w) in enumerate(workers())
+            @async partial_objectives[i] = remotecall_fetch(w, subworkers[w-1]) do sw
+                return mapreduce(+, fetch(sw), init = zero(T)) do subproblem
+                    _objective_value(subproblem)
                 end
-            end,
-            w,
-            subworkers[w-1])
+            end
         end
     end
     return sum(partial_objectives)
 end
 
-
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::ScenarioProblems, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
-    j = 0
-    @sync begin
-        for w in workers()
-            n = remotecall_fetch((sw)->length(fetch(sw)), w, subworkers[w-1])
-            for i = 1:n
-                k = i+j
-                @async fill_submodel!(scenarioproblems.problems[k],remotecall_fetch((sw,i,x)->begin
-                    sp = fetch(sw)[i]
-                    get_solution(sp)
-                end,
-                w,
-                subworkers[w-1],
-                i,
-                ph.ξ)..., nrows, ncols)
+function work_on_subproblems!(subworker::SubWorker{T,A,S},
+                              work::Work,
+                              finalize::Work,
+                              progress::ProgressQueue{T},
+                              x̄::RemoteRunningAverage{A},
+                              δ::RemoteRunningAverage{T},
+                              iterates::RemoteIterates{A},
+                              r::IteratedValue{T}) where {T <: AbstractFloat, A <: AbstractArray, S <: MOI.AbstractOptimizer}
+    subproblems::Vector{SubProblem{T,A,S}} = fetch(subworker)
+    if isempty(subproblems)
+       # Workers has nothing do to, return.
+       return nothing
+    end
+    x̄ = fetch(x̄)
+    δ = fetch(δ)
+    quit = false
+    while true
+        t::Int = try
+            if isready(finalize)
+                quit = true
+                take!(finalize)
+            else
+                wait(work)
+                take!(work)
             end
-            j += n
+        catch err
+            if err isa InvalidStateException
+                # Master closed the work/finalize channel. Worker finished
+                return nothing
+            end
         end
-    end
-end
-
-function fill_first_stage!(ph::AbstractProgressiveHedgingSolver, stochasticprogram::StochasticProgram, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
-    μ, λ = remotecall_fetch((sw,nrows,ncols) -> begin
-        subproblem = fetch(sw)[1]
-        μ = try
-            MPB.getreducedcosts(subproblem.solver.lqmodel)[1:ncols]
-        catch
-            fill(NaN, ncols)
+        t == -1 && continue
+        ξ::A = fetch(iterates, t)
+        if t > 1
+            update_subproblems!(subproblems, ξ, fetch(r,t-1))
         end
-        λ = try
-            MPB.getconstrduals(subproblem.solver.lqmodel)[1:nrows]
-        catch
-            fill(NaN, nrows)
+        for (i,subproblem) in enumerate(subproblems)
+            !quit && subtract!(δ, i)
+            !quit && subtract!(x̄, i)
+            x = subproblem.x
+            π = subproblem.probability
+            !quit && add!(δ, i, norm(x - ξ, 2) ^ 2, π)
+            reformulate_subproblem!(subproblem, ξ, fetch(r, t))
+            Q::SubproblemSolution{T} = subproblem(ξ)
+            !quit && add!(x̄, i, π)
+            !quit && put!(progress, (t, subproblem.id, Q))
         end
-        μ, λ
-    end,
-    2,
-    subworkers[1],
-    nrows,
-    ncols)
-    StochasticPrograms.set_first_stage_redcosts!(stochasticprogram, μ)
-    StochasticPrograms.set_first_stage_duals!(stochasticprogram, λ)
-    return nothing
-end
-
-function fill_submodels!(ph::AbstractProgressiveHedgingSolver, scenarioproblems::DScenarioProblems, subworkers::Vector{<:SubWorker}, nrows::Integer, ncols::Integer)
-    @sync begin
-        for w in workers()
-            @async remotecall(fill_submodels!,
-                              w,
-                              subworkers[w-1],
-                              ph.ξ,
-                              scenarioproblems[w-1],
-                              nrows,
-                              ncols)
+        if quit
+            # Worker finished
+            return nothing
         end
-    end
-end
-
-function load_worker!(scenarioproblems::ScenarioProblems,
-                      sp::StochasticProgram,
-                      w::Integer,
-                      worker::SubWorker,
-                      subsolver::QPSolver,
-                      penaltyterm::PenaltyTerm)
-    n = StochasticPrograms.nscenarios(scenarioproblems)
-    (nscen, extra) = divrem(n, nworkers())
-    prev = [nscen + (extra + 2 - p > 0) for p in 2:(w-1)]
-    start = isempty(prev) ? 1 : sum(prev) + 1
-    stop = min(start + nscen + (extra + 2 - w > 0) - 1, n)
-    return remotecall_fetch(initialize_subworker!,
-                            w,
-                            worker,
-                            generator(sp, :stage_1),
-                            generator(sp, :stage_2),
-                            stage_parameters(sp, 1),
-                            stage_parameters(sp, 2),
-                            scenarios(sp)[start:stop],
-                            decision_length(sp),
-                            subsolver,
-                            penaltyterm,
-                            start)
-end
-
-function load_worker!(scenarioproblems::DScenarioProblems,
-                      sp::StochasticProgram,
-                      w::Integer,
-                      worker::SubWorker,
-                      subsolver::QPSolver,
-                      penaltyterm::PenaltyTerm)
-    leading_scen = [scenarioproblems.scenario_distribution[p-1] for p in 2:(w-1)]
-    start_id = isempty(leading_scen) ? 1 : sum(leading_scen)+1
-    return remotecall_fetch(initialize_subworker!,
-                            w,
-                            worker,
-                            generator(sp, :stage_1),
-                            generator(sp, :stage_2),
-                            stage_parameters(sp, 1),
-                            stage_parameters(sp, 2),
-                            scenarioproblems[w-1],
-                            decision_length(sp),
-                            subsolver,
-                            penaltyterm,
-                            start_id)
-end
-
-function initialize_subworker!(subworker::SubWorker{T,A,S,PT},
-                               stage_one_generator::Function,
-                               stage_two_generator::Function,
-                               stage_one_params::Any,
-                               stage_two_params::Any,
-                               scenarios::Vector{<:AbstractScenario},
-                               xdim::Integer,
-                               subsolver::QPSolver,
-                               penaltyterm::PenaltyTerm,
-                               start_id::Integer) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
-    subproblems = Vector{SubProblem{T,A,S,PT}}(undef, length(scenarios))
-    id = start_id
-    solver = get_solver(subsolver)
-    for (i,scenario) = enumerate(scenarios)
-        subproblems[i] = SubProblem(_WS(stage_one_generator, stage_two_generator, stage_one_params, stage_two_params, scenario, solver),
-                                    id,
-                                    probability(scenario),
-                                    xdim,
-                                    solver,
-                                    penaltyterm)
-        id += 1
-    end
-    put!(subworker, subproblems)
-end
-
-function initialize_subworker!(subworker::SubWorker{T,A,S,PT},
-                               stage_one_generator::Function,
-                               stage_two_generator::Function,
-                               stage_one_params::Any,
-                               stage_two_params::Any,
-                               scenarioproblems::ScenarioProblemChannel,
-                               xdim::Integer,
-                               subsolver::QPSolver,
-                               penaltyterm::PenaltyTerm,
-                               start_id::Integer) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
-    sp = fetch(scenarioproblems)
-    subproblems = Vector{SubProblem{T,A,S,PT}}(undef, StochasticPrograms.nscenarios(sp))
-    id = start_id
-    solver = get_solver(subsolver)
-    for (i,scenario) = enumerate(scenarios(sp))
-        subproblems[i] = SubProblem(_WS(stage_one_generator, stage_two_generator, stage_one_params, stage_two_params, scenario, solver),
-                                    id,
-                                    probability(scenario),
-                                    xdim,
-                                    solver,
-                                    penaltyterm)
-        id += 1
-    end
-    put!(subworker, subproblems)
-end
-
-function fill_submodels!(subworker::SubWorker{T,A,S,PT},
-                         x::A,
-                         scenarioproblems::ScenarioProblemChannel,
-                         nrows::Integer,
-                         ncols::Integer) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
-    sp = fetch(scenarioproblems)
-    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
-    for (i, submodel) in enumerate(sp.problems)
-        fill_submodel!(submodel, subproblems[i], nrows, ncols)
-    end
-end
-
-function resolve_subproblems!(subworker::SubWorker{T,A,S,PT}, ξ::AbstractVector, r::AbstractFloat) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
-    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
-    Qs = A(undef, length(subproblems))
-    for (i,subproblem) ∈ enumerate(subproblems)
-        reformulate_subproblem!(subproblem, ξ, r)
-        Qs[i] = subproblem(ξ)
-    end
-    return sum(Qs)
-end
-
-function collect_primals(subworker::SubWorker{T,A,S,PT}, n::Integer) where {T <: AbstractFloat, A <: AbstractArray, S <: LQSolver, PT <: PenaltyTerm}
-    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
-    if length(subproblems) > 0
-        return sum([subproblem.π*subproblem.x for subproblem in subproblems])
-    else
-        return zeros(T,n)
     end
 end

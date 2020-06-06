@@ -37,7 +37,7 @@ function Base.print(io::IO, structure::VerticalBlockStructure{N}) where N
         print(io, "\nStage $s\n")
         print(io, "============== \n")
         for (id, subproblem) in enumerate(subproblems(structure, s))
-            @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(structure, id, s)))
+            @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(structure, id, s))
             print(io, subproblem)
             print(io, "\n")
         end
@@ -50,7 +50,7 @@ function Base.print(io::IO, structure::VerticalBlockStructure{2})
     print(io, "\nSecond-stage \n")
     print(io, "============== \n")
     for (id, subproblem) in enumerate(subproblems(structure))
-        @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(structure, id)))
+        @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(structure, id))
         print(io, subproblem)
         print(io, "\n")
     end

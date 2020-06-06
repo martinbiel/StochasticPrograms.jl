@@ -52,7 +52,7 @@ function initialize_penalty!(ph::AbstractProgressiveHedging, penalty::AdaptivePe
     update_dual_gap!(ph)
     @unpack δ₂ = ph.data
     @unpack ζ = penalty.parameters
-    penalty.data.r = max(1., 2*ζ*abs(calculate_objective_value(ph)))/max(1., δ₂)
+    penalty.data.r = max(1., 2 * ζ *abs(calculate_objective_value(ph)))/max(1., δ₂)
 end
 function update_penalty!(ph::AbstractProgressiveHedging, penalty::AdaptivePenalization)
     @unpack δ₁, δ₂ = ph.data

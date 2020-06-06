@@ -398,17 +398,6 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
     # all occuring decisions.
     unbridged_func = zero(QuadraticDecisionFunction{T,LinearPart{T}})
     variables_to_remove = Vector{Int}()
-    # Affine terms
-    for (i,term) in enumerate(lq.decision_part.terms)
-        unbridged = MOIB.unbridged_variable_function(model, term.variable_index)
-        push!(unbridged_func.linear_quadratic_terms.decision_part.terms,
-              MOI.ScalarAffineTerm(term.coefficient, unbridged.variable))
-        # Check if a mapped variable exists and remove it as well if so
-        j = something(findfirst(t -> t.variable_index == term.variable_index,
-                                lq.variable_part.terms), 0)
-        j != 0 && push!(variables_to_remove, j)
-    end
-    empty!(lq.decision_part.affine_terms)
     # Known/variable cross terms
     for term in f.known_variable_terms.affine_terms
         # Subtract any added variable/decision cross terms
@@ -423,6 +412,7 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
     for term in f.known_decision_terms.affine_terms
         # Subtract any added variable/decision cross terms
         remove_term!(lq.variable_part.terms, term)
+        remove_term!(lq.decision_part.terms, term)
     end
     empty!(f.known_decision_terms.affine_terms)
     for (i, term) in enumerate(f.known_decision_terms.quadratic_terms)
@@ -433,6 +423,17 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
                                       unbridged.variable))
     end
     empty!(f.known_decision_terms.quadratic_terms)
+    # Affine terms
+    for (i,term) in enumerate(lq.decision_part.terms)
+        unbridged = MOIB.unbridged_variable_function(model, term.variable_index)
+        push!(unbridged_func.linear_quadratic_terms.decision_part.terms,
+              MOI.ScalarAffineTerm(term.coefficient, unbridged.variable))
+        # Check if a mapped variable exists and remove it as well if so
+        j = something(findfirst(t -> t.variable_index == term.variable_index,
+                                lq.variable_part.terms), 0)
+        j != 0 && push!(variables_to_remove, j)
+    end
+    empty!(lq.decision_part.affine_terms)
     # Remove terms that come from bridged decisions
     deleteat!(f.variable_part.affine_terms, variables_to_remove)
     # Reset constants
@@ -466,35 +467,8 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
     unbridged_func = zero(QuadraticDecisionFunction{T,QuadraticPart{T}})
     aff_variables_to_remove = Vector{Int}()
     quad_variables_to_remove = Vector{Int}()
-    # Affine terms
-    for (i,term) in enumerate(lq.decision_part.affine_terms)
-        unbridged = MOIB.unbridged_variable_function(model, term.variable_index)
-        push!(unbridged_func.linear_quadratic_terms.decision_part.affine_terms,
-              MOI.ScalarAffineTerm(term.coefficient, unbridged.variable))
-        # Check if a mapped variable exists and remove it as well if so
-        j = something(findfirst(t -> t.variable_index == term.variable_index,
-                                lq.variable_part.terms), 0)
-        j != 0 && push!(aff_variables_to_remove, j)
-    end
-    empty!(lq.decision_part.affine_terms)
-    # Quadratic terms
-    for (i,term) in enumerate(lq.decision_part.quadratic_terms)
-        unbridged_1 = MOIB.unbridged_variable_function(model, term.variable_index_1)
-        unbridged_2 = MOIB.unbridged_variable_function(model, term.variable_index_2)
-        push!(unbridged_func.linear_quadratic_terms.decision_part.quadratic_terms,
-              MOI.ScalarQuadraticTerm(term.coefficient,
-                                      unbridged_1.variable,
-                                      unbridged_2.variable))
-        # Check if a mapped variable exists and remove it as well if so
-        j = something(findfirst(t -> t.variable_index_1 == term.variable_index_1 ||
-                                t.variable_index_2 == term.variable_index_2,
-                                lq.variable_part.quadratic_terms), 0)
-        j != 0 && push!(quad_variables_to_remove, j)
-    end
-    empty!(lq.decision_part.quadratic_terms)
     # Cross terms
     for (i,term) in enumerate(lq.cross_terms.affine_terms)
-        push!(aff_cross_to_remove, i)
         # Subtract any added variable/decision cross terms
         remove_term!(lq.variable_part.affine_terms, term)
     end
@@ -525,6 +499,7 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
     for term in f.known_decision_terms.affine_terms
         # Subtract any added variable/decision cross terms
         remove_term!(lq.variable_part.affine_terms, term)
+        remove_term!(lq.decision_part.affine_terms, term)
     end
     empty!(f.known_decision_terms.affine_terms)
     for (i, term) in enumerate(f.known_decision_terms.quadratic_terms)
@@ -535,6 +510,32 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
                                       unbridged.variable))
     end
     empty!(f.known_decision_terms.quadratic_terms)
+    # Affine decision terms
+    for (i,term) in enumerate(lq.decision_part.affine_terms)
+        unbridged = MOIB.unbridged_variable_function(model, term.variable_index)
+        push!(unbridged_func.linear_quadratic_terms.decision_part.affine_terms,
+              MOI.ScalarAffineTerm(term.coefficient, unbridged.variable))
+        # Check if a mapped variable exists and remove it as well if so
+        j = something(findfirst(t -> t.variable_index == term.variable_index,
+                                lq.variable_part.affine_terms), 0)
+        j != 0 && push!(aff_variables_to_remove, j)
+    end
+    empty!(lq.decision_part.affine_terms)
+    # Quadratic decision terms
+    for (i,term) in enumerate(lq.decision_part.quadratic_terms)
+        unbridged_1 = MOIB.unbridged_variable_function(model, term.variable_index_1)
+        unbridged_2 = MOIB.unbridged_variable_function(model, term.variable_index_2)
+        push!(unbridged_func.linear_quadratic_terms.decision_part.quadratic_terms,
+              MOI.ScalarQuadraticTerm(term.coefficient,
+                                      unbridged_1.variable,
+                                      unbridged_2.variable))
+        # Check if a mapped variable exists and remove it as well if so
+        j = something(findfirst(t -> t.variable_index_1 == term.variable_index_1 ||
+                                t.variable_index_2 == term.variable_index_2,
+                                lq.variable_part.quadratic_terms), 0)
+        j != 0 && push!(quad_variables_to_remove, j)
+    end
+    empty!(lq.decision_part.quadratic_terms)
     # Remove terms that come from bridged decisions
     deleteat!(lq.variable_part.affine_terms, aff_variables_to_remove)
     deleteat!(lq.variable_part.quadratic_terms, quad_variables_to_remove)

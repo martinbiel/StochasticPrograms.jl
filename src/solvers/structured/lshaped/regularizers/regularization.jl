@@ -12,6 +12,14 @@ objective_value(lshaped::AbstractLShaped) = objective_value(lshaped, lshaped.reg
 gap(lshaped::AbstractLShaped) = gap(lshaped, lshaped.regularization)
 process_cut!(lshaped::AbstractLShaped, cut::AbstractHyperPlane) = process_cut!(lshaped, cut, lshaped.regularization)
 # ------------------------------------------------------------
+# Attributes #
+# ------------------------------------------------------------
+struct RawRegularizationParameter <: RegularizationParameter
+    name::Any
+end
+
+struct RegularizationPenaltyterm <: RegularizationParameter end
+
 include("common.jl")
 include("no_regularization.jl")
 include("rd.jl")

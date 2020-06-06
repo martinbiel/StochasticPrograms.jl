@@ -4,51 +4,71 @@
 Functor object for using synchronous execution in an L-shaped algorithm (assuming multiple Julia cores are available). Create by supplying a [`Synchronous`](@ref) object through `execution` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 """
-struct SynchronousExecution{F <: AbstractFeasibility,
+struct SynchronousExecution{H <: AbstractFeasibilityHandler,
                             T <: AbstractFloat,
                             A <: AbstractVector,
-                            S <: LQSolver} <: AbstractExecution
-    subworkers::Vector{SubWorker{F,T,A,S}}
+                            S <: MOI.AbstractOptimizer} <: AbstractLShapedExecution
+    subworkers::Vector{SubWorker{H,T,S}}
+    decisions::Vector{DecisionChannel}
     subobjectives::A
     model_objectives::A
     metadata::Vector{MetaData}
     cutqueue::CutQueue{T}
 
-    function SynchronousExecution(nscenarios::Integer, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-        return new{F,T,A,S}(Vector{SubWorker{F,T,A,S}}(undef, nworkers()),
+    function SynchronousExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+                                  ::Type{F}, ::Type{T},
+                                  ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
+                                                               T <: AbstractFloat,
+                                                               A <: AbstractVector,
+                                                               S <: MOI.AbstractOptimizer}
+        H = HandlerType(F)
+        return new{H,T,A,S}(Vector{SubWorker{H,T,S}}(undef, nworkers()),
+                            scenarioproblems(structure).decisions,
                             A(),
                             A(),
-                            Vector{MetaData}(undef,nworkers()),
-                            RemoteChannel(() -> Channel{QCut{T}}(4*nworkers()*nscenarios)))
+                            Vector{MetaData}(undef, nworkers()),
+                            RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))))
     end
 end
 
 function initialize_subproblems!(execution::SynchronousExecution,
-                                 scenarioproblems::AbstractScenarioProblems,
-                                 x::AbstractVector,
-                                 subsolver::MPB.AbstractMathProgSolver)
-    load_subproblems!(execution.subworkers, scenarioproblems, x, subsolver)
+                                 scenarioproblems::DistributedScenarioProblems,
+                                 tolerance::AbstractFloat)
+    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions, tolerance)
     return nothing
 end
 
-function finish_initilization!(lshaped::AbstractLShapedSolver, execution::SynchronousExecution)
-    append!(execution.subobjectives, fill(1e10, nthetas(lshaped)))
-    append!(execution.model_objectives, fill(-1e10, nthetas(lshaped)))
+function finish_initilization!(lshaped::AbstractLShaped, execution::SynchronousExecution)
+    append!(execution.subobjectives, fill(1e10, num_thetas(lshaped)))
+    append!(execution.model_objectives, fill(-1e10, num_thetas(lshaped)))
     for w in workers()
         execution.metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
     end
     return lshaped
 end
 
-function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::SynchronousExecution{F,T}) where {F <: AbstractFeasibility, T <: AbstractFloat}
+function restore_subproblems!(::AbstractLShaped, execution::SynchronousExecution)
+    restore_subproblems!(execution.subworkers)
+    return nothing
+end
+
+function resolve_subproblems!(lshaped::AbstractLShaped, execution::SynchronousExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     # Update metadata
     for w in workers()
         put!(execution.metadata[w-1], timestamp(lshaped), :gap, gap(lshaped))
     end
     @sync begin
         for (i,w) in enumerate(workers())
-            worker_aggregator = remote_aggregator(lshaped.aggregation, scenarioproblems(lshaped.stochasticprogram), w)
-            remotecall_fetch(resolve_subproblems!, w, execution.subworkers[w-1], lshaped.x, execution.cutqueue, worker_aggregator, timestamp(lshaped), execution.metadata[w-1])
+            worker_aggregator = remote_aggregator(lshaped.aggregation, scenarioproblems(lshaped.structure), w)
+            @async remotecall_fetch(resolve_subproblems!,
+                                    w,
+                                    execution.subworkers[w-1],
+                                    execution.decisions[w-1],
+                                    lshaped.x,
+                                    execution.cutqueue,
+                                    worker_aggregator,
+                                    timestamp(lshaped),
+                                    execution.metadata[w-1])
         end
     end
     # Assume no cuts are added
@@ -62,18 +82,15 @@ function resolve_subproblems!(lshaped::AbstractLShapedSolver, execution::Synchro
     return current_objective_value(lshaped), added
 end
 
-function calculate_objective_value(lshaped::AbstractLShapedSolver, execution::SynchronousExecution)
-    return get_obj(lshaped)⋅decision(lshaped) + eval_second_stage(execution.subworkers, decision(lshaped))
-end
-
-function fill_submodels!(lshaped::AbstractLShapedSolver, scenarioproblems, execution::SynchronousExecution)
-    return fill_submodels!(execution.subworkers, decision(lshaped), scenarioproblems)
-end
-
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(nscenarios::Integer, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: LQSolver}
-    return SynchronousExecution(nscenarios, F, T, A, S)
+function (execution::Synchronous)(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+                                  ::Type{F}, ::Type{T},
+                                  ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
+                                                               T <: AbstractFloat,
+                                                               A <: AbstractVector,
+                                                               S <: MOI.AbstractOptimizer}
+    return SynchronousExecution(structure, F, T, A, S)
 end
 
 function str(::Synchronous)

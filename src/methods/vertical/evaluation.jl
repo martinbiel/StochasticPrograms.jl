@@ -52,10 +52,10 @@ function _eval_second_stages(structure::VerticalBlockStructure{2,1,Tuple{SP}},
                 sp[w-1],
                 sp.decisions[w-1],
                 decision,
-                sense) do (sp,d,x,sense)
+                sense) do sp, d, x, sense
                     scenarioproblems = fetch(sp)
                     decisions = fetch(d)
-                    num_scenarios(scenarioproblems) && return 0.0
+                    num_scenarios(scenarioproblems) == 0 && return 0.0
                     update_known_decisions!(decisions, x)
                     map(subprob -> update_known_decisions!(subprob), subproblems(scenarioproblems))
                     return outcome_mean(subproblems(scenarioproblems),
@@ -86,7 +86,7 @@ function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,SP},
                 sp[w-1],
                 sp.decisions[w-1],
                 decision,
-                sense) do (sp,d,x,sense)
+                sense) do sp, d, x, sense
                     scenarioproblems = fetch(sp)
                     decisions = fetch(d)
                     num_scenarios(scenarioproblems) == 0 && return zero(eltype(x)), zero(eltype(x)), zero(eltype(x)), zero(Int)

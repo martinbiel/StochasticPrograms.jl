@@ -4,13 +4,11 @@ StochasticPrograms.num_subproblems(ph::AbstractProgressiveHedging) = StochasticP
 
 # Initialization #
 # ======================================================================== #
-function initialize!(ph::AbstractProgressiveHedging, penaltyterm::PenaltyTerm)
+function initialize!(ph::AbstractProgressiveHedging, penaltyterm::AbstractPenaltyterm)
     # Initialize progress meter
     ph.progress.thresh = ph.parameters.τ
     # Initialize subproblems
     initialize_subproblems!(ph, scenarioproblems(ph.structure), penaltyterm)
-    # Initial reduction
-    update_iterate!(ph)
     # Initialize penalty parameter (if applicable)
     ph.data.δ₁ = 1.0
     initialize_penalty!(ph)

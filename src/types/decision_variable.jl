@@ -84,7 +84,7 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariabl
                  dvar::DecisionVariable)
     check_belongs_to_model(dvar, stochasticprogram)
     if MOI.is_set_by_optimize(attr)
-        _check_provided_optimizer(stochasticprogram.optimizer)
+        check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         end
@@ -96,7 +96,7 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractConstra
                  cr::ConstraintRef{<:StochasticProgram})
     check_belongs_to_model(cr, stochasticprogram)
     if MOI.is_set_by_optimize(attr)
-        _check_provided_optimizer(stochasticprogram.optimizer)
+        check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         end

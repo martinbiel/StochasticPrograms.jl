@@ -193,7 +193,7 @@ See also: [`VRP`](@ref)
 """
 function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been initialized at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
@@ -268,7 +268,7 @@ Return the optimal recourse decision of `stochasticprogram` corresponding to the
 #                                    decision::AbstractVector,
 #                                    scenario::AbstractScenario)
 #     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     _check_provided_optimizer(stochasticprogram.optimizer)
+#     check_provided_optimizer(stochasticprogram.optimizer)
 #     # Sanity checks on given decision vector
 #     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
 #     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -297,7 +297,7 @@ Return the objective value associated with result index result of the most-recen
 """
 function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Switch on termination status
     status = JuMP.termination_status(stochasticprogram)
     if status != MOI.OPTIMAL
@@ -327,7 +327,7 @@ See also: [`StochasticSolution`](@ref)
 #                         confidence::AbstractFloat = 0.95,
 #                         kwargs...)
 #     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     _check_provided_optimizer(provided_optimizer(stochasticmodel))
+#     check_provided_optimizer(provided_optimizer(stochasticmodel))
 #     # Switch on solver type
 #     return _optimize!(stochasticmodel, sampler, confidence, provided_optimizer(stochasticmodel); kwargs...)
 # end
@@ -363,7 +363,7 @@ See also: [`StochasticSolution`](@ref)
 # """
 # function optimal_decision(stochasticmodel::StochasticModel)
 #     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     _check_provided_optimizer(provided_optimizer(stochasticmodel))
+#     check_provided_optimizer(provided_optimizer(stochasticmodel))
 #     return optimal_decision(optimizer(stochasticmodel))
 # end
 # """
@@ -373,7 +373,7 @@ See also: [`StochasticSolution`](@ref)
 # """
 # function optimal_value(stochasticmodel::StochasticModel)
 #     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     _check_provided_optimizer(provided_optimizer(stochasticmodel))
+#     check_provided_optimizer(provided_optimizer(stochasticmodel))
 #     return optimal_value(optimizer(stochasticmodel))
 # end
 """
@@ -606,7 +606,7 @@ distributed(stochasticprogram::StochasticProgram, s::Integer = 2) = distributed(
 
 Return true if `stochasticprogram` is not fully generated.
 """
-deferred(stochasticprogram::StochasticProgram) = deferred(structure(stochasticprogram))
+deferred(stochasticprogram::StochasticProgram) = num_scenarios(stochasticprogram) == 0 || deferred(structure(stochasticprogram))
 """
     optimizer_constructor(stochasticmodel::StochasticModel)
 
@@ -655,12 +655,12 @@ function master_optimizer(stochasticprogram::StochasticProgram)
     return master_optimizer(stochasticprogram.optimizer)
 end
 """
-    sub_optimizer(stochasticprogram::StochasticProgram)
+    subproblem_optimizer(stochasticprogram::StochasticProgram)
 
 Return a MOI optimizer for solving subproblems using the currently provided optimizer of `stochasticprogram`.
 """
-function sub_optimizer(stochasticprogram::StochasticProgram)
-    return sub_optimizer(stochasticprogram.optimizer)
+function subproblem_optimizer(stochasticprogram::StochasticProgram)
+    return subproblem_optimizer(stochasticprogram.optimizer)
 end
 """
     optimizer(stochasticprogram::StochasticProgram)
@@ -678,6 +678,32 @@ Return the optimizer attached to `stochasticmodel`.
 function optimizer(stochasticmodel::StochasticModel)
     return stochasticmodel.optimizer.optimizer
 end
+"""
+    get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the solver-specific attribute named `name`.
+
+See also: [`set_optimizer_attribute!`](@ref), [`set_optimizer_attributes!`](@ref).
+"""
+function get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
+    return get_optimizer_attribute(stochasticprogram, MOI.RawParameter(name))
+end
+
+"""
+    get_optimizer_attribute(
+        stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute
+    )
+
+Return the value of the solver-specific attribute `attr` in `stochasticprogram`.
+
+See also: [`set_optimizer_attribute!`](@ref), [`set_optimizer_attributes!`](@ref).
+"""
+function get_optimizer_attribute(
+    stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute
+)
+    return MOI.get(stochasticprogram, attr)
+end
+
 # ========================== #
 
 # Setters
@@ -696,15 +722,34 @@ end
 
 Set the optimizer of the `stochasticprogram`.
 """
-function set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
-    if stochasticprogram.optimizer.optimizer isa LShaped.Optimizer
-        if stochasticprogram.optimizer.optimizer.lshaped != nothing
-            LShaped.restore_master!(stochasticprogram.optimizer.optimizer.lshaped)
-        end
-    end
+function JuMP.set_optimizer(stochasticprogram::StochasticProgram, optimizer)
     set_optimizer!(stochasticprogram.optimizer, optimizer)
-    set_optimizer!(stochasticprogram.structure, stochasticprogram.optimizer.optimizer)
+    master_opt = master_optimizer(stochasticprogram)
+    if master_opt != nothing
+        set_master_optimizer!(structure(stochasticprogram), master_opt)
+    end
+    sub_opt = subproblem_optimizer(stochasticprogram)
+    if sub_opt != nothing
+        set_subproblem_optimizer!(structure(stochasticprogram), sub_opt)
+    end
     return nothing
+end
+function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, MOI.RawParameter(name), value)
+end
+function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
+    return MOI.set(stochasticprogram, attr, value)
+end
+function set_optimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_optimizer_attribute(stochasticprogram, name, value)
+    end
+end
+function JuMP.set_silent(stochasticprogram::StochasticProgram)
+    return MOI.set(stochasticprogram, MOI.Silent(), true)
+end
+function JuMP.unset_silent(stochasticprogram::StochasticProgram)
+    return MOI.set(stochasticprogram, MOI.Silent(), false)
 end
 """
     add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2)

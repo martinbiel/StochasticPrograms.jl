@@ -59,9 +59,9 @@ See also: [`WS`](@ref)
 """
 function wait_and_see_decision(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve WS model for supplied scenario
-    ws_model = WS(stochasticprogram, scenario, optimizer = sub_optimizer(stochasticprogram))
+    ws_model = WS(stochasticprogram, scenario, optimizer = subproblem_optimizer(stochasticprogram))
     optimize!(ws_model)
     # Return WS decision
     return JuMP.value.(all_decision_variables(ws_model))
@@ -79,7 +79,7 @@ See also: [`VRP`](@ref), [`WS`](@ref)
 """
 function EWS(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve all possible WS models and compute EWS
     return EWS(stochasticprogram, structure(stochasticprogram))
 end
@@ -92,7 +92,7 @@ function EWS(stochasticprogram::StochasticProgram, structure::AbstractStochastic
                  stage_parameters(stochasticprogram, 2),
                  scenario,
                  Decisions(),
-                 sub_optimizer(stochasticprogram))
+                 subproblem_optimizer(stochasticprogram))
         optimize!(ws)
         probability(scenario)*objective_value(ws)
     end
@@ -108,7 +108,7 @@ See also: [`VRP`](@ref), [`WS`](@ref)
 """
 function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, N::Integer)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Generate a sample model and statistically evaluate EWS
     let eval_model = sample(stochasticmodel, sampler, N; optimizer = optimizer_constructor(stochasticmodel), kw...)
         𝔼WS, σ = statistical_EWS(eval_model, structure(eval_model))
@@ -127,7 +127,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram, structure::Abstra
                  stage_parameters(stochasticprogram, 2),
                  scenario,
                  Decisions(),
-                 sub_optimizer(stochasticprogram))
+                 subproblem_optimizer(stochasticprogram))
     end
     return welford(ws_models, probability.(scenarios(stochasticprogram)))
 end
@@ -174,7 +174,7 @@ See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
 function VRP(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve DEP
     optimize!(stochasticprogram)
     # Return optimal value
@@ -191,7 +191,7 @@ See also: [`EVPI`](@ref), [`VSS`](@ref), [`EWS`](@ref)
 """
 function VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Optimize stochastic model using sample-based method
     ss = optimize!(stochasticmodel, sampler; confidence = confidence)
     return confidence_interval(ss)
@@ -207,7 +207,7 @@ See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
 function EVPI(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Calculate VRP
     vrp = VRP(stochasticprogram)
     # Solve all possible WS models and calculate EWS
@@ -226,7 +226,7 @@ See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
 function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, tol::AbstractFloat = 1e-1, kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = (1-confidence)/2
     # Calculate confidence interval around VRP
@@ -278,7 +278,7 @@ See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
 function expected_value_decision(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP
     evp = EVP(stochasticprogram, optimizer = master_optimizer(stochasticprogram))
     optimize!(evp)
@@ -296,7 +296,7 @@ See also: [`EVP`](@ref), [`expected_value_decision`](@ref), [`EEV`](@ref)
 """
 function EV(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP model
     evp = EVP(stochasticprogram, optimizer = master_optimizer(stochasticprogram))
     optimize!(evp)
@@ -314,7 +314,7 @@ See also: [`EVP`](@ref), [`EV`](@ref)
 """
 function EEV(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP model
     evp_decision = expected_value_decision(stochasticprogram)
     # Calculate EEV by evaluating the EVP decision
@@ -335,7 +335,7 @@ See also: [`EVP`](@ref), [`EV`](@ref)
 """
 function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, N::Integer = 100, Ñ::Integer = 1000)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     sp = sample(stochasticmodel, sampler, N)
     x̄ = expected_value_decision(sp, optimizer_factory)
     return evaluate_decision(stochasticmodel, x̄, sampler, optimizer_factory; confidence = confidence, Ñ = Ñ)
@@ -349,7 +349,7 @@ In other words, calculate the gap between `EEV` and `VRP`. If an optimizer has n
 """
 function VSS(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Solve EVP and determine EEV
     eev = EEV(stochasticprogram)
     # Calculate VRP
@@ -370,7 +370,7 @@ See also: [`VRP`](@ref), [`EEV`](@ref), [`EVPI`](@ref)
 """
 function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, Ñ::Integer = 1000, tol::AbstractFloat = 1e-1, kwargs...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Condidence level
     α = (1-confidence)/2
     # Calculate confidence interval around VRP

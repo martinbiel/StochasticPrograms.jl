@@ -262,7 +262,7 @@ function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
     f_lq.variable_part.constant = op(f_lq.variable_part.constant, g_lq.variable_part.constant)
     # Decision part
     _operate_terms!(op, f_lq.decision_part, g_lq.decision_part)
-    lq.decision_part.constant = op(lq.decision_part.constant, g_lq.decision_part.constant)
+    f_lq.decision_part.constant = op(f_lq.decision_part.constant, g_lq.decision_part.constant)
     # Cross terms
     _operate_terms!(op, f_lq.cross_terms, g_lq.cross_terms)
     # Known part

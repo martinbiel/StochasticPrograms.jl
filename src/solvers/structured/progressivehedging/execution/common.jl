@@ -1,4 +1,4 @@
-function iterate!(ph::AbstractProgressiveHedging, ::AbstractExecution)
+function iterate!(ph::AbstractProgressiveHedging, ::AbstractProgressiveHedgingExecution)
     # Resolve all subproblems at the current optimal solution
     Q = resolve_subproblems!(ph)
     if Q.status != MOI.OPTIMAL
@@ -31,10 +31,26 @@ function iterate!(ph::AbstractProgressiveHedging, ::AbstractExecution)
     return nothing
 end
 
-function start_workers!(::AbstractProgressiveHedging, ::AbstractExecution)
+function finish_initilization!(execution::AbstractProgressiveHedgingExecution, penalty::AbstractFloat)
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(
+                w,
+                execution.subworkers[w-1],
+                penalty) do sw, penalty
+                    for subproblem in fetch(sw)
+                        initialize!(subproblem, penalty)
+                    end
+                end
+        end
+    end
     return nothing
 end
 
-function close_workers!(::AbstractProgressiveHedging, ::AbstractExecution)
+function start_workers!(::AbstractProgressiveHedging, ::AbstractProgressiveHedgingExecution)
+    return nothing
+end
+
+function close_workers!(::AbstractProgressiveHedging, ::AbstractProgressiveHedgingExecution)
     return nothing
 end

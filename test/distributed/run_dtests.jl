@@ -21,4 +21,4 @@ using GLPK
 
 include("../problems/problem_load.jl")
 include("dfunctional_tests.jl")
-#include("dsolver_tests.jl")
+include("dsolver_tests.jl")

@@ -34,7 +34,7 @@ function generate!(stochasticprogram::TwoStageStochasticProgram, structure::Hori
                              stage_parameters(stochasticprogram, 1),
                              stage_parameters(stochasticprogram, 2),
                              structure.decisions[stage - 1],
-                             sub_optimizer(stochasticprogram))
+                             subproblem_optimizer(stochasticprogram))
     end
     return nothing
 end
@@ -74,21 +74,21 @@ function generate_horizontal!(scenarioproblems::DistributedScenarioProblems,
                 stage_one_params,
                 stage_two_params,
                 scenarioproblems.decisions[w-1],
-                optimizer) do (sp,gen_one,gen_two,one_params,two_params,decisions,opt)
-                    generate!(fetch(sp),
-                              gen_one,
-                              gen_two,
-                              one_params,
-                              two_params,
-                              decisions,
-                              opt)
+                optimizer) do sp, gen_one, gen_two, one_params, two_params, decisions, opt
+                    generate_horizontal!(fetch(sp),
+                                         gen_one,
+                                         gen_two,
+                                         one_params,
+                                         two_params,
+                                         fetch(decisions),
+                                         opt)
                 end
         end
     end
     return nothing
 end
 
-function clear(structure::HorizontalBlockStructure{N}) where N
+function clear!(structure::HorizontalBlockStructure{N}) where N
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)
@@ -98,10 +98,6 @@ end
 
 function clear_stage!(structure::HorizontalBlockStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    if s == 1
-        empty!(first_stage(stochasticprogram))
-    else
-        clear!(scenarioproblems(structure, s))
-    end
+    clear!(scenarioproblems(structure, s))
     return nothing
 end

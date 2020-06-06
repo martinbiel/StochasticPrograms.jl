@@ -27,7 +27,7 @@ Functor object for using level-set regularization in an L-shaped algorithm. Crea
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
-struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: PenaltyTerm} <: AbstractRegularization
+struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization
     data::LVData{T}
     parameters::LVParameters{T}
 
@@ -41,7 +41,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: PenaltyTerm} <: A
 
     penaltyterm::PT
 
-    function LevelSet(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::PenaltyTerm; kw...)
+    function LevelSet(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyterm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -146,12 +146,10 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
     status = solve_master!(lshaped)
     if status != MOI.OPTIMAL
         # Early termination
-        print(lshaped.structure.first_stage)
         return nothing
     end
-    # Update master solution
-    update_solution!(lshaped)
-    θ = calculate_estimate(lshaped)
+    # Update model objective
+    θ = MOI.get(lshaped.master, MOI.ObjectiveValue())
     lshaped.data.θ = θ
     # Calculate new level
     L = (1-λ)*θ + λ*Q̃
@@ -171,6 +169,18 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
     return nothing
 end
 
+function process_cut!(lshaped::AbstractLShaped, cut::AnyOptimalityCut, lv::LevelSet)
+    if lshaped.execution isa AsynchronousExecution
+        # Shift level by cut value to prevent infeasibility
+        increment = cut(lshaped.x)
+        if !iszero(lv.data.constraint.value)
+            L = MOI.get(lshaped.master, MOI.ConstraintSet(), lv.data.constraint)
+            MOI.set(lshaped.master, MOI.ConstraintSet(), lv.data.constraint, MOIU.shift_constant(L, -increment))
+        end
+    end
+    return nothing
+end
+
 function str(::LevelSet)
     return "L-shaped using level sets"
 end
@@ -183,28 +193,25 @@ end
 Factory object for [`LevelSet`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `LV`, `WithLV`, `LevelSet`, `WithLevelSets`. See ?LevelSet for parameter descriptions.
 
 """
-struct LV <: AbstractRegularizer
-    penaltyterm::PenaltyTerm
-    parameters::Dict{Symbol,Any}
+mutable struct LV <: AbstractRegularizer
+    penaltyterm::AbstractPenaltyterm
+    parameters::LVParameters{Float64}
 end
-LV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, Dict{Symbol,Any}(kw))
-WithLV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, Dict{Symbol,Any}(kw))
-LevelSet(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, Dict{Symbol,Any}(kw))
-WithLevelSets(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, Dict{Symbol,Any}(kw))
+LV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
+WithLV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
+LevelSet(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
+WithLevelSets(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
 
-function add_regularization_params!(regularizer::LV; kwargs...)
-    push!(regularizer.parameters, kwargs...)
-    for (k,v) in kwargs
-        if k == :penaltyterm
-            setfield!(regularizer, k, v)
-            delete!(regularizer.parameters, k)
-        end
-    end
-    return nothing
+function MOI.get(lv::LV, ::RegularizationPenaltyterm)
+    return lv.penaltyterm
+end
+
+function MOI.set(lv::LV, ::RegularizationPenaltyterm, penaltyterm::AbstractPenaltyterm)
+    return lv.penaltyterm = penaltyterm
 end
 
 function (lv::LV)(decisions::Decisions, x::AbstractVector)
-    return LevelSet(decisions, x, lv.penaltyterm; lv.parameters...)
+    return LevelSet(decisions, x, lv.penaltyterm; type2dict(lv.parameters)...)
 end
 
 function str(::LV)

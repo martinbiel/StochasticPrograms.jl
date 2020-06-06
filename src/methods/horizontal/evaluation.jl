@@ -23,7 +23,7 @@ function _eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
                 w,
                 sp[w-1],
                 sp.decisions[w-1],
-                decision) do (sp, d, x)
+                decision) do sp, d, x
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) && return 0.0
                     take_decisions!(fetch(d), x)
@@ -53,7 +53,7 @@ function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,SP},
                 w,
                 sp[w-1],
                 sp.decisions[w-1],
-                x) do (sp,d,x)
+                x) do sp, d, x
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
                     take_decisions!(fetch(d), x)

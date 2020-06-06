@@ -30,7 +30,7 @@ Functor object for using regularized decomposition regularization in an L-shaped
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
-struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: PenaltyTerm} <: AbstractRegularization
+struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization
     data::RDData{T}
     parameters::RDParameters{T}
 
@@ -44,7 +44,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: P
 
     penaltyterm::PT
 
-    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::PenaltyTerm; kw...)
+    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyterm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -154,28 +154,25 @@ end
 Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `RD`, `WithRD`, `RegularizedDecomposition`, `WithRegularizedDecomposition`. See ?RegularizedDecomposition for parameter descriptions.
 
 """
-struct RD <: AbstractRegularizer
-    penaltyterm::PenaltyTerm
-    parameters::Dict{Symbol,Any}
+mutable struct RD <: AbstractRegularizer
+    penaltyterm::AbstractPenaltyterm
+    parameters::RDParameters{Float64}
 end
-RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
-WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
-RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
-WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, Dict{Symbol,Any}(kw))
+RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
+WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
+RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
+WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
 
-function add_regularization_params!(regularizer::RD; kwargs...)
-    push!(regularizer.parameters, kwargs...)
-    for (k,v) in kwargs
-        if k == :penaltyterm
-            setfield!(regularizer, k, v)
-            delete!(regularizer.parameters, k)
-        end
-    end
-    return nothing
+function MOI.get(rd::RD, ::RegularizationPenaltyterm)
+    return rd.penaltyterm
+end
+
+function MOI.set(rd::RD, ::RegularizationPenaltyterm, penaltyterm::AbstractPenaltyterm)
+    return rd.penaltyterm = penaltyterm
 end
 
 function (rd::RD)(decisions::Decisions, x::AbstractVector)
-    return RegularizedDecomposition(decisions, x, rd.penaltyterm; rd.parameters...)
+    return RegularizedDecomposition(decisions, x, rd.penaltyterm; type2dict(rd.parameters)...)
 end
 
 function str(::RD)

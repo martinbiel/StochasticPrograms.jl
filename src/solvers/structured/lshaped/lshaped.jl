@@ -11,18 +11,18 @@ using Parameters
 using JuMP
 using MathOptInterface
 using StochasticPrograms
-using StochasticPrograms: UnspecifiedInstantiation, VerticalBlockStructure, BlockVertical, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
-using StochasticPrograms: Execution, Serial, Synchronous, Asynchronous
-using StochasticPrograms: AbstractStructuredOptimizer
+using StochasticPrograms: UnspecifiedInstantiation, VerticalBlockStructure, BlockVertical, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
+using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
+using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubproblemOptimizer
 using StochasticPrograms: SingleDecisionSet, update_decision_constraint!
 using StochasticPrograms: set_known_decision!, update_known_decisions!, SingleKnownSet, KnownModification, KnownValuesChange
 using StochasticPrograms: add_subscript
-using StochasticPrograms: PenaltyTerm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!
+using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!
 using ProgressMeter
 using Clustering
 
 import Base: show, put!, wait, isready, take!, fetch, zero, +, length, size
-import StochasticPrograms: supports_structure, default_structure, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, sub_optimizer, num_subproblems
+import StochasticPrograms: supports_structure, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
@@ -32,18 +32,11 @@ const CutConstraint = CI{AffineDecisionFunction{Float64}, MOI.GreaterThan{Float6
 export
     num_cuts,
     num_iterations,
-    add_params!,
-    optimsolver,
-    hyperoptimal_lshaped,
-    optimize_structured!,
-    fill_solution!,
-    Serial,
-    Synchronous,
-    Asynchronous,
-    Quadratic,
-    Linearized,
-    InfNorm,
-    ManhattanNorm,
+    FeasibilityCuts,
+    Regularizer,
+    RegularizationParameter,
+    set_regularization_attribute,
+    set_regularization_attributes,
     DontRegularize,
     NoRegularization,
     RegularizedDecomposition,
@@ -58,12 +51,20 @@ export
     WithLevelSets,
     LV,
     WithLV,
+    Consolidator,
     DontConsolidate,
     Consolidate,
     Consolidation,
+    ConsolidationParameter,
+    set_consolidation_attribute,
+    set_consolidation_attributes,
     at_tolerance,
     num_iters,
     tolerance_reached,
+    Aggregator,
+    AggregationParameter,
+    set_aggregation_attribute,
+    set_aggregation_attributes,
     DontAggregate,
     NoAggregation,
     PartialAggregate,

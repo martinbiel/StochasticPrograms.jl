@@ -1,6 +1,27 @@
 abstract type AbstractConsolidation end
 abstract type AbstractConsolidator end
 
+struct RawConsolidationParameter <: ConsolidationParameter
+    name::Any
+end
+
+function MOI.get(consolidator::AbstractConsolidator, param::RawConsolidationParameter)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(consolidator)))
+        error("Unrecognized parameter name: $(name) for consolidator $(typeof(consolidator)).")
+    end
+    return getfield(consolidator, name)
+end
+
+function MOI.set(consolidator::AbstractConsolidator, param::RawConsolidationParameter, value)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(consolidator)))
+        error("Unrecognized parameter name: $(name) for consolidator $(typeof(consolidator)).")
+    end
+    setfield!(consolidator, name, value)
+    return nothing
+end
+
 # No consolidation
 # ------------------------------------------------------------
 """
@@ -170,7 +191,7 @@ end
 Factory object for [`Consolidation`](@ref). Pass to `consolidate` in the `LShapedSolver` factory function. See ?Consolidation for parameter descriptions.
 
 """
-struct Consolidate <: AbstractConsolidator
+mutable struct Consolidate <: AbstractConsolidator
     redundance_treshold::Float64
     consolidation_trigger::Int
     rebuild::Function

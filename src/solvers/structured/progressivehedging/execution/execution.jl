@@ -1,7 +1,7 @@
-abstract type AbstractExecution end
+abstract type AbstractProgressiveHedgingExecution end
 # Execution API #
 # ------------------------------------------------------------
-initialize_subproblems!(ph::AbstractProgressiveHedging, scenarioproblems::AbstractScenarioProblems, penaltyterm::PenaltyTerm) = initialize_subproblems!(ph.execution, scenarioproblems, penaltyterm)
+initialize_subproblems!(ph::AbstractProgressiveHedging, scenarioproblems::AbstractScenarioProblems, penaltyterm::AbstractPenaltyterm) = initialize_subproblems!(ph, ph.execution, scenarioproblems, penaltyterm)
 finish_initilization!(ph::AbstractProgressiveHedging, penalty::AbstractFloat) = finish_initilization!(ph.execution, penalty)
 restore_subproblems!(ph::AbstractProgressiveHedging) = restore_subproblems!(ph, ph.execution)
 iterate!(ph::AbstractProgressiveHedging) = iterate!(ph, ph.execution)
@@ -15,8 +15,7 @@ calculate_objective_value(ph::AbstractProgressiveHedging) = calculate_objective_
 # ------------------------------------------------------------
 include("common.jl")
 include("serial.jl")
-# include("distributed.jl")
-# include("channels.jl")
-# include("worker.jl")
-# include("synchronous.jl")
-# include("asynchronous.jl")
+include("channels.jl")
+include("distributed.jl")
+include("synchronous.jl")
+include("asynchronous.jl")

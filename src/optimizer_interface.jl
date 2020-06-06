@@ -1,6 +1,24 @@
 # Structured optimizer interface
 # ========================== #
 """
+    supports_structure(optimizer::StochasticProgramOptimizerType, structure::AbstractStochasticStructure)
+
+Return a `Bool` indicating whether `optimizer` supports the stochastic `structure`. That is, `load_structure!(optimizer, structure)` will not throw `UnsupportedStructure`
+"""
+function supports_structure(optimizer::StochasticProgramOptimizerType, structure::AbstractStochasticStructure)
+    return false
+end
+"""
+    check_loadable(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure)
+
+Throws an `UnloadableStructure` exception if `structure` is not loadable by `optimizer`.
+
+    See also: [`load_structure!`](@ref)
+"""
+function check_loadable(optimizer::AbstractStructuredOptimizer)
+    throw(MethodError(is_loadable, optimizer))
+end
+"""
     load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure, x₀::AbstractVector)
 
 Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure` and inital decision `x₀`.
@@ -55,12 +73,12 @@ function master_optimizer(optimizer::AbstractStructuredOptimizer)
     return throw(MethodError(master_optimizer, optimizer))
 end
 """
-    master_optimizer(optimizer::AbstractStructuredOptimizer)
+   subproblem_optimizer(optimizer::AbstractStructuredOptimizer)
 
 Return a MOI optimizer constructor for solving subproblems
 """
-function sub_optimizer(optimizer::AbstractStructuredOptimizer)
-    return throw(MethodError(sub_optimizer, optimizer))
+function subproblem_optimizer(optimizer::AbstractStructuredOptimizer)
+    return throw(MethodError(subproblem_optimizer, optimizer))
 end
 # # Sample-based solver interface
 # # ========================== #

@@ -33,60 +33,92 @@ Progressive Hedging Time: 0:00:06 (1315 iterations)
 :Optimal
 ```
 """
-mutable struct Optimizer{E <: Execution,
-                         P <: AbstractPenalizer,
-                         PT <: PenaltyTerm} <: AbstractStructuredOptimizer
-    optimizer
-    execution::E
-    penalization::P
-    penaltyterm::PT
-    parameters::Dict{Symbol,Any}
+mutable struct Optimizer <: AbstractStructuredOptimizer
+    subproblem_optimizer
+    execution::AbstractExecution
+    penalizer::AbstractPenalizer
+    penaltyterm::AbstractPenaltyterm
+    parameters::ProgressiveHedgingParameters{Float64}
 
     status::MOI.TerminationStatusCode
     progressivehedging::Union{AbstractProgressiveHedging, Nothing}
 
-    function Optimizer(optimizer;
-                       execution::Execution = Serial(),
+    function Optimizer(; subproblem_optimizer = nothing,
+                       execution::AbstractExecution = nworkers() == 1 ? Serial() : Synchronous(),
                        penalty::AbstractPenalizer = Fixed(),
-                       penaltyterm::PenaltyTerm = Quadratic(),
-                       kwargs...)
-        E = typeof(execution)
-        P = typeof(penalty)
-        PT = typeof(penaltyterm)
-        return new{E, P, PT}(optimizer,
-                             execution,
-                             penalty,
-                             penaltyterm,
-                             Dict{Symbol,Any}(kwargs),
-                             MOI.OPTIMIZE_NOT_CALLED,
-                             nothing)
+                       penaltyterm::AbstractPenaltyterm = Quadratic(),
+                       kw...)
+        return new(subproblem_optimizer,
+                   execution,
+                   penalty,
+                   penaltyterm,
+                   ProgressiveHedgingParameters{Float64}(; kw...),
+                   MOI.OPTIMIZE_NOT_CALLED,
+                   nothing)
     end
 end
 
 # Interface #
 # ========================== #
-function supports_structure(::Optimizer, ::HorizontalBlockStructure)
+function supports_structure(optimizer::Optimizer, ::HorizontalBlockStructure{2, 1, <:Tuple{ScenarioProblems}})
+    if optimizer.execution isa Serial
+        return true
+    end
+    @warn "Distributed execution policies are not compatible with a single-core horizontal structure. Consider setting the execution policy to `Serial` or re-instantiate the stochastic program on worker cores."
+    return false
+end
+
+function supports_structure(optimizer::Optimizer, ::HorizontalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
+    if optimizer.execution isa Serial
+        @warn "Serial execution not compatible with distributed horizontal structure. Consider setting the execution policy to `Synchronous` or `Asynchronous` or re-instantiate the stochastic program on a single core."
+        return false
+    end
     return true
 end
 
-function default_structure(::UnspecifiedInstantiation, ::Optimizer)
-    return BlockHorizontal()
+function default_structure(::UnspecifiedInstantiation, optimizer::Optimizer)
+    if optimizer.execution isa Serial && nworkers() == 1
+        return BlockHorizontal()
+    else
+        return DistributedBlockHorizontal()
+    end
+end
+
+function check_loadable(optimizer::Optimizer, ::HorizontalBlockStructure)
+    if optimizer.subproblem_optimizer === nothing
+        msg = "Subproblem optimizer not set. Consider setting `SubproblemOptimizer` attribute."
+        throw(UnloadableStructure{Optimizer, HorizontalBlockStructure}(msg))
+    end
+    return nothing
 end
 
 function load_structure!(optimizer::Optimizer, structure::HorizontalBlockStructure, x₀::AbstractVector)
+    # Sanity check
+    check_loadable(optimizer, structure)
+    # Restore structure if optimization has been run before
     restore_structure!(optimizer)
     optimizer.progressivehedging = ProgressiveHedgingAlgorithm(structure,
                                                                x₀,
                                                                optimizer.execution,
-                                                               optimizer.penalization,
+                                                               optimizer.penalizer,
                                                                optimizer.penaltyterm;
-                                                               optimizer.parameters...)
+                                                               type2dict(optimizer.parameters)...)
     return nothing
 end
 
 function restore_structure!(optimizer::Optimizer)
     if optimizer.progressivehedging !== nothing
         restore_subproblems!(optimizer.progressivehedging)
+    end
+    return nothing
+end
+
+function reload_structure!(optimizer::Optimizer)
+    if optimizer.progressivehedging !== nothing
+        x₀ = copy(optimizer.progressivehedging.ξ)
+        structure = optimizer.progressivehedging.structure
+        restore_structure!(optimizer)
+        load_structure!(optimizer, structure, x₀)
     end
     return nothing
 end
@@ -104,19 +136,129 @@ function termination_status(optimizer::Optimizer)
 end
 
 function optimizer_name(optimizer::Optimizer)
-    return "$(str(optimizer.execution))Progressive-hedging with $(str(optimizer.penalization))"
-end
-
-function master_optimizer(optimizer::Optimizer)
-    return optimizer.optimizer
-end
-
-function sub_optimizer(optimizer::Optimizer)
-    return optimizer.optimizer
+    return "$(str(optimizer.execution))Progressive-hedging with $(str(optimizer.penalizer))"
 end
 
 # MOI #
 # ========================== #
+function MOI.get(optimizer::Optimizer, ::MOI.Silent)
+    return !MOI.get(optimizer, MOI.RawParameter("log"))
+end
+
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, flag::Bool)
+    MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    name = Symbol(param.name)
+    if !(name in fieldnames(ProgressiveHedgingParameters))
+        error("Unrecognized parameter name: $(name).")
+    end
+    return getfield(optimizer.parameters, name)
+end
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    name = Symbol(param.name)
+    if !(name in fieldnames(ProgressiveHedgingParameters))
+        error("Unrecognized parameter name: $(name).")
+    end
+    setfield!(optimizer.parameters, name, value)
+    if optimizer.progressivehedging != nothing
+        setfield!(optimizer.progressivehedging.parameters, name, value)
+    end
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
+    limit = MOI.get(optimizer, MOI.RawParameter("time_limit"))
+    return isinf(limit) ? nothing : limit
+end
+
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, limit::Union{Real, Nothing})
+    limit = limit === nothing ? Inf : limit
+    MOI.set(optimizer, MOI.RawParameter("time_limit"), limit)
+    return
+end
+
+function MOI.get(optimizer::Optimizer, ::RelativeTolerance)
+    return MOI.get(optimizer, MOI.RawParameter("τ"))
+end
+
+function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
+    MOI.set(optimizer, MOI.RawParameter("τ"), limit)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
+    return optimizer.subproblem_optimizer
+end
+
+function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
+    optimizer.subproblem_optimizer = optimizer_constructor
+    if optimizer.progressivehedging != nothing
+        set_master_optimizer!(optimizer.progressivehedging.structure, optimizer_constructor)
+    end
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Execution)
+    return optimizer.execution
+end
+
+function MOI.set(optimizer::Optimizer, ::Execution, execution::AbstractExecution)
+    optimizer.execution = execution
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Penalizer)
+    return optimizer.penalizer
+end
+
+function MOI.set(optimizer::Optimizer, ::Penalizer, penalizer::AbstractPenalizer)
+    optimizer.penalizer = penalizer
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Penaltyterm)
+    return optimizer.penaltyterm
+end
+
+function MOI.set(optimizer::Optimizer, ::Penaltyterm, penaltyterm::AbstractPenaltyterm)
+    optimizer.penaltyterm = penaltyterm
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::ExecutionParameter)
+    return MOI.get(optimizer.execution, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::ExecutionParameter, value)
+    MOI.set(optimizer.execution, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::PenalizationParameter)
+    return MOI.get(optimizer.penalizer, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::PenalizationParameter, value)
+    MOI.set(optimizer.penalizer, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
 end
@@ -139,14 +281,20 @@ function MOI.is_empty(optimizer::Optimizer)
     return optimizer.progressivehedging === nothing
 end
 
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.supports(::Optimizer, ::MOI.RawParameter) = true
+MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
+MOI.supports(::Optimizer, ::MasterOptimizer) = false
+MOI.supports(::Optimizer, ::AbstractProgressiveHedgingAttribute) = true
+
+# High-level attribute setting #
 # ========================== #
-function add_params!(solver::Optimizer; kwargs...)
-    push!(solver.parameters, kwargs...)
-    for (k,v) in kwargs
-        if k ∈ [:optimizer, :execution, :penalty, :penaltyterms]
-            setfield!(solver, k, v)
-            delete!(solver.parameters, k)
-        end
+function set_penalization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, RawPenalizationParameter(name), value)
+end
+function set_penalization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_regularization_attributes(stochasticprogram, name, value)
     end
-    return nothing
 end

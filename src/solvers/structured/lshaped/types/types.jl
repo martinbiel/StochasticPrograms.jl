@@ -1,3 +1,4 @@
+include("attributes.jl")
 include("hyperplane.jl")
 include("channels.jl")
 include("AbstractLShaped.jl")

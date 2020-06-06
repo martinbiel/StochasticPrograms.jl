@@ -22,10 +22,10 @@ struct DistributedScenarioProblems{S <: AbstractScenario} <: AbstractScenarioPro
     end
 end
 
-function DistributedScenarioProblems(scenarios::Vector{S}) where S <: AbstractScenario
+function DistributedScenarioProblems(_scenarios::Vector{S}) where S <: AbstractScenario
     scenarioproblems = Vector{ScenarioProblemChannel{S}}(undef, nworkers())
     decisions = Vector{DecisionChannel}(undef, nworkers())
-    (nscen, extra) = divrem(length(scenarios), nworkers())
+    (nscen, extra) = divrem(length(_scenarios), nworkers())
     start = 1
     stop = nscen + (extra > 0)
     scenario_distribution = zeros(Int, nworkers())
@@ -38,18 +38,18 @@ function DistributedScenarioProblems(scenarios::Vector{S}) where S <: AbstractSc
             @async remotecall_fetch(
                 w,
                 scenarioproblems[i],
-                scenarios[scenario_range]) do (sp,scenarios)
+                _scenarios[scenario_range]) do sp, scenarios
                     put!(sp, ScenarioProblems(scenarios))
                 end
             @async remotecall_fetch(
                 w,
-                decisions[i]) do d
-                    put!(d, Decisions())
+                decisions[i]) do channel
+                    put!(channel, Decisions())
                 end
             scenario_distribution[i] = n
             start = stop + 1
             stop += n
-            stop = min(stop, length(scenarios))
+            stop = min(stop, length(_scenarios))
             extra -= 1
         end
     end
@@ -63,7 +63,7 @@ function ScenarioProblems(scenarios::Vector{S}, ::Union{BlockVertical, BlockHori
 end
 
 function ScenarioProblems(scenarios::Vector{S}, ::Union{DistributedBlockVertical, DistributedBlockHorizontal}) where S <: AbstractScenario
-    DistributedScenarioProblems(Vector{S}())
+    DistributedScenarioProblems(scenarios)
 end
 
 
@@ -83,7 +83,7 @@ function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.Abstra
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], attr, value) do (sp, attr, value)
+                w, scenarioproblems[w-1], attr, value) do sp, attr, value
                     MOI.set(fetch(sp), attr, value)
                 end
         end
@@ -101,7 +101,7 @@ function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.Abstra
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], attr, index, value) do (sp, attr, index, value)
+                w, scenarioproblems[w-1], attr, index, value) do sp, attr, index, value
                     MOI.set(fetch(sp), attr, index, value)
                 end
         end
@@ -118,7 +118,7 @@ function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.Abstra
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], attr, index, value) do (sp, attr, index, value)
+                w, scenarioproblems[w-1], attr, index, value) do sp, attr, index, value
                     MOI.set(fetch(sp), attr, index, value)
                 end
         end
@@ -137,7 +137,7 @@ function scenario(scenarioproblems::DistributedScenarioProblems, i::Integer)
         n = scenarioproblems.scenario_distribution[w-1]
         if i <= n+j
             return remotecall_fetch(
-                w, scenarioproblems[w-1], i-j) do (sp,i)
+                w, scenarioproblems[w-1], i-j) do sp, i
                     fetch(sp).scenarios[i]
                 end
         end
@@ -193,7 +193,7 @@ function subproblem(scenarioproblems::DistributedScenarioProblems, i::Integer)
         n = scenarioproblems.scenario_distribution[w-1]
         if i <= n+j
             return remotecall_fetch(
-                w,scenarioproblems[w-1],i-j) do (sp,i)
+                w,scenarioproblems[w-1],i-j) do sp, i
                     fetch(sp).problems[i]
                 end
         end
@@ -206,7 +206,7 @@ function subproblems(scenarioproblems::ScenarioProblems)
 end
 function subproblems(scenarioproblems::DistributedScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    partial_subproblems = Vector{JuMP.Model}(undef, nworkers())
+    partial_subproblems = Vector{Vector{JuMP.Model}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
             @async partial_subproblems[i] = remotecall_fetch(
@@ -246,7 +246,7 @@ function probability(scenarioproblems::DistributedScenarioProblems, i::Integer)
         n = scenarioproblems.scenario_distribution[w-1]
         if i <= n+j
             return remotecall_fetch(
-                w, scenarioproblems[w-1], i-j) do (sp,i)
+                w, scenarioproblems[w-1], i-j) do sp, i
                     probability(fetch(sp).scenarios[i])
                 end
         end
@@ -292,7 +292,7 @@ function update_decisions!(scenarioproblems::DistributedScenarioProblems, change
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], change) do (sp, change)
+                w, scenarioproblems[w-1], change) do sp, change
                     update_decisions!(fetch(sp), change)
                 end
         end
@@ -309,7 +309,7 @@ function set_optimizer!(scenarioproblems::DistributedScenarioProblems, optimizer
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], optimizer) do (sp, opt)
+                w, scenarioproblems[w-1], optimizer) do sp, opt
                     set_optimizer!(fetch(sp), opt)
                 end
         end
@@ -331,7 +331,7 @@ function add_scenario!(scenarioproblems::DistributedScenarioProblems{S}, scenari
     remotecall_fetch(
         w,
         scenarioproblems[w-1],
-        scenario) do (sp, scenario)
+        scenario) do sp, scenario
             add_scenario!(fetch(sp), scenario)
         end
     scenarioproblems.scenario_distribution[w-1] += 1
@@ -344,7 +344,7 @@ end
 function add_scenario!(scenariogenerator::Function, scenarioproblems::DistributedScenarioProblems)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     _, w = findmin(scenarioproblems.scenario_distribution)
-    add_scenario!(scenariogenerator, scenarioproblems, w+1)
+    add_scenario!(scenariogenerator, scenarioproblems, w + 1)
     return nothing
 end
 function add_scenario!(scenariogenerator::Function, scenarioproblems::DistributedScenarioProblems, w::Integer)
@@ -352,7 +352,7 @@ function add_scenario!(scenariogenerator::Function, scenarioproblems::Distribute
     remotecall_fetch(
         w,
         scenarioproblems[w-1],
-        scenariogenerator) do (sp, generator)
+        scenariogenerator) do sp, generator
             add_scenario!(fetch(sp), generator())
         end
     scenarioproblems.scenario_distribution[w] += 1
@@ -382,7 +382,7 @@ function add_scenarios!(scenarioproblems::DistributedScenarioProblems{S}, scenar
             @async remotecall_fetch(
                 w,
                 scenarioproblems[w-1],
-                scenarios[scenario_range]) do (sp, scenarios)
+                scenarios[scenario_range]) do sp, scenarios
                     add_scenarios!(fetch(sp), scenarios)
                 end
             scenarioproblems.scenario_distribution[w-1] += n
@@ -399,7 +399,7 @@ function add_scenarios!(scenarioproblems::DistributedScenarioProblems{S}, scenar
     remotecall_fetch(
         w,
         scenarioproblems[w-1],
-        scenarios) do (sp, scenarios)
+        scenarios) do sp, scenarios
             add_scenarios!(fetch(sp), scenarios)
         end
     scenarioproblems.scenario_distribution[w-1] += length(scenarios)
@@ -415,7 +415,7 @@ function add_scenarios!(scenariogenerator::Function, scenarioproblems::Distribut
                 w,
                 scenarioproblems[w-1],
                 scenariogenerator,
-                m) do (sp, gen, n)
+                m) do sp, gen, n
                     add_scenarios!(gen, fetch(sp), n)
                 end
             scenarioproblems.scenario_distribution[w-1] += m
@@ -430,7 +430,7 @@ function add_scenarios!(scenariogenerator::Function, scenarioproblems::Distribut
         w,
         scenarioproblems[w-1],
         scenariogenerator,
-        n) do (sp, gen)
+        n) do sp, gen
             add_scenarios!(gen, fetch(sp), n)
         end
     scenarioproblems.scenario_distribution[w-1] += n
@@ -445,7 +445,7 @@ function clear_scenarios!(scenarioproblems::DistributedScenarioProblems)
     @sync begin
         for w in workers()
             @async remotecall_fetch(
-                w, scenarioproblems[w-1]) do (sp)
+                w, scenarioproblems[w-1]) do sp
                     remove_scenarios!(fetch(sp))
                 end
             scenarioproblems.scenario_distribution[w-1] = 0
@@ -454,8 +454,7 @@ function clear_scenarios!(scenarioproblems::DistributedScenarioProblems)
     return nothing
 end
 function clear!(scenarioproblems::ScenarioProblems)
-    clear_decision_variables!(scenarioproblems.decision_variables)
-    map!(empty!, scenarioproblems.problems)
+    map(empty!, scenarioproblems.problems)
     empty!(scenarioproblems.problems)
     return nothing
 end
@@ -494,8 +493,8 @@ function sample!(scenarioproblems::DistributedScenarioProblems{S}, sampler::Abst
                 sampler,
                 d,
                 m,
-                1/n) do (sp,sampler,n,m,π)
-                    _sample!(fetch(sp),sampler,n,m,π)
+                1/n) do sp, sampler, n, m, π
+                    _sample!(fetch(sp), sampler, n, m, π)
                 end
             scenarioproblems.scenario_distribution[w-1] += d
             extra -= 1
@@ -516,8 +515,8 @@ function sample!(scenarioproblems::DistributedScenarioProblems{S}, sampler::Abst
                 sampler,
                 d,
                 m,
-                1/n) do (sp,sampler,n,m,π)
-                    _sample!(fetch(sp),sampler,n,m,π)
+                1/n) do sp, sampler, n, m, π
+                    _sample!(fetch(sp), sampler, n, m, π)
                 end
             scenarioproblems.scenario_distribution[w-1] += d
             extra -= 1

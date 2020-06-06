@@ -103,7 +103,7 @@ function untake_decisions!(structure::HorizontalBlockStructure{2,1,NTuple{1,SP}}
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, sp[w-1], sp.decisions[w-1]) do (sp, d)
+                w, sp[w-1], sp.decisions[w-1]) do sp, d
                     if untake_decisions!(fetch(d))
                         update_decisions!(fetch(sp), DecisionsStateChange())
                     end

@@ -1,124 +1,105 @@
-SubWorker{F,T,A,S} = RemoteChannel{Channel{Vector{SubProblem{F,T,A,S}}}}
-ScenarioProblemChannel{S} = RemoteChannel{Channel{StochasticPrograms.ScenarioProblems{S}}}
+SubWorker{H,T,S} = RemoteChannel{Channel{Vector{SubProblem{H,T,S}}}}
+ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
 Work = RemoteChannel{Channel{Int}}
 
-function load_subproblems!(subworkers::Vector{SubWorker{F,T,A,S}},
-                           scenarioproblems::AbstractScenarioProblems,
-                           x::AbstractVector,
-                           subsolver::SubSolver) where {F <: AbstractFeasibility,
-                                                        T <: AbstractFloat,
-                                                        A <: AbstractVector,
-                                                        S <: LQSolver}
+function load_subproblems!(subworkers::Vector{SubWorker{H,T,S}},
+                           scenarioproblems::DistributedScenarioProblems,
+                           decisions::Vector{DecisionChannel},
+                           tolerance::AbstractFloat) where {H <: AbstractFeasibilityHandler,
+                                                            T <: AbstractFloat,
+                                                            S <: MOI.AbstractOptimizer}
     # Create subproblems on worker processes
     @sync begin
         for w in workers()
-            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{F,T,A,S}}}(1), w)
-            @async load_worker!(scenarioproblems, w, subworkers[w-1], x, subsolver)
+            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{H,T,S}}}(1), w)
+            prev = map(2:(w-1)) do p
+                scenarioproblems.scenario_distribution[p-1]
+            end
+            start_id = isempty(prev) ? 0 : sum(prev)
+            @async remotecall_fetch(initialize_subworker!,
+                                    w,
+                                    subworkers[w-1],
+                                    scenarioproblems[w-1],
+                                    decisions[w-1],
+                                    tolerance,
+                                    start_id)
         end
     end
 end
 
-function load_worker!(sp::ScenarioProblems,
-                      w::Integer,
-                      worker::SubWorker,
-                      x::AbstractVector,
-                      subsolver::SubSolver)
-    n = StochasticPrograms.nscenarios(sp)
-    (nscen, extra) = divrem(n, nworkers())
-    prev = [nscen + (extra + 2 - p > 0) for p in 2:(w-1)]
-    start = isempty(prev) ? 1 : sum(prev) + 1
-    stop = min(start + nscen + (extra + 2 - w > 0) - 1, n)
-    prev = [begin
-            jobsize = nscen + (extra + 2 - p > 0)
-            ceil(Int, jobsize)
-            end for p in 2:(w-1)]
-    start_id = isempty(prev) ? 0 : sum(prev)
-    πs = [probability(sp.scenarios[i]) for i = start:stop]
-    return remotecall_fetch(init_subworker!,
-                            w,
-                            worker,
-                            sp.parent,
-                            sp.problems[start:stop],
-                            πs,
-                            x,
-                            subsolver,
-                            start_id)
-end
-
-function load_worker!(sp::DScenarioProblems,
-                      w::Integer,
-                      worker::SubWorker,
-                      x::AbstractVector,
-                      subsolver::SubSolver)
-    prev = [sp.scenario_distribution[p-1] for p in 2:(w-1)]
-    start_id = isempty(prev) ? 0 : sum(prev)
-    return remotecall_fetch(init_subworker!,
-                            w,
-                            worker,
-                            sp[w-1],
-                            x,
-                            subsolver,
-                            start_id)
-end
-
-function init_subworker!(subworker::SubWorker{F,T,A,S},
-                         parent::JuMP.Model,
-                         submodels::Vector{JuMP.Model},
-                         πs::A,
-                         x::A,
-                         subsolver::SubSolver,
-                         start_id::Integer) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
-    subproblems = Vector{SubProblem{F,T,A,S}}(undef, length(submodels))
-    for (i,submodel) = enumerate(submodels)
-        y₀ = convert(A, rand(submodel.numCols))
-        subproblems[i] = SubProblem(submodel, parent, start_id + i, πs[i], x, y₀, get_solver(subsolver), F)
-    end
-    put!(subworker, subproblems)
-    return nothing
-end
-
-function init_subworker!(subworker::SubWorker{F,T,A,S},
-                         scenarioproblems::ScenarioProblemChannel,
-                         x::A,
-                         subsolver::SubSolver,
-                         start_id::Integer) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
+function initialize_subworker!(subworker::SubWorker{H,T,S},
+                               scenarioproblems::ScenarioProblemChannel,
+                               decisions::DecisionChannel,
+                               tolerance::AbstractFloat,
+                               start_id::Integer) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
     sp = fetch(scenarioproblems)
-    subproblems = Vector{SubProblem{F,T,A,S}}(undef, StochasticPrograms.nsubproblems(sp))
-    for (i,submodel) = enumerate(sp.problems)
-        y₀ = convert(A, rand(sp.problems[i].numCols))
-        subproblems[i] = SubProblem(submodel, sp.parent, start_id + i, probability(sp.scenarios[i]), x, y₀, get_solver(subsolver), F)
+    subproblems = Vector{SubProblem{H,T,S}}(undef, num_subproblems(sp))
+    for i in 1:num_subproblems(sp)
+        subproblems[i] = SubProblem(
+            subproblem(sp, i),
+            start_id + i,
+            T(probability(scenario(sp, i))),
+            T(tolerance),
+            fetch(decisions).knowns,
+            H)
     end
     put!(subworker, subproblems)
     return nothing
 end
 
-function resolve_subproblems!(subworker::SubWorker{F,T,A,S}, x::AbstractVector, cutqueue::CutQueue{T}, aggregator::AbstractAggregator, t::Integer, metadata::MetaData) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
+function restore_subproblems!(subworkers::Vector{<:SubWorker})
+     @sync begin
+        for w in workers()
+            @async remotecall_fetch(w, subworkers[w-1]) do sw
+                for subproblem in fetch(sw)
+                    restore_subproblem!(subproblem)
+                end
+            end
+        end
+    end
+    return nothing
+end
+
+function resolve_subproblems!(subworker::SubWorker{H,T,S},
+                              decisions::DecisionChannel,
+                              x::AbstractVector,
+                              cutqueue::CutQueue{T},
+                              aggregator::AbstractAggregator,
+                              t::Integer,
+                              metadata::MetaData) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
     # Fetch all subproblems stored in worker
-    subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
+    subproblems::Vector{SubProblem{H,T,S}} = fetch(subworker)
     if isempty(subproblems)
         # Workers has nothing do to, return.
         return nothing
     end
+    # Update subproblems
+    update_known_decisions!(fetch(decisions), x)
+    change = KnownValuesChange()
     # Aggregation policy
     aggregation::AbstractAggregation = aggregator(length(subproblems), T)
     # Solve subproblems
-    for subproblem ∈ subproblems
-        update_subproblem!(subproblem, x)
-        cut = subproblem()
+    for subproblem in subproblems
+        update_subproblem!(subproblem, change)
+        cut::SparseHyperPlane{T} = subproblem(x)
         aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
     end
     flush!(cutqueue, aggregation, metadata, t, x)
     return nothing
 end
 
-function work_on_subproblems!(subworker::SubWorker{F,T,A,S},
+function work_on_subproblems!(subworker::SubWorker{H,T,S},
+                              decisions::DecisionChannel,
                               work::Work,
                               finalize::Work,
                               cutqueue::CutQueue{T},
-                              decisions::Decisions{A},
+                              iterates::RemoteIterates{A},
                               metadata::MetaData,
-                              aggregator::AbstractAggregator) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
-    subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
+                              aggregator::AbstractAggregator) where {H <: AbstractFeasibilityHandler,
+                                                                     T <: AbstractFloat,
+                                                                     A <: AbstractVector,
+                                                                     S <: MOI.AbstractOptimizer}
+    subproblems::Vector{SubProblem{H,T,S}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.
        return nothing
@@ -141,10 +122,13 @@ function work_on_subproblems!(subworker::SubWorker{F,T,A,S},
             end
         end
         t == -1 && continue
-        x::A = fetch(decisions,t)
+        x::A = fetch(iterates, t)
+        # Update subproblems
+        update_known_decisions!(fetch(decisions), x)
+        change = KnownValuesChange()
         for subproblem in subproblems
-            update_subproblem!(subproblem, x)
-            cut = subproblem()
+            update_subproblem!(subproblem, change)
+            cut::SparseHyperPlane{T} = subproblem(x)
             !quit && aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
         end
         !quit && flush!(cutqueue, aggregation, metadata, t, x)
@@ -153,71 +137,4 @@ function work_on_subproblems!(subworker::SubWorker{F,T,A,S},
             return nothing
         end
     end
-end
-
-function eval_second_stage(subworkers::Vector{<:SubWorker}, x::AbstractVector)
-    partial_objectives = Vector{Float64}(undef, nworkers())
-    @sync begin
-        for (i,w) in enumerate(workers())
-            @async partial_objectives[i] = remotecall_fetch(calculate_subobjective, w, subworkers[w-1], x)
-        end
-    end
-    return sum(partial_objectives)
-end
-
-function calculate_subobjective(subworker::SubWorker{F,T,A,S}, x::A) where {F, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
-    subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
-    if length(subproblems) > 0
-        return sum([subproblem.π*subproblem(x) for subproblem in subproblems])
-    else
-        return zero(T)
-    end
-end
-
-function fill_submodels!(subworkers::Vector{<:SubWorker}, x::AbstractVector, scenarioproblems::ScenarioProblems)
-    j = 0
-    @sync begin
-        for w in workers()
-            n = remotecall_fetch((sw)->length(fetch(sw)), w, subworkers[w-1])
-            for i = 1:n
-                k = i+j
-                @async fill_submodel!(scenarioproblems.problems[k],remotecall_fetch((sw,i,x)->begin
-                    sp = fetch(sw)[i]
-                    sp(x)
-                    get_solution(sp)
-                end,
-                w,
-                subworkers[w-1],
-                i,
-                x)...)
-            end
-            j += n
-        end
-    end
-    return nothing
-end
-
-function fill_submodels!(subworkers::Vector{<:SubWorker}, x::AbstractVector, scenarioproblems::DScenarioProblems)
-    @sync begin
-        for w in workers()
-            @async remotecall_fetch(fill_submodels!,
-                                    w,
-                                    subworkers[w-1],
-                                    x,
-                                    scenarioproblems[w-1])
-        end
-    end
-    return nothing
-end
-
-function fill_submodels!(subworker::SubWorker{F,T,A,S},
-                         x::A,
-                         scenarioproblems::ScenarioProblemChannel) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractArray, S <: LQSolver}
-    sp = fetch(scenarioproblems)
-    subproblems::Vector{SubProblem{F,T,A,S}} = fetch(subworker)
-    for (i, submodel) in enumerate(sp.problems)
-        subproblems[i](x)
-        fill_submodel!(submodel, subproblems[i])
-    end
-    return nothing
 end

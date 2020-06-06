@@ -1,36 +1,36 @@
-mutable struct DecisionChannel{A <: AbstractArray} <: AbstractChannel{A}
+mutable struct IterateChannel{A <: AbstractArray} <: AbstractChannel{A}
     decisions::Dict{Int,A}
     cond_take::Condition
-    DecisionChannel(decisions::Dict{Int,A}) where A <: AbstractArray = new{A}(decisions, Condition())
+    IterateChannel(decisions::Dict{Int,A}) where A <: AbstractArray = new{A}(decisions, Condition())
 end
 
-function put!(channel::DecisionChannel, t, x)
+function put!(channel::IterateChannel, t, x)
     channel.decisions[t] = copy(x)
     notify(channel.cond_take)
     return channel
 end
 
-function take!(channel::DecisionChannel, t)
+function take!(channel::IterateChannel, t)
     x = fetch(channel, t)
     delete!(channel.decisions, t)
     return x
 end
 
-isready(channel::DecisionChannel) = length(channel.decisions) > 1
-isready(channel::DecisionChannel, t) = haskey(channel.decisions, t)
+isready(channel::IterateChannel) = length(channel.decisions) > 1
+isready(channel::IterateChannel, t) = haskey(channel.decisions, t)
 
-function fetch(channel::DecisionChannel, t)
+function fetch(channel::IterateChannel, t)
     wait(channel, t)
     return channel.decisions[t]
 end
 
-function wait(channel::DecisionChannel, t)
+function wait(channel::IterateChannel, t)
     while !isready(channel, t)
         wait(channel.cond_take)
     end
 end
 
-RemoteDecisions{A} = RemoteChannel{DecisionChannel{A}}
+RemoteIterates{A} = RemoteChannel{IterateChannel{A}}
 
 mutable struct MetaChannel <: AbstractChannel{Any}
     metadata::Dict{Tuple{Int,Symbol},Any}

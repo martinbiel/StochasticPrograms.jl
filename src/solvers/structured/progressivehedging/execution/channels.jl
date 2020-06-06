@@ -30,52 +30,35 @@ function wait(channel::IterationChannel, t)
     end
 end
 
-mutable struct RunningAverageChannel{D} <: AbstractChannel{D}
+mutable struct RunningAverage{D}
     average::D
     data::Vector{D}
     buffer::Dict{Int,D}
-    cond_put::Condition
-    RunningAverageChannel(average::D, data::Vector{D}) where D = new{D}(average, data, Dict{Int,D}(), Condition())
+
+    RunningAverage(average::D, data::Vector{D}) where D = new{D}(average, data, Dict{Int,D}())
 end
 
-function take!(channel::RunningAverageChannel, i::Integer)
-    channel.buffer[i] = copy(channel.data[i])
+function average(running_average::RunningAverage)
+    return running_average.average
 end
 
-function put!(channel::RunningAverageChannel, i::Integer, π::AbstractFloat)
-    channel.average -= π*channel.buffer[i]
-    channel.average += π*channel.data[i]
-    delete!(channel.buffer, i)
-    notify(channel.cond_put)
-    return channel
+function subtract!(running_average::RunningAverage, i::Integer)
+    running_average.buffer[i] = copy(running_average.data[i])
 end
 
-function put!(channel::RunningAverageChannel{D}, i::Integer, x::D, π::AbstractFloat) where D
-    channel.average -= π*channel.buffer[i]
-    channel.average += π*x
-    channel.data[i] = copy(x)
-    delete!(channel.buffer, i)
-    notify(channel.cond_put)
-    return channel
+function add!(running_average::RunningAverage, i::Integer, π::AbstractFloat)
+    running_average.average -= π * running_average.buffer[i]
+    running_average.average += π * running_average.data[i]
+    return running_average
 end
 
-isready(channel::RunningAverageChannel) = length(channel.buffer) == 0
-
-function fetch(channel::RunningAverageChannel)
-    wait(channel)
-    return channel.average
-end
-
-function fetch(channel::RunningAverageChannel, i::Integer)
-    return channel.data[i]
-end
-
-function wait(channel::RunningAverageChannel)
-    while !isready(channel)
-        wait(channel.cond_put)
-    end
+function add!(running_average::RunningAverage{D}, i::Integer, x::D, π::AbstractFloat) where D
+    running_average.average -= π * running_average.buffer[i]
+    running_average.average += π * x
+    running_average.data[i] = copy(x)
+    return running_average
 end
 
 IteratedValue{T <: AbstractFloat} = RemoteChannel{IterationChannel{T}}
-RunningAverage{D} = RemoteChannel{RunningAverageChannel{D}}
-Decisions{A <: AbstractArray} = RemoteChannel{IterationChannel{A}}
+RemoteRunningAverage{D} = RemoteChannel{Channel{RunningAverage{D}}}
+RemoteIterates{A <: AbstractArray} = RemoteChannel{IterationChannel{A}}

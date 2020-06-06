@@ -29,9 +29,9 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
                                    A <: AbstractVector,
                                    ST <: HorizontalBlockStructure,
                                    S <: MOI.AbstractOptimizer,
-                                   E <: AbstractExecution,
+                                   E <: AbstractProgressiveHedgingExecution,
                                    P <: AbstractPenalization,
-                                   PT <: PenaltyTerm} <: AbstractProgressiveHedging
+                                   PT <: AbstractPenaltyterm} <: AbstractProgressiveHedging
     structure::ST
     data::ProgressiveHedgingData{T}
     parameters::ProgressiveHedgingParameters{T}
@@ -52,18 +52,9 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
 
     function ProgressiveHedgingAlgorithm(structure::HorizontalBlockStructure,
                                          x₀::AbstractVector,
-                                         executer::Execution,
+                                         executer::AbstractExecution,
                                          penalizer::AbstractPenalizer,
-                                         penaltyterm::PenaltyTerm; kw...)
-        if nworkers() > 1 && executer isa Serial
-            @warn "There are worker processes, consider using distributed version of algorithm"
-        end
-        executer = if nworkers() == 1 && !(executer isa Serial)
-            @warn "There are no worker processes, defaulting to serial version of algorithm"
-            Serial()
-        else
-            executer
-        end
+                                         penaltyterm::AbstractPenaltyterm; kw...)
         # Sanity checks
         length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
         num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run progressive-hedging procedure.")

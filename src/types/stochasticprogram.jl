@@ -207,7 +207,7 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::Union{MOI.Terminati
 end
 function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractModelAttribute)
     if MOI.is_set_by_optimize(attr)
-        _check_provided_optimizer(stochasticprogram.optimizer)
+        check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         end
@@ -220,7 +220,7 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimiz
     MOI.get(optimizer(stochasticprogram), attr)
 end
 
-MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(spa), attr, value)
+MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(sp), attr, value)
 MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value) = MOI.set(structure(sp), attr, value)
 
 function JuMP.check_belongs_to_model(con_ref::ConstraintRef{<:StochasticProgram}, stochasticprogram::StochasticProgram)

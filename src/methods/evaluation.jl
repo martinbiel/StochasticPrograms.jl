@@ -15,13 +15,15 @@ In other words, evaluate the first-stage objective at `decision` and solve outco
 """
 function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
     end
     # Sanity checks on given decision vector
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Restore structure (if necessary)
+    restore_structure!(stochasticprogram.optimizer)
     # Dispatch evaluation on stochastic structure
     return evaluate_decision(structure(stochasticprogram), decision)
 end
@@ -34,7 +36,7 @@ The supplied `decision` must match the defined decision variables in `stochastic
 """
 function statistically_valuate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)
         generate!(stochasticprogram)
@@ -56,7 +58,7 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
                            decision::AbstractVector,
                            scenario::AbstractScenario)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticprogram.optimizer)
     # Sanity checks on given decision vector
     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -99,7 +101,7 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
                            Ñ::Integer = 1000,
                            kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Calculate confidence interval using provided optimizer
     CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = optimizer_constructor(stochasticmodel), kw...)
         # Sanity checks on given decision vector
@@ -143,7 +145,7 @@ function lower_bound(stochasticmodel::StochasticModel{2},
                      indent::Int = 0,
                      kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = 1-confidence
     # Lower bound
@@ -192,7 +194,7 @@ function upper_bound(stochasticmodel::StochasticModel{2},
                      indent::Int = 0,
                      kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = 1-confidence
     # decision generation
@@ -227,7 +229,7 @@ function upper_bound(stochasticmodel::StochasticModel{2},
                      indent::Int = 0,
                      kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = 1-confidence
     Qs = Vector{Float64}(undef, T)
@@ -282,7 +284,7 @@ function confidence_interval(stochasticmodel::StochasticModel{2},
                              indent::Int = 0,
                              kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = (1-confidence)/2
     # Lower bound
@@ -322,7 +324,7 @@ function gap(stochasticmodel::StochasticModel{2},
              indent::Int = 0,
              kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    _check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(provided_optimizer(stochasticmodel))
     # Condidence level
     α = (1-confidence)/2
     # Lower bound

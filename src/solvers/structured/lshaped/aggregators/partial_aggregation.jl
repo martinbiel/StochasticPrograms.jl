@@ -82,7 +82,7 @@ function num_thetas(num_subproblems::Integer, aggregation::PartialAggregation, s
     return n * (nworkers() - 1) + aggregationem
 end
 
-function nthetas(::Integer, aggregation::PartialAggregation, sp::DistributedScenarioProblems)
+function num_thetas(::Integer, aggregation::PartialAggregation, sp::DistributedScenarioProblems)
     return sum([ceil(Int, nscen/aggregation.size) for nscen in sp.scenario_distribution])
 end
 
@@ -113,7 +113,7 @@ end
 Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.  See ?PartialAggregation for parameter descriptions.
 
 """
-struct PartialAggregate <: AbstractAggregator
+mutable struct PartialAggregate <: AbstractAggregator
     size::Int
     start_id::Int
 

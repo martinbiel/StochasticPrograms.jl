@@ -7,15 +7,20 @@ Functor object for using serial execution in a lshaped algorithm. Create by supp
 struct SerialExecution{H <: AbstractFeasibilityHandler,
                        T <: AbstractFloat,
                        A <: AbstractVector,
-                       S <: MOI.AbstractOptimizer} <: AbstractExecution
+                       S <: MOI.AbstractOptimizer} <: AbstractLShapedExecution
     subproblems::Vector{SubProblem{H,T,S}}
-    decisions::Tuple{Decisions, Decisions}
+    decisions::Decisions
     subobjectives::A
     model_objectives::A
 
-    function SerialExecution(structure::VerticalBlockStructure{2}, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer}
+    function SerialExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
+                             ::Type{F}, ::Type{T},
+                             ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
+                                                          T <: AbstractFloat,
+                                                          A <: AbstractVector,
+                                                          S <: MOI.AbstractOptimizer}
         H = HandlerType(F)
-        return new{H,T,A,S}(Vector{SubProblem{H,T,S}}(), structure.decisions, A(), A())
+        return new{H,T,A,S}(Vector{SubProblem{H,T,S}}(), structure.decisions[2], A(), A())
     end
 end
 
@@ -27,16 +32,13 @@ function initialize_subproblems!(execution::SerialExecution{H,T},
                                  scenarioproblems::ScenarioProblems,
                                  tolerance::AbstractFloat) where {H <: AbstractFeasibilityHandler,
                                                                   T <: AbstractFloat}
-    # Assume sorted order
-    master_indices = sort!(collect(keys(execution.decisions[1].decisions)),
-                           by = idx -> idx.value)
-    for i = 1:num_subproblems(scenarioproblems)
+    for i in 1:num_subproblems(scenarioproblems)
         push!(execution.subproblems, SubProblem(
             subproblem(scenarioproblems, i),
             i,
             T(probability(scenario(scenarioproblems, i))),
             T(tolerance),
-            master_indices,
+            execution.decisions.knowns,
             H))
     end
     return nothing
@@ -57,7 +59,7 @@ end
 
 function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     # Update subproblems
-    update_known_decisions!(execution.decisions[2], lshaped.x)
+    update_known_decisions!(execution.decisions, lshaped.x)
     change = KnownValuesChange()
     # Assume no cuts are added
     added = false
@@ -72,13 +74,14 @@ function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecuti
     return current_objective_value(lshaped), added
 end
 
-# function calculate_objective_value(lshaped::AbstractLShaped, execution::SerialExecution)
-#     return get_obj(lshaped)⋅decision(lshaped) + sum([subproblem.π*subproblem(decision(lshaped)) for subproblem in execution.subproblems])
-# end
-
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(structure::VerticalBlockStructure, ::Type{F}, ::Type{T}, ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility, T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer}
+function (execution::Serial)(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
+                             ::Type{F}, ::Type{T},
+                             ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
+                                                          T <: AbstractFloat,
+                                                          A <: AbstractVector,
+                                                          S <: MOI.AbstractOptimizer}
     return SerialExecution(structure, F, T, A, S)
 end
 

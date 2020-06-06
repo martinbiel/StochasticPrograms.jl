@@ -49,14 +49,20 @@ function Base.showerror(io::IO, err::UnloadedStructure{Opt}) where Opt <: Stocha
     print(io, "The optimizer $Opt has no loaded structure. Consider `load_structure!`")
 end
 
-"""
-    supports_structure(optimizer::StochasticProgramOptimizerType, structure::AbstractStochasticStructure)
-
-Return a `Bool` indicating whether `optimizer` supports the stochastic `structure`. That is, `load_structure!(optimizer, structure)` will not throw `UnsupportedStructure`
-"""
-function supports_structure(optimizer::StochasticProgramOptimizerType, structure::AbstractStochasticStructure)
-    return false
+struct UnloadableStructure{Opt <: StochasticProgramOptimizerType, S <: AbstractStochasticStructure} <: Exception
+    message # Human-friendly explanation why the structure cannot be loaded by the optimizer
 end
+
+function Base.showerror(io::IO, err::UnloadableStructure{Opt, S}) where {Opt <: StochasticProgramOptimizerType, S <: AbstractStochasticStructure}
+    print(io, "The optimizer $Opt cannot load structure $S")
+    m = message(err)
+    if Base.isempty(m)
+        print(io, ".")
+    else
+        print(io, ": ", m)
+    end
+end
+message(err::UnloadableStructure) = err.message
 
 # Getters #
 # ========================== #

@@ -7,17 +7,19 @@ Functor object for using serial execution in a progressive-hedging algorithm. Cr
 struct SerialExecution{T <: AbstractFloat,
                        A <: AbstractVector,
                        S <: MOI.AbstractOptimizer,
-                       PT <: PenaltyTerm} <: AbstractExecution
+                       PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
     subproblems::Vector{SubProblem{T,A,S,PT}}
 
-    function SerialExecution(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: PenaltyTerm}
+    function SerialExecution(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
         return new{T,A,S,PT}(Vector{SubProblem{T,A,S,PT}}())
     end
 end
 
-function initialize_subproblems!(execution::SerialExecution{T},
+function initialize_subproblems!(ph::AbstractProgressiveHedging,
+                                 execution::SerialExecution{T},
                                  scenarioproblems::ScenarioProblems,
-                                 penaltyterm::PenaltyTerm) where T <: AbstractFloat
+                                 penaltyterm::AbstractPenaltyterm) where T <: AbstractFloat
+    # Create subproblems
     for i = 1:num_subproblems(scenarioproblems)
         push!(execution.subproblems, SubProblem(
             subproblem(scenarioproblems, i),
@@ -25,6 +27,9 @@ function initialize_subproblems!(execution::SerialExecution{T},
             T(probability(scenarioproblems, i)),
             copy(penaltyterm)))
     end
+    # Initial reductions
+    update_iterate!(ph)
+    update_dual_gap!(ph)
     return nothing
 end
 
@@ -56,7 +61,7 @@ end
 function update_iterate!(ph::AbstractProgressiveHedging, execution::SerialExecution)
     # Update the estimate
     ξ_prev = copy(ph.ξ)
-    ph.ξ .= mapreduce(+, execution.subproblems) do subproblem
+    ph.ξ .= mapreduce(+, execution.subproblems, init = zero(ph.ξ)) do subproblem
         π = subproblem.probability
         x = subproblem.x
         π * x
@@ -72,9 +77,9 @@ function update_subproblems!(ph::AbstractProgressiveHedging, execution::SerialEx
     return nothing
 end
 
-function update_dual_gap!(ph::AbstractProgressiveHedging, execution::SerialExecution)
+function update_dual_gap!(ph::AbstractProgressiveHedging, execution::SerialExecution{T}) where T <: AbstractFloat
     # Update δ₂
-    ph.data.δ₂ = mapreduce(+, execution.subproblems) do subproblem
+    ph.data.δ₂ = mapreduce(+, execution.subproblems, init = zero(T)) do subproblem
         π = subproblem.probability
         x = subproblem.x
         π * norm(x - ph.ξ, 2)^2
@@ -82,15 +87,15 @@ function update_dual_gap!(ph::AbstractProgressiveHedging, execution::SerialExecu
     return nothing
 end
 
-function calculate_objective_value(ph::AbstractProgressiveHedging, execution::SerialExecution)
-    return mapreduce(+, execution.subproblems) do subproblem
+function calculate_objective_value(ph::AbstractProgressiveHedging, execution::SerialExecution{T}) where T <: AbstractFloat
+    return mapreduce(+, execution.subproblems, init = zero(T)) do subproblem
         _objective_value(subproblem)
     end
 end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: PenaltyTerm}
+function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
     return SerialExecution(T,A,S,PT)
 end
 

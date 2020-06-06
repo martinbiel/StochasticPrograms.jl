@@ -11,6 +11,7 @@ end
     τ::T = 1e-6
     cut_scaling::T = 1.0
     debug::Bool = false
+    time_limit::T = Inf
     log::Bool = true
     keep::Bool = true
     offset::Int = 0
@@ -35,7 +36,7 @@ struct LShapedAlgorithm{T <: AbstractFloat,
                         ST <: VerticalBlockStructure,
                         M <: MOI.AbstractOptimizer,
                         S <: MOI.AbstractOptimizer,
-                        E <: AbstractExecution,
+                        E <: AbstractLShapedExecution,
                         F <: AbstractFeasibility,
                         R <: AbstractRegularization,
                         Agg <: AbstractAggregation,
@@ -72,19 +73,10 @@ struct LShapedAlgorithm{T <: AbstractFloat,
     function LShapedAlgorithm(structure::VerticalBlockStructure,
                               x₀::AbstractVector,
                               feasibility_cuts::Bool,
-                              executer::Execution,
+                              _execution::AbstractExecution,
                               regularizer::AbstractRegularizer,
                               aggregator::AbstractAggregator,
                               consolidator::AbstractConsolidator; kw...)
-        if nworkers() > 1 && executer isa Serial
-            @warn "There are worker processes, consider using distributed version of algorithm"
-        end
-        executer = if nworkers() == 1 && !(executer isa Serial)
-            @warn "There are no worker processes, defaulting to serial version of algorithm"
-            Serial()
-        else
-            executer
-        end
         # Sanity checks
         length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
         num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run L-shaped procedure.")
@@ -101,7 +93,7 @@ struct LShapedAlgorithm{T <: AbstractFloat,
         feasibility = feasibility_cuts ? HandleFeasibility(T) : IgnoreFeasibility()
         F = typeof(feasibility)
         # Execution policy
-        execution = executer(structure,F,T,A,S)
+        execution = _execution(structure,F,T,A,S)
         E = typeof(execution)
         # Regularization policy
         regularization = regularizer(structure.decisions[1], x₀_)

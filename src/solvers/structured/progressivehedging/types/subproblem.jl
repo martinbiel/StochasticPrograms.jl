@@ -1,4 +1,4 @@
-struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: PenaltyTerm}
+struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
     id::Int
     probability::T
     optimizer::S
@@ -16,7 +16,7 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOpti
     function SubProblem(model::JuMP.Model,
                         id::Integer,
                         π::AbstractFloat,
-                        penaltyterm::PenaltyTerm)
+                        penaltyterm::AbstractPenaltyterm)
         T = typeof(π)
         # Get optimizer backend and initial objective
         optimizer = backend(model)
@@ -74,6 +74,7 @@ function Base.:+(lhs::SubproblemSolution{T}, rhs::SubproblemSolution{T}) where T
     # Let lhs dictate end status
     return SubproblemSolution(lhs.status, val)
 end
+Base.zero(::Type{SubproblemSolution{T}}) where T = SubproblemSolution(MOI.OPTIMAL, zero(T))
 
 function initialize!(subproblem::SubProblem, penalty::AbstractFloat)
     # Add projection targets

@@ -15,7 +15,10 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalB
         has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
         # Set the optimizer (if any)
         if has_provided_optimizer(stochasticprogram.optimizer)
-            set_optimizer(structure.first_stage, master_optimizer(stochasticprogram))
+            master_opt = master_optimizer(stochasticprogram)
+            if master_opt != nothing
+                set_optimizer(structure.first_stage, master_opt)
+            end
         end
         # Prepare decisions
         structure.first_stage.ext[:decisions] = structure.decisions[1]
@@ -40,7 +43,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalB
                            stage_parameters(stochasticprogram, stage - 1),
                            stage_parameters(stochasticprogram, stage),
                            structure.decisions[stage],
-                           sub_optimizer(stochasticprogram))
+                           subproblem_optimizer(stochasticprogram))
     end
     return nothing
 end
@@ -82,13 +85,13 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
                 decision_params,
                 stage_params,
                 scenarioproblems.decisions[w-1],
-                optimizer) do (sp,dgenerator,generator,dparams,params,decisions,opt)
+                optimizer) do sp, dgenerator, generator, dparams, params, decisions, opt
                     generate_vertical!(fetch(sp),
                                        dgenerator,
                                        generator,
                                        dparams,
                                        params,
-                                       decisions,
+                                       fetch(decisions),
                                        opt)
                 end
         end
@@ -96,7 +99,7 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
     return nothing
 end
 
-function clear(structure::VerticalBlockStructure{N}) where N
+function clear!(structure::VerticalBlockStructure{N}) where N
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)
@@ -107,7 +110,7 @@ end
 function clear_stage!(structure::VerticalBlockStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     if s == 1
-        empty!(first_stage(stochasticprogram))
+        empty!(structure.first_stage)
     else
         clear!(scenarioproblems(structure, s))
     end

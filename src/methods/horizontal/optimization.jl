@@ -10,6 +10,11 @@ function optimize!(structure::HorizontalBlockStructure, optimizer::AbstractStruc
     return nothing
 end
 
-function set_optimizer!(structure::HorizontalBlockStructure, optimizer::AbstractStructuredOptimizer)
-    set_optimizer!(scenarioproblems(structure), sub_optimizer(optimizer))
+function set_master_optimizer!(structure::HorizontalBlockStructure, optimizer)
+    return nothing
+end
+
+function set_subproblem_optimizer!(structure::HorizontalBlockStructure, optimizer)
+    set_optimizer!(scenarioproblems(structure), optimizer)
+    return nothing
 end

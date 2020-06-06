@@ -1,7 +1,19 @@
 # Common
 # ------------------------------------------------------------
-function add_regularization_params!(regularization::AbstractRegularizer; kwargs...)
-    push!(regularization.parameters, kwargs...)
+function MOI.get(regularizer::AbstractRegularizer, param::RawRegularizationParameter)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(regularizer)))
+        error("Unrecognized parameter name: $(name) for regularizer $(typeof(regularizer)).")
+    end
+    return getfield(regularizer, name)
+end
+
+function MOI.set(regularizer::AbstractRegularizer, param::RawRegularizationParameter, value)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(regularizer)))
+        error("Unrecognized parameter name: $(name) for regularizer $(typeof(regularizer)).")
+    end
+    setfield!(regularizer, name, value)
     return nothing
 end
 

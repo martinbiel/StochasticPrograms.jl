@@ -1,6 +1,6 @@
-abstract type SelectionRule end
+abstract type AbstractSelectionRule end
 
-function reset!(::SelectionRule)
+function reset!(::AbstractSelectionRule)
     return nothing
 end
 
@@ -10,7 +10,7 @@ end
 Incoming cuts are placed into aggregates uniformly, so that each aggregate has at most `n` cuts. Behaves as [`PartialAggregation`](@ref).
 
 """
-mutable struct SelectUniform <: SelectionRule
+mutable struct SelectUniform <: AbstractSelectionRule
     n::Integer
 
     function SelectUniform(n::Integer)
@@ -35,7 +35,7 @@ end
 Behaves like [`SelectUniform`](@ref), but the uniform aggregate size decays by `γ` each iteration, starting from `T₀`. `T̲` is an optional lower bound on the aggregate size.
 
 """
-mutable struct SelectDecaying <: SelectionRule
+mutable struct SelectDecaying <: AbstractSelectionRule
     n::Int
     T̲::Int
     γ::Float64
@@ -73,7 +73,7 @@ end
 Incoming cuts are placed into aggregates randomly. An optional maximum number of cuts `max` can be specified.
 
 """
-struct SelectRandom <: SelectionRule
+struct SelectRandom <: AbstractSelectionRule
     max::Float64
 end
 
@@ -105,7 +105,7 @@ The following distance measures are available
 - [`spatioangular_distance`](@ref
 
 """
-struct SelectClosest <: SelectionRule
+struct SelectClosest <: AbstractSelectionRule
     τ::Float64
     distance::Function
 end
@@ -142,7 +142,7 @@ The following distance measures are available
 - [`spatioangular_distance`](@ref
 
 """
-mutable struct SelectClosestToReference{T <: AbstractFloat} <: SelectionRule
+mutable struct SelectClosestToReference{T <: AbstractFloat} <: AbstractSelectionRule
     τ::T
     distance::Function
     reference::AggregatedOptimalityCut{T}

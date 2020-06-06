@@ -113,7 +113,7 @@ end
 function log_regularization!(lshaped::AbstractLShaped, t::Integer, tr::TrustRegion)
     @unpack Q̃,Δ,incumbent = tr.data
     tr.Q̃_history[t] = Q̃
-    tr.Δ_history[t] = known_decision(tr.decisions, Δ).value
+    tr.Δ_history[t] = StochasticPrograms.decision(tr.decisions, Δ).value
     tr.incumbents[t] = incumbent
     return nothing
 end
@@ -177,10 +177,10 @@ function enlarge_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
     Δ̃ = incumbent_trustregion(lshaped, t, tr)
     ξ = incumbent_decision(lshaped, t, tr)
     Q̃ = incumbent_objective(lshaped, t, tr)
-    if Q̃ - Q >= 0.5*(Q̃-θ) && abs(norm(ξ - lshaped.x, Inf) - Δ̃) <= τ
+    if Q̃ - Q >= 0.5*(Q̃ - θ) && abs(norm(ξ - lshaped.x, Inf) - Δ̃) <= τ
         # Enlarge the trust-region radius
         Δ = StochasticPrograms.decision(tr.decisions, tr.data.Δ)
-        Δ.value = max(Δ.value, min(Δ̅, 2*Δ̃))
+        Δ.value = max(Δ.value, min(Δ̅, 2 * Δ̃))
         return true
     else
         return false
@@ -216,16 +216,16 @@ end
 Factory object for [`TrustRegion`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `TR`, `WithTR`, `TrustRegion`, `WithTrustRegion`. See ?TrustRegion for parameter descriptions.
 
 """
-struct TR <: AbstractRegularizer
-    parameters::Dict{Symbol,Any}
+mutable struct TR <: AbstractRegularizer
+    parameters::TRParameters{Float64}
 end
-TR(; kw...) = TR(Dict{Symbol,Any}(kw))
-WithTR(; kw...) = TR(Dict{Symbol,Any}(kw))
-TrustRegion(; kw...) = TR(Dict{Symbol,Any}(kw))
-WithTrustRegion(; kw...) = TR(Dict{Symbol,Any}(kw))
+TR(; kw...) = TR(TRParameters(kw...))
+WithTR(; kw...) = TR(TRParameters(kw...))
+TrustRegion(; kw...) = TR(TRParameters(kw...))
+WithTrustRegion(; kw...) = TR(TRParameters(kw...))
 
 function (tr::TR)(decisions::Decisions, x::AbstractVector)
-    return TrustRegion(decisions, x; tr.parameters...)
+    return TrustRegion(decisions, x; type2dict(tr.parameters)...)
 end
 
 function str(::TR)

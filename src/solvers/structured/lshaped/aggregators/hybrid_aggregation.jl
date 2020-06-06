@@ -90,17 +90,34 @@ end
 Factory object for [`HybridAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?HybridAggregation for parameter descriptions.
 
 """
-struct HybridAggregate{T <: AbstractFloat, Agg1 <: AbstractAggregator, Agg2 <: AbstractAggregator} <: AbstractAggregator
-    initial::Agg1
-    final::Agg2
-    τ::T
+mutable struct HybridAggregate <: AbstractAggregator
+    initial::AbstractAggregator
+    final::AbstractAggregator
+    τ::Float64
 
     function HybridAggregate(initial::AbstractAggregator, final::AbstractAggregator, τ::AbstractFloat)
-        Agg1 = typeof(initial)
-        Agg2 = typeof(final)
-        T = typeof(τ)
-        return new{T,Agg1,Agg2}(initial, final, τ)
+        return new(initial, final, τ)
     end
+end
+
+struct InitialAggregator <: AggregationParameter end
+
+function MOI.get(aggregator::HybridAggregate, ::InitialAggregator)
+    return aggregator.initial
+end
+
+function MOI.set(aggregator::HybridAggregate, ::InitialAggregator, initial::AbstractAggregator)
+    return aggregator.initial = initial
+end
+
+struct FinalAggregator <: AggregationParameter end
+
+function MOI.get(aggregator::HybridAggregate, ::FinalAggregator)
+    return aggregator.final
+end
+
+function MOI.set(aggregator::HybridAggregate, ::FinalAggregator, final::AbstractAggregator)
+    return aggregator.final = final
 end
 
 function (aggregator::HybridAggregate)(num_subproblems::Integer, T::Type{<:AbstractFloat})

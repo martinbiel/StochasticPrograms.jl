@@ -1,45 +1,45 @@
-function num_thetas(lshaped::AbstractLShaped, ::AbstractExecution)
+function num_thetas(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     return num_thetas(num_subproblems(lshaped),
                       lshaped.aggregation,
                       scenarioproblems(lshaped.structure))
 end
 
-function timestamp(lshaped::AbstractLShaped, ::AbstractExecution)
+function timestamp(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     return lshaped.data.iterations
 end
 
-function current_decision(lshaped::AbstractLShaped, ::AbstractExecution)
+function current_decision(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     return lshaped.x
 end
 
-function incumbent_decision(::AbstractLShaped, ::Integer, regularization::AbstractRegularization, ::AbstractExecution)
+function incumbent_decision(::AbstractLShaped, ::Integer, regularization::AbstractRegularization, ::AbstractLShapedExecution)
     return map(regularization.ξ) do ξᵢ
         return ξᵢ.value
     end
 end
 
-function incumbent_objective(::AbstractLShaped, ::Integer, regularization::AbstractRegularization, ::AbstractExecution)
+function incumbent_objective(::AbstractLShaped, ::Integer, regularization::AbstractRegularization, ::AbstractLShapedExecution)
     return regularization.data.Q̃
 end
 
-function incumbent_trustregion(::AbstractLShaped, ::Integer, rd::RegularizedDecomposition, ::AbstractExecution)
+function incumbent_trustregion(::AbstractLShaped, ::Integer, rd::RegularizedDecomposition, ::AbstractLShapedExecution)
     return rd.data.σ
 end
 
-function incumbent_trustregion(::AbstractLShaped, ::Integer, tr::TrustRegion, ::AbstractExecution)
+function incumbent_trustregion(::AbstractLShaped, ::Integer, tr::TrustRegion, ::AbstractLShapedExecution)
     Δ = StochasticPrograms.decision(tr.decisions, tr.data.Δ)
     return Δ.value
 end
 
-function start_workers!(::AbstractLShaped, ::AbstractExecution)
+function start_workers!(::AbstractLShaped, ::AbstractLShapedExecution)
     return nothing
 end
 
-function close_workers!(::AbstractLShaped, ::AbstractExecution)
+function close_workers!(::AbstractLShaped, ::AbstractLShapedExecution)
     return nothing
 end
 
-function readd_cuts!(lshaped::AbstractLShaped, consolidation::Consolidation, ::AbstractExecution)
+function readd_cuts!(lshaped::AbstractLShaped, consolidation::Consolidation, ::AbstractLShapedExecution)
     for i in eachindex(consolidation.cuts)
         for cut in consolidation.cuts[i]
             add_cut!(lshaped, cut; consider_consolidation = false, check = false)
@@ -51,26 +51,26 @@ function readd_cuts!(lshaped::AbstractLShaped, consolidation::Consolidation, ::A
     return nothing
 end
 
-function subobjectives(lshaped::AbstractLShaped, execution::AbstractExecution)
+function subobjectives(lshaped::AbstractLShaped, execution::AbstractLShapedExecution)
     return execution.subobjectives
 end
 
-function set_subobjectives(lshaped::AbstractLShaped, Qs::AbstractVector, execution::AbstractExecution)
+function set_subobjectives(lshaped::AbstractLShaped, Qs::AbstractVector, execution::AbstractLShapedExecution)
     execution.subobjectives .= Qs
     return nothing
 end
 
-function model_objectives(lshaped::AbstractLShaped, execution::AbstractExecution)
+function model_objectives(lshaped::AbstractLShaped, execution::AbstractLShapedExecution)
     return execution.model_objectives
 end
 
-function set_model_objectives(lshaped::AbstractLShaped, θs::AbstractVector, execution::AbstractExecution)
+function set_model_objectives(lshaped::AbstractLShaped, θs::AbstractVector, execution::AbstractLShapedExecution)
     ids = active_model_objectives(lshaped)
     execution.model_objectives[ids] .= θs[ids]
     return nothing
 end
 
-function solve_master!(lshaped::AbstractLShaped, ::AbstractExecution)
+function solve_master!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     try
         MOI.optimize!(lshaped.master)
     catch err
@@ -85,7 +85,7 @@ function solve_master!(lshaped::AbstractLShaped, ::AbstractExecution)
     return MOI.get(lshaped.master, MOI.TerminationStatus())
 end
 
-function iterate!(lshaped::AbstractLShaped, ::AbstractExecution)
+function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     # Resolve all subproblems at the current optimal solution
     Q, added = resolve_subproblems!(lshaped)
     if Q == Inf && !handle_feasibility(lshaped.feasibility)
@@ -104,9 +104,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractExecution)
     take_step!(lshaped)
     # Early optimality check if using level sets
     if lshaped.regularization isa LevelSet && check_optimality(lshaped)
-        # Optimal
-        #lshaped.data.Q = calculate_objective_value(lshaped)
-        # Final log
+        # Optimal, final log
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL
     end
@@ -124,9 +122,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractExecution)
     log!(lshaped)
     # Check optimality
     if check_optimality(lshaped) || (lshaped.regularization isa NoRegularization && !added)
-        # Optimal
-        #lshaped.data.Q = calculate_objective_value(lshaped)
-        # Final log
+        # Optimal, final log
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL
     end

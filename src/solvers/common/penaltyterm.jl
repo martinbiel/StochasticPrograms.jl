@@ -1,11 +1,11 @@
-abstract type PenaltyTerm end
+abstract type AbstractPenaltyterm end
 const L2NormConstraint = CI{QuadraticDecisionFunction{Float64,QuadraticPart{Float64}}, MOI.LessThan{Float64}}
 const SOCConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.SecondOrderCone}
 const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64,LinearPart{Float64}}, MOI.LessThan{Float64}}
 const InfNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
 const ManhattanNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormOneCone}
 
-Base.copy(::PT) where PT <: PenaltyTerm = PT()
+Base.copy(::PT) where PT <: AbstractPenaltyterm = PT()
 
 """
     Quadratic
@@ -13,7 +13,7 @@ Base.copy(::PT) where PT <: PenaltyTerm = PT()
 Functor object for using a quadratic 2-norm penalty term. Requires an `AbstractMathProgSolver` capable of solving QP problems. Passed by default through `penalty` where applicable.
 
 """
-mutable struct Quadratic <: PenaltyTerm
+mutable struct Quadratic <: AbstractPenaltyterm
     t::MOI.VariableIndex
     constraint::Union{L2NormConstraint, SOCConstraint}
 
@@ -121,7 +121,7 @@ Functor object for using an approximately quadratic penalty term, through linear
 - `nbreakpoints::Int`: Number of cutting planes used to approximate quadratic term
 ...
 """
-mutable struct Linearized <: PenaltyTerm
+mutable struct Linearized <: AbstractPenaltyterm
     num_breakpoints::Int
     spacing::Float64
     auxilliary_variables::Vector{MOI.VariableIndex}
@@ -246,7 +246,7 @@ end
 Functor object for using a linear ∞-norm penalty term. Pass through `penalty` where applicable.
 
 """
-mutable struct InfNorm <: PenaltyTerm
+mutable struct InfNorm <: AbstractPenaltyterm
     t::MOI.VariableIndex
     constraint::InfNormConstraint
 
@@ -322,7 +322,7 @@ end
 Functor object for using a linear 1-norm penalty term. Pass through `penalty` where applicable.
 
 """
-mutable struct ManhattanNorm <: PenaltyTerm
+mutable struct ManhattanNorm <: AbstractPenaltyterm
     t::MOI.VariableIndex
     constraint::ManhattanNormConstraint
 

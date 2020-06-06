@@ -44,7 +44,7 @@ The following execution policies are available
 The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using the L-shaped algorithm with GLPK as an `lpsolver`.
 
 ```jldoctest
-julia> optimize!(sp, solver = Optimizer(GLPKSolverLP()))
+julia> optimize!(sp, solver = LShaped.Optimizer(GLPKSolverLP()))
 L-Shaped Gap  Time: 0:00:00 (6 iterations)
   Objective:       -855.8333333333339
   Gap:             0.0
@@ -53,63 +53,93 @@ L-Shaped Gap  Time: 0:00:00 (6 iterations)
 :Optimal
 ```
 """
-mutable struct Optimizer{E <: Execution, R <: AbstractRegularizer, A <: AbstractAggregator, C <: AbstractConsolidator} <: AbstractStructuredOptimizer
-    optimizer
-    suboptimizer
+mutable struct Optimizer <: AbstractStructuredOptimizer
+    master_optimizer
+    subproblem_optimizer
     feasibility_cuts::Bool
-    execution::E
-    regularize::R
-    aggregate::A
-    consolidate::C
-    parameters::Dict{Symbol, Any}
+    execution::AbstractExecution
+    regularizer::AbstractRegularizer
+    aggregator::AbstractAggregator
+    consolidator::AbstractConsolidator
+    parameters::LShapedParameters{Float64}
 
     status::MOI.TerminationStatusCode
+
     lshaped::Union{AbstractLShaped, Nothing}
 
-    function Optimizer(optimizer;
-                       execution::Execution = Serial(),
+    function Optimizer(; master_optimizer = nothing,
+                       execution::AbstractExecution = nworkers() == 1 ? Serial() : Synchronous(),
                        feasibility_cuts::Bool = false,
                        regularize::AbstractRegularizer = DontRegularize(),
                        aggregate::AbstractAggregator = DontAggregate(),
                        consolidate::AbstractConsolidator = DontConsolidate(),
-                       suboptimizer = optimizer, kwargs...)
-        E = typeof(execution)
-        R = typeof(regularize)
-        A = typeof(aggregate)
-        C = typeof(consolidate)
-        return new{E, R, A, C}(optimizer,
-                               suboptimizer,
-                               feasibility_cuts,
-                               execution,
-                               regularize,
-                               aggregate,
-                               consolidate,
-                               Dict{Symbol,Any}(kwargs),
-                               MOI.OPTIMIZE_NOT_CALLED,
-                               nothing)
+                       subproblem_optimizer = nothing, kw...)
+        return new(master_optimizer,
+                   subproblem_optimizer,
+                   feasibility_cuts,
+                   execution,
+                   regularize,
+                   aggregate,
+                   consolidate,
+                   LShapedParameters{Float64}(; kw...),
+                   MOI.OPTIMIZE_NOT_CALLED,
+                   nothing)
     end
 end
 
 # Interface #
 # ========================== #
-function supports_structure(::Optimizer, ::VerticalBlockStructure)
+function supports_structure(optimizer::Optimizer, ::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}})
+    if optimizer.execution isa Serial
+        return true
+    end
+    @warn "Distributed execution policies are not compatible with a single-core vertical structure. Consider setting the execution policy to `Serial` or re-instantiate the stochastic program on worker cores."
+    return false
+end
+
+function supports_structure(optimizer::Optimizer, ::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
+    if optimizer.execution isa Serial
+        @warn "Serial execution not compatible with distributed vertical structure. Consider setting the execution policy to `Synchronous` or `Asynchronous` or re-instantiate the stochastic program on a single core."
+        return false
+    end
     return true
 end
 
-function default_structure(::UnspecifiedInstantiation, ::Optimizer)
-    return BlockVertical()
+function default_structure(::UnspecifiedInstantiation, optimizer::Optimizer)
+    if optimizer.execution isa Serial && nworkers() == 1
+        return BlockVertical()
+    else
+        return DistributedBlockVertical()
+    end
+end
+
+function check_loadable(optimizer::Optimizer, ::VerticalBlockStructure)
+    if optimizer.master_optimizer === nothing
+        msg = "Master optimizer not set. Consider setting `MasterOptimizer` attribute."
+        throw(UnloadableStructure{Optimizer, VerticalBlockStructure}(msg))
+    end
+    return nothing
 end
 
 function load_structure!(optimizer::Optimizer, structure::VerticalBlockStructure, x₀::AbstractVector)
+    # Sanity check
+    check_loadable(optimizer, structure)
+    # Default subproblem optimizer to master optimizer if
+    # none have been set
+    if optimizer.subproblem_optimizer === nothing
+        set_subproblem_optimizer!(structure, optimizer.master_optimizer)
+    end
+    # Restore structure if optimization has been run before
     restore_structure!(optimizer)
+    # Create new L-shaped algorithm
     optimizer.lshaped = LShapedAlgorithm(structure,
                                          x₀,
                                          optimizer.feasibility_cuts,
                                          optimizer.execution,
-                                         optimizer.regularize,
-                                         optimizer.aggregate,
-                                         optimizer.consolidate;
-                                         optimizer.parameters...)
+                                         optimizer.regularizer,
+                                         optimizer.aggregator,
+                                         optimizer.consolidator;
+                                         type2dict(optimizer.parameters)...)
     return nothing
 end
 
@@ -121,17 +151,27 @@ function restore_structure!(optimizer::Optimizer)
     return nothing
 end
 
+function reload_structure!(optimizer::Optimizer)
+    if optimizer.lshaped !== nothing
+        x₀ = copy(optimizer.lshaped.x)
+        structure = optimizer.lshaped.structure
+        restore_structure!(optimizer)
+        load_structure!(optimizer, structure, x₀)
+    end
+    return nothing
+end
+
 function MOI.optimize!(optimizer::Optimizer)
     if optimizer.lshaped === nothing
-        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+        throw(UnloadedStructure{Optimizer}())
     end
     optimizer.status = optimizer.lshaped()
     return nothing
 end
 
 function optimizer_name(optimizer::Optimizer)
-    optimizer_str = "$(str(optimizer.execution))$(str(optimizer.regularize))"
-    aggregate_str = str(optimizer.aggregate)
+    optimizer_str = "$(str(optimizer.execution))$(str(optimizer.regularizer))"
+    aggregate_str = str(optimizer.aggregator)
     if aggregate_str != ""
         return string(optimizer_str, " with ", aggregate_str)
     else
@@ -139,30 +179,192 @@ function optimizer_name(optimizer::Optimizer)
     end
 end
 
-function master_optimizer(optimizer::Optimizer)
-    return optimizer.optimizer
-end
-
-function sub_optimizer(optimizer::Optimizer)
-    return optimizer.suboptimizer
-end
-
 # MOI #
 # ========================== #
+function MOI.get(optimizer::Optimizer, ::MOI.Silent)
+    return !MOI.get(optimizer, MOI.RawParameter("log"))
+end
+
+function MOI.set(optimizer::Optimizer, ::MOI.Silent, flag::Bool)
+    MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+    name = Symbol(param.name)
+    if !(name in fieldnames(LShapedParameters))
+        error("Unrecognized parameter name: $(name).")
+    end
+    return getfield(optimizer.parameters, name)
+end
+
+function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+    name = Symbol(param.name)
+    if !(name in fieldnames(LShapedParameters))
+        error("Unrecognized parameter name: $(name).")
+    end
+    setfield!(optimizer.parameters, name, value)
+    if optimizer.lshaped != nothing
+        setfield!(optimizer.lshaped.parameters, name, value)
+    end
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
+    limit = MOI.get(optimizer, MOI.RawParameter("time_limit"))
+    return isinf(limit) ? nothing : limit
+end
+
+function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, limit::Union{Real, Nothing})
+    limit = limit === nothing ? Inf : limit
+    MOI.set(optimizer, MOI.RawParameter("time_limit"), limit)
+    return
+end
+
+function MOI.get(optimizer::Optimizer, ::RelativeTolerance)
+    return MOI.get(optimizer, MOI.RawParameter("τ"))
+end
+
+function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
+    MOI.set(optimizer, MOI.RawParameter("τ"), limit)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::MasterOptimizer)
+    return optimizer.master_optimizer
+end
+
+function MOI.set(optimizer::Optimizer, ::MasterOptimizer, optimizer_constructor)
+    optimizer.master_optimizer = optimizer_constructor
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
+    return optimizer.subproblem_optimizer
+end
+
+function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
+    optimizer.subproblem_optimizer = optimizer_constructor
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::FeasibilityCuts)
+    return optimizer.feasibility_cuts
+end
+
+function MOI.set(optimizer::Optimizer, ::FeasibilityCuts, use_feasibility_cuts)
+    optimizer.feasibility_cuts = use_feasibility_cuts
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Execution)
+    return optimizer.execution
+end
+
+function MOI.set(optimizer::Optimizer, ::Execution, execution::AbstractExecution)
+    optimizer.execution = execution
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Regularizer)
+    return optimizer.regularizer
+end
+
+function MOI.set(optimizer::Optimizer, ::Regularizer, regularizer::AbstractRegularizer)
+    optimizer.regularizer = regularizer
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Aggregator)
+    return optimizer.aggregator
+end
+
+function MOI.set(optimizer::Optimizer, ::Aggregator, aggregator::AbstractAggregator)
+    optimizer.aggregator = aggregator
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Consolidator)
+    return optimizer.consolidator
+end
+
+function MOI.set(optimizer::Optimizer, ::Consolidator, consolidator::AbstractConsolidator)
+    optimizer.consolidator = consolidator
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::ExecutionParameter)
+    return MOI.get(optimizer.execution, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::ExecutionParameter, value)
+    MOI.set(optimizer.execution, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::RegularizationParameter)
+    return MOI.get(optimizer.regularizer, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::RegularizationParameter, value)
+    MOI.set(optimizer.regularizer, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::AggregationParameter)
+    return MOI.get(optimizer.aggregator, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::AggregationParameter, value)
+    MOI.set(optimizer.aggregator, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::ConsolidationParameter)
+    return MOI.get(optimizer.consolidator, param)
+end
+
+function MOI.set(optimizer::Optimizer, param::ConsolidationParameter, value)
+    MOI.set(optimizer.consolidator, param, value)
+    # Trigger reload
+    reload_structure!(optimizer)
+    return nothing
+end
+
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.VariableIndex)
     if optimizer.lshaped === nothing
-        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+        throw(UnloadedStructure{Optimizer}())
     end
     return decision(optimizer.lshaped, index)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
     if optimizer.lshaped === nothing
-        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+        throw(UnloadedStructure{Optimizer}())
     end
     return objective_value(optimizer.lshaped)
 end
@@ -171,25 +373,35 @@ function MOI.is_empty(optimizer::Optimizer)
     return optimizer.lshaped === nothing
 end
 
+MOI.supports(::Optimizer, ::MOI.Silent) = true
+MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
+MOI.supports(::Optimizer, ::MOI.RawParameter) = true
+MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
+MOI.supports(::Optimizer, ::AbstractLShapedAttribute) = true
+
+# High-level attribute setting #
 # ========================== #
-function add_params!(optimizer::Optimizer; kwargs...)
-    push!(optimizer.parameters, kwargs...)
-    for (k,v) in kwargs
-        if k ∈ [:optimizer, :suboptimizer, :feasibility_cuts, :execution, :regularize, :aggregate]
-            setfield!(solver, k, v)
-            delete!(solver.parameters, k)
-        end
-    end
-    return nothing
+function set_regularization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, RawRegularizationParameter(name), value)
 end
-
-function add_regularization_params!(solver::Optimizer; kwargs...)
-    add_regularization_params!(solver.regularize; kwargs...)
-end
-
-function default_choice(given, default, null)
-    if default isa null
-        return given
+function set_regularization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_regularization_attributes(stochasticprogram, name, value)
     end
-    return default
+end
+function set_aggregation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, RawAggregationParameter(name), value)
+end
+function set_aggregation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_aggregation_attributes(stochasticprogram, name, value)
+    end
+end
+function set_consolidation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, RawConsolidationParameter(name), value)
+end
+function set_consolidation_attribute(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_aggregation_attributes(stochasticprogram, name, value)
+    end
 end

@@ -1,5 +1,27 @@
 abstract type AbstractAggregation end
 abstract type AbstractAggregator end
+
+struct RawAggregationParameter <: AggregationParameter
+    name::Any
+end
+
+function MOI.get(aggregator::AbstractAggregator, param::RawAggregationParameter)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(aggregator)))
+        error("Unrecognized parameter name: $(name) for aggregator $(typeof(aggregator)).")
+    end
+    return getfield(aggregator, name)
+end
+
+function MOI.set(aggregator::AbstractAggregator, param::RawAggregationParameter, value)
+    name = Symbol(param.name)
+    if !(name in fieldnames(typeof(aggregator)))
+        error("Unrecognized parameter name: $(name) for aggregator $(typeof(aggregator)).")
+    end
+    setfield!(aggregator, name, value)
+    return nothing
+end
+
 # ------------------------------------------------------------
 include("cut_collection.jl")
 include("distance_measures.jl")

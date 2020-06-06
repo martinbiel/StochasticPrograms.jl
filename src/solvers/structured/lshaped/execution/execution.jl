@@ -1,4 +1,4 @@
-abstract type AbstractExecution end
+abstract type AbstractLShapedExecution end
 # Execution API #
 # ------------------------------------------------------------
 num_thetas(lshaped::AbstractLShaped) = num_thetas(lshaped, lshaped.execution)
@@ -26,6 +26,6 @@ fill_submodels!(lshaped::AbstractLShaped, scenarioproblems::AbstractScenarioProb
 # ------------------------------------------------------------
 include("common.jl")
 include("serial.jl")
-#include("distributed.jl")
-#include("synchronous.jl")
-#include("asynchronous.jl")
+include("distributed.jl")
+include("synchronous.jl")
+include("asynchronous.jl")

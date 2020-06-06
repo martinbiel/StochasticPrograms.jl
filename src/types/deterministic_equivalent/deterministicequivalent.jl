@@ -26,10 +26,6 @@ function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, :
     return DeterministicEquivalent(scenarios)
 end
 
-function supports_structure(::MOI.AbstractOptimizer, ::DeterministicEquivalent)
-    return true
-end
-
 # Base overloads #
 # ========================== #
 function Base.print(io::IO, structure::DeterministicEquivalent)

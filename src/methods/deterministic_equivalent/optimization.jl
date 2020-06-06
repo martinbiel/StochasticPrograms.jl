@@ -14,11 +14,24 @@ function optimize!(structure::DeterministicEquivalent, optimizer::MOI.AbstractOp
     return nothing
 end
 
-function set_optimizer!(structure::DeterministicEquivalent, optimizer::MOI.AbstractOptimizer)
-    structure.model.moi_backend = optimizer
+function supports_structure(::MOI.AbstractOptimizer, ::DeterministicEquivalent)
+    return true
+end
+
+function check_loadable(::MOI.AbstractOptimizer, ::DeterministicEquivalent)
+    return nothing
+end
+
+function set_master_optimizer!(structure::DeterministicEquivalent, optimizer)
+    # Ensure decision bridges are added
     for bridge_type in structure.model.bridge_types
-        JuMP._moi_add_bridge(optimizer, bridge_type)
+        JuMP._moi_add_bridge(structure.model.moi_backend, bridge_type)
     end
+    return nothing
+end
+
+function set_subproblem_optimizer!(structure::DeterministicEquivalent, optimizer)
+    return nothing
 end
 
 function optimize!(structure::DeterministicEquivalent, optimizer::AbstractStructuredOptimizer)

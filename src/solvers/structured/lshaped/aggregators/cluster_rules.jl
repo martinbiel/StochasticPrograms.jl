@@ -1,4 +1,4 @@
-abstract type ClusterRule end
+abstract type AbstractClusterRule end
 
 """
     StaticCluster(clusters::Vector{Float64})
@@ -6,7 +6,7 @@ abstract type ClusterRule end
 Buffered cuts are sorting according to the supplied weights `clusters`
 
 """
-struct StaticCluster <: ClusterRule
+struct StaticCluster <: AbstractClusterRule
     clusters::Vector{Float64}
 
     function StaticCluster(clusters::Vector{Float64})
@@ -38,7 +38,7 @@ function str(::StaticCluster)
     return "static clustering"
 end
 
-struct ClusterByReference <: ClusterRule
+struct ClusterByReference <: AbstractClusterRule
     τ::Float64
     distance::Function
 end
@@ -94,7 +94,7 @@ The following distance measures are available
 - [`spatioangular_distance`](@ref
 
 """
-struct Kmedoids <: ClusterRule
+struct Kmedoids <: AbstractClusterRule
     nclusters::Int
     distance::Function
 end
@@ -148,7 +148,7 @@ The following distance measures are available
 - [`spatioangular_distance`](@ref
 
 """
-struct Hierarchical <: ClusterRule
+struct Hierarchical <: AbstractClusterRule
     nclusters::Int
     distance::Function
     linkage::Symbol
