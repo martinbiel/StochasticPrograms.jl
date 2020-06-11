@@ -53,8 +53,3 @@ end
 function process_cut!(lshaped::AbstractLShaped, cut::AbstractHyperPlane, ::AbstractRegularization)
     return nothing
 end
-
-function add_regularization_params!(regularization::AbstractRegularization; kwargs...)
-    push!(regularization.params, kwargs...)
-    return nothing
-end

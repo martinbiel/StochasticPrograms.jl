@@ -17,7 +17,13 @@ abstract type AbstractStructuredOptimizerAttribute <: MOI.AbstractOptimizerAttri
 
 Abstract supertype for sample-based optimizers.
 """
-abstract type AbstractSampledOptimizer end
+abstract type AbstractSampledOptimizer <: MOI.AbstractOptimizer end
+"""
+    AbstractSampledOptimizerAttribute
+
+Abstract supertype for attribute objects that can be used to set or get attributes (properties) of the sample-based optimizer.
+"""
+abstract type AbstractSampledOptimizerAttribute <: MOI.AbstractOptimizerAttribute end
 
 """
     AbstractCrash
@@ -65,9 +71,10 @@ function StochasticProgramOptimizer(optimizer_constructor)
 end
 
 bridge_type(optimizer::Type{<:AbstractStructuredOptimizer}) = nothing
+bridge_type(optimizer::Type{<:AbstractSampledOptimizer}) = nothing
 bridge_type(optimizer::Type{<:MOI.AbstractOptimizer}) = Float64
 bridge_type(optimizer::MOI.OptimizerWithAttributes) = bridge_type(optimizer.optimizer_constructor)
-bridge_type(optimizer::Function) = bridge_type(first(Base.return_types(optimizer)))
+bridge_type(optimizer::Function) = bridge_type(typeof(optimizer()))
 
 function has_provided_optimizer(sp_optimizer::StochasticProgramOptimizer)
     return sp_optimizer.optimizer_constructor !== nothing
@@ -117,6 +124,11 @@ function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer::A
     if sp_optimizer.optimizer != nothing && sp_optimizer.optimizer isa AbstractStructuredOptimizer
         restore_structure!(sp_optimizer.optimizer)
     end
+    sp_optimizer.optimizer = optimizer
+    return nothing
+end
+
+function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractSampledOptimizer)
     sp_optimizer.optimizer = optimizer
     return nothing
 end

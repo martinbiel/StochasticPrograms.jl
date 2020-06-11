@@ -45,7 +45,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram,
                 sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
-                    ws_models = reduce(scenarios(scenarioproblems)) do scenario
+                    ws_models = map(scenarios(scenarioproblems)) do scenario
                         ws = _WS(gen_one,
                                  gen_two,
                                  one_params,

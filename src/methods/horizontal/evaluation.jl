@@ -2,8 +2,9 @@ function evaluate_decision(structure::HorizontalBlockStructure, decision::Abstra
     return _eval_subproblems(structure, decision)
 end
 
-function statistically_evalute_decision(structure::HorizontalBlockStructure, decision::AbstractVector)
-    return _stat_eval_subproblems(structure, decision)
+function statistically_evaluate_decision(structure::HorizontalBlockStructure, decision::AbstractVector)
+    𝔼Q, σ² = _stat_eval_subproblems(structure, decision)
+    return 𝔼Q, sqrt(σ²)
 end
 
 function _eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
@@ -64,5 +65,5 @@ function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,SP},
         end
     end
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
-    return 𝔼Q, sqrt(σ²)
+    return 𝔼Q, σ²
 end

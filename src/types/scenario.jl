@@ -123,7 +123,7 @@ end
 Scenarios{S <: AbstractScenario} = Vector{S}
 ScenarioTypes{N} = NTuple{N, Union{DataType, UnionAll}}
 
-function expected(scenarios::Vector{Scenario{NT}}) where NT <: NamedTuple
+function expected(scenarios::Vector{<:Scenario{NT}}) where NT <: NamedTuple
     isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{NT}))
     expected = reduce(scenarios) do s₁, s₂
         keys(s₁.data) == keys(s₂.data) || error("Iconsistent scenarios. $(keys(s₁)) and $(keys(s₂)) do not match.")

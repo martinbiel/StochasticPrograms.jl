@@ -1,0 +1,113 @@
+@with_kw mutable struct SAAData{T <: AbstractFloat}
+    sample_size::Integer = 16
+    interval::ConfidenceInterval{T} = ConfidenceInterval(-Inf, Inf, 1.0)
+end
+
+@with_kw mutable struct SAAParameters{T <: AbstractFloat}
+    confidence::T = 0.95
+    num_lower_trials::Integer = 10
+    num_upper_trials::Integer = 10
+    num_samples::Integer = 100
+    num_eval_samples::Integer = 1000
+    num_ews_samples::Integer = 1000
+    num_eev_samples::Integer = 1000
+    tolerance::T = 1e-2
+    init_num_samples::Int = 16
+    max_num_samples::Int = 5000
+    optimize_config::Function = (optimizer, N) -> nothing
+    time_limit::T = Inf
+    log::Bool = true
+    keep::Bool = false
+    offset::Int = 5
+    indent::Int = 4
+end
+
+"""
+    SAA
+
+Functor object for the sample average approximation algorithm.
+"""
+mutable struct SampleAverageApproximation{T <: AbstractFloat, A <: AbstractVector, SM <: StochasticModel, S <: AbstractSampler}
+    model::SM
+    sampler::S
+    optimizer
+    x₀::A
+    data::SAAData{T}
+    parameters::SAAParameters{T}
+
+    function SampleAverageApproximation(model::StochasticModel, sampler::AbstractSampler, x₀::AbstractVector; optimizer = nothing, kw...)
+        T = eltype(x₀)
+        A = typeof(x₀)
+        SM = typeof(model)
+        S = typeof(sampler)
+        # Algorithm parameters
+        params = SAAParameters{T}(; kw...)
+        return new{T,A,SM,S}(model,
+                             sampler,
+                             optimizer,
+                             x₀,
+                             SAAData{T}(),
+                             params)
+    end
+end
+
+function (saa::SampleAverageApproximation)()
+    @unpack log, tolerance, confidence = saa.parameters
+    @unpack init_num_samples, max_num_samples = saa.parameters
+    @unpack num_lower_trials, num_upper_trials, num_eval_samples = saa.parameters
+    N = init_num_samples
+    α = 1 - confidence
+    progress = ProgressThresh(tolerance, 0.0, "SAA gap")
+    log && ProgressMeter.update!(progress, Inf,
+                                 showvalues = [
+                                     ("Confidence interval", NaN),
+                                     ("Relative error", Inf),
+                                     ("Sample size", NaN),
+                                 ])
+    while true
+        CI = confidence_interval(saa.model, saa.sampler)
+        saa.data.interval = CI
+        saa.data.sample_size = N
+        Q = (upper(CI) + lower(CI)) / 2
+        gap = length(CI) / abs(Q + 1e-10)
+        log && ProgressMeter.update!(progress, gap,
+                                     showvalues = [
+                                         ("Confidence interval", CI),
+                                         ("Relative error", gap),
+                                         ("Sample size", N)
+                                     ])
+        if gap <= tolerance
+            return MOI.OPTIMAL
+        end
+        N = N * 2
+        if N > max_num_samples
+            status = MOI.ITERATION_LIMIT
+            log && ProgressMeter.update!(progress, 0.0,
+                                         showvalues = [
+                                             ("Confidence interval", CI),
+                                             ("Early termination", status),
+                                             ("Sample size", N)
+                                         ])
+            return status
+        end
+        #optimizer_config(optimizer(stochasticmodel), N)
+    end
+end
+
+function instance(saa::SampleAverageApproximation)
+    sp = instantiate(saa.model,
+                     saa.sampler,
+                     saa.data.sample_size;
+                     optimizer = saa.optimizer)
+    optimize!(sp)
+    Q = objective_value(sp)
+    while !(Q ∈ saa.data.interval)
+        sp = instantiate(saa.model,
+                         saa.sampler,
+                         saa.data.sample_size;
+                         optimizer = saa.optimizer)
+        optimize!(sp)
+        Q = objective_value(sp)
+    end
+    return sp
+end

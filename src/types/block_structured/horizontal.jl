@@ -30,7 +30,7 @@ end
 # Base overloads #
 # ========================== #
 function Base.print(io::IO, structure::HorizontalBlockStructure{2})
-    print(io, "\nScenarioproblems \n")
+    print(io, "Block-horizontal scenario problems \n")
     print(io, "============== \n")
     for (id, subproblem) in enumerate(subproblems(structure))
         @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(structure, id)))

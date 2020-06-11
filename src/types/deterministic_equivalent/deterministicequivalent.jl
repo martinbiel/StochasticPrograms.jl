@@ -2,6 +2,7 @@ struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStoch
     decisions::Decisions
     decision_variables::NTuple{M, Vector{DecisionRef}}
     scenarios::S
+    sub_objectives::NTuple{M, Vector{MOI.AbstractScalarFunction}}
     model::JuMP.Model
 
     function DeterministicEquivalent(scenarios::NTuple{M, Scenarios}) where M
@@ -10,8 +11,11 @@ struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStoch
         decision_variables = ntuple(Val(M)) do i
             Vector{DecisionRef}()
         end
+        sub_objectives = ntuple(Val(M)) do i
+            Vector{MOI.AbstractScalarFunction}()
+        end
         S = typeof(scenarios)
-        return new{N,M,S}(decisions, decision_variables, scenarios, Model())
+        return new{N,M,S}(decisions, decision_variables, scenarios, sub_objectives, Model())
     end
 end
 

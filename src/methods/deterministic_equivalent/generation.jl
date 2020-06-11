@@ -21,11 +21,8 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
 end
 
 function generate!(stochasticprogram::StochasticProgram{N}, structure::DeterministicEquivalent{N}, stage::Integer) where N
-    generate_deterministic_equivalent!(stochasticprogram, structure.model, stage)
-end
-
-function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram{N}, dep_model::JuMP.Model, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    dep_model = structure.model
     if stage == 1
         # Define first-stage problem
         generator(stochasticprogram, :stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
@@ -38,6 +35,7 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
         # Cache current objective
         dep_obj = objective_function(dep_model)
         obj_sense = objective_sense(dep_model)
+        obj_sense = obj_sense == MOI.FEASIBILITY_SENSE ? MOI.MIN_SENSE : obj_sense
         # Define second-stage problems, renaming variables according to scenario.
         stage_two_params = stage_parameters(stochasticprogram, 2)
         visited_objs = collect(keys(object_dictionary(dep_model)))
@@ -45,17 +43,20 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
             stage_key = Symbol(:stage_, stage)
             generator(stochasticprogram, stage_key)(dep_model, stage_parameters(stochasticprogram, stage), scenario)
             sub_sense = objective_sense(dep_model)
+            sub_obj = objective_function(dep_model)
             if obj_sense == sub_sense
-                dep_obj += probability(scenario)*objective_function(dep_model)
+                dep_obj += probability(scenario) * objective_function(dep_model)
+                push!(structure.sub_objectives[stage - 1], moi_function(sub_obj))
             else
-                dep_obj -= probability(scenario)*objective_function(dep_model)
+                dep_obj -= probability(scenario) * objective_function(dep_model)
+                push!(structure.sub_objectives[stage - 1], -moi_function(sub_obj))
             end
             for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
                 newkey = if isa(obj, VariableRef) || isa(obj, DecisionRef)
                     varname = if N > 2
                         varname = add_subscript(add_subscript(JuMP.name(obj), stage), i)
                     else
-                        varname = add_subscript(JuMP.name(obj),i)
+                        varname = add_subscript(JuMP.name(obj), i)
                     end
                     set_name(obj, varname)
                     newkey = Symbol(varname)
@@ -75,7 +76,7 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
                         set_name(var, @sprintf("%s[%s", add_subscript(varname,i), splitname[2]))
                     end
                     newkey = Symbol(arrayname)
-                elseif isa(obj,JuMP.ConstraintRef)
+                elseif isa(obj, JuMP.ConstraintRef)
                     arrayname = if N > 2
                         arrayname = add_subscript(add_subscript(objkey, stage), i)
                     else
@@ -89,6 +90,13 @@ function generate_deterministic_equivalent!(stochasticprogram::StochasticProgram
                         arrayname = add_subscript(objkey, i)
                     end
                     newkey = Symbol(arrayname)
+                elseif isa(obj, AbstractJuMPScalar)
+                    exprname = if N > 2
+                        exprname = add_subscript(add_subscript(objkey, stage), i)
+                    else
+                        exprname = add_subscript(objkey, i)
+                    end
+                    newkey = Symbol(exprname)
                 else
                     continue
                 end

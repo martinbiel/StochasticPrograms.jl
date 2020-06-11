@@ -42,7 +42,7 @@
             @test isapprox(EEV(sp_copy), EEV(sp), rtol = tol)
         end
         @testset "Sampling" begin
-            sampled_sp = StochasticPrograms.sample(simple, sampler, 100, optimizer = GLPK.Optimizer)
+            sampled_sp = instantiate(simple, sampler, 100, optimizer = GLPK.Optimizer)
             generate!(sampled_sp)
             @test num_scenarios(sampled_sp) == 100
             @test isapprox(stage_probability(sampled_sp), 1.0)

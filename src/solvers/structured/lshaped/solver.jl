@@ -21,7 +21,7 @@ end
 """
     LShapedAlgorithm
 
-Functor object for the L-shaped algorithm. Create using the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for the L-shaped algorithm.
 
 ...
 # Algorithm parameters

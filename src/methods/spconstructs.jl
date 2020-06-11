@@ -98,29 +98,37 @@ function EWS(stochasticprogram::StochasticProgram, structure::AbstractStochastic
     end
 end
 """
-    EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler, optimizer_constructor = nothing; confidence = 0.95, N::Integer = 1000)
+    EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
 
-Approximately calculate the **expected wait-and-see result** (`EWS`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
+Approximately calculate the **expected wait-and-see result** (`EWS`) of the two-stage `stochasticmodel` to the current confidence level, over the scenario distribution induced by `sampler`.
 
-Supply a capable `optimizer_factory` to solve the intermediate problems. `N` is the number of scenarios to sample.
+The attribute [`NumEWSSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The confidence level can be set through the [`Confidence`](@ref) attribute.
+
+If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
-function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, N::Integer)
+function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(stochasticprogram.optimizer)
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    N = MOI.get(stochasticmodel, NumEWSSamples())
     # Generate a sample model and statistically evaluate EWS
-    let eval_model = sample(stochasticmodel, sampler, N; optimizer = optimizer_constructor(stochasticmodel), kw...)
-        𝔼WS, σ = statistical_EWS(eval_model, structure(eval_model))
+    let eval_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer)
+        𝔼WS, σ² = statistical_EWS(eval_model, structure(eval_model))
+        σ = sqrt(σ²)
         z = quantile(Normal(0,1), confidence)
-        L = 𝔼WS - z*σ/sqrt(N)
-        U = 𝔼WS + z*σ/sqrt(N)
+        L = 𝔼WS - z * σ / sqrt(N)
+        U = 𝔼WS + z * σ / sqrt(N)
         return ConfidenceInterval(L, U, confidence)
     end
 end
 # Default implementation
 function statistical_EWS(stochasticprogram::StochasticProgram, structure::AbstractStochasticStructure)
-    ws_models = reduce(scenarios(stochasticprogram)) do scenario
+    ws_models = map(scenarios(stochasticprogram)) do scenario
         ws = _WS(stochasticprogram.generator[:stage_1],
                  stochasticprogram.generator[:stage_2],
                  stage_parameters(stochasticprogram, 1),
@@ -155,9 +163,9 @@ function DEP(stochasticprogram::StochasticProgram{2}, ::AbstractStochasticStruct
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     has_generator(stochasticprogram, :stage_2) || error("Second-stage problem not defined in stochastic program. Consider @stage 2.")
     # Generate and cache deterministic equivalent
-    dep = optimizer == nothing ? Model() : Model(optimizer)
-    _generate_deterministic_equivalent!(stochasticprogram, dep)
-    cache[:dep] = dep
+    dep = StochasticStructure(scenario_types(stochasticprogram), Deterministic())
+    generate!(stochasticprogram, dep)
+    cache[:dep] = dep.model
     # Return DEP
     return dep
 end
@@ -185,16 +193,16 @@ end
 
 Return a confidence interval around the **value of the recouse problem** (`VRP`) of `stochasticmodel` to the given `confidence` level.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVPI`](@ref), [`VSS`](@ref), [`EWS`](@ref)
 """
-function VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95)
+function VRP(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(stochasticmodel.optimizer)
     # Optimize stochastic model using sample-based method
-    ss = optimize!(stochasticmodel, sampler; confidence = confidence)
-    return confidence_interval(ss)
+    optimize!(stochasticmodel, sampler)
+    return objective_value(stochasticmodel)
 end
 """
     EVPI(stochasticprogram::TwoStageStochasticProgram)
@@ -212,35 +220,57 @@ function EVPI(stochasticprogram::StochasticProgram{2})
     vrp = VRP(stochasticprogram)
     # Solve all possible WS models and calculate EWS
     ews = EWS(stochasticprogram)
-    # Return EVPI = EWS-VRP
+    # Return EVPI = EWS - VRP
     return abs(ews-vrp)
 end
 """
-    EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence = 0.95)
+    EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
 
-Approximately calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
+Approximately calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticmodel` to the current confidence level, over the scenario distribution induced by `sampler`.
 
-In other words, calculate confidence intervals around `VRP` and `EWS`. If they do not overlap, the EVPI is statistically significant, and a confidence interval is calculated and returned. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, calculate confidence intervals around `VRP` and `EWS`. If they do not overlap, the EVPI is statistically significant, and a confidence interval is calculated and returned.
+
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
+
+If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
-function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, tol::AbstractFloat = 1e-1, kwargs...)
+function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    # Modify confidence for two-sided interval
     α = (1-confidence)/2
+    MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Calculate confidence interval around VRP
-    ss = optimize!(stochasticmodel, sampler; confidence = 1-α, tol = tol, kwargs...)
-    vrp = confidence_interval(ss)
+    optimize!(stochasticmodel, sampler)
+    # Check return status
+    status = termination_status(stochasticmodel)
+    if status != MOI.OPTIMAL
+        error("Stochastic model could not be solved to optimality, returned status $status.")
+    end
+    vrp = objective_value(stochasticmodel)
     # EWS solution of the corresponding size
-    ews = EWS(stochasticmodel, sampler; confidence = 1-α, N = ss.N)
-    try
-        evpi = ConfidenceInterval(lower(ews) - upper(vrp), upper(ews) - lower(vrp), confidence)
-        lower(evpi) >= -tol || error()
-        return evpi
-    catch
+    ews = EWS(stochasticmodel, sampler)
+    # Restore confidence level
+    MOI.set(stochasticmodel, Confidence(), confidence)
+    # Check overlap
+    if (upper(vrp) >= lower(ews) + eps() && upper(ews) >= lower(vrp) + eps()) ||
+       (lower(vrp) <= upper(ews) - eps() && upper(vrp) >= lower(ews) + eps())
         @warn "EVPI is not statistically significant to the chosen confidence level and tolerance"
-        return ConfidenceInterval(-Inf, Inf, 1.0)
+        # Return confidence interval as tolerance around zero
+        tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+        return ConfidenceInterval(-tolerance, tolerance, confidence)
+    end
+    # Switch on sign
+    if lower(ews) >= upper(vrp)
+        # Return confidence interval around EVPI
+        return ConfidenceInterval(lower(ews) - upper(vrp), upper(ews) - lower(vrp), confidence)
+    else
+        # Return confidence interval around EVPI
+        return ConfidenceInterval(lower(vrp) - upper(ews), upper(vrp) - lower(ews), confidence)
     end
 end
 """
@@ -323,22 +353,35 @@ function EEV(stochasticprogram::StochasticProgram{2})
     return eev
 end
 """
-    EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence = 0.95, N::Integer = 100, Ñ::Integer = 1000)
+    EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
 
-Approximately calculate the **expected value of the expected value decision** (`EEV`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
+Approximately calculate the **expected value of the expected value decision** (`EEV`) of the two-stage `stochasticmodel` to the current confidence level, over the scenario distribution induced by `sampler`.
 
-`N` is the number of scenarios to sample in order to determine the EVP decision and `Ñ` is the number of samples in the out-of-sample evaluation of the EVP decision.
+The attribute [`NumEEVSamples`](@ref) is the size of the sampled models used in the eev calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
-function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, N::Integer = 100, Ñ::Integer = 1000)
+function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(stochasticprogram.optimizer)
-    sp = sample(stochasticmodel, sampler, N)
-    x̄ = expected_value_decision(sp, optimizer_factory)
-    return evaluate_decision(stochasticmodel, x̄, sampler, optimizer_factory; confidence = confidence, Ñ = Ñ)
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get the instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    N = MOI.get(stochasticmodel, NumSamples())
+    # Generate expected value decision
+    sp = instantiate(stochasticmodel, sampler, N, optimizer = optimizer)
+    x̄ = expected_value_decision(sp)
+    # Evaluate expected value decision
+    M = MOI.get(stochasticmodel, NumEvalSamples())
+    MOI.set(stochasticmodel, NumEvalSamples(), MOI.get(stochasticmodel, NumEEVSamples()))
+    eev = evaluate_decision(stochasticmodel, x̄, sampler)
+    # Restore NumEvalSamples()
+    MOI.set(stochasticmodel, NumEvalSamples(), M)
+    # Return EEV
+    return eev
 end
 """
     VSS(stochasticprogram::TwoStageStochasticProgram)
@@ -358,33 +401,53 @@ function VSS(stochasticprogram::StochasticProgram{2})
     return abs(vrp-eev)
 end
 """
-    VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence = 0.95, Ñ::Integer = 1000)
+    VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
 
-Approximately calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticmodel` to the given `confidence` level, over the scenario distribution induced by `sampler`.
+Approximately calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticmodel` to the current confidence level, over the scenario distribution induced by `sampler`.
 
 In other words, calculate confidence intervals around `EEV` and `VRP`. If they do not overlap, the VSS is statistically significant, and a confidence interval is calculated and returned. `Ñ` is the number of samples in the out-of-sample evaluation of EEV.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The same size is used to generate the expected value decision. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalSamples`](@ref) is the size of the sampled models used in the upper bound calculation and the attribute [`NumEEVSamples`] is the size of the sampled models used in the `EEV` calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
+
+If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`EEV`](@ref), [`EVPI`](@ref)
 """
-function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, Ñ::Integer = 1000, tol::AbstractFloat = 1e-1, kwargs...)
+function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, Ñ::Integer = 1000, tol::AbstractFloat = 1e-1, kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(stochasticprogram.optimizer)
-    # Condidence level
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    # Modify confidence for two-sided interval
     α = (1-confidence)/2
+    MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Calculate confidence interval around VRP
-    ss = optimize!(stochasticmodel, sampler; confidence = 1-α, Ñ = Ñ, tol = tol, kwargs...)
-    vrp = confidence_interval(ss)
+    optimize!(stochasticmodel, sampler)
+    # Check return status
+    status = termination_status(stochasticmodel)
+    if status != MOI.OPTIMAL
+        error("Stochastic model could not be solved to optimality, returned status $status.")
+    end
+    vrp = objective_value(stochasticmodel)
     # Calculate confidence interval around EEV
-    eev = EEV(stochasticmodel, sampler; confidence = 1-α, N = ss.N, Ñ = Ñ)
-    try
-        vss = ConfidenceInterval(lower(vrp) - upper(eev), upper(vrp) - lower(eev), confidence)
-        lower(vss) >= -tol || error()
-        return vss
-    catch
+    eev = EEV(stochasticmodel, sampler)
+    # Restore confidence level
+    MOI.set(stochasticmodel, Confidence(), confidence)
+    # Check overlap
+    if (upper(eev) >= lower(vrp) + eps() && upper(vrp) >= lower(eev) + eps()) ||
+       (lower(eev) <= upper(vrp) - eps() && upper(eev) >= lower(vrp) + eps())
         @warn "VSS is not statistically significant to the chosen confidence level and tolerance"
-        return ConfidenceInterval(-Inf, Inf, 1.0)
+        # Return confidence interval as tolerance around zero
+        tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+        return ConfidenceInterval(-tolerance, tolerance, confidence)
+    end
+    # Switch on sign
+    if lower(vrp) >= upper(eev)
+        # Return confidence interval around VSS
+        return ConfidenceInterval(lower(vrp) - upper(eev), upper(vrp) - lower(eev), confidence)
+    else
+        # Return confidence interval around VSS
+        return ConfidenceInterval(lower(eev) - upper(vrp), upper(eev) - lower(vrp), confidence)
     end
 end
 # ========================== #

@@ -21,7 +21,7 @@ end
 """
     load_structure!(optimizer::AbstractStructuredOptimizer, structure::AbstractStochasticStructure, x₀::AbstractVector)
 
-Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure` and inital decision `x₀`.
+Instantiate the `optimizer` with the stochastic program represented in memory by the given `structure` and initial decision `x₀`.
 
 See also: [`optimize!`](@ref)
 """
@@ -49,14 +49,6 @@ function optimize!(optimizer::AbstractStructuredOptimizer)
     throw(MethodError(optimize_structured!, optimizer))
 end
 """
-    termination_status(optimizer::AbstractStructuredOptimizer)
-
-Return the reason why the solver stopped (i.e., the MathOptInterface model attribute `TerminationStatus`).
-"""
-function termination_status(optimizer::AbstractStructuredOptimizer)
-    throw(MethodError(termination_status, optimizer))
-end
-"""
     optimizer_name(optimizer::AbstractStructuredOptimizer)
 
 Optionally, return a string identifier of `AbstractStructuredOptimizer`.
@@ -80,40 +72,31 @@ Return a MOI optimizer constructor for solving subproblems
 function subproblem_optimizer(optimizer::AbstractStructuredOptimizer)
     return throw(MethodError(subproblem_optimizer, optimizer))
 end
-# # Sample-based solver interface
-# # ========================== #
-# """
-#     optimize_sampled!(sampledoptimizer::AbstractSampledOptimizer, stochasticmodel::StochasticModel, sampler::AbstractSampler, confidence::AbstractFloat)
-
-# Approximately optimize the `stochasticmodel` to the given `confidence` level, using `sampler` to generate scenarios.
-# """
-# function optimize_sampled!(sampledoptimizer::AbstractSampledOptimizer, stochasticmodel::StochasticModel, sampler::AbstractSampler, confidence::AbstractFloat)
-#     throw(MethodError(optimize_sampled!, sampledoptimizer, stochasticmodel, sampler))
-# end
-# """
-#     optimal_value(sampledoptimizer::AbstractStructuredOptimizer)
-
-# Generate a `StochasticSolution` from `sampledoptimizer` after a call to `optimize_sampled!`. The solution should include an approximately optimal first-stage decision, an an approximate optimal value and a confidence interval around the true optimum of the original stochastic model.
-
-# See also: [`optimize_sampled!`](@ref), [`StochasticSolution`](@ref)
-# """
-# function optimal_value(sampledoptimizer::AbstractStructuredOptimizer)
-#     throw(MethodError(optimal_value, sampledoptimizer))
-# end
-# """
-#     internal_solver(solver::AbstractSampledOptimizer)
-
-# Return an `AbstractMathProgSolver`, if available, from `solver`.
-# """
-# function internal_solver(solver::AbstractSampledOptimizer)
-#     throw(MethodError(optimsolver, solver))
-# end
-# """
-#     optimizer_name(optimizer::AbstractSampledOptimizer)
-
-# Optionally, return a string identifier of `AbstractSampledOptimizer`.
-# """
-# function optimizer_name(::AbstractSampledOptimizer)
-#     return "SolverName() attribute not implemented by the optimizer."
-# end
+# Sample-based solver interface
 # ========================== #
+"""
+    load_model!(optimizer::AbstractSampledOptimizer, model::StochasticModel, x₀::AbstractVector)
+
+Instantiate the `optimizer` with the stochastic model and initial decision `x₀`.
+
+See also: [`optimize!`](@ref)
+"""
+function load_model!(optimizer::AbstractSampledOptimizer, model::StochasticModel, sampler::AbstractSampler, x₀::AbstractVector)
+    throw(MethodError(load_model!, optimizer, sampler, model, x₀))
+end
+"""
+    optimizer_name(optimizer::AbstractSampledOptimizer)
+
+Optionally, return a string identifier of `AbstractSampledOptimizer`.
+"""
+function optimizer_name(::AbstractSampledOptimizer)
+    return "SolverName() attribute not implemented by the optimizer."
+end
+"""
+    optimal_instance(optimizer::AbstractSampledOptimizer)
+
+Return a stochastic programming instance of the stochastic model after a call to [`optimize!`](@ref).
+"""
+function optimal_instance(::AbstractSampledOptimizer)
+    return throw(MethodError(instance, optimizer))
+end

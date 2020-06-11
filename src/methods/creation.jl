@@ -429,7 +429,7 @@ In a @stage block, annotate each decision taken in the previous stage using the 
 
 See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
-macro decision(def) @warn "@decision should be used inside a @stage block." end
+macro decision(def...) @warn "@decision should be used inside a @stage block." end
 """
     @known(def)
 
@@ -565,19 +565,19 @@ macro stage(stage, args)
     # Decision definitions might require parameter calculations,
     # so we first need to extract and save any such lines
     vardefs = Expr(:block)
-    decisiondefs = Expr(:block)
-    for line in block(def).args
-        if  @capture(line, @variable(m_Symbol, variabledef__)) ||
-            @capture(line, @decision(m_Symbol, decisiondef__)) ||
-            @capture(line, @constraint(m_Symbol, constdef__)) ||
-            @capture(line, @objective(m_Symbol, objdef__)) ||
-            @capture(line, @parameters args__) ||
-            @capture(line, @uncertain args__)
+    decisiondefs = postwalk(def) do x
+        if  @capture(x, @variable(m_Symbol, variabledef__)) ||
+            @capture(x, @decision(m_Symbol, knowndef__)) ||
+            @capture(x, @known(m_Symbol, variabledef__)) ||
+            @capture(x, @constraint(m_Symbol, constdef__)) ||
+            @capture(x, @objective(m_Symbol, objdef__)) ||
+            @capture(x, @parameters args__) ||
+            @capture(x, @uncertain args__)
             # Skip any line related to the JuMP model, stochastics, or unhandled @decision/@parameter lines
-            continue
+            return Expr(:block)
         else
             # Everything else could be required for decision variable construction, and is therefore saved
-            push!(decisiondefs.args, line)
+            return x
         end
     end
     # Next, handle @decision annotations
@@ -695,7 +695,7 @@ macro stage(stage, args)
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
         $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(decisiondefs))
+            $(esc(prettify(decisiondefs)))
 	        return $(esc(:model))
         end
         # Stage model generation code

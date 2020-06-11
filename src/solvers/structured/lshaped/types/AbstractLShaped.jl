@@ -24,13 +24,6 @@ end
 
 # Functions #
 # ======================================================================== #
-function set_params!(lshaped::AbstractLShaped; kwargs...)
-    for (k,v) in kwargs
-        setfield!(lshaped.parameters, k, v)
-    end
-    return nothing
-end
-
 function prepare_master!(lshaped::AbstractLShaped)
     # Cache the objective function
     F = MOI.get(lshaped.master, MOI.ObjectiveFunctionType())
@@ -48,7 +41,7 @@ function add_master_variable!(lshaped::AbstractLShaped, index::Integer)
             add_subscript("θ", index))
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    coeff = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     # Add to objective
     MOI.modify(lshaped.master, MOI.ObjectiveFunction{F}(), MOI.ScalarCoefficientChange(master_variable, coeff))
     lshaped.master_variables[index] = master_variable
@@ -136,7 +129,7 @@ end
 function current_objective_value(lshaped::AbstractLShaped)
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     # Return sense-corrected value
     return evaluate_first_stage(lshaped, current_decision(lshaped)) +
         correction * sum(subobjectives(lshaped))
@@ -145,7 +138,7 @@ end
 function calculate_estimate(lshaped::AbstractLShaped)
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     # Return sense-corrected value
     return evaluate_first_stage(lshaped, lshaped.x) +
         correction * sum(model_objectives(lshaped))

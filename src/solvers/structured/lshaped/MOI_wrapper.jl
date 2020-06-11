@@ -56,6 +56,8 @@ L-Shaped Gap  Time: 0:00:00 (6 iterations)
 mutable struct Optimizer <: AbstractStructuredOptimizer
     master_optimizer
     subproblem_optimizer
+    master_params::Dict{MOI.AbstractOptimizerAttribute, Any}
+    sub_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     feasibility_cuts::Bool
     execution::AbstractExecution
     regularizer::AbstractRegularizer
@@ -76,6 +78,8 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                        subproblem_optimizer = nothing, kw...)
         return new(master_optimizer,
                    subproblem_optimizer,
+                   Dict{MOI.AbstractOptimizerAttribute, Any}(),
+                   Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    feasibility_cuts,
                    execution,
                    regularize,
@@ -127,7 +131,7 @@ function load_structure!(optimizer::Optimizer, structure::VerticalBlockStructure
     # Default subproblem optimizer to master optimizer if
     # none have been set
     if optimizer.subproblem_optimizer === nothing
-        set_subproblem_optimizer!(structure, optimizer.master_optimizer)
+        StochasticPrograms.set_subproblem_optimizer!(structure, optimizer.master_optimizer)
     end
     # Restore structure if optimization has been run before
     restore_structure!(optimizer)
@@ -140,6 +144,13 @@ function load_structure!(optimizer::Optimizer, structure::VerticalBlockStructure
                                          optimizer.aggregator,
                                          optimizer.consolidator;
                                          type2dict(optimizer.parameters)...)
+    # Set any given master/sub optimizer attributes
+    for (attr, value) in optimizer.master_params
+        MOI.set(optimizer.lshaped.master, attr, value)
+    end
+    for (attr, value) in optimizer.sub_params
+        MOI.set(scenarioproblems(optimizer.lshaped.structure), attr, value)
+    end
     return nothing
 end
 
@@ -185,8 +196,14 @@ function MOI.get(optimizer::Optimizer, ::MOI.Silent)
     return !MOI.get(optimizer, MOI.RawParameter("log"))
 end
 
-function MOI.set(optimizer::Optimizer, ::MOI.Silent, flag::Bool)
+function MOI.set(optimizer::Optimizer, attr::MOI.Silent, flag::Bool)
     MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    optimizer.master_params[attr] = flag
+    optimizer.sub_params[attr] = flag
+    if optimizer.lshaped != nothing
+        MOI.set(optimizer.lshaped.master, attr, flag)
+        MOI.set(scenarioproblems(optimizer.lshaped.structure), attr, flag)
+    end
     return nothing
 end
 
@@ -241,7 +258,27 @@ function MOI.set(optimizer::Optimizer, ::MasterOptimizer, optimizer_constructor)
     return nothing
 end
 
+function MOI.get(optimizer::Optimizer, param::RawMasterOptimizerParameter)
+    moi_param = MOI.RawParameter(param.name)
+    if !haskey(optimizer.master_params, moi_param)
+        error("Master optimizer attribute $(param.name) has not been set.")
+    end
+    return optimizer.master_params[moi_param]
+end
+
+function MOI.set(optimizer::Optimizer, param::RawMasterOptimizerParameter, value)
+    moi_param = MOI.RawParameter(param.name)
+    optimizer.master_params[moi_param] = value
+    if optimizer.lshaped != nothing
+        MOI.set(optimizer.lshaped.master, moi_param, value)
+    end
+    return nothing
+end
+
 function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
+    if optimizer.subproblem_optimizer === nothing
+        return optimizer.master_optimizer
+    end
     return optimizer.subproblem_optimizer
 end
 
@@ -249,6 +286,23 @@ function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_construc
     optimizer.subproblem_optimizer = optimizer_constructor
     # Trigger reload
     reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
+    moi_param = MOI.RawParameter(param.name)
+    if !haskey(optimizer.sub_params, moi_param)
+        error("Subproblem optimizer attribute $(param.name) has not been set.")
+    end
+    return optimizer.sub_params[moi_param]
+end
+
+function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, value)
+    moi_param = MOI.RawParameter(param.name)
+    optimizer.sub_params[moi_param] = value
+    if optimizer.lshaped != nothing
+        MOI.set(scenarioproblems(optimizer.lshaped.structure), attr, flag)
+    end
     return nothing
 end
 
@@ -377,31 +431,47 @@ MOI.supports(::Optimizer, ::MOI.Silent) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
+MOI.supports(::Optimizer, ::RawInstanceOptimizerParameter) = true
 MOI.supports(::Optimizer, ::AbstractLShapedAttribute) = true
 
 # High-level attribute setting #
 # ========================== #
 function set_regularization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawRegularizationParameter(name), value)
+    return set_optimizer_attribute(stochasticprogram, RawRegularizationParameter(String(name)), value)
 end
 function set_regularization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_regularization_attributes(stochasticprogram, name, value)
     end
 end
+function set_regularization_attribute(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
+        set_regularization_attributes(stochasticprogram, name, value)
+    end
+end
 function set_aggregation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawAggregationParameter(name), value)
+    return set_optimizer_attribute(stochasticprogram, RawAggregationParameter(String(name)), value)
 end
 function set_aggregation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_aggregation_attributes(stochasticprogram, name, value)
     end
 end
+function set_aggregation_attribute(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
+        set_aggregation_attributes(stochasticprogram, name, value)
+    end
+end
 function set_consolidation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawConsolidationParameter(name), value)
+    return set_optimizer_attribute(stochasticprogram, RawConsolidationParameter(String(name)), value)
 end
 function set_consolidation_attribute(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
-        set_aggregation_attributes(stochasticprogram, name, value)
+        set_consolidation_attributes(stochasticprogram, name, value)
+    end
+end
+function set_consolidation_attribute(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
+        set_consolidation_attributes(stochasticprogram, name, value)
     end
 end

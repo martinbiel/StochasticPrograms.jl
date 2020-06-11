@@ -11,7 +11,7 @@ end
 
 Evaluate the first-stage `decision` in `stochasticprogram`.
 
-In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, evaluate the first-stage objective at `decision` and solve outcome models of `decision` for every available scenario. The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
 function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
@@ -28,13 +28,13 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decisio
     return evaluate_decision(structure(stochasticprogram), decision)
 end
 """
-    statistically_valuate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
+    statistically_evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
 
 Statistically evaluate the first-stage `decision` in `stochasticprogram`, returning the evaluated value and the spread over the scenarios.
 
-The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function statistically_valuate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
+function statistically_evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been generated at this point
@@ -44,15 +44,12 @@ function statistically_valuate_decision(stochasticprogram::TwoStageStochasticPro
     # Sanity checks on given decision vector
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
     # Dispatch evaluation on stochastic structure
-    return statistically_valuate_decision(structure(stochasticprogram), decision)
+    return statistically_evaluate_decision(structure(stochasticprogram), decision)
 end
 """
-    evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
-                      decision::AbstractVector,
-                      scenario::AbstractScenario;
-                      optimizer = nothing)
+    evaluate_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector, scenario::AbstractScenario)
 
-Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+Evaluate the result of taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
 function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
                            decision::AbstractVector,
@@ -60,7 +57,7 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Sanity checks on given decision vector
-    length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
+    length(decision) == num_decisions(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
     # Generate and solve outcome model
     outcome = outcome_model(stochasticprogram, decision, scenario, sub_optimizer(stochasticprogram))
@@ -79,42 +76,35 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     end
 end
 """
-    evaluate_decision(stochasticmodel::StochasticModel{2},
-                      decision::AbstractVector,
-                      sampler::AbstractSampler;
-                      optimizer = nothing;
-                      confidence = 0.95,
-                      N = 1000)
+    evaluate_decision(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
 
-Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision` in the form of a confidence interval at level `confidence`, over the scenario distribution induced by `sampler`.
+Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision` in the form of a confidence interval at the current confidence level, over the scenario distribution induced by `sampler`.
 
-In other words, evaluate `decision` on a sampled model of size `N`. Generate an confidence interval using the sample variance of the evaluation.
+In other words, evaluate `decision` on a sampled model and generate an confidence interval using the sample variance of the evaluation. The confidence level can be set through the [`Confidence`](@ref) attribute and the sample size can be set through the [`NumEvalSamples`](@ref) attribute.
 
-The supplied `decision` must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must match the defined decision variables in `stochasticmodel`. If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`confidence_interval`](@ref)
 """
-function evaluate_decision(stochasticmodel::StochasticModel{2},
-                           decision::AbstractVector,
-                           sampler::AbstractSampler;
-                           confidence::AbstractFloat = 0.95,
-                           Ñ::Integer = 1000,
-                           kw...)
+function evaluate_decision(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    N = MOI.get(stochasticmodel, NumEvalSamples())
     # Calculate confidence interval using provided optimizer
-    CI = let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = optimizer_constructor(stochasticmodel), kw...)
+    CI = let eval_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
         # Sanity checks on given decision vector
-        length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
+        length(decision) == num_decisions(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(eval_model))
         all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
-        # Initialize after checks
-        initialize!(eval_model)
-        # Condidence level
-        α = 1-confidence
-        𝔼Q, σ = statistically_evalute_decision(eval_model, decision)
-        z = quantile(Normal(0,1), 1-α)
-        L = 𝔼Q - z*σ/sqrt(Ñ)
-        U = 𝔼Q + z*σ/sqrt(Ñ)
+        # Confidence level
+        α = 1 - confidence
+        𝔼Q, σ = statistically_evaluate_decision(eval_model, decision)
+        z = quantile(Normal(0,1), 1 - α)
+        L = 𝔼Q - z * σ / sqrt(N)
+        U = 𝔼Q + z * σ / sqrt(N)
         # Clear memory from temporary model
         clear!(eval_model)
         return ConfidenceInterval(L, U, confidence)
@@ -122,39 +112,40 @@ function evaluate_decision(stochasticmodel::StochasticModel{2},
     return CI
 end
 """
-    lower_bound(stochasticmodel::StochasticModel{2},
-                sampler::AbstractSampler;
-                confidence = 0.95,
-                N = 100,
-                M = 10)
+    lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
 
-Generate a confidence interval around a lower bound on the true optimum of the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around a lower bound on the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function lower_bound(stochasticmodel::StochasticModel{2},
-                     sampler::AbstractSampler;
-                     confidence::AbstractFloat = 0.95,
-                     N::Integer = 100,
-                     M::Integer = 10,
-                     log = true,
-                     keep = true,
-                     offset = 0,
-                     indent::Int = 0,
-                     kw...)
+function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
-    α = 1-confidence
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get the instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    α = 1 - confidence
+    N = MOI.get(stochasticmodel, NumSamples())
+    M = MOI.get(stochasticmodel, NumLowerTrials())
+    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
+    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
+    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
+    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     progress = Progress(M, 0.0, "$(repeat(" ", indent))Lower CI    ")
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:M
-        let sampled_model = sample(stochasticmodel, sampler, N; optimizer = optimizer_constructor(stochasticmodel), kw...)
+        let sampled_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
+            # Set log parameters
+            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("log"), log)
+            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("keep"), keep)
+            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("offset"), offset)
+            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("indent"), indent)
             Qs[i] = VRP(sampled_model)
             # Clear memory from temporary model
             clear!(sampled_model)
@@ -164,174 +155,151 @@ function lower_bound(stochasticmodel::StochasticModel{2},
     Q̂ = mean(Qs)
     σ = std(Qs)
     t = quantile(TDist(M-1), 1-α)
-    L = Q̂ - t*σ/sqrt(M)
-    U = Q̂ + t*σ/sqrt(M)
+    L = Q̂ - t * σ / sqrt(M)
+    U = Q̂ + t * σ / sqrt(M)
     return ConfidenceInterval(L, U, 1-α)
 end
 """
-    upper_bound(stochasticmodel::StochasticModel{2},
-                sampler::AbstractSampler;
-                confidence = 0.95,
-                N = 100,
-                T = 10,
-                n = 1000)
+    upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
 
-Generate a confidence interval around an upper of the true optimum of the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around an upper bound of the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`, by generating and evaluating a candidate decision.
 
-`N` is the size of the sampled model used to generate a candidate decision. `Ñ` is the size of each sampled model and `T` is the number of sampled models.
+The attribute [`NumSamples`](@ref) is the size of the sampled model used to generate a candidate decision. The attribute [`NumUpperTrials`](@ref) is the number of sampled models and the attribute [`NumEvalSamples`](@ref) is the size of the evaluation models. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function upper_bound(stochasticmodel::StochasticModel{2},
-                     sampler::AbstractSampler;
-                     confidence::AbstractFloat = 0.95,
-                     N::Integer = 100,
-                     T::Integer = 10,
-                     Ñ::Integer = 1000,
-                     log = true,
-                     keep = true,
-                     offset = 0,
-                     indent::Int = 0,
-                     kw...)
+function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
-    α = 1-confidence
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get the instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    α = 1 - confidence
+    num_samples = MOI.get(stochasticmodel, NumSamples())
+    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
+    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
+    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
+    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
     # decision generation
-    sampled_model = sample(stochasticmodel, sampler, N; optimizer = optimizer_constructor(stochasticmodel), kw...)
+    sampled_model = instantiate(stochasticmodel,
+                                sampler,
+                                num_samples;
+                                optimizer = optimizer,
+                                kw...)
+    # Set log parameters
+    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("log"), log)
+    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("keep"), keep)
+    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("offset"), offset)
+    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("indent"), indent)
+    # Optimize
     optimize!(sampled_model)
     x̂ = optimal_decision(sampled_model)
-    return upper_bound(stochasticmodel, x̂, sampler; confidence = confidence, T = T, Ñ = Ñ, log = log, keep = keep, offset = offset, indent = indent, kw...)
+    return upper_bound(stochasticmodel, x̂, sampler; kw...)
 end
 """
-    upper_bound(stochasticmodel::StochasticModel{2},
-                decision::AbstractVector,
-                sampler::AbstractSampler;
-                confidence = 0.95,
-                T = 10,
-                Ñ = 1000)
+    upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
 
-Generate a confidence interval around an upper bound of the expected value of `decision` in the two-stage `stochasticmodel` at level `confidence`, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around an upper bound of the expected value of `decision` in the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
-`Ñ` is the size of each sampled model and `T` is the number of sampled models.
+The attribute [`NumUpperTrials`](@ref) is the number of sampled models and the attribute [`NumEvalSamples`](@ref) is the size of the evaluation models. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-The supplied `decision` must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function upper_bound(stochasticmodel::StochasticModel{2},
-                     decision::AbstractVector,
-                     sampler::AbstractSampler;
-                     confidence::AbstractFloat = 0.95,
-                     T::Integer = 10,
-                     Ñ::Integer = 1000,
-                     log = true,
-                     keep = true,
-                     offset = 0,
-                     indent::Int = 0,
-                     kw...)
+function upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler, kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
-    α = 1-confidence
-    Qs = Vector{Float64}(undef, T)
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Get the instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get parameters
+    confidence = MOI.get(stochasticmodel, Confidence())
+    α = 1 - confidence
+    N = MOI.get(stochasticmodel, NumEvalSamples())
+    T = MOI.get(stochasticmodel, NumUpperTrials())
+    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
+    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
+    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
+    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
+    # Generate upper bound
+    Q = Vector{Float64}(undef, T)
     progress = Progress(T, 0.0, "$(repeat(" ", indent))Upper CI    ")
     log && sleep(0.1)
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:T
-        let eval_model = sample(stochasticmodel, sampler, Ñ; optimizer = optimizer_constructor(stochasticmodel), defer = true, kw...)
+        let eval_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
             # Sanity checks on given decision vector
-            length(decision) == decision_length(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(eval_model))
+            length(decision) == num_decisions(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(eval_model))
             all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
-            # Initialize after checks
-            initialize!(eval_model)
             # Evaluate on sampled model
-            Qs[i] = evaluate_decision(eval_model, decision)
+            Q[i] = evaluate_decision(eval_model, decision)
             # Clear memory from temporary model
             clear!(eval_model)
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
     end
-    Q̂ = mean(Qs)
-    σ = std(Qs)
-    t = quantile(TDist(T-1), 1-α)
-    L = Q̂ - t*σ/sqrt(T)
-    U = Q̂ + t*σ/sqrt(T)
-    return ConfidenceInterval(L, U, 1-α)
+    Q̂ = mean(Q)
+    σ = std(Q)
+    t = quantile(TDist(T - 1), 1 - α)
+    L = Q̂ - t * σ / sqrt(T)
+    U = Q̂ + t * σ / sqrt(T)
+    return ConfidenceInterval(L, U, 1 - α)
 end
 """
-    confidence_interval(stochasticmodel::StochasticModel{2},
-                        sampler::AbstractSampler;
-                        confidence = 0.9,
-                        N = 100,
-                        M = 10,
-                        T = 10)
+    confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
 
 Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the sampled models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function confidence_interval(stochasticmodel::StochasticModel{2},
-                             sampler::AbstractSampler;
-                             confidence::AbstractFloat = 0.9,
-                             N::Integer = 100,
-                             M::Integer = 10,
-                             T::Integer = 10,
-                             Ñ::Integer = 1000,
-                             log = true,
-                             keep = true,
-                             offset = 0,
-                             indent::Int = 0,
-                             kw...)
+function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Confidence level
+    confidence = MOI.get(stochasticmodel, Confidence())
+    # Modify confidence for two-sided interval
     α = (1-confidence)/2
+    MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Lower bound
-    lower_CI = lower_bound(stochasticmodel, sampler; confidence = 1-α, N = N, M = M, log = log, keep = keep, offset = offset, indent = indent, kw...)
+    lower_CI = lower_bound(stochasticmodel, sampler; kw...)
     L = lower(lower_CI)
     # Upper bound
-    upper_CI = upper_bound(stochasticmodel, sampler; confidence = 1-α, N = N, T = T, Ñ = Ñ, log = log, keep = keep, offset = offset, indent = indent, kw...)
-    U = upper(upper_CI)
+    U = -Inf
+    while U < L
+        upper_CI = upper_bound(stochasticmodel, sampler; kw...)
+        U = upper(upper_CI)
+    end
+    # Restore confidence level
+    MOI.set(stochasticmodel, Confidence(), confidence)
+    # Return confidence interval
     return ConfidenceInterval(L, U, confidence)
 end
 """
-    gap(stochasticmodel::StochasticModel{2},
-        decision::UnionAbstractVector,
-        sampler::AbstractSampler;
-        confidence = 0.9,
-        N = 100,
-        M = 10,
-        T = 10)
+    gap(stochasticmodel::StochasticModel{2}, decision::UnionAbstractVector, sampler::AbstractSampler)
 
-Generate a confidence interval around the gap between the result of using `decision` and the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
+Generate a confidence interval around the gap between the result of using `decision` and the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
-`N` is the size of the SAA models used to generate the interval and generally governs how tight it is. `M` is the number of sampled models used in the lower bound calculation, and `T` is the number of sampled models used in the upper bound calculation.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-The supplied `decision` must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+The supplied `decision` must match the defined decision variables in `stochasticmodel`. If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function gap(stochasticmodel::StochasticModel{2},
-             decision::AbstractVector,
-             sampler::AbstractSampler;
-             confidence::AbstractFloat = 0.9,
-             N::Integer = 100,
-             M::Integer = 10,
-             T::Integer = 10,
-             Ñ::Integer = 1000,
-             log = true,
-             keep = true,
-             offset = 0,
-             indent::Int = 0,
-             kw...)
+function gap(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
-    check_provided_optimizer(provided_optimizer(stochasticmodel))
-    # Condidence level
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Confidence level
+    confidence = MOI.get(stochasticmodel, Confidence())
+    # Modify confidence for two-sided interval
     α = (1-confidence)/2
+    MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Lower bound
-    lower_CI = lower_bound(stochasticmodel, sampler; confidence = 1-α, N = N, M = M, log = log, keep = keep, offset = offset, indent = indent, kw...)
+    lower_CI = lower_bound(stochasticmodel, sampler; kw...)
     L = lower(lower_CI)
     # Upper bound
-    upper_CI = upper_bound(stochasticmodel, x, sampler; confidence = 1-α, N = N, T = T, Ñ = Ñ, log = log, keep = keep, offset = offset, indent = indent, kw...)
+    upper_CI = upper_bound(stochasticmodel, decision, sampler; kw...)
     U = upper(upper_CI)
-    return ConfidenceInterval(0., U-L, confidence)
+    # Restore confidence level
+    MOI.set(stochasticmodel, Confidence(), confidence)
+    # Return confidence interval
+    return ConfidenceInterval(0., U - L, confidence)
 end

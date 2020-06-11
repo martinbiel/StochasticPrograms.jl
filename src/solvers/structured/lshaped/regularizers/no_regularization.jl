@@ -41,10 +41,6 @@ function gap(lshaped::AbstractLShaped, ::NoRegularization)
     return abs(θ-Q)/(abs(Q)+1e-10)
 end
 
-function add_regularization_params!(::NoRegularization; kwargs...)
-    return nothing
-end
-
 # API
 # ------------------------------------------------------------
 """

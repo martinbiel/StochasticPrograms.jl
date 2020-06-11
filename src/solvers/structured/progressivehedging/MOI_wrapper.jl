@@ -35,6 +35,7 @@ Progressive Hedging Time: 0:00:06 (1315 iterations)
 """
 mutable struct Optimizer <: AbstractStructuredOptimizer
     subproblem_optimizer
+    sub_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     execution::AbstractExecution
     penalizer::AbstractPenalizer
     penaltyterm::AbstractPenaltyterm
@@ -49,6 +50,7 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                        penaltyterm::AbstractPenaltyterm = Quadratic(),
                        kw...)
         return new(subproblem_optimizer,
+                   Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    execution,
                    penalty,
                    penaltyterm,
@@ -103,6 +105,9 @@ function load_structure!(optimizer::Optimizer, structure::HorizontalBlockStructu
                                                                optimizer.penalizer,
                                                                optimizer.penaltyterm;
                                                                type2dict(optimizer.parameters)...)
+    for (attr, value) in optimizer.sub_params
+        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, value)
+    end
     return nothing
 end
 
@@ -145,8 +150,12 @@ function MOI.get(optimizer::Optimizer, ::MOI.Silent)
     return !MOI.get(optimizer, MOI.RawParameter("log"))
 end
 
-function MOI.set(optimizer::Optimizer, ::MOI.Silent, flag::Bool)
+function MOI.set(optimizer::Optimizer, attr::MOI.Silent, flag::Bool)
     MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    optimizer.sub_params[attr] = flag
+    if optimizer.progressivehedging != nothing
+        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, flag)
+    end
     return nothing
 end
 
@@ -201,6 +210,23 @@ function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_construc
     end
     # Trigger reload
     reload_structure!(optimizer)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
+    moi_param = MOI.RawParameter(param.name)
+    if !haskey(optimizer.sub_params, moi_param)
+        error("Subproblem optimizer attribute $(param.name) has not been set.")
+    end
+    return optimizer.sub_params[moi_param]
+end
+
+function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, value)
+    moi_param = MOI.RawParameter(param.name)
+    optimizer.sub_params[moi_param] = value
+    if optimizer.progressivehedging != nothing
+        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, flag)
+    end
     return nothing
 end
 
@@ -286,15 +312,21 @@ MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::MasterOptimizer) = false
+MOI.supports(::Optimizer, ::RawInstanceOptimizerParameter) = true
 MOI.supports(::Optimizer, ::AbstractProgressiveHedgingAttribute) = true
 
 # High-level attribute setting #
 # ========================== #
 function set_penalization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawPenalizationParameter(name), value)
+    return set_optimizer_attribute(stochasticprogram, RawPenalizationParameter(String(name)), value)
 end
 function set_penalization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
+        set_regularization_attributes(stochasticprogram, name, value)
+    end
+end
+function set_penalization_attributes(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
         set_regularization_attributes(stochasticprogram, name, value)
     end
 end

@@ -5,11 +5,11 @@ function evaluate_decision(structure::VerticalBlockStructure, decision::Abstract
     return cᵀx + 𝔼Q
 end
 
-function statistically_evalute_decision(structure::VerticalBlockStructure, decision::AbstractVector)
+function statistically_evaluate_decision(structure::VerticalBlockStructure, decision::AbstractVector)
     # Evalaute decision stage-wise
     cᵀx = _eval_first_stage(structure, decision)
-    𝔼Q, σ = _stat_eval_second_stages(structure, decision, objective_sense(structure.first_stage))
-    return cᵀx + 𝔼Q, σ
+    𝔼Q, σ² = _stat_eval_second_stages(structure, decision, objective_sense(structure.first_stage))
+    return cᵀx + 𝔼Q, sqrt(σ²)
 end
 
 function _eval_first_stage(structure::VerticalBlockStructure, decision::AbstractVector)
@@ -97,5 +97,5 @@ function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,SP},
         end
     end
     𝔼Q, σ², _ = reduce(aggregate_welford, partial_welfords)
-    return 𝔼Q, sqrt(σ²)
+    return 𝔼Q, σ²
 end

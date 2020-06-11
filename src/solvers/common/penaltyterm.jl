@@ -70,7 +70,7 @@ function initialize_penaltyterm!(penalty::Quadratic,
     # Add sense-corrected aux term to objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
@@ -85,7 +85,7 @@ function update_penaltyterm!(penalty::Quadratic,
     # Update penalty parameter
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
@@ -188,7 +188,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     # Add sense-corrected aux term to objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     for i in eachindex(x)
         MOI.modify(model,
                    MOI.ObjectiveFunction{F}(),
@@ -206,7 +206,7 @@ function update_penaltyterm!(penalty::Linearized,
     # Update penalty parameter
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     for i in eachindex(x)
         MOI.modify(model,
                    MOI.ObjectiveFunction{F}(),
@@ -275,7 +275,7 @@ function initialize_penaltyterm!(penalty::InfNorm,
     # Add sense-corrected aux term to objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
@@ -290,7 +290,7 @@ function update_penaltyterm!(penalty::InfNorm,
     # Update penalty parameter
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
@@ -351,7 +351,7 @@ function initialize_penaltyterm!(penalty::ManhattanNorm,
     # Add sense-corrected aux term to objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
@@ -366,7 +366,7 @@ function update_penaltyterm!(penalty::ManhattanNorm,
     # Update penalty parameter
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     MOI.modify(model,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))

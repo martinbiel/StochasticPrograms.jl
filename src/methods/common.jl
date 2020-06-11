@@ -37,7 +37,7 @@ end
 function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector, sense::Union{MOI.OptimizationSense, Nothing} = nothing)
     # Sanity check
     length(subproblems) == length(probabilities) || error("Inconsistent number of subproblems and probabilities")
-    N = num_subproblems(scenarioproblems)
+    N = length(subproblems)
     N == 0 && return 0.0, 0.0, 0.0, N
     sense === nothing ? sense = objective_sense(subproblems[1]) : sense
     Q̄ₖ = Sₖ = wₖ = w²ₖ = 0
@@ -51,24 +51,24 @@ function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector,
             status = termination_status(problem)
             Q = if status != MOI.OPTIMAL
                 Q = if status == MOI.INFEASIBLE
-                    objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
+                    objective_sense(problem) == MOI.MAX_SENSE ? -Inf : Inf
                 elseif status == MOI.DUAL_INFEASIBLE
-                    objective_sense(outcome) == MOI.MAX_SENSE ? Inf : -Inf
+                    objective_sense(problem) == MOI.MAX_SENSE ? Inf : -Inf
                 else
-                    error("Outcome model could not be solved, returned status: $status")
+                    error("Subproblem could not be solved during welford algorithm, returned status: $status")
                 end
             else
                 Q = objective_value(problem)
             end
-            Q = sense == objective_sense(outcome) ? Q : -Q
+            Q = sense == objective_sense(problem) ? Q : -Q
             Q̄ₖ = Q̄ₖ + (π / wₖ) * (Q - Q̄ₖ)
             Sₖ = Sₖ + π * (Q - Q̄ₖ) * (Q - Q̄ₖ₋₁)
         catch error
             if isa(error, NoOptimizer)
-                @warn "No optimizer set, cannot solve outcome model."
+                @warn "No optimizer set, cannot solve subproblem during welford algorithm."
                 rethrow(NoOptimizer())
             else
-                @warn "Outcome model could not be solved."
+                @warn "Subproblem could not be solved during welford algorithm."
                 rethrow(error)
             end
         end

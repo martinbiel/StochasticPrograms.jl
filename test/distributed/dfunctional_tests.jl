@@ -27,7 +27,7 @@
             @test termination_status(sp) == MOI.OPTIMAL
             optimize!(sp_nondist)
             @test termination_status(sp_nondist) == MOI.OPTIMAL
-            @test scenariotype(sp) == scenariotype(sp_nondist)
+            @test scenario_type(sp) == scenario_type(sp_nondist)
             @test isapprox(stage_probability(sp), stage_probability(sp_nondist))
             @test num_scenarios(sp) == num_scenarios(sp_nondist)
             @test num_scenarios(sp) == length(scenarios(sp))

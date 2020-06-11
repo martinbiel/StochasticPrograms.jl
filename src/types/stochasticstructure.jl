@@ -69,10 +69,10 @@ message(err::UnloadableStructure) = err.message
 function structure_name(structure::AbstractStochasticStructure)
     return "Unknown"
 end
-function scenariotype(structure::AbstractStochasticStructure, s::Integer = 2)
-    return _scenariotype(scenarios(structure, s))
+function scenario_type(structure::AbstractStochasticStructure, s::Integer = 2)
+    return _scenario_type(scenarios(structure, s))
 end
-function _scenariotype(::Vector{S}) where S <: AbstractScenario
+function _scenario_type(::Vector{S}) where S <: AbstractScenario
     return S
 end
 function num_scenarios(structure::AbstractStochasticStructure, s::Integer = 2)

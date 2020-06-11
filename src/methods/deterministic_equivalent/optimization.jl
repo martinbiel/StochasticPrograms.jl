@@ -3,8 +3,8 @@ function optimize!(structure::DeterministicEquivalent, optimizer::MOI.AbstractOp
     backend(structure.model) === optimizer || error("Stochastic program optimizer has not been connected to the deterministically equivalent problem.")
     # Crash if supported
     if MOI.supports(optimizer, MOI.VariablePrimalStart(), MOI.VariableIndex)
-        for (i,dvar) in enumerate(all_decision_variables(structure))
-            MOI.set(optimizer, MOI.VariablePrimalStart(), index(dvar), x₀[i])
+        for (i, idx) in enumerate(all_decisions(structure))
+            MOI.set(optimizer, MOI.VariablePrimalStart(), idx, x₀[i])
         end
     end
     # Ensure that no decisions are fixed

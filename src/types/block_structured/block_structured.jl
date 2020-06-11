@@ -32,8 +32,8 @@ end
 function expected(structure::AbstractBlockStructure, s::Integer = 2)
     return expected(scenarioproblems(structure, s))
 end
-function scenariotype(structure::AbstractBlockStructure, s::Integer = 2)
-    return scenariotype(scenarioproblems(structure, s))
+function scenario_type(structure::AbstractBlockStructure, s::Integer = 2)
+    return scenario_type(scenarioproblems(structure, s))
 end
 function probability(structure::AbstractBlockStructure, i::Integer, s::Integer = 2)
     return probability(scenarioproblems(structure, s), i)

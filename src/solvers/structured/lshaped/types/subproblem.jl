@@ -215,7 +215,7 @@ function OptimalityCut(subproblem::SubProblem, x::AbstractVector)
     end
     # Get sense
     sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     # Create sense-corrected optimality cut
     δQ = sparsevec(cols, vals, length(x))
     q = correction * π * MOI.get(subproblem.optimizer, MOI.ObjectiveValue()) + δQ⋅x
@@ -239,7 +239,7 @@ function FeasibilityCut(subproblem::SubProblem, x::AbstractVector)
     end
     # Get sense
     sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
-    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
     # Create sense-corrected optimality cut
     G = sparsevec(cols, vals, length(x))
     g = correction * MOI.get(subproblem.optimizer, MOI.ObjectiveValue()) + G⋅x

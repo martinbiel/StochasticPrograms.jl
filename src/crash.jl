@@ -33,8 +33,6 @@ using MathOptInterface
 
 const MOI = MathOptInterface
 
-
-
 """
     None
 
@@ -47,6 +45,13 @@ function (::None)(stochasticprogram::StochasticProgram)
     return rand(num_decisions(stochasticprogram))
 end
 
+function (::None)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    sp = instantiate(stochasticmodel, sampler, 0; optimizer = optimizer)
+    return rand(num_decisions(sp))
+end
+
 """
     EVP
 
@@ -57,6 +62,13 @@ struct EVP <: AbstractCrash end
 
 function (::EVP)(stochasticprogram::StochasticProgram)
     return expected_value_decision(stochasticprogram)
+end
+
+function (::EVP)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
+    return expected_value_decision(sp)
 end
 
 """
@@ -77,6 +89,13 @@ function (crash::Scenario)(stochasticprogram::StochasticProgram)
     return wait_and_see_decision(stochasticprogram, crash.scenario)
 end
 
+function (crash::Scenario)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
+    return wait_and_see_decision(sp, crash.scenario)
+end
+
 """
     Custom(x₀)
 
@@ -93,6 +112,13 @@ end
 
 function (crash::Custom)(stochasticprogram::StochasticProgram)
     return crash.x₀[1:num_decisions(stochasticprogram)]
+end
+
+function (crash::Custom)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    sp = instantiate(stochasticmodel, sampler, 0; optimizer = optimizer)
+    return crash.x₀[1:num_decisions(sp)]
 end
 
 end

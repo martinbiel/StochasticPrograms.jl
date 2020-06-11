@@ -42,7 +42,7 @@ end
     instantiate(stochasticmodel::StochasticModel{2};
                 instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
                 optimizer = nothing,
-                scenariotype::Type{S} = Scenario,
+                scenario_type::Type{S} = Scenario,
                 defer::Bool = false,
                 kw...) where S <: AbstractScenario
 
@@ -51,11 +51,11 @@ Instantiate a deferred two-stage stochastic program using the model definition s
 function instantiate(sm::StochasticModel{2};
                      instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
                      optimizer = nothing,
-                     scenariotype::Type{S} = Scenario,
+                     scenario_type::Type{S} = Scenario,
                      kw...) where S <: AbstractScenario
     sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
                            parameters(sm.parameters[2]; kw...),
-                           scenariotype,
+                           scenario_type,
                            instantiation,
                            optimizer)
     # Generate model recipes
@@ -95,35 +95,32 @@ function instantiate(sm::StochasticModel{N},
     return sp
 end
 """
-    sample(stochasticmodel::StochasticModel,
-           sampler::AbstractSampler,
-           n::Integer;
-           instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
-           optimizer = nothing,
-           defer::Bool = false,
-           kw...)
-
-Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
-
-Optionally, a capable `optimizer` can be supplied to `sample`. Otherwise, any previously set solver will be used.
-
-See also: [`sample!`](@ref)
-"""
-function sample(sm::StochasticModel{2},
-                sampler::AbstractSampler{S},
+    instantiate(stochasticmodel::StochasticModel,
+                sampler::AbstractSampler,
                 n::Integer;
                 instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
                 optimizer = nothing,
                 defer::Bool = false,
-                kw...) where S <: AbstractScenario
+                kw...)
+
+Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
+
+"""
+function instantiate(stochasticmodel::StochasticModel{2},
+                     sampler::AbstractSampler{S},
+                     n::Integer;
+                     instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
+                     optimizer = nothing,
+                     defer::Bool = false,
+                     kw...) where S <: AbstractScenario
     # Create new stochastic program instance
-    sp = StochasticProgram(parameters(sm.parameters[1]; kw...),
-                           parameters(sm.parameters[2]; kw...),
+    sp = StochasticProgram(parameters(stochasticmodel.parameters[1]; kw...),
+                           parameters(stochasticmodel.parameters[2]; kw...),
                            S,
                            instantiation,
                            optimizer)
     # Generate model recipes
-    sm.generator(sp)
+    stochasticmodel.generator(sp)
     # Sample n scenarios
     add_scenarios!(sp, n) do
         return sample(sampler, 1/n)
@@ -135,28 +132,38 @@ function sample(sm::StochasticModel{2},
     # Return the sample instance
     return sp
 end
-function sample(sm::StochasticModel{2},
-                sampler::AbstractSampler{S},
-                solution::StochasticSolution;
-                instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
-                optimizer = nothing,
-                defer::Bool = false,
-                kw...) where S <: AbstractScenario
-    if optimizer == nothing
-        error("Cannot generate sample from stochastic solution without an optimizer.")
+function instantiate(stochasticmodel::StochasticModel{2},
+                     sampler::AbstractSampler{Scenario},
+                     n::Integer;
+                     instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
+                     optimizer = nothing,
+                     defer::Bool = false,
+                     kw...)
+    # Get concrete scenario type
+    S = typeof(sampler())
+    # Create new stochastic program instance
+    sp = StochasticProgram(parameters(stochasticmodel.parameters[1]; kw...),
+                           parameters(stochasticmodel.parameters[2]; kw...),
+                           S,
+                           instantiation,
+                           optimizer)
+    # Generate model recipes
+    stochasticmodel.generator(sp)
+    # Sample n scenarios
+    add_scenarios!(sp, n) do
+        return sample(sampler, 1/n)
     end
-    n = 16
-    CI = confidence_interval(solution)
-    α = 1 - confidence(CI)
-    while !(confidence_interval(sm, sampler, optimizer; N = n, M = M, confidence = 1-α) ⊆ CI)
-        n = n * 2
+    # Generate stochastic program if not deferred
+    if !defer
+        generate!(sp)
     end
-    return sample(sm, sampler, n; instantiation = instantiation, optimizer = optimizer, defer = defer, kw...)
+    # Return the sample instance
+    return sp
 end
 """
-    optimize!(stochasticprogram::StochasticProgram)
+    optimize!(stochasticprogram::StochasticProgram; crash::AbstractCrash = Crash.None(); kw...)
 
-Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 ## Examples
 
@@ -164,9 +171,10 @@ The following solves the stochastic program `sp` using the L-shaped algorithm.
 
 ```julia
 using LShapedSolvers
-using GLPKMathProgInterface
+using GLPK
 
-set_optimizer!(sp, LShapedOptimizer)
+set_optimizer(sp, LShaped.Optimizer)
+set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
 optimize!(sp);
 
 # output
@@ -175,23 +183,21 @@ L-Shaped Gap  Time: 0:00:01 (4 iterations)
   Objective:       -855.8333333333339
   Gap:             0.0
   Number of cuts:  7
-:Optimal
 ```
 
 The following solves the stochastic program `sp` using GLPK on the extended form.
 
 ```julia
-using GLPKMathProgInterface
+using GLPK
 
-set_optimizer!(sp, GLPK.Optimizer)
+set_optimizer(sp, GLPK.Optimizer)
 optimize!(sp)
 
-:Optimal
 ```
 
 See also: [`VRP`](@ref)
 """
-function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), kwargs...)
+function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been initialized at this point
@@ -200,8 +206,9 @@ function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::Abs
     end
     # Crash initial decision
     x₀ = crash(stochasticprogram)
-    # Switch on solver type
-    return optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kwargs...)
+    # Switch on structure and solver type
+    optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kw...)
+    return nothing
 end
 function JuMP.termination_status(stochasticprogram::StochasticProgram)
     return MOI.get(stochasticprogram, MOI.TerminationStatus())::MOI.TerminationStatusCode
@@ -220,76 +227,6 @@ function optimal_decision(stochasticprogram::TwoStageStochasticProgram)
     end
     return JuMP.value.(all_decision_variables(stochasticprogram))
 end
-"""
-    optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
-
-Return the optimal recourse decision of `stochasticprogram` corresponding to the `i`th scenario, after a call to `optimize!(stochasticprogram)`.
-"""
-# function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer)
-#     return _optimal_recourse_decision(stochasticprogram, i, provided_optimizer(stochasticprogram))
-# end
-# function _optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram, i::Integer, ::OptimizerProvided)
-#     dep = DEP(stochasticprogram)
-#     status = termination_status(dep)
-#     if status != MOI.OPTIMAL
-#         if status == MOI.OPTIMIZE_NOT_CALLED
-#             throw(OptimizeNotCalled())
-#         elseif status == MOI.INFEASIBLE
-#             @warn "Stochastic program is infeasible"
-#         elseif status == MOI.DUAL_INFEASIBLE
-#             @warn "Stochastic program is unbounded"
-#         else
-#             error("Stochastic program model could not be solved, returned status: $status")
-#         end
-#     end
-#     temp = copy(decision_variables(stochasticprogram, 2))
-#     for (i,dvar) in enumerate(decision_names(temp))
-#         temp.names[i] = add_subscript(dvar, i)
-#     end
-#     decision = extract_decision_variables(dep, temp)
-#     decision.names .= decision_names(decision_variables(stochasticprogram, 2))
-#     return decision
-# end
-"""
-    optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
-                              decision::Union{AbstractVector, DecisionVariables},
-                              scenario::AbstractScenario)
-
-Return the optimal recourse decision of `stochasticprogram` corresponding to the given `scenario`, after taking the given `decision`. The supplied `decision` must be of type `AbstractVector` or `DecisionVariables`, and must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
-"""
-# function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
-#                                    decision::Vector{Decision},
-#                                    scenario::AbstractScenario)
-#     # Sanity checks on given decision vector
-
-#     return optimal_recourse_decision(stochasticprogram, decisions(decision), scenario)
-# end
-# function optimal_recourse_decision(stochasticprogram::TwoStageStochasticProgram,
-#                                    decision::AbstractVector,
-#                                    scenario::AbstractScenario)
-#     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     check_provided_optimizer(stochasticprogram.optimizer)
-#     # Sanity checks on given decision vector
-#     length(decision) == decision_length(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", decision_length(stochasticprogram))
-#     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
-#     # Generate and solve outcome model
-#     outcome = outcome_model(stochasticprogram, decision, scenario; optimizer = moi_optimizer(stochasticprogram))
-#     optimize!(outcome)
-#     status = termination_status(outcome)
-#     if status != MOI.OPTIMAL
-#         if status == MOI.OPTIMIZE_NOT_CALLED
-#             throw(OptimizeNotCalled())
-#         elseif status == MOI.INFEASIBLE
-#             @warn "Outcome is infeasible"
-#         elseif status == MOI.DUAL_INFEASIBLE
-#             @warn "Outcome is unbounded"
-#         else
-#             error("Outcome model could not be solved, returned status: $status")
-#         end
-#     end
-#     decision = extract_decision_variables(outcome, decision_variables(stochasticprogram, 2))
-#     return decision
-# end
 """
     objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
 
@@ -310,72 +247,77 @@ function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int 
             @warn "Stochastic program is unbounded"
             return objective_sense(stochasticprogram) == MOI.MAX_SENSE ? Inf : -Inf
         else
-            error("Stochastic program could not be solved, returned status: $status")
+            @warn("Stochastic program could not be solved, returned status: $status")
         end
     end
-    return return MOI.get(optimizer(stochasticprogram), MOI.ObjectiveValue(result))
+    return MOI.get(optimizer(stochasticprogram), MOI.ObjectiveValue(result))
 end
 """
-    optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; confidence::AbstractFloat = 0.95, kwargs...)
+    optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; crash::AbstractCrash = Crash.None(), kw...)
 
-Approximately optimize the `stochasticmodel` using when the underlying scenario distribution is inferred by `sampler` and return a `StochasticSolution` with the given `confidence` level. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+Approximately optimize the `stochasticmodel` using when the underlying scenario distribution is inferred by `sampler`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
-See also: [`StochasticSolution`](@ref)
 """
-# function JuMP.optimize!(stochasticmodel::StochasticModel,
-#                         sampler::AbstractSampler;
-#                         confidence::AbstractFloat = 0.95,
-#                         kwargs...)
-#     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     check_provided_optimizer(provided_optimizer(stochasticmodel))
-#     # Switch on solver type
-#     return _optimize!(stochasticmodel, sampler, confidence, provided_optimizer(stochasticmodel); kwargs...)
-# end
-# function _optimize!(stochasticmodel::StochasticModel,
-#                     sampler::AbstractSampler,
-#                     confidence::AbstractFloat,
-#                     ::Union{OptimizerProvided, StructuredOptimizerProvided};
-#                     kwargs...)
-#     # Default to SAA algorithm if standard optimizers have been provided
-#     stochasticmodel.optimizer.optimizer = SAA()
-#     return optimize_sampled!(optimizer(stochasticmodel), stochasticmodel, sampler, confidence; kwargs...)
-# end
-# function _optimize!(stochasticmodel::StochasticModel,
-#                     sampler::AbstractSampler,
-#                     confidence::AbstractFloat,
-#                     ::SampledOptimizerProvided;
-#                     kwargs...)
-#     return optimize_sampled!(optimizer(stochasticmodel), stochasticmodel, sampler, confidence; kwargs...)
-# end
-# function JuMP.termination_status(stochasticmodel::StochasticModel)
-#     return _termination_status(stochasticmodel, provided_optimizer(stochasticmodel))
-# end
-# function _termination_status(stochasticmodel::StochasticModel, ::Union{NoOptimizerProvided, UnrecognizedOptimizerProvided})
-#     return MOI.OPTIMIZE_NOT_CALLED
-# end
-# function _termination_status(stochasticmodel::StochasticModel, ::Union{OptimizerProvided, StructuredOptimizerProvided, SampledOptimizerProvided})
-#     return termination_status(optimizer(stochasticmodel))
-# end
-# """
-#     optimal_decision(stochasticmodel::StochasticModel)
+function JuMP.optimize!(stochasticmodel::StochasticModel,
+                        sampler::AbstractSampler;
+                        crash::AbstractCrash = Crash.None(),
+                        kw...)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Crash initial decision
+    x₀ = crash(stochasticmodel, sampler)
+    # Switch on solver type
+    return _optimize!(stochasticmodel, sampler, optimizer(stochasticmodel), x₀; kw...)
+end
+function _optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler, optimizer::AbstractSampledOptimizer, x₀; kw...)
+    # Load optimizer
+    load_model!(optimizer, stochasticmodel, sampler, x₀)
+    # Run sample-based optimization procedure
+    MOI.optimize!(optimizer)
+    return nothing
+end
+function JuMP.termination_status(stochasticmodel::StochasticModel)
+    return MOI.get(stochasticmodel, MOI.TerminationStatus())::MOI.TerminationStatusCode
+end
+function JuMP.objective_sense(stochasticmodel::StochasticModel)
+    return MOI.get(stochasticmodel, MOI.ObjectiveSense())::MOI.OptimizationSense
+end
+"""
+    optimal_decision(stochasticmodel::StochasticModel)
 
-# Return the optimal first stage decision of `stochasticmodel`, after a call to `optimize!(stochasticmodel)`.
-# """
-# function optimal_decision(stochasticmodel::StochasticModel)
-#     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     check_provided_optimizer(provided_optimizer(stochasticmodel))
-#     return optimal_decision(optimizer(stochasticmodel))
-# end
-# """
-#     optimal_value(stochasticmodel::StochasticModel)
+Return the optimal first stage decision of `stochasticmodel`, after a call to `optimize!(stochasticmodel)`.
+"""
+function optimal_decision(stochasticmodel::StochasticModel)
+    if termination_status(stochasticmodel) == MOI.OPTIMIZE_NOT_CALLED
+        throw(OptimizeNotCalled())
+    end
+    return optimal_decision(instance(stochasticmodel))
+end
+"""
+    objective_value(stochasticmodel::StochasticModel; result::Int = 1)
 
-# Return the optimal value of `stochasticmodel`, after a call to `optimize!(stochasticmodel)`.
-# """
-# function optimal_value(stochasticmodel::StochasticModel)
-#     # Throw NoOptimizer error if no recognized optimizer has been provided
-#     check_provided_optimizer(provided_optimizer(stochasticmodel))
-#     return optimal_value(optimizer(stochasticmodel))
-# end
+Returns the value of the recourse problem after a call to `optimize!(stochasticprogram)`, or the result of taking the decision `x` after a call to `evaluate_decision(stochasticmodel, x)`
+"""
+function JuMP.objective_value(stochasticmodel::StochasticModel; result::Int = 1)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    check_provided_optimizer(stochasticmodel.optimizer)
+    # Switch on termination status
+    status = JuMP.termination_status(stochasticmodel)
+    if status != MOI.OPTIMAL
+        if status == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        elseif status == MOI.INFEASIBLE
+            @warn "Stochastic program is infeasible"
+            return objective_sense(stochasticmodel) == MOI.MAX_SENSE ? -Inf : Inf
+        elseif status == MOI.DUAL_INFEASIBLE
+            @warn "Stochastic program is unbounded"
+            return objective_sense(stochasticmodel) == MOI.MAX_SENSE ? Inf : -Inf
+        else
+            @warn("Stochastic program could not be solved, returned status: $status")
+        end
+    end
+    return MOI.get(optimizer(stochasticmodel), MOI.ObjectiveValue(result))
+end
 """
     stage_parameters(stochasticprogram::StochasticProgram, s::Integer)
 
@@ -516,12 +458,22 @@ function expected(stochasticprogram::StochasticProgram, s::Integer = 2)
     return expected(structure(stochasticprogram), s)
 end
 """
-    scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
+    scenario_type(stochasticprogram::StochasticProgram, s::Integer = 2)
 
 Return the type of the scenario structure associated with `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
-function scenariotype(stochasticprogram::StochasticProgram, s::Integer = 2)
-    return scenariotype(structure(stochasticprogram), s)
+function scenario_type(stochasticprogram::StochasticProgram, s::Integer = 2)
+    return scenario_type(structure(stochasticprogram), s)
+end
+"""
+    scenario_types(stochasticprogram::StochasticProgram, s::Integer = 2)
+
+Return the scenario types of each stage of `stochasticprogram`.
+"""
+function scenario_types(stochasticprogram::StochasticProgram)
+    return ntuple(Val(num_stages(stochasticprogram))) do s
+        scenario_type(stochasticprogram, s + 1)
+    end
 end
 """
     probability(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
@@ -683,7 +635,7 @@ end
 
 Return the value associated with the solver-specific attribute named `name`.
 
-See also: [`set_optimizer_attribute!`](@ref), [`set_optimizer_attributes!`](@ref).
+See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
 function get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
     return get_optimizer_attribute(stochasticprogram, MOI.RawParameter(name))
@@ -696,7 +648,7 @@ end
 
 Return the value of the solver-specific attribute `attr` in `stochasticprogram`.
 
-See also: [`set_optimizer_attribute!`](@ref), [`set_optimizer_attributes!`](@ref).
+See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
 function get_optimizer_attribute(
     stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute
@@ -709,16 +661,22 @@ end
 # Setters
 # ========================== #
 """
-    set_optimizer!(stochasticmodel::StochasticModel, optimizer)
+    set_optimizer(stochasticmodel::StochasticModel, optimizer)
 
 Set the optimizer of the `stochasticmodel`.
 """
-function set_optimizer!(stochasticmodel::StochasticModel, optimizer)
-    stochasticmodel.optimizer.optimizer_constructor = optimizer
+function JuMP.set_optimizer(stochasticmodel::StochasticModel, optimizer)
+    set_optimizer!(stochasticmodel.optimizer, optimizer)
+    if stochasticmodel.optimizer.optimizer isa AbstractSampledOptimizer
+        return nothing
+    end
+    # Default to SAA
+    set_optimizer(stochasticmodel, SAA.Optimizer)
+    set_optimizer_attribute(stochasticmodel, InstanceOptimizer(), optimizer)
     return nothing
 end
 """
-    set_optimizer!(stochasticprogram::StochasticProgram, optimizer)
+    set_optimizer(stochasticprogram::StochasticProgram, optimizer)
 
 Set the optimizer of the `stochasticprogram`.
 """
@@ -735,13 +693,18 @@ function JuMP.set_optimizer(stochasticprogram::StochasticProgram, optimizer)
     return nothing
 end
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, MOI.RawParameter(name), value)
+    return set_optimizer_attribute(stochasticprogram, MOI.RawParameter(String(name)), value)
 end
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
     return MOI.set(stochasticprogram, attr, value)
 end
-function set_optimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+function JuMP.set_optimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
+        set_optimizer_attribute(stochasticprogram, name, value)
+    end
+end
+function JuMP.set_optimizer_attributes(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
         set_optimizer_attribute(stochasticprogram, name, value)
     end
 end
@@ -750,6 +713,28 @@ function JuMP.set_silent(stochasticprogram::StochasticProgram)
 end
 function JuMP.unset_silent(stochasticprogram::StochasticProgram)
     return MOI.set(stochasticprogram, MOI.Silent(), false)
+end
+function JuMP.set_optimizer_attribute(stochasticmodel::StochasticModel, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticmodel, MOI.RawParameter(String(name)), value)
+end
+function JuMP.set_optimizer_attribute(stochasticmodel::StochasticModel, attr::MOI.AbstractOptimizerAttribute, value)
+    return MOI.set(stochasticmodel, attr, value)
+end
+function JuMP.set_optimizer_attributes(stochasticmodel::StochasticModel, pairs::Pair...)
+    for (name, value) in pairs
+        set_optimizer_attribute(stochasticmodel, name, value)
+    end
+end
+function JuMP.set_optimizer_attributes(stochasticmodel::StochasticModel; kw...)
+    for (name, value) in kw
+        set_optimizer_attribute(stochasticmodel, name, value)
+    end
+end
+function JuMP.set_silent(stochasticmodel::StochasticModel)
+    return MOI.set(stochasticmodel, MOI.Silent(), true)
+end
+function JuMP.unset_silent(stochasticmodel::StochasticModel)
+    return MOI.set(stochasticmodel, MOI.Silent(), false)
 end
 """
     add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2)

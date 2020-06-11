@@ -126,7 +126,7 @@ function Base.copy(src::StochasticProgram{N}; instantiation = UnspecifiedInstant
         Stage(stage_parameters(src, i))
     end
     scenario_types = ntuple(Val(N-1)) do i
-        scenariotype(src, i+1)
+        scenario_type(src, i+1)
     end
     dest = StochasticProgram(stages, scenario_types, instantiation, optimizer)
     merge!(dest.generator, src.generator)
@@ -148,10 +148,10 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
                 return " * Stage $s:\n   * $(ndecisions) decision variable$(plural(ndecisions))"
             end
         elseif s == 2 && N == 2
-            stype = typename(scenariotype(stochasticprogram))
+            stype = typename(scenario_type(stochasticprogram))
             return " * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
         else
-            stype = typename(scenariotype(stochasticprogram, s))
+            stype = typename(scenario_type(stochasticprogram, s))
             if distributed(stochasticprogram, s)
                 if s == N
                     return " * Distributed stage $s:\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"

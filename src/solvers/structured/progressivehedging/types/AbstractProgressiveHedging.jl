@@ -19,12 +19,6 @@ end
 
 # Functions #
 # ======================================================================== #
-function set_params!(ph::AbstractProgressiveHedging; kwargs...)
-    for (k,v) in kwargs
-        setfield!(ph.parameters, k, v)
-    end
-end
-
 function decision(ph::AbstractProgressiveHedging)
     return ph.ξ
 end
@@ -35,12 +29,6 @@ function decision(ph::AbstractProgressiveHedging, index::MOI.VariableIndex)
         throw(MOI.InvalidIndex(index))
     end
     return decision(ph)[i]
-end
-
-function get_obj(ph::AbstractProgressiveHedging)
-    first_stage = StochasticPrograms.get_stage_one(ph.stochasticprogram)
-    c = JuMP.prepAffObjective(first_stage)
-    return first_stage.objSense == :Min ? c : -c
 end
 
 function current_objective_value(ph::AbstractProgressiveHedging, Qs::AbstractVector)

@@ -89,6 +89,21 @@ function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.Abstra
         end
     end
 end
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractOptimizerAttribute, value)
+    for problem in subproblems(scenarioproblems)
+        MOI.set(backend(problem), attr, value)
+    end
+end
+function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractOptimizerAttribute, value)
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], attr, value) do sp, attr, value
+                    MOI.set(fetch(sp), attr, value)
+                end
+        end
+    end
+end
 function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     for problem in subproblems(scenarioproblems)
@@ -177,10 +192,10 @@ function expected(scenarioproblems::DistributedScenarioProblems{S}) where S <: A
     end
     return expected(partial_expecations)
 end
-function scenariotype(scenarioproblems::ScenarioProblems{S}) where S <: AbstractScenario
+function scenario_type(scenarioproblems::ScenarioProblems{S}) where S <: AbstractScenario
     return S
 end
-function scenariotype(scenarioproblems::DistributedScenarioProblems{S}) where S <: AbstractScenario
+function scenario_type(scenarioproblems::DistributedScenarioProblems{S}) where S <: AbstractScenario
     return S
 end
 function subproblem(scenarioproblems::ScenarioProblems, i::Integer)

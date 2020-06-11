@@ -51,8 +51,8 @@ where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ``.
 ```julia
 sm = @stochastic_model begin
     @stage 1 begin
-        @variable(model, x₁ >= 40)
-        @variable(model, x₂ >= 20)
+        @decision(model, x₁ >= 40)
+        @decision(model, x₂ >= 20)
         @objective(model, Min, 100*x₁ + 150*x₂)
         @constraint(model, x₁ + x₂ <= 120)
     end
@@ -117,11 +117,11 @@ macro stochastic_model(def)
             paramdefs[stage] = paramdef
         end
         if @capture(x, @decision arg__)
-            if @capture(x, @decision model_ var_Symbol) || @capture(x, @decision model_ var_Symbol[range_]) ||
+            if @capture(x, @decision model_ var_Symbol) || @capture(x, @decision model_ var_Symbol[range__]) ||
                @capture(x, @decision model_ var_Symbol <= ub_) || @capture(x, @decision model_ var_Symbol >= lb_) ||
-               @capture(x, @decision model_ var_Symbol[range_] <= ub_) || @capture(x, @decision model_ var_Symbol[range_] >= ln_) ||
-               @capture(x, @decision model_ var_Symbol in set_) || @capture(x, @decision model_ var_Symbol[range_] in set_) ||
-               @capture(x, @decision model_ lb_ <= var_Symbol <= ub_) || @capture(x, @decision model_ lb_ <= var_Symbol[range_] <= ub_)
+               @capture(x, @decision model_ var_Symbol[range__] <= ub_) || @capture(x, @decision model_ var_Symbol[range__] >= ln_) ||
+               @capture(x, @decision model_ var_Symbol in set_) || @capture(x, @decision model_ var_Symbol[range__] in set_) ||
+               @capture(x, @decision model_ lb_ <= var_Symbol <= ub_) || @capture(x, @decision model_ lb_ <= var_Symbol[range__] <= ub_)
                 push!(decisiondefs[stage], var)
             end
         end
@@ -160,4 +160,40 @@ f(x,ξ) = min  f(y; x, ξ)
     print(io, "Two-Stage Stochastic Model\n\n")
     println(io, modelstr)
 end
+
+# Getters #
 # ========================== #
+"""
+    optimal_instance(stochasticmodel::StochasticModel)
+
+Return a stochastic programming instance of the stochastic model after a call to [`optimize!`](@ref).
+"""
+function optimal_instance(stochasticmodel::StochasticModel)
+    # Sanity checks
+    check_provided_optimizer(stochasticmodel.optimizer)
+    if MOI.get(stochasticmodel, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
+        throw(OptimizeNotCalled())
+    end
+    return optimal_instance(optimizer(stochasticmodel))
+end
+
+# MOI #
+# ========================== #
+function MOI.get(stochasticmodel::StochasticModel, attr::Union{MOI.TerminationStatus, MOI.PrimalStatus, MOI.DualStatus})
+    return MOI.get(optimizer(stochasticmodel), attr)
+end
+function MOI.get(stochasticmodel::StochasticModel, attr::MOI.AbstractModelAttribute)
+    if MOI.is_set_by_optimize(attr)
+        check_provided_optimizer(stochasticmodel.optimizer)
+        if MOI.get(stochasticmodel, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        end
+    end
+    return MOI.get(optimizer(stochasticmodel), attr)
+end
+function MOI.get(stochasticmodel::StochasticModel, attr::MOI.AbstractOptimizerAttribute)
+    MOI.get(optimizer(stochasticmodel), attr)
+end
+
+MOI.set(sp::StochasticModel, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(sp), attr, value)
+MOI.set(sp::StochasticModel, attr::MOI.AbstractModelAttribute, value) = MOI.set(optimizer(sp), attr, value)
