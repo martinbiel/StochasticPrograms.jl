@@ -66,8 +66,9 @@ executions = [Synchronous(), Asynchronous()]
                 set_optimizer_attribute(sp, Execution(), execution)
                 set_optimizer_attribute(sp, Penalizer(), penalizer)
                 set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
-                set_optimizer_attribute(sp, RelativeTolerance(), 1e-3)
-                set_optimizer_attribute(sp, Penaltyterm(), Linearized(num_breakpoints = 200, spacing = 0.5))
+                set_optimizer_attribute(sp, PrimalTolerance(), 1e-3)
+                set_optimizer_attribute(sp, DualTolerance(), 1e-2)
+                set_optimizer_attribute(sp, Penaltyterm(), Linearized(num_breakpoints = 1000, spacing = 0.5))
                 @testset "$(optimizer_name(sp)): $name" begin
                     optimize!(sp)
                     @test termination_status(sp) == MOI.OPTIMAL

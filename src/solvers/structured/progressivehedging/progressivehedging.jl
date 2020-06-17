@@ -28,6 +28,8 @@ const MOIU = MOI.Utilities
 export
     ProgressiveHedgingSolver,
     ProgressiveHedging,
+    PrimalTolerance,
+    DualTolerance,
     Penalizer,
     PenalizationParameter,
     set_penalization_attribute,

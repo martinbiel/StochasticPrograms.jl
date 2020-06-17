@@ -5,7 +5,9 @@ function outcome_mean(subproblems::Vector{JuMP.Model}, probabilities::AbstractVe
     length(subproblems) == length(probabilities) || error("Inconsistent number of subproblems and probabilities")
     N = length(subproblems)
     N == 0 && return 0.0
-    sense === nothing ? sense = objective_sense(subproblems[1]) : sense
+    if sense === nothing || sense == MOI.FEASIBILITY_SENSE
+        sense = objective_sense(subproblems[1])
+    end
     return mapreduce(+, 1:N) do k
         outcome = subproblems[k]
         val = try
@@ -39,7 +41,9 @@ function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector,
     length(subproblems) == length(probabilities) || error("Inconsistent number of subproblems and probabilities")
     N = length(subproblems)
     N == 0 && return 0.0, 0.0, 0.0, N
-    sense === nothing ? sense = objective_sense(subproblems[1]) : sense
+    if sense === nothing || sense == MOI.FEASIBILITY_SENSE
+        sense = objective_sense(subproblems[1])
+    end
     Q̄ₖ = Sₖ = wₖ = w²ₖ = 0
     for k = 1:N
         π = probabilities[k]

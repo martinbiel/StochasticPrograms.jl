@@ -1,13 +1,13 @@
 @with_kw mutable struct ProgressiveHedgingData{T <: AbstractFloat}
     Q::T = 1e10
-    δ::T = 1.0
     δ₁::T = 1.0
     δ₂::T = 1.0
     iterations::Int = 0
 end
 
 @with_kw mutable struct ProgressiveHedgingParameters{T <: AbstractFloat}
-    τ::T = 1e-5
+    ϵ₁::T = 1e-5
+    ϵ₂::T = 1e-5
     log::Bool = true
     keep::Bool = true
     offset::Int = 0
@@ -28,7 +28,6 @@ Functor object for the progressive-hedging algorithm. Create using the `Progress
 struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
                                    A <: AbstractVector,
                                    ST <: HorizontalBlockStructure,
-                                   S <: MOI.AbstractOptimizer,
                                    E <: AbstractProgressiveHedgingExecution,
                                    P <: AbstractPenalization,
                                    PT <: AbstractPenaltyterm} <: AbstractProgressiveHedging
@@ -40,6 +39,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
     ξ::A
     decisions::Decisions
     Q_history::A
+    primal_gaps::A
     dual_gaps::A
 
     # Execution
@@ -65,11 +65,10 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
         A = typeof(x₀_)
         # Structure
         ST = typeof(structure)
-        S = typeof(backend(subproblem(structure, 1)))
         # Penalty term
         PT = typeof(penaltyterm)
         # Execution policy
-        execution = executer(T,A,S,PT)
+        execution = executer(T, A, PT)
         E = typeof(execution)
         # Penalization policy
         penalization = penalizer()
@@ -77,16 +76,17 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
         # Algorithm parameters
         params = ProgressiveHedgingParameters{T}(; kw...)
 
-        ph = new{T,A,ST,S,E,P,PT}(structure,
-                                  ProgressiveHedgingData{T}(),
-                                  params,
-                                  x₀_,
-                                  structure.decisions[1],
-                                  A(),
-                                  A(),
-                                  execution,
-                                  penalization,
-                                  ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))Progressive Hedging"))
+        ph = new{T,A,ST,E,P,PT}(structure,
+                                ProgressiveHedgingData{T}(),
+                                params,
+                                x₀_,
+                                structure.decisions[1],
+                                A(),
+                                A(),
+                                A(),
+                                execution,
+                                penalization,
+                                ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))Progressive Hedging"))
         # Initialize solver
         initialize!(ph, penaltyterm)
         return ph

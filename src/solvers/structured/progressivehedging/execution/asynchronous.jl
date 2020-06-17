@@ -6,9 +6,8 @@ Functor object for using asynchronous execution in a progressive-hedging algorit
 """
 struct AsynchronousExecution{T <: AbstractFloat,
                              A <: AbstractVector,
-                             S <: MOI.AbstractOptimizer,
                              PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
-    subworkers::Vector{SubWorker{T,A,S,PT}}
+    subworkers::Vector{SubWorker{T,A,PT}}
     work::Vector{Work}
     finalize::Vector{Work}
     progressqueue::ProgressQueue{T}
@@ -24,23 +23,21 @@ struct AsynchronousExecution{T <: AbstractFloat,
     κ::T
 
     function AsynchronousExecution(κ::T,
-                                   ::Type{T}, ::Type{A},
-                                   ::Type{S}, ::Type{PT}) where {T <: AbstractFloat,
-                                                                 A <: AbstractVector,
-                                                                 S <: MOI.AbstractOptimizer,
-                                                                 PT <: AbstractPenaltyterm}
-        return new{T,A,S,PT}(Vector{SubWorker{T,A,S,PT}}(undef, nworkers()),
-                             Vector{Work}(undef, nworkers()),
-                             Vector{Work}(undef, nworkers()),
-                             RemoteChannel(() -> Channel{Progress{T}}(4 * nworkers())),
-                             Vector{RemoteRunningAverage{A}}(undef, nworkers()),
-                             Vector{RemoteRunningAverage{T}}(undef, nworkers()),
-                             RemoteChannel(() -> IterationChannel(Dict{Int,A}())),
-                             RemoteChannel(() -> IterationChannel(Dict{Int,T}())),
-                             Vector{Future}(undef, nworkers()),
-                             Vector{A}(),
-                             Vector{Int}(),
-                             κ)
+                                   ::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
+                                                                            A <: AbstractVector,
+                                                                            PT <: AbstractPenaltyterm}
+        return new{T,A,PT}(Vector{SubWorker{T,A,PT}}(undef, nworkers()),
+                           Vector{Work}(undef, nworkers()),
+                           Vector{Work}(undef, nworkers()),
+                           RemoteChannel(() -> Channel{Progress{T}}(4 * nworkers())),
+                           Vector{RemoteRunningAverage{A}}(undef, nworkers()),
+                           Vector{RemoteRunningAverage{T}}(undef, nworkers()),
+                           RemoteChannel(() -> IterationChannel(Dict{Int,A}())),
+                           RemoteChannel(() -> IterationChannel(Dict{Int,T}())),
+                           Vector{Future}(undef, nworkers()),
+                           Vector{A}(),
+                           Vector{Int}(),
+                           κ)
     end
 end
 
@@ -143,8 +140,8 @@ function iterate!(ph::AbstractProgressiveHedging, execution::AsynchronousExecuti
         update_dual_gap!(ph)
         # Update progress
         @unpack δ₁, δ₂ = ph.data
+        ph.primal_gaps[t] = δ₁
         ph.dual_gaps[t] = δ₂
-        ph.data.δ = sqrt(δ₁ + δ₂) / (1e-10 + norm(ph.ξ, 2))
         # Check if optimal
         if check_optimality(ph)
             # Optimal, final log
@@ -227,12 +224,10 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Asynchronous)(::Type{T}, ::Type{A},
-                                   ::Type{S}, ::Type{PT}) where {T <: AbstractFloat,
-                                                                 A <: AbstractVector,
-                                                                 S <: MOI.AbstractOptimizer,
-                                                                 PT <: AbstractPenaltyterm}
-    return AsynchronousExecution(execution.κ, T, A, S, PT)
+function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
+                                                                            A <: AbstractVector,
+                                                                            PT <: AbstractPenaltyterm}
+    return AsynchronousExecution(execution.κ, T, A, PT)
 end
 
 function str(::Asynchronous)

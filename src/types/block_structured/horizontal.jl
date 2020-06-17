@@ -51,7 +51,7 @@ function MOI.get(structure::HorizontalBlockStructure, attr::MOI.AbstractConstrai
     return MOI.get(backend(structure.proxy), attr, cindex)
 end
 
-function MOI.set(structure::HorizontalBlockStructure, attr::MOI.AbstractModelAttribute, value)
+function MOI.set(structure::HorizontalBlockStructure, attr::Union{MOI.AbstractModelAttribute, MOI.Silent}, value)
     MOI.set(scenarioproblems(structure), attr, value)
     MOI.set(backend(structure.proxy), attr, value)
 end

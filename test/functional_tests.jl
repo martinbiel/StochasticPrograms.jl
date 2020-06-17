@@ -2,9 +2,7 @@
 @testset "Stochastic Programs: Functionality" begin
     for (model, _scenarios, res, name) in problems
         tol = 1e-2
-        sp = instantiate(model,
-                         _scenarios,
-                         optimizer = () -> GLPK.Optimizer(presolve = true))
+        sp = instantiate(model, _scenarios, optimizer = GLPK.Optimizer)
         @testset "SP Constructs: $name" begin
             optimize!(sp)
             @test termination_status(sp) == MOI.OPTIMAL
@@ -25,7 +23,7 @@
             @test EVPI(sp) <= EEV(sp)-EV(sp)
         end
         @testset "Copying: $name" begin
-            sp_copy = copy(sp, optimizer = () -> GLPK.Optimizer(presolve = true))
+            sp_copy = copy(sp, optimizer = GLPK.Optimizer)
             add_scenarios!(sp_copy, scenarios(sp))
             @test num_scenarios(sp_copy) == num_scenarios(sp)
             generate!(sp_copy)

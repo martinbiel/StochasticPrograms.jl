@@ -44,6 +44,7 @@ export
     StochasticSolution,
     AbstractStructuredOptimizerAttribute,
     AbstractSampledOptimizerAttribute,
+    AbsoluteTolerance,
     RelativeTolerance,
     MasterOptimizer,
     RawMasterOptimizerParameter,

@@ -1,8 +1,7 @@
-struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
+struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     id::Int
     probability::T
-    tolerance::T
-    optimizer::S
+    optimizer::MOI.AbstractOptimizer
     feasibility_handler::H
     linking_constraints::Vector{MOI.ConstraintIndex}
     masterterms::Vector{Vector{Tuple{Int, T}}}
@@ -10,13 +9,11 @@ struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.
     function SubProblem(model::JuMP.Model,
                         id::Integer,
                         π::AbstractFloat,
-                        τ::AbstractFloat,
                         master_indices::Vector{MOI.VariableIndex},
                         ::Type{H}) where H <: AbstractFeasibilityHandler
         T = typeof(π)
         # Get optimizer backend
         optimizer = backend(model)
-        S = typeof(optimizer)
         # Instantiate feasibility handler if requested
         feasibility_handler = H(optimizer)
         # Collect all constraints with known decision occurances
@@ -24,13 +21,12 @@ struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.
             collect_linking_constraints(model,
                                         master_indices,
                                         T)
-        return new{H,T,S}(id,
-                          π,
-                          τ,
-                          optimizer,
-                          feasibility_handler,
-                          constraints,
-                          terms)
+        return new{H,T}(id,
+                        π,
+                        optimizer,
+                        feasibility_handler,
+                        constraints,
+                        terms)
     end
 end
 
@@ -183,7 +179,7 @@ function (subproblem::SubProblem{FeasibilityHandler})(x::AbstractVector)
     if status != MOI.OPTIMAL
         error("Subproblem $(subproblem.id) was not solved properly during feasibility check, returned status code: $status")
     end
-    if MOI.get(model, MOI.ObjectiveValue()) > subproblem.tolerance
+    if MOI.get(model, MOI.ObjectiveValue()) > sqrt(eps())
         # Subproblem is infeasible, create feasibility cut
         return FeasibilityCut(subproblem, x)
     end

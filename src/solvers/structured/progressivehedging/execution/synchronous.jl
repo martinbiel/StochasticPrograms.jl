@@ -6,16 +6,13 @@ Functor object for using synchronous execution in a progressive-hedging algorith
 """
 struct SynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
-                            S <: MOI.AbstractOptimizer,
                             PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
-    subworkers::Vector{SubWorker{T,A,S,PT}}
+    subworkers::Vector{SubWorker{T,A,PT}}
 
-    function SynchronousExecution(::Type{T}, ::Type{A},
-                                  ::Type{S}, ::Type{PT}) where {T <: AbstractFloat,
-                                                                A <: AbstractVector,
-                                                                S <: MOI.AbstractOptimizer,
-                                                                PT <: AbstractPenaltyterm}
-        return new{T,A,S,PT}(Vector{SubWorker{T,A,S,PT}}(undef, nworkers()))
+    function SynchronousExecution(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
+                                                                           A <: AbstractVector,
+                                                                           PT <: AbstractPenaltyterm}
+        return new{T,A,PT}(Vector{SubWorker{T,A,PT}}(undef, nworkers()))
     end
 end
 
@@ -99,12 +96,10 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(::Type{T}, ::Type{A},
-                                  ::Type{S}, ::Type{PT}) where {T <: AbstractFloat,
-                                                                A <: AbstractVector,
-                                                                S <: MOI.AbstractOptimizer,
-                                                                PT <: AbstractPenaltyterm}
-    return SynchronousExecution(T,A,S,PT)
+function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
+                                                                           A <: AbstractVector,
+                                                                           PT <: AbstractPenaltyterm}
+    return SynchronousExecution(T,A,PT)
 end
 
 function str(::Synchronous)

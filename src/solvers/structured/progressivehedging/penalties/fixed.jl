@@ -10,7 +10,7 @@ Functor object for using fixed penalty in a progressive-hedging algorithm. Creat
 - `r::T = 1.00`: Fixed penalty
 ...
 """
-struct FixedPenalization{T <: AbstractFloat} <: AbstractPenalization
+mutable struct FixedPenalization{T <: AbstractFloat} <: AbstractPenalization
     r::T
 
     function FixedPenalization(r::AbstractFloat)

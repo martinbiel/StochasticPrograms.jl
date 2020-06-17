@@ -1,8 +1,8 @@
-struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
+struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
     id::Int
     probability::T
-    optimizer::S
-    objective::AffineDecisionFunction{T}
+    optimizer::MOI.AbstractOptimizer
+    objective::MOI.AbstractScalarFunction
 
     decisions::Decisions
     projection_targets::Vector{MOI.VariableIndex}
@@ -20,9 +20,13 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOpti
         T = typeof(π)
         # Get optimizer backend and initial objective
         optimizer = backend(model)
-        S = typeof(optimizer)
         F = MOI.get(optimizer, MOI.ObjectiveFunctionType())
         objective = MOI.get(optimizer, MOI.ObjectiveFunction{F}())
+        # Ensure that we use AffineDecisionFunction
+        if !(F <: AffineDecisionFunction)
+            F = AffineDecisionFunction{Float64}
+            MOI.set(optimizer, MOI.ObjectiveFunction{F}(), convert(F, objective))
+        end
         # Get decisions
         decisions = get_decisions(model)::Decisions
         # Optimize wait-and-see model to generate
@@ -41,16 +45,16 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOpti
         end
         # Penalty term
         PT = typeof(penaltyterm)
-        subproblem = new{T,A,S,PT}(id,
-                                   π,
-                                   optimizer,
-                                   objective,
-                                   decisions,
-                                   Vector{MOI.VariableIndex}(undef, length(x₀)),
-                                   ξ,
-                                   x₀,
-                                   zero(x₀),
-                                   penaltyterm)
+        subproblem = new{T,A,PT}(id,
+                                 π,
+                                 optimizer,
+                                 objective,
+                                 decisions,
+                                 Vector{MOI.VariableIndex}(undef, length(x₀)),
+                                 ξ,
+                                 x₀,
+                                 zero(x₀),
+                                 penaltyterm)
         return subproblem
     end
 end
@@ -112,12 +116,16 @@ update_subproblems!(subproblems::Vector{<:SubProblem}, ξ::AbstractVector, r::Ab
 function reformulate_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::AbstractFloat)
     model = subproblem.optimizer
     f = subproblem.objective
-    F = MOI.get(model, MOI.ObjectiveFunctionType())
+    F = AffineDecisionFunction{Float64}
     # Update dual penalty
     for (i,vi) in enumerate(subproblem.decisions.undecided)
-        i = something(findfirst(t -> t.variable_index == vi,
-                                f.decision_part.terms), 0)
-        coefficient = iszero(i) ? 0.0 : f.decision_part.terms[i].coefficient
+        j = if typeof(f) <: AffineDecisionFunction
+            j = something(findfirst(t -> t.variable_index == vi,
+                                    f.decision_part.terms), 0)
+        else
+            j = 0
+        end
+        coefficient = iszero(j) ? 0.0 : f.decision_part.terms[j].coefficient
         MOI.modify(model, MOI.ObjectiveFunction{F}(),
                    StochasticPrograms.DecisionCoefficientChange(vi, coefficient + subproblem.ρ[i]))
     end
@@ -144,16 +152,10 @@ function restore_subproblem!(subproblem::SubProblem)
         MOI.delete(model, var)
     end
     empty!(subproblem.projection_targets)
-    # Restore objective coefficients
+    # Restore objective
     f = subproblem.objective
-    F = MOI.get(model, MOI.ObjectiveFunctionType())
-    for (i,vi) in enumerate(subproblem.decisions.undecided)
-        i = something(findfirst(t -> t.variable_index == vi,
-                                f.decision_part.terms), 0)
-        coefficient = iszero(i) ? 0.0 : f.decision_part.terms[i].coefficient
-        MOI.modify(model, MOI.ObjectiveFunction{F}(),
-                   StochasticPrograms.DecisionCoefficientChange(vi, coefficient))
-    end
+    F = typeof(f)
+    MOI.set(model, MOI.ObjectiveFunction{F}(), f)
     return nothing
 end
 
@@ -170,7 +172,7 @@ function (subproblem::SubProblem{T})(ξ::AbstractVector) where T <: AbstractFloa
         val = MOI.get(subproblem.optimizer, MOI.ObjectiveSense()) == MOI.MAX_SENSE ? Inf : -Inf
         return SubproblemSolution(status, T(val))
     else
-        error("Subproblem $(subproblem.id) was not solved properly, returned status code: $status")
+        return SubproblemSolution(status, NaN)
     end
 end
 

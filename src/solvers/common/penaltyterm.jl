@@ -1,6 +1,5 @@
 abstract type AbstractPenaltyterm end
 const L2NormConstraint = CI{QuadraticDecisionFunction{Float64,QuadraticPart{Float64}}, MOI.LessThan{Float64}}
-const SOCConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.SecondOrderCone}
 const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64,LinearPart{Float64}}, MOI.LessThan{Float64}}
 const InfNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
 const ManhattanNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormOneCone}
@@ -15,7 +14,7 @@ Functor object for using a quadratic 2-norm penalty term. Requires an `AbstractM
 """
 mutable struct Quadratic <: AbstractPenaltyterm
     t::MOI.VariableIndex
-    constraint::Union{L2NormConstraint, SOCConstraint}
+    constraint::L2NormConstraint
 
     Quadratic() = new(MOI.VariableIndex(0), L2NormConstraint(0))
 end
@@ -30,15 +29,11 @@ function initialize_penaltyterm!(penalty::Quadratic,
     # Get current objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     f = MOI.get(model, MOI.ObjectiveFunction{F}())
-    # Check if SecondOrderCone is supported
-    soc_support = MOI.supports_constraint(model, MOI.VectorAffineFunction{Float64}, MOI.SecondOrderCone)
     # Check if quadratic constraint is supported
     F = MOI.ScalarQuadraticFunction{Float64}
     quad_support = MOI.supports_constraint(model, MOI.ScalarQuadraticFunction{Float64}, MOI.LessThan{Float64})
     if !quad_support
-        if !(soc_support && iszero(f))
-            throw(MOI.UnsupportedAttribute(MOI.ConstraintFunction(), "Using a quadratic penalty term requires an optimizer that supports quadratic constraints"))
-        end
+        throw(MOI.UnsupportedAttribute(MOI.ConstraintFunction(), "Using a quadratic penalty term requires an optimizer that supports quadratic constraints"))
     end
     # Add ℓ₂-norm auxilliary variable
     penalty.t = MOI.add_variable(model)
@@ -46,27 +41,15 @@ function initialize_penaltyterm!(penalty::Quadratic,
     # Prepare variable vectors
     x = VectorOfDecisions(x)
     ξ = VectorOfKnowns(ξ)
-    # Prefer SecondOrderCone if objective is zero
-    # because minimizing ‖x - ξ‖₂ and ‖x - ξ‖₂² are
-    # then equivalent
-    if soc_support && iszero(f)
-        MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂")
-        # Add ℓ₂-norm constraint
-        f = MOIU.operate(vcat, T, t, x) -
-            MOIU.operate(vcat, T, zero(α), ξ)
-        penalty.constraint =
-            MOI.add_constraint(model, f,
-                               MOI.SecondOrderCone(n))
-    elseif quad_support
-        MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂²")
-        # Add quadratic ℓ₂-norm constraint
-        g = MOIU.operate(-, T, x, ξ)
-        g = LinearAlgebra.dot(g, g)
-        MOIU.operate!(-, T, g, t)
-        penalty.constraint =
-            MOI.add_constraint(model, g,
-                               MOI.LessThan(0.0))
-    end
+    # Set name
+    MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂²")
+    # Add quadratic ℓ₂-norm constraint
+    g = MOIU.operate(-, T, x, ξ)
+    g = LinearAlgebra.dot(g, g)
+    MOIU.operate!(-, T, g, t)
+    penalty.constraint =
+        MOI.add_constraint(model, g,
+                           MOI.LessThan(0.0))
     # Add sense-corrected aux term to objective
     F = MOI.get(model, MOI.ObjectiveFunctionType())
     sense = MOI.get(model, MOI.ObjectiveSense())

@@ -223,6 +223,14 @@ end
 MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(sp), attr, value)
 MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value) = MOI.set(structure(sp), attr, value)
 
+function MOI.set(sp::StochasticProgram, attr::MOI.Silent, flag)
+    # Ensure that Silent is always passed
+    MOI.set(structure(sp), attr, flag)
+    # Pass to optimizer anyway
+    MOI.set(optimizer(sp), attr, flag)
+    return nothing
+end
+
 function JuMP.check_belongs_to_model(con_ref::ConstraintRef{<:StochasticProgram}, stochasticprogram::StochasticProgram)
     if owner_model(con_ref) !== model
         throw(ConstraintNotOwned(con_ref))

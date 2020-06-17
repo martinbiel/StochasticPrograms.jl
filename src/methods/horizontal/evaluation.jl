@@ -37,14 +37,14 @@ function _eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
     return sum(Qs)
 end
 
-function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,SP},
+function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
                                 decision::AbstractVector) where SP <: ScenarioProblems
     # Update decisions
     take_decisions!(structure.decisions[1], decision)
     map(subprob -> update_decisions!(subprob), subproblems(structure))
     return welford(subproblems(structure), probability.(scenarios(structure)))
 end
-function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,SP},
+function _stat_eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
                                 decision::AbstractVector) where SP <: DistributedScenarioProblems
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())
     sp = scenarioproblems(structure)

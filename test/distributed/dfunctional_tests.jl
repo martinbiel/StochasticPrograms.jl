@@ -7,8 +7,8 @@
                          optimizer = LShaped.Optimizer)
         @test_throws UnloadableStructure optimize!(sp)
         set_silent(sp)
-        set_optimizer_attribute(sp, MasterOptimizer(), () -> GLPK.Optimizer(presolve = true))
-        set_optimizer_attribute(sp, SubproblemOptimizer(), () -> GLPK.Optimizer(presolve = true))
+        set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
+        set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
         if name == "Infeasible"
             set_optimizer_attribute(sp, FeasibilityCuts(), true)
         end

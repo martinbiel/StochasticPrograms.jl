@@ -10,6 +10,8 @@ struct SingleKnownSet{T} <: MOI.AbstractScalarSet
     known::Decision{T}
 end
 
+struct FreeDecision <: MOI.AbstractScalarSet end
+
 struct MultipleDecisionSet{T} <: MOI.AbstractVectorSet
     decisions::Vector{Decision{T}}
 end

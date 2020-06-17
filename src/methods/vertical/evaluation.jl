@@ -67,14 +67,14 @@ function _eval_second_stages(structure::VerticalBlockStructure{2,1,Tuple{SP}},
     return sum(Qs)
 end
 
-function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,SP},
+function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,Tuple{SP}},
                                   decision::AbstractVector,
                                   sense::MOI.OptimizationSense) where SP <: ScenarioProblems
-    update_known_decisions!(structure.decision, decision)
+    update_known_decisions!(structure.decisions[2], decision)
     map(subprob -> update_known_decisions!(subprob), subproblems(structure))
     return welford(subproblems(structure), probability.(scenarios(structure)), sense)
 end
-function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,SP},
+function _stat_eval_second_stages(structure::VerticalBlockStructure{2,1,Tuple{SP}},
                                   decision::AbstractVector,
                                   sense::MOI.OptimizationSense) where SP <: DistributedScenarioProblems
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())

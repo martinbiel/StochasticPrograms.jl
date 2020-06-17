@@ -1,20 +1,19 @@
-SubWorker{T,A,S,PT} = RemoteChannel{Channel{Vector{SubProblem{T,A,S,PT}}}}
+SubWorker{T,A,PT} = RemoteChannel{Channel{Vector{SubProblem{T,A,PT}}}}
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
 Work = RemoteChannel{Channel{Int}}
 Progress{T <: AbstractFloat} = Tuple{Int,Int,SubproblemSolution{T}}
 ProgressQueue{T <: AbstractFloat} = RemoteChannel{Channel{Progress{T}}}
 
 function initialize_subproblems!(ph::AbstractProgressiveHedging,
-                                 subworkers::Vector{SubWorker{T,A,S,PT}},
+                                 subworkers::Vector{SubWorker{T,A,PT}},
                                  scenarioproblems::DistributedScenarioProblems,
                                  penaltyterm::AbstractPenaltyterm) where {T <: AbstractFloat,
                                                                           A <: AbstractVector,
-                                                                          S <: MOI.AbstractOptimizer,
                                                                           PT <: AbstractPenaltyterm}
     # Create subproblems on worker processes
     @sync begin
         for w in workers()
-            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,A,S,PT}}}(1), w)
+            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,A,PT}}}(1), w)
             prev = map(2:(w-1)) do p
                 scenarioproblems.scenario_distribution[p-1]
             end
@@ -31,10 +30,7 @@ function initialize_subproblems!(ph::AbstractProgressiveHedging,
 end
 
 function update_dual_gap!(ph::AbstractProgressiveHedging,
-                          subworkers::Vector{SubWorker{T,A,S,PT}}) where {T <: AbstractFloat,
-                                                                          A <: AbstractVector,
-                                                                          S <: MOI.AbstractOptimizer,
-                                                                          PT <: AbstractPenaltyterm}
+                          subworkers::Vector{<:SubWorker{T}}) where T <: AbstractFloat
     # Update δ₂
     partial_δs = Vector{Float64}(undef, nworkers())
     @sync begin
@@ -47,7 +43,7 @@ function update_dual_gap!(ph::AbstractProgressiveHedging,
                     return mapreduce(+, subproblems, init = zero(T)) do subproblem
                         π = subproblem.probability
                         x = subproblem.x
-                        π * norm(x - ph.ξ, 2)^2
+                        π * norm(x - ph.ξ, 2) ^ 2
                     end
                 end
         end
@@ -56,15 +52,14 @@ function update_dual_gap!(ph::AbstractProgressiveHedging,
     return nothing
 end
 
-function initialize_subworker!(subworker::SubWorker{T,A,S,PT},
+function initialize_subworker!(subworker::SubWorker{T,A,PT},
                                scenarioproblems::ScenarioProblemChannel,
                                penaltyterm::AbstractPenaltyterm,
                                start_id::Integer) where {T <: AbstractFloat,
                                                          A <: AbstractArray,
-                                                         S <: MOI.AbstractOptimizer,
                                                          PT <: AbstractPenaltyterm}
     sp = fetch(scenarioproblems)
-    subproblems = Vector{SubProblem{T,A,S,PT}}(undef, num_subproblems(sp))
+    subproblems = Vector{SubProblem{T,A,PT}}(undef, num_subproblems(sp))
     for i = 1:num_subproblems(sp)
         subproblems[i] = SubProblem(
             subproblem(sp, i),
@@ -89,13 +84,12 @@ function restore_subproblems!(subworkers::Vector{<:SubWorker})
     return nothing
 end
 
-function resolve_subproblems!(subworker::SubWorker{T,A,S,PT},
+function resolve_subproblems!(subworker::SubWorker{T,A,PT},
                               ξ::AbstractVector,
                               r::AbstractFloat) where {T <: AbstractFloat,
                                                        A <: AbstractArray,
-                                                       S <: MOI.AbstractOptimizer,
                                                        PT <: AbstractPenaltyterm}
-    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
+    subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     Qs = Vector{SubproblemSolution{T}}(undef, length(subproblems))
     # Reformulate and solve sub problems
     for (i,subproblem) in enumerate(subproblems)
@@ -106,11 +100,10 @@ function resolve_subproblems!(subworker::SubWorker{T,A,S,PT},
     return sum(Qs)
 end
 
-function collect_primals(subworker::SubWorker{T,A,S,PT}, n::Integer) where {T <: AbstractFloat,
-                                                                            A <: AbstractArray,
-                                                                            S <: MOI.AbstractOptimizer,
-                                                                            PT <: AbstractPenaltyterm}
-    subproblems::Vector{SubProblem{T,A,S,PT}} = fetch(subworker)
+function collect_primals(subworker::SubWorker{T,A,PT}, n::Integer) where {T <: AbstractFloat,
+                                                                          A <: AbstractArray,
+                                                                          PT <: AbstractPenaltyterm}
+    subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     return mapreduce(+, subproblems, init = zeros(T, n)) do subproblem
         π = subproblem.probability
         x = subproblem.x
@@ -132,15 +125,17 @@ function calculate_objective_value(subworkers::Vector{<:SubWorker{T}}) where T <
     return sum(partial_objectives)
 end
 
-function work_on_subproblems!(subworker::SubWorker{T,A,S},
+function work_on_subproblems!(subworker::SubWorker{T,A,PT},
                               work::Work,
                               finalize::Work,
                               progress::ProgressQueue{T},
                               x̄::RemoteRunningAverage{A},
                               δ::RemoteRunningAverage{T},
                               iterates::RemoteIterates{A},
-                              r::IteratedValue{T}) where {T <: AbstractFloat, A <: AbstractArray, S <: MOI.AbstractOptimizer}
-    subproblems::Vector{SubProblem{T,A,S}} = fetch(subworker)
+                              r::IteratedValue{T}) where {T <: AbstractFloat,
+                                                          A <: AbstractArray,
+                                                          PT <: AbstractPenaltyterm}
+    subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.
        return nothing

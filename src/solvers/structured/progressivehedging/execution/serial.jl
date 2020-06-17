@@ -6,12 +6,11 @@ Functor object for using serial execution in a progressive-hedging algorithm. Cr
 """
 struct SerialExecution{T <: AbstractFloat,
                        A <: AbstractVector,
-                       S <: MOI.AbstractOptimizer,
                        PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
-    subproblems::Vector{SubProblem{T,A,S,PT}}
+    subproblems::Vector{SubProblem{T,A,PT}}
 
-    function SerialExecution(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
-        return new{T,A,S,PT}(Vector{SubProblem{T,A,S,PT}}())
+    function SerialExecution(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
+        return new{T,A,PT}(Vector{SubProblem{T,A,PT}}())
     end
 end
 
@@ -67,7 +66,7 @@ function update_iterate!(ph::AbstractProgressiveHedging, execution::SerialExecut
         π * x
     end
     # Update δ₁
-    ph.data.δ₁ = norm(ph.ξ - ξ_prev, 2)^2
+    ph.data.δ₁ = norm(ph.ξ - ξ_prev, 2) ^ 2
     return nothing
 end
 
@@ -82,7 +81,7 @@ function update_dual_gap!(ph::AbstractProgressiveHedging, execution::SerialExecu
     ph.data.δ₂ = mapreduce(+, execution.subproblems, init = zero(T)) do subproblem
         π = subproblem.probability
         x = subproblem.x
-        π * norm(x - ph.ξ, 2)^2
+        π * norm(x - ph.ξ, 2) ^ 2
     end
     return nothing
 end
@@ -95,8 +94,8 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{S}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, S <: MOI.AbstractOptimizer, PT <: AbstractPenaltyterm}
-    return SerialExecution(T,A,S,PT)
+function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
+    return SerialExecution(T, A, PT)
 end
 
 function str(::Serial)

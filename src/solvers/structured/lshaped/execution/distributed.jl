@@ -1,17 +1,15 @@
-SubWorker{H,T,S} = RemoteChannel{Channel{Vector{SubProblem{H,T,S}}}}
+SubWorker{H,T} = RemoteChannel{Channel{Vector{SubProblem{H,T}}}}
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
 Work = RemoteChannel{Channel{Int}}
 
-function load_subproblems!(subworkers::Vector{SubWorker{H,T,S}},
+function load_subproblems!(subworkers::Vector{SubWorker{H,T}},
                            scenarioproblems::DistributedScenarioProblems,
-                           decisions::Vector{DecisionChannel},
-                           tolerance::AbstractFloat) where {H <: AbstractFeasibilityHandler,
-                                                            T <: AbstractFloat,
-                                                            S <: MOI.AbstractOptimizer}
+                           decisions::Vector{DecisionChannel}) where {H <: AbstractFeasibilityHandler,
+                                                                      T <: AbstractFloat}
     # Create subproblems on worker processes
     @sync begin
         for w in workers()
-            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{H,T,S}}}(1), w)
+            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{H,T}}}(1), w)
             prev = map(2:(w-1)) do p
                 scenarioproblems.scenario_distribution[p-1]
             end
@@ -21,25 +19,22 @@ function load_subproblems!(subworkers::Vector{SubWorker{H,T,S}},
                                     subworkers[w-1],
                                     scenarioproblems[w-1],
                                     decisions[w-1],
-                                    tolerance,
                                     start_id)
         end
     end
 end
 
-function initialize_subworker!(subworker::SubWorker{H,T,S},
+function initialize_subworker!(subworker::SubWorker{H,T},
                                scenarioproblems::ScenarioProblemChannel,
                                decisions::DecisionChannel,
-                               tolerance::AbstractFloat,
-                               start_id::Integer) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
+                               start_id::Integer) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     sp = fetch(scenarioproblems)
-    subproblems = Vector{SubProblem{H,T,S}}(undef, num_subproblems(sp))
+    subproblems = Vector{SubProblem{H,T}}(undef, num_subproblems(sp))
     for i in 1:num_subproblems(sp)
         subproblems[i] = SubProblem(
             subproblem(sp, i),
             start_id + i,
             T(probability(scenario(sp, i))),
-            T(tolerance),
             fetch(decisions).knowns,
             H)
     end
@@ -60,15 +55,15 @@ function restore_subproblems!(subworkers::Vector{<:SubWorker})
     return nothing
 end
 
-function resolve_subproblems!(subworker::SubWorker{H,T,S},
+function resolve_subproblems!(subworker::SubWorker{H,T},
                               decisions::DecisionChannel,
                               x::AbstractVector,
                               cutqueue::CutQueue{T},
                               aggregator::AbstractAggregator,
                               t::Integer,
-                              metadata::MetaData) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat, S <: MOI.AbstractOptimizer}
+                              metadata::MetaData) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     # Fetch all subproblems stored in worker
-    subproblems::Vector{SubProblem{H,T,S}} = fetch(subworker)
+    subproblems::Vector{SubProblem{H,T}} = fetch(subworker)
     if isempty(subproblems)
         # Workers has nothing do to, return.
         return nothing
@@ -88,7 +83,7 @@ function resolve_subproblems!(subworker::SubWorker{H,T,S},
     return nothing
 end
 
-function work_on_subproblems!(subworker::SubWorker{H,T,S},
+function work_on_subproblems!(subworker::SubWorker{H,T},
                               decisions::DecisionChannel,
                               work::Work,
                               finalize::Work,
@@ -97,9 +92,8 @@ function work_on_subproblems!(subworker::SubWorker{H,T,S},
                               metadata::MetaData,
                               aggregator::AbstractAggregator) where {H <: AbstractFeasibilityHandler,
                                                                      T <: AbstractFloat,
-                                                                     A <: AbstractVector,
-                                                                     S <: MOI.AbstractOptimizer}
-    subproblems::Vector{SubProblem{H,T,S}} = fetch(subworker)
+                                                                     A <: AbstractVector}
+    subproblems::Vector{SubProblem{H,T}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.
        return nothing

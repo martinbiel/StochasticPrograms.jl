@@ -6,21 +6,18 @@ Functor object for using serial execution in a lshaped algorithm. Create by supp
 """
 struct SerialExecution{H <: AbstractFeasibilityHandler,
                        T <: AbstractFloat,
-                       A <: AbstractVector,
-                       S <: MOI.AbstractOptimizer} <: AbstractLShapedExecution
-    subproblems::Vector{SubProblem{H,T,S}}
+                       A <: AbstractVector} <: AbstractLShapedExecution
+    subproblems::Vector{SubProblem{H,T}}
     decisions::Decisions
     subobjectives::A
     model_objectives::A
 
     function SerialExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
-                             ::Type{F}, ::Type{T},
-                             ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                          T <: AbstractFloat,
-                                                          A <: AbstractVector,
-                                                          S <: MOI.AbstractOptimizer}
+                             ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                     T <: AbstractFloat,
+                                                                     A <: AbstractVector}
         H = HandlerType(F)
-        return new{H,T,A,S}(Vector{SubProblem{H,T,S}}(), structure.decisions[2], A(), A())
+        return new{H,T,A}(Vector{SubProblem{H,T}}(), structure.decisions[2], A(), A())
     end
 end
 
@@ -29,15 +26,13 @@ function num_thetas(lshaped::AbstractLShaped, ::SerialExecution)
 end
 
 function initialize_subproblems!(execution::SerialExecution{H,T},
-                                 scenarioproblems::ScenarioProblems,
-                                 tolerance::AbstractFloat) where {H <: AbstractFeasibilityHandler,
-                                                                  T <: AbstractFloat}
+                                 scenarioproblems::ScenarioProblems) where {H <: AbstractFeasibilityHandler,
+                                                                            T <: AbstractFloat}
     for i in 1:num_subproblems(scenarioproblems)
         push!(execution.subproblems, SubProblem(
             subproblem(scenarioproblems, i),
             i,
             T(probability(scenario(scenarioproblems, i))),
-            T(tolerance),
             execution.decisions.knowns,
             H))
     end
@@ -77,12 +72,10 @@ end
 # API
 # ------------------------------------------------------------
 function (execution::Serial)(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
-                             ::Type{F}, ::Type{T},
-                             ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                          T <: AbstractFloat,
-                                                          A <: AbstractVector,
-                                                          S <: MOI.AbstractOptimizer}
-    return SerialExecution(structure, F, T, A, S)
+                             ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                     T <: AbstractFloat,
+                                                                     A <: AbstractVector}
+    return SerialExecution(structure, F, T, A)
 end
 
 function str(::Serial)

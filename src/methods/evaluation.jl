@@ -96,6 +96,8 @@ function evaluate_decision(stochasticmodel::StochasticModel{2}, decision::Abstra
     N = MOI.get(stochasticmodel, NumEvalSamples())
     # Calculate confidence interval using provided optimizer
     CI = let eval_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
+        # Silence output
+        MOI.set(eval_model, MOI.Silent(), true)
         # Sanity checks on given decision vector
         length(decision) == num_decisions(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(eval_model))
         all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -141,11 +143,6 @@ function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampl
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:M
         let sampled_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
-            # Set log parameters
-            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("log"), log)
-            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("keep"), keep)
-            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("offset"), offset)
-            MOI.set(stochasticmodel, RawInstanceOptimizerParameter("indent"), indent)
             Qs[i] = VRP(sampled_model)
             # Clear memory from temporary model
             clear!(sampled_model)
@@ -177,21 +174,12 @@ function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampl
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
     num_samples = MOI.get(stochasticmodel, NumSamples())
-    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
-    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
-    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
-    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
     # decision generation
     sampled_model = instantiate(stochasticmodel,
                                 sampler,
                                 num_samples;
                                 optimizer = optimizer,
                                 kw...)
-    # Set log parameters
-    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("log"), log)
-    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("keep"), keep)
-    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("offset"), offset)
-    MOI.set(stochasticmodel, RawInstanceOptimizerParameter("indent"), indent)
     # Optimize
     optimize!(sampled_model)
     x̂ = optimal_decision(sampled_model)
@@ -215,6 +203,7 @@ function upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVect
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
     N = MOI.get(stochasticmodel, NumEvalSamples())
+    N = max(N, MOI.get(stochasticmodel, NumSamples()))
     T = MOI.get(stochasticmodel, NumUpperTrials())
     log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
     keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
@@ -224,9 +213,11 @@ function upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVect
     Q = Vector{Float64}(undef, T)
     progress = Progress(T, 0.0, "$(repeat(" ", indent))Upper CI    ")
     log && sleep(0.1)
-    log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
+    log && ProgressMeter.update!(progress, 0, keep = false, offset = offset - 1)
     for i = 1:T
         let eval_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
+            # Silence output
+            MOI.set(eval_model, MOI.Silent(), true)
             # Sanity checks on given decision vector
             length(decision) == num_decisions(eval_model) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(eval_model))
             all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
@@ -235,7 +226,7 @@ function upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVect
             # Clear memory from temporary model
             clear!(eval_model)
         end
-        log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
+        log && ProgressMeter.update!(progress, i, keep = keep, offset = offset - 1)
     end
     Q̂ = mean(Q)
     σ = std(Q)
@@ -259,19 +250,21 @@ function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::Abstr
     # Confidence level
     confidence = MOI.get(stochasticmodel, Confidence())
     # Modify confidence for two-sided interval
-    α = (1-confidence)/2
+    α = (1 - confidence)/2
     MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Lower bound
     lower_CI = lower_bound(stochasticmodel, sampler; kw...)
     L = lower(lower_CI)
     # Upper bound
-    U = -Inf
-    while U < L
-        upper_CI = upper_bound(stochasticmodel, sampler; kw...)
-        U = upper(upper_CI)
-    end
+    upper_CI = upper_bound(stochasticmodel, sampler; kw...)
+    U = upper(upper_CI)
     # Restore confidence level
     MOI.set(stochasticmodel, Confidence(), confidence)
+    # Check if confidence interval is valid
+    if U <= L
+        @warn "Could not calculate confidence interval at current level of confidence and sample size"
+        return ConfidenceInterval(-Inf, Inf, confidence)
+    end
     # Return confidence interval
     return ConfidenceInterval(L, U, confidence)
 end

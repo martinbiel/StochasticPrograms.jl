@@ -103,7 +103,7 @@ end
 
 function update_decision_variable_constraints!(model::JuMP.Model, change::DecisionStateChange)
     F = DecisionRef
-    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
+    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
         for cref in all_constraints(model, F, S)
             update_decision_constraint!(cref, change)
         end
@@ -113,7 +113,7 @@ end
 
 function update_decision_variable_constraints!(model::JuMP.Model, ::DecisionsStateChange)
     F = DecisionRef
-    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
+    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
         for cref in all_constraints(model, F, S)
             # Fetch the decision
             dref = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))
@@ -126,10 +126,11 @@ function update_decision_variable_constraints!(model::JuMP.Model, ::DecisionsSta
 end
 
 function update_decision_constraints!(model::JuMP.Model, change::Union{DecisionModification, KnownModification})
-    F = CombinedAffExpr{Float64}
-    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
-        for cref in all_constraints(model, F, S)
-            update_decision_constraint!(cref, change)
+    for F in [CombinedAffExpr{Float64}, CombinedQuadExpr{Float64}]
+        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
+            for cref in all_constraints(model, F, S)
+                update_decision_constraint!(cref, change)
+            end
         end
     end
     return nothing
@@ -145,7 +146,16 @@ function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintInd
     return nothing
 end
 
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionModification, KnownModification}) where {T,S}
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionCoefficientChange, KnownModification}) where {T,S}
+    MOI.modify(model, ci, change)
+    return nothing
+end
+
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionStateChange, DecisionsStateChange}) where {T,S}
+    return nothing
+end
+
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{QuadraticDecisionFunction{T}, S}, change::Union{DecisionModification, KnownModification}) where {T,S}
     MOI.modify(model, ci, change)
     return nothing
 end

@@ -168,28 +168,39 @@ end
 function _moi_constrain_decision(backend::MOI.ModelLike, index, info, ::Union{SingleDecisionSet, MultipleDecisionSet})
     # We don't call the _moi* versions (e.g., _moi_set_lower_bound) because they
     # have extra checks that are not necessary for newly created variables.
+    nothing_added = true
     if info.has_lb
         MOI.add_constraint(backend, SingleDecision(index),
                            MOI.GreaterThan{Float64}(info.lower_bound))
+        nothing_added &= false
     end
     if info.has_ub
         MOI.add_constraint(backend, SingleDecision(index),
                            MOI.LessThan{Float64}(info.upper_bound))
+        nothing_added &= false
     end
     if info.has_fix
         MOI.add_constraint(backend, SingleDecision(index),
                            MOI.EqualTo{Float64}(info.fixed_value))
+        nothing_added &= false
     end
     if info.binary
         MOI.add_constraint(backend, SingleDecision(index),
                            MOI.ZeroOne())
+        nothing_added &= false
     end
     if info.integer
         MOI.add_constraint(backend, SingleDecision(index), MOI.Integer())
+        nothing_added &= false
     end
     if info.has_start
         MOI.set(backend, MOI.VariablePrimalStart(), index,
                 Float64(info.start))
+        nothing_added &= false
+    end
+    # Mark decision as free if not bounded
+    if nothing_added
+        MOI.add_constraint(backend, SingleDecision(index), FreeDecision())
     end
 end
 

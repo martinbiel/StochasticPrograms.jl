@@ -339,12 +339,13 @@ end
 # To enable certain modifications (decision coefficient changes and decision state updates)
 # a few methods must be added to MathOptInterface
 function MOIB.is_bridged(b::MOIB.AbstractBridgeOptimizer,
-                         change::Union{DecisionCoefficientChange, DecisionMultirowChange, DecisionStateChange})
+                         change::Union{DecisionCoefficientChange, DecisionMultirowChange})
     return MOIB.is_bridged(b, change.decision)
 end
 
 function MOIB.is_bridged(b::MOIB.AbstractBridgeOptimizer,
-                         change::Union{DecisionsStateChange, KnownCoefficientChange,
+                         change::Union{DecisionStateChange, DecisionsStateChange,
+                                       KnownCoefficientChange,
                                        KnownValueChange, KnownValuesChange})
     # These modifications should not be handled by the variable bridges
     return false
@@ -386,16 +387,6 @@ function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
         for term in f.terms
             MOI.modify(b, obj, DecisionMultirowChange(term.variable_index, change.new_coefficients))
         end
-    end
-    return nothing
-end
-
-function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
-                                    change::DecisionStateChange{T}) where T
-    f = MOIB.bridged_variable_function(b, change.decision)
-    for term in f.terms
-        # Let bridge for obj handle rest of state update
-        MOI.modify(b, obj, DecisionStateChange(term.variable_index, change.new_state, change.value_difference))
     end
     return nothing
 end

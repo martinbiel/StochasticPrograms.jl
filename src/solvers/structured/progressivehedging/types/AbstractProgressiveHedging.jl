@@ -6,7 +6,7 @@ StochasticPrograms.num_subproblems(ph::AbstractProgressiveHedging) = StochasticP
 # ======================================================================== #
 function initialize!(ph::AbstractProgressiveHedging, penaltyterm::AbstractPenaltyterm)
     # Initialize progress meter
-    ph.progress.thresh = ph.parameters.τ
+    ph.progress.thresh = sqrt(ph.parameters.ϵ₁ ^ 2 + ph.parameters.ϵ₂ ^ 2)
     # Initialize subproblems
     initialize_subproblems!(ph, scenarioproblems(ph.structure), penaltyterm)
     # Initialize penalty parameter (if applicable)
@@ -49,8 +49,8 @@ function objective_value(ph::AbstractProgressiveHedging)
 end
 
 function log!(ph::AbstractProgressiveHedging; optimal = false, status = nothing)
-    @unpack Q, δ, δ₂, iterations = ph.data
-    @unpack keep, offset, indent = ph.parameters
+    @unpack Q, δ₁, δ₂, iterations = ph.data
+    @unpack ϵ₁, ϵ₂, keep, offset, indent = ph.parameters
     # Early termination log
     if status != nothing && ph.parameters.log
         ph.progress.thresh = Inf
@@ -71,14 +71,20 @@ function log!(ph::AbstractProgressiveHedging; optimal = false, status = nothing)
         return nothing
     end
     push!(ph.Q_history, Q)
+    push!(ph.primal_gaps, δ₁)
     push!(ph.dual_gaps, δ₂)
     ph.data.iterations += 1
     if ph.parameters.log
+        δ = sqrt(δ₁ ^ 2 + δ₂ ^ 2)
+        if δ <= ph.progress.thresh && !(δ₁ <= ϵ₁ && δ₂ <= ϵ₂)
+            δ = 1.01 * ph.progress.thresh
+        end
         δ = optimal ? 0.0 : δ
         ProgressMeter.update!(ph.progress, δ,
                               showvalues = [
                                   ("$(indentstr(indent))Objective",Q),
-                                  ("$(indentstr(indent))δ", δ),
+                                  ("$(indentstr(indent))Primal gap", δ₁),
+                                  ("$(indentstr(indent))Dual gap", δ₂),
                                   ("$(indentstr(indent))Iterations", iterations)
                               ], keep = keep, offset = offset)
     end
@@ -89,9 +95,9 @@ function indentstr(n::Integer)
 end
 
 function check_optimality(ph::AbstractProgressiveHedging)
-    @unpack τ = ph.parameters
-    @unpack δ = ph.data
-    return δ <= τ
+    @unpack ϵ₁, ϵ₂ = ph.parameters
+    @unpack δ₁, δ₂ = ph.data
+    return δ₁ <= ϵ₁ && δ₂ <= ϵ₂
 end
 # ======================================================================== #
 function show(io::IO, ph::AbstractProgressiveHedging)

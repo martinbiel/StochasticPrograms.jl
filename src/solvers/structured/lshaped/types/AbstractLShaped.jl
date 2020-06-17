@@ -1,6 +1,6 @@
 abstract type AbstractLShaped end
 
-StochasticPrograms.num_subproblems(lshaped::AbstractLShaped) = StochasticPrograms.num_subproblems(lshaped.structure)
+StochasticPrograms.num_subproblems(lshaped::AbstractLShaped) = lshaped.num_subproblems
 num_cuts(lshaped::AbstractLShaped) = lshaped.data.num_cuts
 num_iterations(lshaped::AbstractLShaped) = lshaped.data.iterations
 tolerance(lshaped::AbstractLShaped) = lshaped.parameters.τ
@@ -11,7 +11,7 @@ function initialize!(lshaped::AbstractLShaped)
     # Initialize progress meter
     lshaped.progress.thresh = lshaped.parameters.τ
     # Initialize subproblems
-    initialize_subproblems!(lshaped, scenarioproblems(lshaped.structure), tolerance(lshaped))
+    initialize_subproblems!(lshaped, scenarioproblems(lshaped.structure))
     # Prepare the master optimization problem
     prepare_master!(lshaped)
     # Initialize regularization policy
@@ -25,9 +25,19 @@ end
 # Functions #
 # ======================================================================== #
 function prepare_master!(lshaped::AbstractLShaped)
-    # Cache the objective function
-    F = MOI.get(lshaped.master, MOI.ObjectiveFunctionType())
-    lshaped.data.master_objective = MOI.get(lshaped.master, MOI.ObjectiveFunction{F}())
+    # Check sense first
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    if sense == MOI.FEASIBILITY_SENSE
+        lshaped.data.no_objective = true
+        # Use min-sense during L-shaped procedure
+        MOI.set(lshaped.master, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        F = AffineDecisionFunction{Float64}
+        MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), zero(F))
+    else
+        # Cache the objective function
+        F = MOI.get(lshaped.master, MOI.ObjectiveFunctionType())
+        lshaped.data.master_objective = MOI.get(lshaped.master, MOI.ObjectiveFunction{F}())
+    end
     # Initialize the required number of master variables. Use
     # MOI.VariableIndex(0) as an undef value
     append!(lshaped.master_variables, fill(MOI.VariableIndex(0), num_thetas(lshaped)))
@@ -41,7 +51,7 @@ function add_master_variable!(lshaped::AbstractLShaped, index::Integer)
             add_subscript("θ", index))
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    coeff = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     # Add to objective
     MOI.modify(lshaped.master, MOI.ObjectiveFunction{F}(), MOI.ScalarCoefficientChange(master_variable, coeff))
     lshaped.master_variables[index] = master_variable
@@ -73,10 +83,15 @@ function restore_master!(lshaped::AbstractLShaped)
     empty!(lshaped.master_variables)
     # Remove any regularization terms
     restore_regularized_master!(lshaped)
-    # Re-add original objective
-    @unpack master_objective = lshaped.data
-    F = typeof(master_objective)
-    MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), master_objective)
+    if lshaped.data.no_objective
+        # Re-set FEASIBILITY_SENSE
+        MOI.set(lshaped.master, MOI.ObjectiveSense(), MOI.FEASIBILITY_SENSE)
+    else
+        # Re-add original objective
+        @unpack master_objective = lshaped.data
+        F = typeof(master_objective)
+        MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), master_objective)
+    end
     return nothing
 end
 
@@ -129,7 +144,7 @@ end
 function current_objective_value(lshaped::AbstractLShaped)
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     # Return sense-corrected value
     return evaluate_first_stage(lshaped, current_decision(lshaped)) +
         correction * sum(subobjectives(lshaped))
@@ -138,7 +153,7 @@ end
 function calculate_estimate(lshaped::AbstractLShaped)
     # Get sense
     sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
-    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     # Return sense-corrected value
     return evaluate_first_stage(lshaped, lshaped.x) +
         correction * sum(model_objectives(lshaped))
@@ -263,11 +278,11 @@ function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{OptimalityCut}, θs:
     end
     # Get the model value
     θ = θs[cut.id]
-    @unpack τ, cut_scaling = lshaped.parameters
+    @unpack cut_scaling = lshaped.parameters
     # Update objective
     subobjectives[cut.id] = Q
     # Check if cut gives new information
-    if check && θ > -Inf && (θ + τ >= Q || θ + τ >= cut(lshaped.x))
+    if check && θ > -Inf && (θ + sqrt(eps()) >= Q || θ + sqrt(eps()) >= cut(lshaped.x))
         # Optimal with respect to this subproblem
         return false
     end
@@ -290,11 +305,11 @@ function add_cut!(lshaped::AbstractLShaped, cut::AggregatedOptimalityCut, θs::A
     end
     θs = θs[cut.ids]
     θ = sum(θs)
-    @unpack τ, cut_scaling = lshaped.parameters
+    @unpack cut_scaling = lshaped.parameters
     # Update objective
     subobjectives[cut.ids] .= Q/length(cut.ids)
     # Check if cut gives new information
-    if check && θ > -Inf && (θ + τ >= Q || θ + τ >= cut(lshaped.x))
+    if check && θ > -Inf && (θ + sqrt(eps()) >= Q || θ + sqrt(eps()) >= cut(lshaped.x))
         # Optimal with respect to these subproblems
         return false
     end

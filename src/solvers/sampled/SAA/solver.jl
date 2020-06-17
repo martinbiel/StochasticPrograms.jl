@@ -32,6 +32,7 @@ mutable struct SampleAverageApproximation{T <: AbstractFloat, A <: AbstractVecto
     sampler::S
     optimizer
     x₀::A
+    interval_history::Vector{ConfidenceInterval{T}}
     data::SAAData{T}
     parameters::SAAParameters{T}
 
@@ -46,6 +47,7 @@ mutable struct SampleAverageApproximation{T <: AbstractFloat, A <: AbstractVecto
                              sampler,
                              optimizer,
                              x₀,
+                             Vector{ConfidenceInterval{T}}(),
                              SAAData{T}(),
                              params)
     end
@@ -64,10 +66,12 @@ function (saa::SampleAverageApproximation)()
                                      ("Relative error", Inf),
                                      ("Sample size", NaN),
                                  ])
+    status = MOI.OPTIMIZE_NOT_CALLED
     while true
+        saa.data.sample_size = N
         CI = confidence_interval(saa.model, saa.sampler)
         saa.data.interval = CI
-        saa.data.sample_size = N
+        push!(saa.interval_history, CI)
         Q = (upper(CI) + lower(CI)) / 2
         gap = length(CI) / abs(Q + 1e-10)
         log && ProgressMeter.update!(progress, gap,
@@ -77,7 +81,8 @@ function (saa::SampleAverageApproximation)()
                                          ("Sample size", N)
                                      ])
         if gap <= tolerance
-            return MOI.OPTIMAL
+            status = MOI.OPTIMAL
+            break
         end
         N = N * 2
         if N > max_num_samples
@@ -88,10 +93,16 @@ function (saa::SampleAverageApproximation)()
                                              ("Early termination", status),
                                              ("Sample size", N)
                                          ])
-            return status
+            break
         end
         #optimizer_config(optimizer(stochasticmodel), N)
     end
+    # Move cursor down
+    for _ in 1:saa.parameters.offset + 2
+        print("\r\u1b[B")
+    end
+    # Return status
+    return status
 end
 
 function instance(saa::SampleAverageApproximation)

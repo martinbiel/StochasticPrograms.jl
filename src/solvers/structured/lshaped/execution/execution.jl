@@ -2,7 +2,7 @@ abstract type AbstractLShapedExecution end
 # Execution API #
 # ------------------------------------------------------------
 num_thetas(lshaped::AbstractLShaped) = num_thetas(lshaped, lshaped.execution)
-initialize_subproblems!(lshaped::AbstractLShaped, scenarioproblems::AbstractScenarioProblems, tolerance::AbstractFloat) = initialize_subproblems!(lshaped.execution, scenarioproblems, tolerance)
+initialize_subproblems!(lshaped::AbstractLShaped, scenarioproblems::AbstractScenarioProblems) = initialize_subproblems!(lshaped.execution, scenarioproblems)
 finish_initilization!(lshaped::AbstractLShaped) = finish_initilization!(lshaped, lshaped.execution)
 restore_subproblems!(lshaped::AbstractLShaped) = restore_subproblems!(lshaped, lshaped.execution)
 solve_master!(lshaped::AbstractLShaped) = solve_master!(lshaped, lshaped.execution)

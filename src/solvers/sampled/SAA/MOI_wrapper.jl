@@ -117,6 +117,9 @@ end
 
 function MOI.set(optimizer::Optimizer, ::NumSamples, num_samples::Integer)
     MOI.set(optimizer, MOI.RawParameter("num_samples"), num_samples)
+    if optimizer.algorithm != nothing
+        optimizer.algorithm.data.sample_size = num_samples
+    end
     return nothing
 end
 
@@ -174,6 +177,10 @@ function MOI.get(optimizer::Optimizer, ::InstanceOptimizer)
         for (attr, value) in optimizer.optimizer_params
             MOI.set(instance_opt, attr, value)
         end
+        MOI.set(instance_opt, MOI.RawParameter("log"), optimizer.parameters.log)
+        MOI.set(instance_opt, MOI.RawParameter("keep"), optimizer.parameters.keep)
+        MOI.set(instance_opt, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
+        MOI.set(instance_opt, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
         return instance_opt
     end
 end

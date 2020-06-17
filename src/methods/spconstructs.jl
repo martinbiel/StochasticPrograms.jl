@@ -37,6 +37,7 @@ function _WS(stage_one_generator::Function,
     stage_one_generator(ws_model, stage_one_params)
     ws_obj = copy(objective_function(ws_model))
     ws_sense = objective_sense(ws_model)
+    ws_sense = ws_sense == MOI.FEASIBILITY_SENSE ? MOI.MIN_SENSE : ws_sense
     # Generate second stage and finalize objective
     stage_two_generator(ws_model, stage_two_params, scenario)
     if ws_sense == objective_sense(ws_model)

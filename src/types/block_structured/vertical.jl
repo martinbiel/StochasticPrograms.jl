@@ -70,6 +70,13 @@ function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractConstraint
 end
 
 MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractModelAttribute, value) = MOI.set(backend(structure.first_stage), attr, value)
+function MOI.set(structure::VerticalBlockStructure, attr::MOI.Silent, flag)
+    # Silence master
+    MOI.set(backend(structure.first_stage), attr, flag)
+    # Silence subproblems
+    MOI.set(scenarioproblems(structure), attr, flag)
+    return nothing
+end
 function MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     MOI.set(backend(structure.first_stage), attr, index, value)

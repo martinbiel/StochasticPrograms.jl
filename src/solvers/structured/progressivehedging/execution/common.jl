@@ -15,11 +15,6 @@ function iterate!(ph::AbstractProgressiveHedging, ::AbstractProgressiveHedgingEx
     update_dual_gap!(ph)
     # Update penalty (if applicable)
     update_penalty!(ph)
-    # Update progress
-    @unpack δ₁, δ₂ = ph.data
-    ph.data.δ = sqrt(δ₁ + δ₂) / (1e-10 + norm(ph.ξ, 2))
-    # Log progress
-    log!(ph)
     # Check optimality
     if check_optimality(ph)
         # Final log
@@ -27,6 +22,8 @@ function iterate!(ph::AbstractProgressiveHedging, ::AbstractProgressiveHedgingEx
         # Optimal
         return MOI.OPTIMAL
     end
+    # Log progress
+    log!(ph)
     # Dont return a status as procedure should continue
     return nothing
 end

@@ -6,9 +6,8 @@ Functor object for using synchronous execution in an L-shaped algorithm (assumin
 """
 struct SynchronousExecution{H <: AbstractFeasibilityHandler,
                             T <: AbstractFloat,
-                            A <: AbstractVector,
-                            S <: MOI.AbstractOptimizer} <: AbstractLShapedExecution
-    subworkers::Vector{SubWorker{H,T,S}}
+                            A <: AbstractVector} <: AbstractLShapedExecution
+    subworkers::Vector{SubWorker{H,T}}
     decisions::Vector{DecisionChannel}
     subobjectives::A
     model_objectives::A
@@ -16,25 +15,22 @@ struct SynchronousExecution{H <: AbstractFeasibilityHandler,
     cutqueue::CutQueue{T}
 
     function SynchronousExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
-                                  ::Type{F}, ::Type{T},
-                                  ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                               T <: AbstractFloat,
-                                                               A <: AbstractVector,
-                                                               S <: MOI.AbstractOptimizer}
+                                  ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                          T <: AbstractFloat,
+                                                                          A <: AbstractVector}
         H = HandlerType(F)
-        return new{H,T,A,S}(Vector{SubWorker{H,T,S}}(undef, nworkers()),
-                            scenarioproblems(structure).decisions,
-                            A(),
-                            A(),
-                            Vector{MetaData}(undef, nworkers()),
-                            RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))))
+        return new{H,T,A}(Vector{SubWorker{H,T}}(undef, nworkers()),
+                          scenarioproblems(structure).decisions,
+                          A(),
+                          A(),
+                          Vector{MetaData}(undef, nworkers()),
+                          RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))))
     end
 end
 
 function initialize_subproblems!(execution::SynchronousExecution,
-                                 scenarioproblems::DistributedScenarioProblems,
-                                 tolerance::AbstractFloat)
-    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions, tolerance)
+                                 scenarioproblems::DistributedScenarioProblems)
+    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions)
     return nothing
 end
 
@@ -85,12 +81,10 @@ end
 # API
 # ------------------------------------------------------------
 function (execution::Synchronous)(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
-                                  ::Type{F}, ::Type{T},
-                                  ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                               T <: AbstractFloat,
-                                                               A <: AbstractVector,
-                                                               S <: MOI.AbstractOptimizer}
-    return SynchronousExecution(structure, F, T, A, S)
+                                  ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                          T <: AbstractFloat,
+                                                                          A <: AbstractVector}
+    return SynchronousExecution(structure, F, T, A)
 end
 
 function str(::Synchronous)

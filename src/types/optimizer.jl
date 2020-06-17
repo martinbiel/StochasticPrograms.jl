@@ -103,11 +103,19 @@ function subproblem_optimizer(sp_optimizer::StochasticProgramOptimizer, optimize
 end
 
 function master_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
-    return MOI.get(optimizer, MasterOptimizer())
+    try
+        return MOI.get(optimizer, MasterOptimizer())
+    catch err
+        return nothing
+    end
 end
 
 function subproblem_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
-    return MOI.get(optimizer, SubproblemOptimizer())
+    try
+        return MOI.get(optimizer, SubproblemOptimizer())
+    catch err
+        return nothing
+    end
 end
 
 function reset_optimizer!(sp_optimizer::StochasticProgramOptimizer{Opt}, optimizer) where Opt <: StochasticProgramOptimizerType

@@ -190,12 +190,21 @@ function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, limit::Union{Real, No
     return
 end
 
-function MOI.get(optimizer::Optimizer, ::RelativeTolerance)
-    return MOI.get(optimizer, MOI.RawParameter("τ"))
+function MOI.get(optimizer::Optimizer, ::PrimalTolerance)
+    return MOI.get(optimizer, MOI.RawParameter("ϵ₁"))
 end
 
-function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
-    MOI.set(optimizer, MOI.RawParameter("τ"), limit)
+function MOI.set(optimizer::Optimizer, ::PrimalTolerance, limit::Real)
+    MOI.set(optimizer, MOI.RawParameter("ϵ₁"), limit)
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::DualTolerance)
+    return MOI.get(optimizer, MOI.RawParameter("ϵ₂"))
+end
+
+function MOI.set(optimizer::Optimizer, ::DualTolerance, limit::Real)
+    MOI.set(optimizer, MOI.RawParameter("ϵ₂"), limit)
     return nothing
 end
 
@@ -205,9 +214,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
-    if optimizer.progressivehedging != nothing
-        set_master_optimizer!(optimizer.progressivehedging.structure, optimizer_constructor)
-    end
     # Trigger reload
     reload_structure!(optimizer)
     return nothing
@@ -312,6 +318,7 @@ MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::MasterOptimizer) = false
+MOI.supports(::Optimizer, ::RelativeTolerance) = false
 MOI.supports(::Optimizer, ::RawInstanceOptimizerParameter) = true
 MOI.supports(::Optimizer, ::AbstractProgressiveHedgingAttribute) = true
 
@@ -322,11 +329,11 @@ function set_penalization_attribute(stochasticprogram::StochasticProgram, name::
 end
 function set_penalization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
-        set_regularization_attributes(stochasticprogram, name, value)
+        set_penalization_attribute(stochasticprogram, name, value)
     end
 end
 function set_penalization_attributes(stochasticprogram::StochasticProgram; kw...)
     for (name, value) in kw
-        set_regularization_attributes(stochasticprogram, name, value)
+        set_penalization_attribute(stochasticprogram, name, value)
     end
 end

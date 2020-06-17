@@ -12,13 +12,12 @@ Functor object for using synchronous execution in an L-shaped algorithm (assumin
 """
 struct AsynchronousExecution{H <: AbstractFeasibilityHandler,
                              T <: AbstractFloat,
-                             A <: AbstractVector,
-                             S <: MOI.AbstractOptimizer} <: AbstractLShapedExecution
+                             A <: AbstractVector} <: AbstractLShapedExecution
     data::AsynchronousData{T}
     subobjectives::Vector{A}
     model_objectives::Vector{A}
     finished::Vector{Int}
-    subworkers::Vector{SubWorker{H,T,S}}
+    subworkers::Vector{SubWorker{H,T}}
     decisions::Vector{DecisionChannel}
     work::Vector{Work}
     finalize::Vector{Work}
@@ -33,35 +32,32 @@ struct AsynchronousExecution{H <: AbstractFeasibilityHandler,
 
     function AsynchronousExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                    max_active::Int, κ::T,
-                                   ::Type{F}, ::Type{T},
-                                   ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                                T <: AbstractFloat,
-                                                                A <: AbstractVector,
-                                                                S <: MOI.AbstractOptimizer}
+                                   ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                           T <: AbstractFloat,
+                                                                           A <: AbstractVector}
         H = HandlerType(F)
-        return new{H,T,A,S}(AsynchronousData{T}(),
-                            Vector{A}(),
-                            Vector{A}(),
-                            Vector{Int}(),
-                            Vector{SubWorker{H,T,S}}(undef, nworkers()),
-                            scenarioproblems(structure).decisions,
-                            Vector{Work}(undef, nworkers()),
-                            Vector{Work}(undef, nworkers()),
-                            Vector{MetaData}(undef, nworkers()),
-                            RemoteChannel(() -> IterateChannel(Dict{Int,A}())),
-                            RemoteChannel(() -> Channel{QCut{T}}(max_active * nworkers() * num_scenarios(structure))),
-                            Vector{Future}(undef, nworkers()),
-                            Vector{Bool}(),
-                            Vector{Bool}(),
-                            max_active,
-                            κ)
+        return new{H,T,A}(AsynchronousData{T}(),
+                          Vector{A}(),
+                          Vector{A}(),
+                          Vector{Int}(),
+                          Vector{SubWorker{H,T}}(undef, nworkers()),
+                          scenarioproblems(structure).decisions,
+                          Vector{Work}(undef, nworkers()),
+                          Vector{Work}(undef, nworkers()),
+                          Vector{MetaData}(undef, nworkers()),
+                          RemoteChannel(() -> IterateChannel(Dict{Int,A}())),
+                          RemoteChannel(() -> Channel{QCut{T}}(max_active * nworkers() * num_scenarios(structure))),
+                          Vector{Future}(undef, nworkers()),
+                          Vector{Bool}(),
+                          Vector{Bool}(),
+                          max_active,
+                          κ)
     end
 end
 
 function initialize_subproblems!(execution::AsynchronousExecution,
-                                 scenarioproblems::DistributedScenarioProblems,
-                                 tolerance::AbstractFloat)
-    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions, tolerance)
+                                 scenarioproblems::DistributedScenarioProblems)
+    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions)
     return nothing
 end
 
@@ -134,6 +130,10 @@ function incumbent_decision(::AbstractLShaped, t::Integer, regularization::Abstr
             return ξᵢ.value
         end
     end
+end
+
+function incumbent_decision(lshaped::AbstractLShaped, t::Integer, ::NoRegularization, execution::AsynchronousExecution)
+    lshaped.x
 end
 
 function incumbent_objective(::AbstractLShaped, t::Integer, regularization::AbstractRegularization, ::AsynchronousExecution)
@@ -236,8 +236,8 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{H,T
             return MOI.DUAL_INFEASIBLE
         end
         # Otherwise, add new cut to master and update bookkeeping
-        lshaped.execution.added[t] |= add_cut!(lshaped, cut)
-        lshaped.execution.finished[t] += num_subproblems(cut)
+        execution.added[t] |= add_cut!(lshaped, cut)
+        execution.finished[t] += num_subproblems(cut)
         # Asynchronicity parameter should be 1 first iteration
         κ = t > 1 ? execution.κ : 1.0
         if execution.finished[t] == num_thetas(lshaped)
@@ -253,8 +253,9 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{H,T
                 log!(lshaped; optimal = true)
                 return MOI.OPTIMAL
             end
-            # Optimal if not using regularization and no cuts were added
-            if lshaped.regularization isa NoRegularization && !execution.added[t]
+            # Optimal if no cuts were added and current decision
+            # is not different from incumbent projection target
+            if !execution.added[t] && norm(incumbent_decision(lshaped, t, lshaped.regularization, execution) - lshaped.x) <= sqrt(eps())
                 # Optimal, final log
                 log!(lshaped, t; optimal = true)
                 return MOI.OPTIMAL
@@ -327,12 +328,10 @@ end
 # API
 # ------------------------------------------------------------
 function (execution::Asynchronous)(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
-                                   ::Type{F}, ::Type{T},
-                                   ::Type{A}, ::Type{S}) where {F <: AbstractFeasibility,
-                                                                T <: AbstractFloat,
-                                                                A <: AbstractVector,
-                                                                S <: MOI.AbstractOptimizer}
-    return AsynchronousExecution(structure, execution.max_active, execution.κ, F, T, A, S)
+                                   ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
+                                                                           T <: AbstractFloat,
+                                                                           A <: AbstractVector}
+    return AsynchronousExecution(structure, execution.max_active, execution.κ, F, T, A)
 end
 
 function str(::Asynchronous)

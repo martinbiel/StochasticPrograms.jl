@@ -121,7 +121,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     # Log progress
     log!(lshaped)
     # Check optimality
-    if check_optimality(lshaped) || (lshaped.regularization isa NoRegularization && !added)
+    if check_optimality(lshaped) || (!added && norm(decision(lshaped) - lshaped.x) <= sqrt(eps()))
         # Optimal, final log
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL

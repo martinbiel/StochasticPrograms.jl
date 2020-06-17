@@ -2,6 +2,7 @@
     Q::T = 1e10
     θ::T = -1e10
     master_objective::AffineDecisionFunction{T} = zero(AffineDecisionFunction{T})
+    no_objective::Bool = false
     num_cuts::Int = 0
     iterations::Int = 1
     consolidations::Int = 0
@@ -35,13 +36,13 @@ struct LShapedAlgorithm{T <: AbstractFloat,
                         A <: AbstractVector,
                         ST <: VerticalBlockStructure,
                         M <: MOI.AbstractOptimizer,
-                        S <: MOI.AbstractOptimizer,
                         E <: AbstractLShapedExecution,
                         F <: AbstractFeasibility,
                         R <: AbstractRegularization,
                         Agg <: AbstractAggregation,
                         C <: AbstractConsolidation} <: AbstractLShaped
     structure::ST
+    num_subproblems::Int
     data::LShapedData{T}
     parameters::LShapedParameters{T}
 
@@ -79,8 +80,8 @@ struct LShapedAlgorithm{T <: AbstractFloat,
                               consolidator::AbstractConsolidator; kw...)
         # Sanity checks
         length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
-        num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run L-shaped procedure.")
         n = num_subproblems(structure)
+        n == 0 && error("No subproblems in stochastic program. Cannot run L-shaped procedure.")
         # Float types
         T = promote_type(eltype(x₀), Float32)
         x₀_ = convert(AbstractVector{T}, copy(x₀))
@@ -88,12 +89,11 @@ struct LShapedAlgorithm{T <: AbstractFloat,
         # Structure
         ST = typeof(structure)
         M = typeof(backend(structure.first_stage))
-        S = typeof(backend(subproblem(structure, 1)))
         # Feasibility
         feasibility = feasibility_cuts ? HandleFeasibility(T) : IgnoreFeasibility()
         F = typeof(feasibility)
         # Execution policy
-        execution = _execution(structure,F,T,A,S)
+        execution = _execution(structure, F, T, A)
         E = typeof(execution)
         # Regularization policy
         regularization = regularizer(structure.decisions[1], x₀_)
@@ -107,23 +107,24 @@ struct LShapedAlgorithm{T <: AbstractFloat,
         # Algorithm parameters
         params = LShapedParameters{T}(; kw...)
 
-        lshaped = new{T,A,ST,M,S,E,F,R,Agg,C}(structure,
-                                              LShapedData{T}(),
-                                              params,
-                                              backend(structure.first_stage),
-                                              structure.decisions[1],
-                                              x₀_,
-                                              A(),
-                                              execution,
-                                              feasibility,
-                                              regularization,
-                                              Vector{MOI.VariableIndex}(),
-                                              Vector{CutConstraint}(),
-                                              Vector{SparseOptimalityCut{T}}(),
-                                              aggregation,
-                                              consolidation,
-                                              A(),
-                                              ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))L-Shaped Gap "))
+        lshaped = new{T,A,ST,M,E,F,R,Agg,C}(structure,
+                                            n,
+                                            LShapedData{T}(),
+                                            params,
+                                            backend(structure.first_stage),
+                                            structure.decisions[1],
+                                            x₀_,
+                                            A(),
+                                            execution,
+                                            feasibility,
+                                            regularization,
+                                            Vector{MOI.VariableIndex}(),
+                                            Vector{CutConstraint}(),
+                                            Vector{SparseOptimalityCut{T}}(),
+                                            aggregation,
+                                            consolidation,
+                                            A(),
+                                            ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))L-Shaped Gap "))
         # Initialize solver
         initialize!(lshaped)
         return lshaped

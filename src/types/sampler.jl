@@ -49,12 +49,12 @@ function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{S}, n::Intege
     _sample!(scenarios, sampler, n, length(scenarios), 1/n)
     return nothing
 end
-function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: AbstractScenario
+function sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{Scenario}, n::Integer) where S <: Scenario
     _sample!(scenarios, sampler, n, length(scenarios), 1/n)
     return nothing
 end
 
-function _sample!(scenarios::Scenarios{S}, sampler::AbstractSampler{S}, n::Integer, m::Integer, π::AbstractFloat) where S <: AbstractScenario
+function _sample!(scenarios::Scenarios, sampler::AbstractSampler, n::Integer, m::Integer, π::AbstractFloat)
     if m > 0
         # Rescale probabilities of existing scenarios
         for scenario in scenarios

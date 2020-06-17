@@ -12,16 +12,23 @@ function MOIB.Constraint.bridge_constraint(::Type{SingleDecisionConstraintBridge
                                            f::SingleDecision,
                                            set::S) where {T, S <: MOI.AbstractScalarSet}
     # Perform the bridge mapping manually
-    bridged = MOIB.bridged_function(
-        model,
-        AffineDecisionFunction{T}(f))
-    mapped_variable = bridged.decision_part.terms[1].variable_index
+    g = MOIB.bridged_variable_function(model, f.decision)
+    mapped_variable = g.terms[1].variable_index
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
                                     MOI.SingleVariable(mapped_variable),
                                     set)
     # Save the constraint index and the decision to allow modifications
     return SingleDecisionConstraintBridge{T,S}(constraint, FixingConstraint{T}(0), f)
+end
+
+function MOIB.Constraint.bridge_constraint(::Type{SingleDecisionConstraintBridge{T,FreeDecision}},
+                                           model,
+                                           f::SingleDecision,
+                                           set::FreeDecision) where T
+    # Do not need to add constraint, just save bridge handle fixing
+    constraint = CI{MOI.SingleVariable, FreeDecision}(0)
+    return SingleDecisionConstraintBridge{T,FreeDecision}(constraint, FixingConstraint{T}(0), f)
 end
 
 function MOI.supports_constraint(::Type{<:SingleDecisionConstraintBridge{T}},
@@ -69,7 +76,9 @@ function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintDual,
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::SingleDecisionConstraintBridge)
-    MOI.delete(model, bridge.constraint)
+    if bridge.constraint.value != 0
+        MOI.delete(model, bridge.constraint)
+    end
     return nothing
 end
 
@@ -80,7 +89,8 @@ function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintSet,
 end
 
 function MOI.modify(model::MOI.ModelLike, bridge::SingleDecisionConstraintBridge{T,S}, change::DecisionStateChange) where {T,S}
-    if bridge.decision != change.decision
+    # Perform the bridge mapping manually
+    if bridge.decision.decision != change.decision
         # Decision not in constraint, nothing to do
         return nothing
     end

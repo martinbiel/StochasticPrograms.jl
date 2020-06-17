@@ -513,7 +513,7 @@ end
 Return the `i`th subproblem of the `stochasticprogram` at stage `s`. Defaults to the second stage.
 """
 function subproblem(stochasticprogram::StochasticProgram, i::Integer, s::Integer = 2)
-    return subproblem(structure(stochasticprogram), s, i)
+    return subproblem(structure(stochasticprogram), i, s)
 end
 """
     subproblems(stochasticprogram::StochasticProgram, s::Integer = 2)
