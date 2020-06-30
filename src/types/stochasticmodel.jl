@@ -96,13 +96,14 @@ macro stochastic_model(def)
         paramdef = if @capture(x, @parameters arg_)
             names = Vector{Symbol}()
             default = Vector{Expr}()
-            for paramdef in prettify(arg).args
+            for paramdef in block(arg).args
                 if @capture(paramdef, key_Symbol = val_)
                     push!(names, key)
                     push!(default, paramdef)
                 elseif @capture(paramdef, key_Symbol)
                     push!(names, key)
                 else
+                    @show paramdef
                     error("Incorrect @parameters syntax. Specify parameter names, possibly with a default value.")
                 end
             end

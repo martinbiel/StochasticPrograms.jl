@@ -144,7 +144,7 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
     MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), objective)
     # Solve unregularized master
     status = solve_master!(lshaped)
-    if status != MOI.OPTIMAL
+    if !(status ∈ AcceptableTermination)
         # Early termination
         return nothing
     end

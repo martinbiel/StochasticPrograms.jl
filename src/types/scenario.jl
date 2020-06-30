@@ -93,12 +93,12 @@ end
 
 Conveniece type that adheres to the [`AbstractScenario`](@ref) abstraction. Useful when uncertain parameters are a finite set of scalar values.
 """
-struct Scenario{NT <: NamedTuple} <: AbstractScenario
+struct Scenario{T} <: AbstractScenario
     probability::Probability
-    data::NT
+    data::T
 
-    function Scenario(data::NT; probability::AbstractFloat = 1.0) where NT <: NamedTuple
-        return new{NT}(Probability(probability), data)
+    function Scenario(data::T; probability::AbstractFloat = 1.0) where T
+        return new{T}(Probability(probability), data)
     end
 
     function Scenario(; probability::AbstractFloat = 1.0, kw...)
@@ -107,16 +107,18 @@ struct Scenario{NT <: NamedTuple} <: AbstractScenario
         return new{NT}(Probability(probability), data)
     end
 end
-function Base.getindex(ξ::Scenario, field::Symbol)
-    return getproperty(ξ.data, field)
-end
 function Base.zero(::Type{Scenario{NT}}) where NT <: NamedTuple
     return Scenario(NamedTuple{Tuple(NT.names)}(zero.(NT.types)); probability = 1.0)
 end
-function scenariotext(io::IO, scenario::Scenario)
+function scenariotext(io::IO, scenario::Scenario{NT}) where NT <: NamedTuple
     for (k,v) in pairs(scenario.data)
         print(io, "\n  $k: $v")
     end
+    return io
+end
+function scenariotext(io::IO, scenario::Scenario)
+    print(io, " and underlying data:\n\n")
+    print(io, scenario.data)
     return io
 end
 

@@ -13,7 +13,7 @@ function outcome_mean(subproblems::Vector{JuMP.Model}, probabilities::AbstractVe
         val = try
             optimize!(outcome)
             status = termination_status(outcome)
-            if status != MOI.OPTIMAL
+            if !(status ∈ AcceptableTermination)
                 if status == MOI.INFEASIBLE
                     objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
                 elseif status == MOI.DUAL_INFEASIBLE
@@ -53,7 +53,7 @@ function welford(subproblems::Vector{JuMP.Model}, probabilities::AbstractVector,
         try
             optimize!(problem)
             status = termination_status(problem)
-            Q = if status != MOI.OPTIMAL
+            Q = if !(status ∈ AcceptableTermination)
                 Q = if status == MOI.INFEASIBLE
                     objective_sense(problem) == MOI.MAX_SENSE ? -Inf : Inf
                 elseif status == MOI.DUAL_INFEASIBLE

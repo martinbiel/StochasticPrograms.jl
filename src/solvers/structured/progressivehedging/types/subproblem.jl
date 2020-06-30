@@ -33,7 +33,7 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
         # initial decision
         MOI.optimize!(optimizer)
         status = MOI.get(optimizer, MOI.TerminationStatus())
-        if status != MOI.OPTIMAL
+        if !(status ∈ StochasticPrograms.AcceptableTermination)
             error("Initial wait-and-see problem could not be solved in subproblem $id, returned status $status.")
         end
         x₀ = map(decisions.undecided) do vi
@@ -69,10 +69,10 @@ function Base.:+(lhs::SubproblemSolution{T}, rhs::SubproblemSolution{T}) where T
         return SubproblemSolution(lhs.status, val)
     end
     # Ensure that non-optimal status is propagated
-    if lhs.status == MOI.OPTIMAL
+    if lhs.status in AcceptableTermination
         return SubproblemSolution(rhs.status, val)
     end
-    if rhs.status == MOI.OPTIMAL
+    if rhs.status in AcceptableTermination
         return SubproblemSolution(lhs.status, val)
     end
     # Let lhs dictate end status
@@ -162,7 +162,7 @@ end
 function (subproblem::SubProblem{T})(ξ::AbstractVector) where T <: AbstractFloat
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
-    if status == MOI.OPTIMAL
+    if status ∈ StochasticPrograms.AcceptableTermination
         subproblem.x .= _get_iterate(subproblem)
         return SubproblemSolution(status, T(_objective_value(subproblem)))
     elseif status == MOI.INFEASIBLE

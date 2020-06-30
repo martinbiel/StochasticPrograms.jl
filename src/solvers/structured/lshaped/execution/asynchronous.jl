@@ -282,7 +282,7 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{H,T
             execution.data.timestamp = t
             # Resolve master
             status = solve_master!(lshaped)
-            if status != MOI.OPTIMAL
+            if !(status ∈ AcceptableTermination)
                 # Early termination log
                 log!(lshaped; status = status)
                 return status

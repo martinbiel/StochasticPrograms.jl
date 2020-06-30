@@ -156,7 +156,7 @@ end
 function solve(subproblem::SubProblem, x::AbstractVector)
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
-    if status == MOI.OPTIMAL
+    if status ∈ AcceptableTermination
         return OptimalityCut(subproblem, x)
     elseif status == MOI.INFEASIBLE
         return Infeasible(subproblem)
@@ -176,7 +176,7 @@ function (subproblem::SubProblem{FeasibilityHandler})(x::AbstractVector)
     MOI.optimize!(model)
     # Sanity check that aux problem could be solved
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
-    if status != MOI.OPTIMAL
+    if !(status ∈ AcceptableTermination)
         error("Subproblem $(subproblem.id) was not solved properly during feasibility check, returned status code: $status")
     end
     if MOI.get(model, MOI.ObjectiveValue()) > sqrt(eps())

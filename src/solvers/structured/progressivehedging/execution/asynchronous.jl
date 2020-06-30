@@ -120,7 +120,7 @@ function iterate!(ph::AbstractProgressiveHedging, execution::AsynchronousExecuti
     while isready(execution.progressqueue)
         # Add new cuts from subworkers
         t::Int, i::Int, Q::SubproblemSolution{T} = take!(execution.progressqueue)
-        if Q.status != MOI.OPTIMAL
+        if !(Q.status ∈ AcceptableTermination)
             # Early termination log
             log!(ph; status = Q.status)
             return Q.status

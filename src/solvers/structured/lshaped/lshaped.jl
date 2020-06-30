@@ -11,6 +11,7 @@ using Parameters
 using JuMP
 using MathOptInterface
 using StochasticPrograms
+using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, VerticalBlockStructure, BlockVertical, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubproblemOptimizer

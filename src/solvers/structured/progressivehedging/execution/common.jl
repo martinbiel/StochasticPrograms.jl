@@ -1,7 +1,7 @@
 function iterate!(ph::AbstractProgressiveHedging, ::AbstractProgressiveHedgingExecution)
     # Resolve all subproblems at the current optimal solution
     Q = resolve_subproblems!(ph)
-    if Q.status != MOI.OPTIMAL
+    if !(Q.status ∈ AcceptableTermination)
         # Early termination log
         log!(ph; status = Q.status)
         return Q.status

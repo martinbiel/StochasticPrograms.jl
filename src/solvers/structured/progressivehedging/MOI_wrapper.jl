@@ -231,7 +231,7 @@ function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, v
     moi_param = MOI.RawParameter(param.name)
     optimizer.sub_params[moi_param] = value
     if optimizer.progressivehedging != nothing
-        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, flag)
+        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), moi_param, value)
     end
     return nothing
 end

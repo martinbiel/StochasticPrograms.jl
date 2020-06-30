@@ -212,6 +212,35 @@ See also [`@scenario`](@ref)
 """
 macro expectation(def) @warn "@expectation should be used inside a @scenario block." end
 """
+    @container_scenario([i=..., j=..., ...], expr, probability = 1.0)
+
+Wraps JuMP's `@container` macro to create [`Scenario`](@ref) instances with `DenseAxisArray` or `SparseAxisArray` as underlying data. See `@container` for syntax.
+
+"""
+macro container_scenario(args...)
+    args, kw_args, probability, requested_container = _extract_kw_args(args)
+    @assert length(args) == 2
+    @assert isempty(kw_args)
+    var, value = args
+    code = Containers.parse_container(error, var, esc(value), requested_container)
+    return :(Scenario($code, probability = $probability))
+end
+function _extract_kw_args(args)
+    kw_args = filter(x -> isexpr(x, :(=)) && x.args[1] != :container && x.args[1] != :probability, collect(args))
+    flat_args = filter(x->!isexpr(x, :(=)), collect(args))
+    requested_container = :Auto
+    probability = 1.0
+    for kw in args
+        if isexpr(kw, :(=)) && kw.args[1] == :container
+            requested_container = kw.args[2]
+        end
+        if isexpr(kw, :(=)) && kw.args[1] == :probability
+            probability = kw.args[2]
+        end
+    end
+    return flat_args, kw_args, probability, requested_container
+end
+"""
     @sampler(def)
 
 Define a sampler type for some `scenariotype` compatible with StochasticPrograms using the syntax
@@ -597,7 +626,7 @@ macro stage(stage, args)
     def = postwalk(def) do x
         if @capture(x, @parameters arg_)
             code = Expr(:block)
-            for paramdef in prettify(arg).args
+            for paramdef in block(arg).args
                 if @capture(paramdef, key_Symbol = val_) || @capture(paramdef, key_Symbol)
                     push!(code.args, :($key = stage.$key))
                 else
@@ -663,12 +692,38 @@ macro stage(stage, args)
                 push!(code.args, :($var = getproperty(scenvar, $varkey)))
             end
             return code
+        elseif @capture(x, @uncertain scenvar_Symbol[args__])
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            idx = Expr(:tuple)
+            for idxdef in args
+                if @capture(idxdef, p_Symbol = set_) || @capture(idxdef, p_Symbol in set_)
+                    push!(idx.args, p)
+                end
+            end
+            code = @q begin
+                typeof(scenario) <: Scenario || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...]` only support scenarios of type `Scenario`. Consider declaring a custom scenario type.")
+                $scenvar = try
+                    $scenvar = Containers.@container([$(args...)], scenario.data[$idx...])
+                catch err
+                    error("Given scenario $scenario does not match @uncertain declaration.")
+                end
+            end
+            return code
         elseif @capture(x, @uncertain args__)
             stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
-            code = Expr(:block)
+            code = @q begin
+                typeof(scenario) <: Scenario || error("@uncertain declarations of type `@uncertain var1, var2, ...` only support scenarios of type `Scenario`. Consider declaring a custom scenario type.")
+            end
             for var in args
                 varkey = Meta.quot(var)
-                push!(code.args, :($var = scenario[$varkey]))
+                push!(code.args, :($var = scenario.data[$varkey]))
+            end
+            code = @q begin
+                try
+                    $code
+                catch err
+                    error("Given scenario $scenario does not match @uncertain declaration.")
+                end
             end
             return code
         else

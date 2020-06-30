@@ -45,10 +45,10 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
             sub_sense = objective_sense(dep_model)
             sub_obj = objective_function(dep_model)
             if obj_sense == sub_sense
-                dep_obj += probability(scenario) * objective_function(dep_model)
+                add_to_expression!(dep_obj, probability(scenario) * objective_function(dep_model))
                 push!(structure.sub_objectives[stage - 1], moi_function(sub_obj))
             else
-                dep_obj -= probability(scenario) * objective_function(dep_model)
+                add_to_expression!(dep_obj, -probability(scenario) * objective_function(dep_model))
                 push!(structure.sub_objectives[stage - 1], -moi_function(sub_obj))
             end
             for (objkey,obj) ∈ filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))

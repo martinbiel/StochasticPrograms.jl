@@ -24,6 +24,7 @@ const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 const CI = MOI.ConstraintIndex
+const AcceptableTermination = [MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.ALMOST_OPTIMAL, MOI.ALMOST_LOCALLY_SOLVED]
 
 import MutableArithmetics
 const MA = MutableArithmetics

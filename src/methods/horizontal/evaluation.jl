@@ -26,7 +26,7 @@ function _eval_subproblems(structure::HorizontalBlockStructure{2,1,Tuple{SP}},
                 sp.decisions[w-1],
                 decision) do sp, d, x
                     scenarioproblems = fetch(sp)
-                    num_scenarios(scenarioproblems) && return 0.0
+                    num_scenarios(scenarioproblems) == 0 && return 0.0
                     take_decisions!(fetch(d), x)
                     map(subprob -> update_decisions!(subprob), subproblems(scenarioproblems))
                     return outcome_mean(subproblems(scenarioproblems),
