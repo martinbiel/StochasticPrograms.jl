@@ -95,6 +95,22 @@ function restore_master!(lshaped::AbstractLShaped)
     return nothing
 end
 
+function filter_cuts!(lshaped::AbstractLShaped, list)
+    # Nothing to do if constraints do not match
+    return nothing
+end
+
+function filter_cuts!(lshaped::AbstractLShaped, list::Vector{<:CutConstraint})
+    # Filter out the cut constraints
+    for cut in optimizer.lshaped.cut_constraints
+        i = something(findfirst(isequal(c), list), 0)
+        if !iszero(i)
+            MOI.deleteat!(list, i)
+        end
+    end
+    return nothing
+end
+
 function active_model_objectives(lshaped::AbstractLShaped)
     return map(lshaped.master_variables) do var
         var.value != 0

@@ -29,16 +29,6 @@ function load_model!(optimizer::Optimizer,
     return nothing
 end
 
-function reload!(optimizer::Optimizer)
-    if optimizer.algorithm !== nothing
-        x₀ = copy(optimizer.algorithm.x₀)
-        model = optimizer.algorithm.model
-        sampler = optimizer.algorithm.sampler
-        load_model!(optimizer, model, sampler, x₀)
-    end
-    return nothing
-end
-
 function MOI.optimize!(optimizer::Optimizer)
     if optimizer.algorithm === nothing
         error("SAA algorithm has not been loaded properly")
@@ -84,9 +74,6 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
         error("Unrecognized parameter name: $(name).")
     end
     setfield!(optimizer.parameters, name, value)
-    if optimizer.algorithm != nothing
-        setfield!(optimizer.algorithm.parameters, name, value)
-    end
     return nothing
 end
 
@@ -117,9 +104,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::NumSamples, num_samples::Integer)
     MOI.set(optimizer, MOI.RawParameter("num_samples"), num_samples)
-    if optimizer.algorithm != nothing
-        optimizer.algorithm.data.sample_size = num_samples
-    end
     return nothing
 end
 
@@ -199,8 +183,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::InstanceOptimizer, attr::MOI.AbstractOptimizerAttribute, value)
     optimizer.optimizer_params[attr] = value
-    # Trigger reload
-    reload!(optimizer)
     return nothing
 end
 
@@ -219,8 +201,6 @@ function MOI.set(optimizer::Optimizer, param::RawInstanceOptimizerParameter, val
     end
     moi_param = MOI.RawParameter(param.name)
     optimizer.optimizer_params[moi_param] = value
-    # Trigger reload
-    reload!(optimizer)
     return nothing
 end
 

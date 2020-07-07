@@ -1,10 +1,10 @@
-const GQE{C,V} = JuMP.GenericQuadExpr{C,V}
-const VariableQuadExpr{C} = JuMP.GenericQuadExpr{C,VariableRef}
-const DecisionQuadExpr{C} = JuMP.GenericQuadExpr{C,DecisionRef}
-const KnownQuadExpr{C} = JuMP.GenericQuadExpr{C,KnownRef}
-const VQE = VariableQuadExpr{Float64}
-const DQE = DecisionQuadExpr{Float64}
-const KQE = KnownQuadExpr{Float64}
+const GQE{C,V} = GenericQuadExpr{C,V}
+const _VariableQuadExpr{C} = GenericQuadExpr{C, VariableRef}
+const _DecisionQuadExpr{C} = GenericQuadExpr{C, DecisionRef}
+const _KnownQuadExpr{C} = GenericQuadExpr{C, KnownRef}
+const _VQE = _VariableQuadExpr{Float64}
+const _DQE = _DecisionQuadExpr{Float64}
+const _KQE = _KnownQuadExpr{Float64}
 
 struct DecisionCrossTerm
     decision::DecisionRef
@@ -31,22 +31,22 @@ function Base.isequal(t1::KnownCrossTerm, t2::KnownCrossTerm)
     return (t1.known == t2.known && t1.variable == t2.variable)
 end
 
-mutable struct CombinedQuadExpr{C} <: JuMP.AbstractJuMPScalar
-    variables::VariableQuadExpr{C}
-    decisions::DecisionQuadExpr{C}
-    knowns::KnownQuadExpr{C}
+mutable struct DecisionQuadExpr{C} <: JuMP.AbstractJuMPScalar
+    variables::GenericQuadExpr{C, VariableRef}
+    decisions::GenericQuadExpr{C, DecisionRef}
+    knowns::GenericQuadExpr{C, KnownRef}
     cross_terms::OrderedDict{DecisionCrossTerm, C}
     known_variable_terms::OrderedDict{KnownVariableCrossTerm, C}
     known_decision_terms::OrderedDict{KnownDecisionCrossTerm, C}
 end
-const CQE = CombinedQuadExpr{Float64}
+const DQE = DecisionQuadExpr{Float64}
 
-CQE() = zero(CQE{Float64})
+DQE() = zero(DQE{Float64})
 
 mutable struct BilinearDecisionExpr{C} <: JuMP.AbstractJuMPScalar
-    variables::VariableAffExpr{C}
-    decisions::DecisionAffExpr{C}
-    knowns::KnownQuadExpr{C}
+    variables::GenericAffExpr{C, VariableRef}
+    decisions::GenericAffExpr{C, DecisionRef}
+    knowns::GenericQuadExpr{C, KnownRef}
     known_variable_terms::OrderedDict{KnownVariableCrossTerm, C}
     known_decision_terms::OrderedDict{KnownDecisionCrossTerm, C}
 end
@@ -54,33 +54,33 @@ const BDE = BilinearDecisionExpr{Float64}
 
 # Base overrides #
 # ========================== #
-function Base.iszero(quad::CombinedQuadExpr)
+function Base.iszero(quad::DecisionQuadExpr)
     return iszero(quad.variables) &&
         iszero(quad.decisions) &&
         iszero(quad.knowns)
 end
-function Base.zero(::Type{CombinedQuadExpr{C}}) where C
-    return CombinedQuadExpr{C}(
-        zero(VariableQuadExpr{C}),
-        zero(DecisionQuadExpr{C}),
-        zero(KnownQuadExpr{C}),
+function Base.zero(::Type{DecisionQuadExpr{C}}) where C
+    return DecisionQuadExpr{C}(
+        zero(_VariableQuadExpr{C}),
+        zero(_DecisionQuadExpr{C}),
+        zero(_KnownQuadExpr{C}),
         OrderedDict{DecisionCrossTerm, C}(),
         OrderedDict{KnownVariableCrossTerm, C}(),
         OrderedDict{KnownDecisionCrossTerm, C}())
 end
-function Base.one(::Type{CombinedQuadExpr{C}}) where C
-    return CombinedQuadExpr{C}(
-        one(VariableQuadExpr{C}),
-        zero(DecisionQuadExpr{C}),
-        zero(KnownQuadexpr{C}),
+function Base.one(::Type{DecisionQuadExpr{C}}) where C
+    return DecisionQuadExpr{C}(
+        one(_VariableQuadExpr{C}),
+        zero(_DecisionQuadExpr{C}),
+        zero(_KnownQuadExpr{C}),
         OrderedDict{DecisionCrossTerm, C}(),
         OrderedDict{KnownVariableCrossTerm, C}(),
         OrderedDict{KnownDecisionCrossTerm, C}())
 end
-Base.zero(quad::CombinedQuadExpr) = zero(typeof(quad))
-Base.one(quad::CombinedQuadExpr) =  one(typeof(quad))
-function Base.copy(quad::CombinedQuadExpr{C}) where C
-    return CombinedQuadExpr{C}(
+Base.zero(quad::DecisionQuadExpr) = zero(typeof(quad))
+Base.one(quad::DecisionQuadExpr) =  one(typeof(quad))
+function Base.copy(quad::DecisionQuadExpr{C}) where C
+    return DecisionQuadExpr{C}(
         copy(quad.variables),
         copy(quad.decisions),
         copy(quad.knowns),
@@ -88,28 +88,58 @@ function Base.copy(quad::CombinedQuadExpr{C}) where C
         copy(quad.known_variable_terms),
         copy(quad.known_decision_terms))
 end
-Base.broadcastable(quad::CombinedQuadExpr) = Ref(quad)
+Base.broadcastable(quad::DecisionQuadExpr) = Ref(quad)
 
-function Base.convert(::Type{CombinedQuadExpr{C}}, c::Number) where C
-    return convert(CombinedQuadExpr{C}, convert(CombinedAffExpr{C}, c))
+function Base.convert(::Type{DecisionQuadExpr{C}}, c::Number) where C
+    return convert(DecisionQuadExpr{C}, convert(DecisionAffExpr{C}, c))
 end
-function Base.convert(::Type{CombinedQuadExpr{C}}, expr::DecisionAffExpr) where C
-    return convert(CombinedQuadExpr{C}, convert(CombinedAffExpr{C}, expr))
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::Union{VariableRef, _VariableAffExpr}) where C
+    return convert(DecisionQuadExpr{C}, convert(DecisionAffExpr{C}, expr))
 end
-function Base.convert(::Type{CombinedQuadExpr{C}}, expr::KnownAffExpr) where C
-    return convert(CombinedQuadExpr{C}, convert(CombinedAffExpr{C}, expr))
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::_VariableQuadExpr) where C
+    return DecisionQuadExpr{C}(
+        expr,
+        zero(_DecisionQuadExpr{C}),
+        zero(_KnownQuadExpr{C}),
+        OrderedDict{DecisionCrossTerm, C}(),
+        OrderedDict{KnownVariableCrossTerm, C}(),
+        OrderedDict{KnownDecisionCrossTerm, C}())
 end
-function Base.convert(::Type{CombinedQuadExpr{C}}, aff::CombinedAffExpr) where C
-    return CombinedQuadExpr{C}(
-        VariableQuadExpr(aff.variables),
-        DecisionQuadExpr(aff.decisions),
-        KnownQuadExpr(aff.knowns),
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::Union{DecisionRef, _DecisionAffExpr}) where C
+    return convert(DecisionQuadExpr{C}, convert(DecisionAffExpr{C}, expr))
+end
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::_DecisionQuadExpr) where C
+    return DecisionQuadExpr{C}(
+        zero(_VariableQuadExpr{C}),
+        expr,
+        zero(_KnownQuadExpr{C}),
+        OrderedDict{DecisionCrossTerm, C}(),
+        OrderedDict{KnownVariableCrossTerm, C}(),
+        OrderedDict{KnownDecisionCrossTerm, C}())
+end
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::Union{KnownRef, _KnownAffExpr}) where C
+    return convert(DecisionQuadExpr{C}, convert(DecisionAffExpr{C}, expr))
+end
+function Base.convert(::Type{DecisionQuadExpr{C}}, expr::_KnownQuadExpr) where C
+    return DecisionQuadExpr{C}(
+        zero(_VariableQuadExpr{C}),
+        zero(_DecisionQuadExpr{C}),
+        expr,
+        OrderedDict{DecisionCrossTerm, C}(),
+        OrderedDict{KnownVariableCrossTerm, C}(),
+        OrderedDict{KnownDecisionCrossTerm, C}())
+end
+function Base.convert(::Type{DecisionQuadExpr{C}}, aff::DecisionAffExpr) where C
+    return DecisionQuadExpr{C}(
+        _VariableQuadExpr(aff.variables),
+        _DecisionQuadExpr(aff.decisions),
+        _KnownQuadExpr(aff.knowns),
         OrderedDict{DecisionCrossTerm, C}(),
         OrderedDict{KnownVariableCrossTerm, C}(),
         OrderedDict{KnownDecisionCrossTerm, C}())
 end
 
-function Base.isequal(quad::CombinedQuadExpr{C}, other::CombinedQuadExpr{C}) where C
+function Base.isequal(quad::DecisionQuadExpr{C}, other::DecisionQuadExpr{C}) where C
     return isequal(quad.variables, other.variables) &&
         isequal(quad.decisions, other.decisions) &&
         isequal(quad.knowns, other.knowns) &&
@@ -118,7 +148,7 @@ function Base.isequal(quad::CombinedQuadExpr{C}, other::CombinedQuadExpr{C}) whe
         isequal(quad.known_decision_terms, other.known_decision_terms)
 end
 
-Base.hash(quad::CombinedQuadExpr, h::UInt) =
+Base.hash(quad::DecisionQuadExpr, h::UInt) =
     hash(hash(quad.variables, h),
          hash(quad.decisions, h),
          hash(quad.knowns, h),
@@ -126,19 +156,19 @@ Base.hash(quad::CombinedQuadExpr, h::UInt) =
          hash(quad.known_variable_terms, h),
          hash(quad.known_decision_terms, h))
 
-function sizehint!(quad::CombinedQuadExpr, n::Int, ::Type{VAE})
+function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_VAE})
     sizehint!(quad.variables.affine.terms, n)
 end
-function sizehint!(quad::CombinedQuadExpr, n::Int, ::Type{DAE})
+function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_DAE})
     sizehint!(quad.decisions.affine.terms, n)
 end
-function sizehint!(quad::CombinedQuadExpr, n::Int, ::Type{KAE})
+function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_KAE})
     sizehint!(quad.knowns.affine.terms, n)
 end
 
 # JuMP overrides #
 # ========================== #
-function JuMP.drop_zeros!(quad::CombinedQuadExpr)
+function JuMP.drop_zeros!(quad::DecisionQuadExpr)
     JuMP.drop_zeros!(quad.variables)
     JuMP.drop_zeros!(quad.decisions)
     JuMP.drop_zeros!(quad.knowns)
@@ -155,17 +185,17 @@ function JuMP.drop_zeros!(quad::CombinedQuadExpr)
     return nothing
 end
 
-function JuMP._affine_coefficient(f::CombinedQuadExpr, variable::VariableRef)
+function JuMP._affine_coefficient(f::DecisionQuadExpr, variable::VariableRef)
     return JuMP._affine_coefficient(f.variables, variable)
 end
-function JuMP._affine_coefficient(f::CombinedQuadExpr, decision::DecisionRef)
+function JuMP._affine_coefficient(f::DecisionQuadExpr, decision::DecisionRef)
     return JuMP._affine_coefficient(f.decisions, decision)
 end
-function JuMP._affine_coefficient(f::CombinedQuadExpr, known::KnownRef)
+function JuMP._affine_coefficient(f::DecisionQuadExpr, known::KnownRef)
     return JuMP._affine_coefficient(f.knowns, known)
 end
 
-function JuMP.map_coefficients_inplace!(f::Function, quad::CombinedQuadExpr)
+function JuMP.map_coefficients_inplace!(f::Function, quad::DecisionQuadExpr)
     JuMP.map_coefficients_inplace!(f, quad.variables)
     JuMP.map_coefficients_inplace!(f, quad.decisions)
     JuMP.map_coefficients_inplace!(f, quad.knowns)
@@ -181,11 +211,11 @@ function _map_cross_terms(f::Function, terms)
     end
 end
 
-function JuMP.map_coefficients(f::Function, quad::CombinedQuadExpr)
+function JuMP.map_coefficients(f::Function, quad::DecisionQuadExpr)
     return JuMP.map_coefficients_inplace!(f, copy(quad))
 end
 
-function JuMP.value(quad::CombinedQuadExpr, value_func::Function)
+function JuMP.value(quad::DecisionQuadExpr, value_func::Function)
     varvalue = JuMP.value(quad.variables, value_func)
     dvarvalue = JuMP.value(quad.decisions, value_func)
     kvarvalue = JuMP.value(quad.knowns, value_func)
@@ -204,21 +234,21 @@ function JuMP.value(quad::CombinedQuadExpr, value_func::Function)
     return ret
 end
 
-function JuMP.constant(quad::CombinedQuadExpr)
+function JuMP.constant(quad::DecisionQuadExpr)
     return quad.variables.constant
 end
 
-function JuMP.linear_terms(quad::CombinedQuadExpr, ::Type{VAE})
+function JuMP.linear_terms(quad::DecisionQuadExpr, ::Type{_VAE})
     JuMP.linear_terms(quad.variables)
 end
-function JuMP.linear_terms(quad::CombinedQuadExpr, ::Type{DAE})
+function JuMP.linear_terms(quad::DecisionQuadExpr, ::Type{_DAE})
     JuMP.linear_terms(quad.decisions)
 end
-function JuMP.linear_terms(quad::CombinedQuadExpr, ::Type{KAE})
+function JuMP.linear_terms(quad::DecisionQuadExpr, ::Type{_KAE})
     JuMP.linear_terms(quad.knowns)
 end
 
-function SparseArrays.dropzeros(quad::CombinedQuadExpr{C}) where C
+function SparseArrays.dropzeros(quad::DecisionQuadExpr{C}) where C
     variables = SparseArrays.dropzeros(quad.variables)
     decisions = SparseArrays.dropzeros(quad.decisions)
     knowns = SparseArrays.dropzeros(quad.knowns)
@@ -235,10 +265,10 @@ function SparseArrays.dropzeros(quad::CombinedQuadExpr{C}) where C
     dropzeros!(known_variable_terms)
     known_decision_terms = copy(quad.known_decision_terms)
     dropzeros!(known_decision_terms)
-    return CombinedQuadExpr(variables, decisions, knowns, cross_terms, known_variable_terms, known_decision_terms)
+    return DecisionQuadExpr(variables, decisions, knowns, cross_terms, known_variable_terms, known_decision_terms)
 end
 
-function JuMP._assert_isfinite(quad::Union{DecisionQuadExpr, KnownQuadExpr})
+function JuMP._assert_isfinite(quad::Union{_DecisionQuadExpr, _KnownQuadExpr})
     JuMP._assert_isfinite(quad.aff)
     for (coef, var1, var2) in quad_terms(quad)
         isfinite(coef) || error("Invalid coefficient $coef on quadratic term $var1*$var2.")
@@ -246,7 +276,7 @@ function JuMP._assert_isfinite(quad::Union{DecisionQuadExpr, KnownQuadExpr})
     return nothing
 end
 
-function JuMP._assert_isfinite(quad::CombinedQuadExpr)
+function JuMP._assert_isfinite(quad::DecisionQuadExpr)
     JuMP._assert_isfinite(quad.variables)
     JuMP._assert_isfinite(quad.decisions)
     JuMP._assert_isfinite(quad.knowns)
@@ -261,7 +291,7 @@ function JuMP._assert_isfinite(quad::CombinedQuadExpr)
     return nothing
 end
 
-function JuMP.check_belongs_to_model(quad::CombinedQuadExpr, model::AbstractModel)
+function JuMP.check_belongs_to_model(quad::DecisionQuadExpr, model::AbstractModel)
     JuMP.check_belongs_to_model(quad.variables, model)
     JuMP.check_belongs_to_model(quad.decisions, model)
     JuMP.check_belongs_to_model(quad.knowns, model)
@@ -277,7 +307,7 @@ function JuMP.check_belongs_to_model(quad::CombinedQuadExpr, model::AbstractMode
     return nothing
 end
 
-function JuMP.function_string(mode, quad::CombinedQuadExpr, show_constant=true)
+function JuMP.function_string(mode, quad::DecisionQuadExpr, show_constant=true)
     # Decisions
     ret = ""
     decision_terms = JuMP.function_string(mode, quad.decisions)
@@ -339,64 +369,64 @@ function _cross_terms_function_string(mode, terms)
 end
 
 # With one factor.
-function JuMP.add_to_expression!(quad::CQE, other::Number)
+function JuMP.add_to_expression!(quad::DQE, other::Number)
     JuMP.add_to_expression!(quad.variables, other)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_var::VariableRef)
+function JuMP.add_to_expression!(quad::DQE, new_var::VariableRef)
     JuMP.add_to_expression!(quad.variables, new_var)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dvar::DecisionRef)
+function JuMP.add_to_expression!(quad::DQE, new_dvar::DecisionRef)
     JuMP.add_to_expression!(quad.decisions, new_dvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kvar::KnownRef)
+function JuMP.add_to_expression!(quad::DQE, new_kvar::KnownRef)
     JuMP.add_to_expression!(quad.knowns, new_kvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_vae::VAE)
+function JuMP.add_to_expression!(quad::DQE, new_vae::_VAE)
     JuMP.add_to_expression!(quad.variables, new_vae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dae::DAE)
+function JuMP.add_to_expression!(quad::DQE, new_dae::_DAE)
     JuMP.add_to_expression!(quad.decisions, new_dae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kae::KAE)
+function JuMP.add_to_expression!(quad::DQE, new_kae::_KAE)
     JuMP.add_to_expression!(quad.knowns, new_kae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_vqe::VQE)
+function JuMP.add_to_expression!(quad::DQE, new_vqe::_VQE)
     JuMP.add_to_expression!(quad.variables, new_vqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dqe::DQE)
+function JuMP.add_to_expression!(quad::DQE, new_dqe::_DQE)
     JuMP.add_to_expression!(quad.decisions, new_dqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kqe::KQE)
+function JuMP.add_to_expression!(quad::DQE, new_kqe::_KQE)
     JuMP.add_to_expression!(quad.knowns, new_kqe)
     return quad
 end
 
-function JuMP.add_to_expression!(lhs_quad::CQE, rhs_aff::CAE)
+function JuMP.add_to_expression!(lhs_quad::DQE, rhs_aff::DAE)
     JuMP.add_to_expression!(lhs_quad.variables, rhs_aff.variables)
     JuMP.add_to_expression!(lhs_quad.decisions, rhs_aff.decisions)
     JuMP.add_to_expression!(lhs_quad.knowns, rhs_aff.knowns)
     return lhs_quad
 end
 
-function JuMP.add_to_expression!(lhs_quad::CQE, rhs_quad::CQE)
+function JuMP.add_to_expression!(lhs_quad::DQE, rhs_quad::DQE)
     JuMP.add_to_expression!(lhs_quad.variables, rhs_quad.variables)
     JuMP.add_to_expression!(lhs_quad.decisions, rhs_quad.decisions)
     JuMP.add_to_expression!(lhs_quad.knowns, rhs_quad.knowns)
@@ -412,97 +442,97 @@ function JuMP.add_to_expression!(lhs_quad::CQE, rhs_quad::CQE)
 end
 
 # With two factors.
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_var::VariableRef)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_var::VariableRef)
     JuMP.add_to_expression!(quad.variables, new_coef, new_var)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_var::VariableRef, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_var::VariableRef, new_coef::_Constant)
     JuMP.add_to_expression!(quad.variables, new_coef, new_var)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_dvar::DecisionRef)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_dvar::DecisionRef)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dvar::DecisionRef, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_dvar::DecisionRef, new_coef::_Constant)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_kvar::KnownRef)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_kvar::KnownRef)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kvar::KnownRef, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_kvar::KnownRef, new_coef::_Constant)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kvar)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_vae::VAE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_vae::_VAE)
     JuMP.add_to_expression!(quad.variables, new_coef, new_vae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_vae::VAE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_vae::_VAE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.variables, new_coef, new_vae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_dae::DAE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_dae::_DAE)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dae::DAE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_dae::_DAE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_kae::KAE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_kae::_KAE)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kae::KAE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_kae::_KAE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kae)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_vqe::VQE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_vqe::_VQE)
     JuMP.add_to_expression!(quad.variables, new_coef, new_vqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_vqe::VQE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_vqe::_VQE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.variables, new_coef, new_vqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_dqe::DQE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_dqe::_DQE)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_dqe::DQE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_dqe::_DQE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant, new_kqe::KQE)
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_kqe::_KQE)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, new_kqe::KQE, new_coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, new_kqe::_KQE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_kqe)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, coef::_Constant, other::CQE)
+function JuMP.add_to_expression!(quad::DQE, coef::_Constant, other::DQE)
     JuMP.add_to_expression!(quad.variables, coef, other.variables)
     JuMP.add_to_expression!(quad.decisions, coef, other.decisions)
     JuMP.add_to_expression!(quad.knowns, coef, other.knowns)
@@ -517,45 +547,45 @@ function JuMP.add_to_expression!(quad::CQE, coef::_Constant, other::CQE)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE, other::CQE, coef::_Constant)
+function JuMP.add_to_expression!(quad::DQE, other::DQE, coef::_Constant)
     JuMP.add_to_expression!(quad, coef, other)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var_1::VariableRef,
                                  var_2::Union{DecisionRef, KnownRef})
     return JuMP.add_to_expression!(quad, 1.0, var_1, var_2)
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var_1::VariableRef,
                                  var_2::KnownRef)
     return JuMP.add_to_expression!(quad, 1.0, var_1, var_2)
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var_1::DecisionRef,
                                  var_2::Union{VariableRef,DecisionRef,KnownRef})
     return JuMP.add_to_expression!(quad, 1.0, var_1, var_2)
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var_1::KnownRef,
                                  var_2::Union{VariableRef,DecisionRef,KnownRef})
     return JuMP.add_to_expression!(quad, 1.0, var_1, var_2)
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var::VariableRef,
-                                 aff::VAE)
+                                 aff::_VAE)
     JuMP.add_to_expression!(quad.variables, var, aff)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  dvar::DecisionRef,
-                                 aff::VAE)
+                                 aff::_VAE)
     for (coef, term_var) in linear_terms(aff)
         key = DecisionCrossTerm(dvar, term_var)
         JuMP._add_or_set!(quad.cross_terms, key, coef)
@@ -563,9 +593,9 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  kvar::KnownRef,
-                                 aff::VAE)
+                                 aff::_VAE)
     for (coef, term_var) in linear_terms(aff)
         key = KnownVariableCrossTerm(kvar, term_var)
         JuMP._add_or_set!(quad.known_variable_terms, key, coef)
@@ -573,9 +603,9 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var::VariableRef,
-                                 aff::DAE)
+                                 aff::_DAE)
     for (coef, term_dvar) in linear_terms(aff)
         key = DecisionCrossTerm(term_dvar, var)
         JuMP._add_or_set!(quad.cross_terms, key, coef)
@@ -583,16 +613,16 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  dvar::DecisionRef,
-                                 aff::DAE)
+                                 aff::_DAE)
     JuMP.add_to_expression!(quad.decisions, dvar, aff)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  kvar::KnownRef,
-                                 aff::DAE)
+                                 aff::_DAE)
     for (coef, term_dvar) in linear_terms(aff)
         key = KnownDecisionCrossTerm(kvar, term_dvar)
         JuMP._add_or_set!(quad.known_decision_terms, key, coef)
@@ -600,9 +630,9 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var::VariableRef,
-                                 aff::KAE)
+                                 aff::_KAE)
     for (coef, term_kvar) in linear_terms(aff)
         key = KnownVariableCrossTerm(term_kvar, var)
         JuMP._add_or_set!(quad.known_variable_terms, key, coef)
@@ -610,9 +640,9 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  dvar::DecisionRef,
-                                 aff::KAE)
+                                 aff::_KAE)
     for (coef, term_kvar) in linear_terms(aff)
         key = KnownDecisionCrossTerm(term_kvar, dvar)
         JuMP._add_or_set!(quad.known_decision_terms, key, coef)
@@ -620,52 +650,52 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  kvar::KnownRef,
-                                 aff::KAE)
+                                 aff::_KAE)
     JuMP.add_to_expression!(quad.knowns, kvar, aff)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
+function JuMP.add_to_expression!(quad::DQE,
                                  var::Union{VariableRef, DecisionRef, KnownRef},
-                                 aff::CAE)
+                                 aff::_DAE)
     JuMP.add_to_expression!(quad, var, aff.variables)
     JuMP.add_to_expression!(quad, var, aff.decisions)
     JuMP.add_to_expression!(quad, var, aff.knowns)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 aff::Union{VAE, DAE, KAE, CAE},
+function JuMP.add_to_expression!(quad::DQE,
+                                 aff::Union{_VAE, _DAE, _KAE, DAE},
                                  var::Union{VariableRef, DecisionRef, KnownRef})
     return JuMP.add_to_expression!(quad, var, aff)
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::VAE,
-                                 rhs::VAE)
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::_VAE,
+                                 rhs::_VAE)
     JuMP.add_to_expression!(quad.variables, lhs, rhs)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::DAE,
-                                 rhs::DAE)
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::_DAE,
+                                 rhs::_DAE)
     JuMP.add_to_expression!(quad.decisions, lhs, rhs)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::KAE,
-                                 rhs::KAE)
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::_KAE,
+                                 rhs::_KAE)
     JuMP.add_to_expression!(quad.knowns, lhs, rhs)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::Union{VAE,DAE,KAE},
-                                 rhs::Union{VAE,DAE,KAE})
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::Union{_VAE,_DAE,_KAE},
+                                 rhs::Union{_VAE,_DAE,_KAE})
     lhs_length = length(linear_terms(lhs))
     rhs_length = length(linear_terms(rhs))
 
@@ -706,25 +736,25 @@ function JuMP.add_to_expression!(quad::CQE,
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::Union{VAE, DAE, KAE},
-                                 rhs::CAE)
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::Union{_VAE, _DAE, _KAE},
+                                 rhs::DAE)
     JuMP.add_to_expression!(quad, lhs, rhs.variables)
     JuMP.add_to_expression!(quad, lhs, rhs.decisions)
     JuMP.add_to_expression!(quad, lhs, rhs.knowns)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::CAE,
-                                 rhs::Union{VAE, DAE, KAE})
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::DAE,
+                                 rhs::Union{_VAE, _DAE, _KAE})
     JuMP.add_to_expression!(quad, rhs, lhs)
     return quad
 end
 
-function JuMP.add_to_expression!(quad::CQE,
-                                 lhs::CAE,
-                                 rhs::CAE)
+function JuMP.add_to_expression!(quad::DQE,
+                                 lhs::DAE,
+                                 rhs::DAE)
     # Variables
     JuMP.add_to_expression!(quad, lhs.variables, rhs.variables)
     JuMP.add_to_expression!(quad, lhs.variables, rhs.decisions)
@@ -741,61 +771,61 @@ function JuMP.add_to_expression!(quad::CQE,
 end
 
 # With three factors.
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::VariableRef,
                                  new_var2::VariableRef)
     JuMP.add_to_expression!(quad.variables, new_coef, new_var1, new_var2)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::VariableRef,
                                  new_var2::DecisionRef)
     key = DecisionCrossTerm(new_var2, new_var1)
     JuMP._add_or_set!(quad.cross_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::VariableRef,
                                  new_var2::KnownRef)
     key = KnownVariableCrossTerm(new_var2, new_var1)
     JuMP._add_or_set!(quad.known_variable_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::DecisionRef,
                                  new_var2::VariableRef)
     key = DecisionCrossTerm(new_var1, new_var2)
     JuMP._add_or_set!(quad.cross_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::DecisionRef,
                                  new_var2::DecisionRef)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_var1, new_var2)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::DecisionRef,
                                  new_var2::KnownRef)
     key = KnownDecisionCrossTerm(new_var2, new_var1)
     JuMP._add_or_set!(quad.known_decision_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::KnownRef,
                                  new_var2::VariableRef)
     key = KnownVariableCrossTerm(new_var1, new_var2)
     JuMP._add_or_set!(quad.known_variable_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::KnownRef,
                                  new_var2::DecisionRef)
     key = KnownDecisionCrossTerm(new_var1, new_var2)
     JuMP._add_or_set!(quad.known_decision_terms, key, new_coef)
     return quad
 end
-function JuMP.add_to_expression!(quad::CQE, new_coef::_Constant,
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant,
                                  new_var1::KnownRef,
                                  new_var2::KnownRef)
     JuMP.add_to_expression!(quad.knowns, new_coef, new_var1, new_var2)

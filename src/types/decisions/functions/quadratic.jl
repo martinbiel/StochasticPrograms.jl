@@ -29,9 +29,9 @@ function Base.copy(lq::L) where L <: LinearPart
              copy(lq.decision_part))
 end
 function Base.copy(lq::Q) where Q <: QuadraticPart
-    return F(copy(f.variable_part),
-             copy(f.decision_part),
-             copy(f.cross_terms))
+    return Q(copy(lq.variable_part),
+             copy(lq.decision_part),
+             copy(lq.cross_terms))
 end
 function Base.copy(f::F) where F <: QuadraticDecisionFunction
     return F(copy(f.linear_quadratic_terms),
@@ -243,7 +243,7 @@ end
 
 # JuMP overrides #
 # ========================== #
-function QuadraticDecisionFunction(quad::CQE)
+function QuadraticDecisionFunction(quad::DQE)
     JuMP._assert_isfinite(quad)
     # Variable part
     variable_part = JuMP.moi_function(quad.variables)
@@ -335,8 +335,8 @@ function QuadraticDecisionFunction(quad::CQE)
                                     known_decision_terms,
                                     0.0))
 end
-JuMP.moi_function(quad::CQE) = QuadraticDecisionFunction(quad)
-function JuMP.moi_function_type(::Type{CombinedQuadExpr{T}}) where T
+JuMP.moi_function(quad::DQE) = QuadraticDecisionFunction(quad)
+function JuMP.moi_function_type(::Type{DecisionQuadExpr{T}}) where T
     return QuadraticDecisionFunction{T,QuadraticPart{T}}
 end
 
@@ -345,11 +345,11 @@ function JuMP.moi_function_type(::Type{BilinearDecisionExpr{T}}) where T
     return QuadraticDecisionFunction{T,LinearPart{T}}
 end
 
-QuadraticDecisionFunction(quad::DQE) = QuadraticDecisionFunction(convert(CQE, quad))
-QuadraticDecisionFunction(quad::KQE) = QuadraticDecisionFunction(convert(CQE, quad))
+QuadraticDecisionFunction(quad::_DQE) = QuadraticDecisionFunction(convert(DQE, quad))
+QuadraticDecisionFunction(quad::_KQE) = QuadraticDecisionFunction(convert(DQE, quad))
 
-function DecisionQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
-    quad = DQE(DecisionAffExpr(m, MOI.ScalarAffineFunction(f.affine_terms, 0.0)))
+function _DecisionQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
+    quad = _DQE(_DecisionAffExpr(m, MOI.ScalarAffineFunction(f.affine_terms, 0.0)))
     for t in f.quadratic_terms
         v1 = t.variable_index_1
         v2 = t.variable_index_2
@@ -363,8 +363,8 @@ function DecisionQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
     return quad
 end
 
-function KnownQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
-    quad = KQE(KnownAffExpr(m, MOI.ScalarAffineFunction(f.affine_terms, 0.0)))
+function _KnownQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
+    quad = _KQE(_KnownAffExpr(m, MOI.ScalarAffineFunction(f.affine_terms, 0.0)))
     for t in f.quadratic_terms
         v1 = t.variable_index_1
         v2 = t.variable_index_2
@@ -378,7 +378,7 @@ function KnownQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
     return quad
 end
 
-function CQE(model::Model, f::QuadraticDecisionFunction{T}) where T
+function DQE(model::Model, f::QuadraticDecisionFunction{T}) where T
     lq = f.linear_quadratic_terms
     # Decision part
     cross_terms = OrderedDict{DecisionCrossTerm, Float64}()
@@ -406,11 +406,11 @@ function CQE(model::Model, f::QuadraticDecisionFunction{T}) where T
             DecisionRef(model, term.variable_index_2))
         JuMP._add_or_set!(known_decision_terms, cross_term, term.coefficient)
     end
-    return CQE(QuadExpr(model,
+    return DQE(QuadExpr(model,
                         convert(MOI.ScalarQuadraticFunction{T}, lq.variable_part)),
-               DecisionQuadExpr(model,
+               _DecisionQuadExpr(model,
                                 convert(MOI.ScalarQuadraticFunction{T}, lq.decision_part)),
-               KnownQuadExpr(model, f.known_part),
+               _KnownQuadExpr(model, f.known_part),
                cross_terms,
                known_variable_terms,
                known_decision_terms)
@@ -422,10 +422,10 @@ function JuMP.jump_function_type(::Model,
 end
 function JuMP.jump_function_type(::Model,
                                  ::Type{QuadraticDecisionFunction{T,QuadraticPart{T}}}) where T
-    return CombinedQuadExpr{T}
+    return DecisionQuadExpr{T}
 end
 function JuMP.jump_function(model::Model, f::QuadraticDecisionFunction{T}) where T
-    return CombinedQuadExpr{T}(model, f)
+    return DecisionQuadExpr{T}(model, f)
 end
 
 # MOI Function interface #

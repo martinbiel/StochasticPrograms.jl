@@ -1,5 +1,5 @@
-struct DecisionVariable{SP <: StochasticProgram} <: JuMP.AbstractVariableRef
-    stochasticprogram::SP
+struct DecisionVariable <: JuMP.AbstractVariableRef
+    stochasticprogram::StochasticProgram
     index::MOI.VariableIndex
 end
 
@@ -84,6 +84,12 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariabl
                  dvar::DecisionVariable)
     check_belongs_to_model(dvar, stochasticprogram)
     if MOI.is_set_by_optimize(attr)
+        # Check if there is a cached solution
+        cache = solutioncache(stochasticprogram)
+        if haskey(cache, :solution)
+            # Returned cached solution
+            return MOI.get(cache[:solution], attr, index(dvar))
+        end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
@@ -96,6 +102,12 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractConstra
                  cr::ConstraintRef{<:StochasticProgram})
     check_belongs_to_model(cr, stochasticprogram)
     if MOI.is_set_by_optimize(attr)
+        # Check if there is a cached solution
+        cache = solutioncache(stochasticprogram)
+        if haskey(cache, :solution)
+            # Returned cached solution
+            return MOI.get(cache[:solution], attr, index(cr))
+        end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())

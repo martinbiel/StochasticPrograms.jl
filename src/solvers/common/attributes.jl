@@ -18,12 +18,12 @@ function set_masteroptimizer_attribute(stochasticprogram::StochasticProgram, nam
 end
 function set_masteroptimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
-        set_masteroptimizer_attributes(stochasticprogram, name, value)
+        set_masteroptimizer_attribute(stochasticprogram, name, value)
     end
 end
 function set_masteroptimizer_attributes(stochasticprogram::StochasticProgram; kw...)
     for (name, value) in kw
-        set_masteroptimizer_attributes(stochasticprogram, name, value)
+        set_masteroptimizer_attribute(stochasticprogram, name, value)
     end
 end
 
@@ -39,16 +39,16 @@ struct RawSubproblemOptimizerParameter <: AbstractStructuredOptimizerAttribute
 end
 
 function set_suboptimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawMasterOptimizerParameter(String(name)), value)
+    return set_optimizer_attribute(stochasticprogram, RawSubproblemOptimizerParameter(String(name)), value)
 end
 function set_suboptimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
-        set_suboptimizer_attributes(stochasticprogram, name, value)
+        set_suboptimizer_attribute(stochasticprogram, name, value)
     end
 end
 function set_suboptimizer_attributes(stochasticprogram::StochasticProgram; kw...)
     for (name, value) in kw
-        set_suboptimizer_attributes(stochasticprogram, name, value)
+        set_suboptimizer_attribute(stochasticprogram, name, value)
     end
 end
 

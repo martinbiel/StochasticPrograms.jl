@@ -239,33 +239,41 @@ function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBri
         modify_coefficient!(lq.decision_part.affine_terms, change.variable, change.new_coefficient)
     end
     # Complete rebridge required
-    F = QuadraticDecisionFunction{T}
-    MOI.modify(model, MOI.ObjectiveFunction{F}(), DecisionsStateChange())
+    MOI.modify(model, bridge.constraint, DecisionsStateChange())
     return nothing
 end
 
 function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionConstraintBridge{T,S}, change::DecisionCoefficientChange) where {T,S}
     f = bridge.decision_function
     lq = f.linear_quadratic_terms
-    terms = lq isa LinearPart ? lq.decision_part.terms : lq.decision_part.affine_terms
+    variable_terms = lq isa LinearPart ? lq.variable_part.terms : lq.variable_part.affine_terms
+    decision_terms = lq isa LinearPart ? lq.decision_part.terms : lq.decision_part.affine_terms
+    # Check if decision has been mapped
     i = something(findfirst(t -> t.variable_index == change.decision,
-                            terms), 0)
-    # Query the fixed decision value
-    unbridged = MOIB.unbridged_variable_function(model, change.decision)::MOI.SingleVariable
-    decision_value = MOI.get(model, MOI.VariablePrimal(), unbridged.variable)
-    # Update decision part of constraint constant
-    coefficient = iszero(i) ? zero(T) : terms[i].coefficient
-    lq.decision_part.constant +=
-        (change.new_coefficient - coefficient) * decision_value
+                            variable_terms), 0)
+    if !iszero(i)
+        # Update mapped variable through ScalarCoefficientChange
+        MOI.modify(model, bridge, MOI.ScalarCoefficientChange(change.decision, change.new_coefficient))
+    else
+        i = something(findfirst(t -> t.variable_index == change.decision,
+                                decision_terms), 0)
+        # Query the fixed decision value
+        unbridged = MOIB.unbridged_variable_function(model, change.decision)::MOI.SingleVariable
+        decision_value = MOI.get(model, MOI.VariablePrimal(), unbridged.variable)
+        # Update decision part of constraint constant
+        coefficient = iszero(i) ? zero(T) : decision_terms[i].coefficient
+        lq.decision_part.constant +=
+            (change.new_coefficient - coefficient) * decision_value
+        # Recalculate total constant and shift constraint set
+        constant = lq.variable_part.constant +
+            lq.decision_part.constant +
+            f.known_part.constant +
+            f.known_decision_terms.constant
+        MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
+                MOIU.shift_constant(bridge.set, -constant))
+    end
     # Update coefficient in decision part
-    modify_coefficient!(terms, change.decision, change.new_coefficient)
-    # Recalculate total constant and shift constraint set
-    constant = lq.variable_part.constant +
-        lq.decision_part.constant +
-        f.known_part.constant +
-        f.known_decision_terms.constant
-    MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
+    modify_coefficient!(decision_terms, change.decision, change.new_coefficient)
     return nothing
 end
 

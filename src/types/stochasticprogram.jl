@@ -3,6 +3,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
     structure::ST
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
+    solutioncache::Dict{Symbol, SolutionCache}
     optimizer::StochasticProgramOptimizer
 
     function StochasticProgram(stages::NTuple{N, Stage},
@@ -19,6 +20,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
                              structure,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
+                             Dict{Symbol, SolutionCache}(),
                              optimizer)
     end
 
@@ -36,6 +38,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
                              structure,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
+                             Dict{Symbol, SolutionCache}(),
                              optimizer)
     end
 end
@@ -203,10 +206,22 @@ end
 # MOI #
 # ========================== #
 function MOI.get(stochasticprogram::StochasticProgram, attr::Union{MOI.TerminationStatus, MOI.PrimalStatus, MOI.DualStatus})
+    # Check if there is a cached solution
+    cache = solutioncache(stochasticprogram)
+    if haskey(cache, :solution)
+        # Returned cached solution
+        return MOI.get(cache[:solution], attr)
+    end
     return MOI.get(optimizer(stochasticprogram), attr)
 end
 function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractModelAttribute)
     if MOI.is_set_by_optimize(attr)
+        # Check if there is a cached solution
+        cache = solutioncache(stochasticprogram)
+        if haskey(cache, :solution)
+            # Returned cached solution
+            return MOI.get(cache[:solution], attr)
+        end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
@@ -220,8 +235,14 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimiz
     MOI.get(optimizer(stochasticprogram), attr)
 end
 
-MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value) = MOI.set(optimizer(sp), attr, value)
-MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value) = MOI.set(structure(sp), attr, value)
+function MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
+    MOI.set(optimizer(sp), attr, value)
+    return nothing
+end
+function MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value)
+    MOI.set(structure(sp), attr, value)
+    return nothing
+end
 
 function MOI.set(sp::StochasticProgram, attr::MOI.Silent, flag)
     # Ensure that Silent is always passed

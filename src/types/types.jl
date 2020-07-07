@@ -1,6 +1,7 @@
 # Types #
 # ==========================
 include("optimizer.jl")
+include("solution_cache.jl")
 include("scenario.jl")
 include("sampler.jl")
 include("stage.jl")

@@ -208,6 +208,9 @@ function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::Abs
     x₀ = crash(stochasticprogram)
     # Switch on structure and solver type
     optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kw...)
+    # Cache solution
+    cache = solutioncache(stochasticprogram)
+    cache[:solution] = SolutionCache(optimizer(stochasticprogram))
     return nothing
 end
 function JuMP.termination_status(stochasticprogram::StochasticProgram)
@@ -230,14 +233,16 @@ end
 """
     objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
 
-Return the objective value associated with result index result of the most-recent solution returned by the solver. Returns the value of the recourse problem after a call to `optimize!(stochasticprogram)`, or the result of taking the decision `x` after a call to `evaluate_decision(stochasticprogram, x)`
+Return the objective value associated with result index result of the most-recent solution after a call to `optimize!(stochasticprogram)`.
 """
 function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Switch on termination status
     status = JuMP.termination_status(stochasticprogram)
-    if status != MOI.OPTIMAL
+    if status in AcceptableTermination
+        return MOI.get(stochasticprogram, MOI.ObjectiveValue(result))
+    else
         if status == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         elseif status == MOI.INFEASIBLE
@@ -248,9 +253,9 @@ function JuMP.objective_value(stochasticprogram::StochasticProgram; result::Int 
             return objective_sense(stochasticprogram) == MOI.MAX_SENSE ? Inf : -Inf
         else
             @warn("Stochastic program could not be solved, returned status: $status")
+            return NaN
         end
     end
-    return MOI.get(optimizer(stochasticprogram), MOI.ObjectiveValue(result))
 end
 """
     optimize!(stochasticmodel::StochasticModel, sampler::AbstractSampler; crash::AbstractCrash = Crash.None(), kw...)
@@ -296,14 +301,16 @@ end
 """
     objective_value(stochasticmodel::StochasticModel; result::Int = 1)
 
-Returns the value of the recourse problem after a call to `optimize!(stochasticprogram)`, or the result of taking the decision `x` after a call to `evaluate_decision(stochasticmodel, x)`
+Returns the value of the recourse problem after a call to `optimize!(stochasticmodel)`.
 """
 function JuMP.objective_value(stochasticmodel::StochasticModel; result::Int = 1)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticmodel.optimizer)
     # Switch on termination status
     status = JuMP.termination_status(stochasticmodel)
-    if status != MOI.OPTIMAL
+    if status in AcceptableTermination
+        return MOI.get(stochasticmodel, MOI.ObjectiveValue(result))
+    else
         if status == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         elseif status == MOI.INFEASIBLE
@@ -314,9 +321,9 @@ function JuMP.objective_value(stochasticmodel::StochasticModel; result::Int = 1)
             return objective_sense(stochasticmodel) == MOI.MAX_SENSE ? Inf : -Inf
         else
             @warn("Stochastic program could not be solved, returned status: $status")
+            return NaN
         end
     end
-    return MOI.get(optimizer(stochasticmodel), MOI.ObjectiveValue(result))
 end
 """
     stage_parameters(stochasticprogram::StochasticProgram, s::Integer)
@@ -414,11 +421,11 @@ function first_stage(stochasticprogram::StochasticProgram, ::AbstractStochasticS
     return stage_one
 end
 """
-    first_stage_nconstraints(stochasticprogram::StochasticProgram)
+    first_stage_num_constraints(stochasticprogram::StochasticProgram)
 
 Return the number of constraints in the the first stage of `stochasticprogram`.
 """
-function first_stage_nconstraints(stochasticprogram::StochasticProgram)
+function first_stage_num_constraints(stochasticprogram::StochasticProgram)
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0
     first_stage = get_stage_one(stochasticprogram)
     return num_constraints(first_stage)
@@ -681,6 +688,10 @@ end
 Set the optimizer of the `stochasticprogram`.
 """
 function JuMP.set_optimizer(stochasticprogram::StochasticProgram, optimizer)
+    if !supports_structure(optimizer(), structure(stochasticprogram))
+        @warn "The provided optimizer does not support the underlying structure of the stochastic program. Consider reinstantiating (see `instantiate`) the stochastic program with the optimizer instead."
+        return nothing
+    end
     set_optimizer!(stochasticprogram.optimizer, optimizer)
     master_opt = master_optimizer(stochasticprogram)
     if master_opt != nothing

@@ -2,18 +2,18 @@
 # ------------------------------------------------------------
 function MOI.get(regularizer::AbstractRegularizer, param::RawRegularizationParameter)
     name = Symbol(param.name)
-    if !(name in fieldnames(typeof(regularizer)))
+    if !(name in fieldnames(typeof(regularizer.parameters)))
         error("Unrecognized parameter name: $(name) for regularizer $(typeof(regularizer)).")
     end
-    return getfield(regularizer, name)
+    return getfield(regularizer.parameters, name)
 end
 
 function MOI.set(regularizer::AbstractRegularizer, param::RawRegularizationParameter, value)
     name = Symbol(param.name)
-    if !(name in fieldnames(typeof(regularizer)))
+    if !(name in fieldnames(typeof(regularizer.parameters)))
         error("Unrecognized parameter name: $(name) for regularizer $(typeof(regularizer)).")
     end
-    setfield!(regularizer, name, value)
+    setfield!(regularizer.parameters, name, value)
     return nothing
 end
 
@@ -37,11 +37,6 @@ end
 
 function objective_value(::AbstractLShaped, regularization::AbstractRegularization)
     return regularization.data.Q̃
-end
-
-function solve_regularized_master!(lshaped::AbstractLShaped, ::AbstractRegularization)
-    #lshaped.mastersolver(lshaped.mastervector)
-    return nothing
 end
 
 function gap(lshaped::AbstractLShaped, regularization::AbstractRegularization)

@@ -15,7 +15,6 @@ function MOIB.Constraint.bridge_constraint(::Type{VectorAffineDecisionConstraint
     F = MOI.VectorAffineFunction{T}
     # Calculate total constant
     constants = f.variable_part.constants +
-        f.decision_part.constants +
         f.known_part.constants
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
@@ -86,7 +85,6 @@ function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintFunction,
     bridge.decision_function = f
     # Recalculate total constants and modify constraint function
     constants = f.variable_part.constants +
-        f.decision_part.constants +
         f.known_part.constants
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.VectorAffineFunction(f.variable_part.terms, constants))
@@ -107,7 +105,6 @@ function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraint
     f.variable_part.constants .= change.new_constant
     # Recalculate total constants and modify constraint function
     constants = f.variable_part.constants +
-        f.decision_part.constants +
         f.known_part.constants
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.VectorAffineFunction(f.variable_part.terms, constants))
@@ -129,28 +126,10 @@ end
 
 function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraintBridge{T,S}, change::DecisionMultirowChange) where {T,S}
     f = bridge.decision_function
-    # Query the fixed decision value
-    unbridged = MOIB.unbridged_variable_function(model, change.decision)::MOI.SingleVariable
-    decision_value = MOI.get(model, MOI.VariablePrimal(), unbridged.variable)
-    seen = Int[]
-    for i in findall(t -> t.scalar_term.variable_index == change.decision, f.decision_part.terms)
-        # Update decision part of constraint constant
-        coefficient = f.decision_part.terms[i].scalar_term.coefficient
-        f.decision_part.constants[i] +=
-            (change.new_coefficient - coefficient) * decision_value
-        push!(seen, i)
-    end
-    for i in filter(i -> i ∉ seen, collect(1:MOI.output_dimension(f)))
-        f.decision_part.constants[i] += change.new_coefficient * decision_value
-    end
     # Update the decision coefficient
     modify_coefficients!(f.decision_part.terms, change.decision, change.new_coefficients)
-    # Recalculate total constants and shift constraint set
-    constants = f.variable_part.constants +
-        f.decision_part.constants +
-        f.known_part.constants
-    MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
-            MOI.VectorAffineFunction(f.variable_part.terms, constants))
+    # Update mapped variable through MultiRowChange
+    MOI.modify(model, bridge, MOI.MultiRowChange(change.decision, change.new_coefficients))
     return nothing
 end
 
@@ -173,97 +152,10 @@ function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraint
     modify_coefficients!(f.known_part.terms, change.known, change.new_coefficients)
     # Recalculate total constants and modify constraint function
     constants = f.variable_part.constants +
-        f.decision_part.constants +
         f.known_part.constants
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.VectorAffineFunction(f.variable_part.terms, constants))
     return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraintBridge{T,S}, change::DecisionStateChange) where {T,S}
-    f = bridge.decision_function
-    # Switch on state transition
-    new_coefficients = Vector{Tuple{Int64, T}}()
-    if change.new_state == NotTaken
-        for i in findall(t -> t.scalar_term.variable_index == change.decision, f.decision_part.terms)
-            output_index = f.decision_part.terms[i].output_index
-            coefficient = f.decision_part.terms[i].scalar_term.coefficient
-            # Update fixed decision value
-            change.value_difference < 0 ||
-                error("Decision value update should be negative when transitioning to NotTaken state.")
-            f.decision_part.constants[i] +=
-                coefficient * change.value_difference
-            # Modify bridge functions
-            push!(f.variable_part.terms,
-                  MOI.VectorAffineTerm(output_index,
-                                       MOI.ScalarAffineTerm(coefficient, change.decision)))
-            deleteat!(f.decision_part.terms, i)
-            push!(new_coefficients, (output_index, coefficient))
-        end
-        # Modify the coefficients of the mapped variable
-        MOI.modify(model, bridge.constraint,
-                   MOI.MultirowChange(change.decision, new_coefficients))
-    end
-    if change.new_state == Taken
-        for i in findall(t -> t.scalar_term.variable_index == change.decision, f.decision_part.terms)
-            output_index = f.decision_part.terms[i].output_index
-            coefficient = f.decision_part.terms[i].scalar_term.coefficient
-            # Update fixed decision value
-            f.decision_part.constants[i] +=
-                coefficient * change.value_difference
-            # Modify bridge functions
-            deleteat!(f.variable_part.terms, i)
-            push!(f.decision_part.terms,
-                  MOI.VectorAffineTerm(output_index,
-                                       MOI.ScalarAffineTerm(coefficient, change.decision)))
-            push!(new_coefficients, (output_index, zero(T)))
-        end
-        # Modify the coefficients of the mapped variable
-        MOI.modify(model, bridge.constraint,
-                   MOI.MultirowChange(change.decision, new_coefficients))
-    end
-    # Recalculate total constants and modify constraint function
-    constants = f.variable_part.constants +
-        f.decision_part.constants +
-        f.known_part.constants
-    MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
-            MOI.VectorAffineFunction(f.variable_part.terms, constants))
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraintBridge{T}, ::DecisionsStateChange) where T
-    f = bridge.decision_function
-    unbridged_func = zero(VectorAffineDecisionFunction{T})
-    variables_to_remove = Vector{Int}()
-    decisions_to_remove = Vector{Int}()
-    # First, unbridge the objective function and cache
-    # all occuring decisions.
-    for (i,term) in enumerate(f.decision_part.terms)
-        unbridged = MOIB.unbridged_variable_function(model, term.scalar_term.variable_index)
-        push!(decisions_to_remove, i)
-        push!(unbridged_func.decision_part.terms,
-              MOI.VectorAffineTerm(term.output_index,
-                                   MOI.ScalarAffineTerm(term.scalar_term.coefficient, unbridged.variable)))
-        # Check if a mapped variable exists and remove it as well if so
-        for j in findall(t -> t.variable_index == term.scalar_term.variable_index, f.variable_part.terms)
-            j != 0 && push!(variables_to_remove, j)
-        end
-    end
-    # Remove terms that come from bridged decisions
-    deleteat!(f.variable_part.terms, variables_to_remove)
-    deleteat!(f.decision_part.terms, decisions_to_remove)
-    # Reset decision constant
-    f.decision_part.constant = zero(T)
-    # Rebridge
-    MOIU.operate!(+, T, f, MOIB.bridged_function(model, unbridged_func))
-    # All decisions have been mapped to either the decision part constant
-    # or the variable part terms at this point.
-    # Recalculate total constants and update constraint function
-    constants = f.variable_part.constants +
-        f.decision_part.constants +
-        f.known_part.constants
-    MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
-            MOI.VectorAffineFunction(f.variable_part.terms, constants))
 end
 
 function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraintBridge{T,S}, change::KnownValueChange) where {T,S}
@@ -277,7 +169,6 @@ function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraint
     end
     # Recalculate total constant and shift constraint set
     constant = f.variable_part.constant +
-        f.decision_part.constant +
         f.known_part.constant
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
             MOIU.shift_constant(bridge.set, -constant))
@@ -296,7 +187,6 @@ function MOI.modify(model::MOI.ModelLike, bridge::VectorAffineDecisionConstraint
     f.known_part.constants .= known_vals
     # Recalculate total constants and modify constraint function
     constants = f.variable_part.constants +
-        f.decision_part.constants +
         f.known_part.constants
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.VectorAffineFunction(f.variable_part.terms, constants))

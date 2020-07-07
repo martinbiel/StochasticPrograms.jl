@@ -19,8 +19,8 @@
             @test VRP(sp) <= EEV(sp)
             @test VSS(sp) >= 0
             @test EVPI(sp) >= 0
-            @test VSS(sp) <= EEV(sp)-EV(sp)
-            @test EVPI(sp) <= EEV(sp)-EV(sp)
+            @test VSS(sp) <= EEV(sp) - EV(sp)
+            @test EVPI(sp) <= EEV(sp) - EV(sp)
         end
         @testset "Copying: $name" begin
             sp_copy = copy(sp, optimizer = GLPK.Optimizer)

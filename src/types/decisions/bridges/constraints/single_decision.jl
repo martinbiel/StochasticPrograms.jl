@@ -13,13 +13,23 @@ function MOIB.Constraint.bridge_constraint(::Type{SingleDecisionConstraintBridge
                                            set::S) where {T, S <: MOI.AbstractScalarSet}
     # Perform the bridge mapping manually
     g = MOIB.bridged_variable_function(model, f.decision)
-    mapped_variable = g.terms[1].variable_index
+    mapped_variable = MOI.SingleVariable(only(g.terms).variable_index)
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
-                                    MOI.SingleVariable(mapped_variable),
+                                    mapped_variable,
                                     set)
+    # Check state of decision
+    fixing_constraint = if !iszero(g.constant)
+        # Decision initially fixed
+        fixing_constraint =
+            MOI.add_constraint(model,
+                               MOI.ScalarAffineFunction{T}([only(g.terms)], zero(T)),
+                               MOI.EqualTo(g.constant))
+    else
+        fixing_constraint = FixingConstraint{T}(0)
+    end
     # Save the constraint index and the decision to allow modifications
-    return SingleDecisionConstraintBridge{T,S}(constraint, FixingConstraint{T}(0), f)
+    return SingleDecisionConstraintBridge{T,S}(constraint, fixing_constraint, f)
 end
 
 function MOIB.Constraint.bridge_constraint(::Type{SingleDecisionConstraintBridge{T,FreeDecision}},
@@ -108,10 +118,10 @@ function MOI.modify(model::MOI.ModelLike, bridge::SingleDecisionConstraintBridge
             MOI.delete(model, bridge.fixing_constraint)
         end
         # Perform the bridge mapping manually
-        aff = MOIB.bridged_function(model, AffineDecisionFunction{T}(bridge.decision))
-        f = MOI.ScalarAffineFunction{T}(MOI.SingleVariable(aff.decision_part.terms[1].variable_index))
+        aff = MOIB.bridged_variable_function(model, bridge.decision.decision)
+        f = MOI.ScalarAffineFunction{T}([only(aff.terms)], zero(T))
         # Get the decision value
-        set = MOI.EqualTo(aff.decision_part.constant)
+        set = MOI.EqualTo(aff.constant)
         # Add a fixing constraint to ensure that fixed decision is feasible.
         bridge.fixing_constraint = MOI.add_constraint(model, f, set)
     end

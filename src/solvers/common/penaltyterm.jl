@@ -94,6 +94,30 @@ function remove_penalty!(penalty::Quadratic,
     return nothing
 end
 
+function remove_penalty_variables!(penalty::AbstractPenaltyterm,
+                                   list::Vector{MOI.VariableIndex})
+    i = something(findfirst(isequal(penalty.t), list), 0)
+    if !iszero(i)
+        deleteat!(list, i)
+    end
+    return nothing
+end
+
+function remove_penalty_constraints!(penalty::AbstractPenaltyterm,
+                                     list)
+    # Nothing to do if constraints do not match
+    return nothing
+end
+
+function remove_penalty_constraints!(penalty::Quadratic,
+                                     list::Vector{<:L2NormConstraint})
+    i = something(findfirst(isequal(penalty.constraint), list), 0)
+    if !iszero(i)
+        deleteat!(list, i)
+    end
+    return nothing
+end
+
 """
     Linearized
 
@@ -223,6 +247,18 @@ function remove_penalty!(penalty::Linearized,
     return nothing
 end
 
+function remove_penalty_variables!(penalty::Linearized,
+                                   list::Vector{MOI.VariableIndex})
+    filter!(vi -> !(vi in penalty.auxilliary_variables), list)
+    return nothing
+end
+
+function remove_penalty_constraints!(penalty::Linearized,
+                                     list::Vector{<:LinearizationConstraint})
+    filter!(ci -> !(ci in penalty.constraints), list)
+    return nothing
+end
+
 """
     InfNorm
 
@@ -299,6 +335,15 @@ function remove_penalty!(penalty::InfNorm,
     return nothing
 end
 
+function remove_penalty_constraints!(penalty::InfNorm,
+                                     list::Vector{<:InfNormConstraint})
+    i = something(findfirst(isequal(penalty.constraint), list), 0)
+    if !iszero(i)
+        deleteat!(list, i)
+    end
+    return nothing
+end
+
 """
     ManhattanNorm
 
@@ -371,6 +416,15 @@ function remove_penalty!(penalty::ManhattanNorm,
     if !iszero(penalty.t.value)
         MOI.delete(model, penalty.t)
         penalty.t = MOI.VariableIndex(0)
+    end
+    return nothing
+end
+
+function remove_penalty_constraints!(penalty::ManhattanNorm,
+                                     list::Vector{<:ManhattanNormConstraint})
+    i = something(findfirst(isequal(penalty.constraint), list), 0)
+    if !iszero(i)
+        deleteat!(list, i)
     end
     return nothing
 end

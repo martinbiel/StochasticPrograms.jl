@@ -152,14 +152,14 @@ end
 
 # Constraints #
 # ========================== #
-function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, set::S) where S <: Union{MOI.LessThan,MOI.GreaterThan,MOI.EqualTo}
+function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, DecisionQuadExpr}, set::MOI.AbstractScalarSet)
     offset = constant(aff.variables)
     JuMP.add_to_expression!(aff.variables, -offset)
     shifted_set = MOIU.shift_constant(set, -offset)
     return JuMP.ScalarConstraint(aff, shifted_set)
 end
 
-function JuMP.build_constraint(_error::Function, aff::CombinedAffExpr, lb, ub)
+function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, DecisionQuadExpr}, lb, ub)
     JuMP.build_constraint(_error, aff, MOI.Interval(lb, ub))
 end
 

@@ -22,12 +22,12 @@ function JuMP.set_objective_coefficient(model::Model, decision_or_known::Union{D
         else
             set_objective_function(model, add_to_expression!(coeff * decision_or_known, current_obj))
         end
-    elseif obj_fct_type == CombinedAffExpr{Float64} && decision_or_known isa DecisionRef
+    elseif obj_fct_type == DecisionAffExpr{Float64} && decision_or_known isa DecisionRef
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
             DecisionCoefficientChange(index(decision_or_known), coeff))
-    elseif obj_fct_type == CombinedAffExpr{Float64} && decision_or_known isa KnownRef
+    elseif obj_fct_type == DecisionAffExpr{Float64} && decision_or_known isa KnownRef
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
@@ -82,14 +82,14 @@ function update_decision_objective!(::JuMP.Model, ::DataType, ::Union{DecisionMo
     return nothing
 end
 
-function update_decision_objective!(model::JuMP.Model, func_type::Type{F}, change::DecisionModification) where F <: Union{SingleDecision, CombinedAffExpr, CombinedQuadExpr}
+function update_decision_objective!(model::JuMP.Model, func_type::Type{<:DecisionQuadExpr}, change::DecisionModification)
     MOI.modify(backend(model),
                MOI.ObjectiveFunction{JuMP.moi_function_type(func_type)}(),
                change)
     return nothing
 end
 
-function update_decision_objective!(model::JuMP.Model, func_type::Type{F}, change::KnownModification) where F <: Union{CombinedAffExpr, CombinedQuadExpr}
+function update_decision_objective!(model::JuMP.Model, func_type::Type{F}, change::KnownModification) where F <: Union{DecisionAffExpr, DecisionQuadExpr}
     MOI.modify(backend(model),
                MOI.ObjectiveFunction{JuMP.moi_function_type(func_type)}(),
                change)
@@ -126,7 +126,7 @@ function update_decision_variable_constraints!(model::JuMP.Model, ::DecisionsSta
 end
 
 function update_decision_constraints!(model::JuMP.Model, change::Union{DecisionModification, KnownModification})
-    for F in [CombinedAffExpr{Float64}, CombinedQuadExpr{Float64}]
+    for F in [DecisionAffExpr{Float64}, DecisionQuadExpr{Float64}]
         for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
             for cref in all_constraints(model, F, S)
                 update_decision_constraint!(cref, change)

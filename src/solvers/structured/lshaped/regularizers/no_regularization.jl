@@ -16,6 +16,14 @@ function restore_regularized_master!(::AbstractLShaped, ::NoRegularization)
     return nothing
 end
 
+function filter_variables!(::NoRegularization, ::Any)
+    return nothing
+end
+
+function filter_constraints!(::NoRegularization, ::Any)
+    return nothing
+end
+
 function log_regularization!(::AbstractLShaped, ::NoRegularization)
     return nothing
 end

@@ -1,4 +1,4 @@
-function EWS(::StochasticProgram, structure::HorizontalBlockStructure)
+function EWS(::StochasticProgram, structure::HorizontalStructure)
     return EWS_horizontal(scenarioproblems(structure))
 end
 function EWS_horizontal(scenarioproblems::ScenarioProblems)
@@ -26,7 +26,7 @@ function EWS_horizontal(scenarioproblems::DistributedScenarioProblems)
     return sum(partial_ews)
 end
 
-function statistical_EWS(::StochasticProgram, structure::HorizontalBlockStructure)
+function statistical_EWS(::StochasticProgram, structure::HorizontalStructure)
     return statistical_EWS_horizontal(scenarioproblems(structure))
 end
 function statistical_EWS_horizontal(scenarioproblems::ScenarioProblems)

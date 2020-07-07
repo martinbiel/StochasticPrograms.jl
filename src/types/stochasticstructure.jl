@@ -4,10 +4,10 @@ abstract type AbstractStochasticStructure{N} end
 abstract type StochasticInstantiation end
 struct UnspecifiedInstantiation <: StochasticInstantiation end
 struct Deterministic <: StochasticInstantiation end
-struct BlockVertical <: StochasticInstantiation end
-struct BlockHorizontal <: StochasticInstantiation end
-struct DistributedBlockVertical <: StochasticInstantiation end
-struct DistributedBlockHorizontal <: StochasticInstantiation end
+struct Vertical <: StochasticInstantiation end
+struct Horizontal <: StochasticInstantiation end
+struct DistributedVertical <: StochasticInstantiation end
+struct DistributedHorizontal <: StochasticInstantiation end
 
 # Constructor of stochastic structure. Should dispatch on instantiation type
 function StochasticStructure end
@@ -21,12 +21,12 @@ end
 function default_structure(::UnspecifiedInstantiation, optimizer)
     if optimizer isa MOI.AbstractOptimizer
         if optimizer isa AbstractStructuredOptimizer
-            # default to block-vertical structure
+            # default to vertical structure
             if nworkers() > 1
                 # Distribute in memory if Julia processes are available
-                return DistributedBlockVertical()
+                return DistributedVertical()
             else
-                return BlockVertical()
+                return Vertical()
             end
         else
             # Default to DEP structure if standard MOI optimizer is given

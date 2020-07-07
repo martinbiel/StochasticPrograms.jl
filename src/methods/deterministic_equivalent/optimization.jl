@@ -7,8 +7,6 @@ function optimize!(structure::DeterministicEquivalent, optimizer::MOI.AbstractOp
             MOI.set(optimizer, MOI.VariablePrimalStart(), idx, x₀[i])
         end
     end
-    # Ensure that no decisions are fixed
-    untake_decisions!(structure.model, structure.decision_variables[1])
     # Run standard MOI optimization procedure
     MOI.optimize!(optimizer)
     return nothing

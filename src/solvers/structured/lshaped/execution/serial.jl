@@ -12,7 +12,7 @@ struct SerialExecution{H <: AbstractFeasibilityHandler,
     subobjectives::A
     model_objectives::A
 
-    function SerialExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
+    function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
                              ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                      T <: AbstractFloat,
                                                                      A <: AbstractVector}
@@ -71,7 +71,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(structure::VerticalBlockStructure{2, 1, <:Tuple{ScenarioProblems}},
+function (execution::Serial)(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
                              ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                      T <: AbstractFloat,
                                                                      A <: AbstractVector}

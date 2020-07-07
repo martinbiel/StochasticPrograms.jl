@@ -354,39 +354,15 @@ end
 function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionCoefficientChange)
     f = MOIB.bridged_variable_function(b, change.decision)
-    # Variable part
-    if iszero(f.constant)
-        # Decision has been mapped to a MOI variable, so
-        # fallback to a ScalarCoefficientChange.
-        for term in f.terms
-            MOI.modify(b, obj, MOI.ScalarCoefficientChange(term.variable_index, change.new_coefficient))
-        end
-    else
-        # Decision has been mapped to a fixed value, so
-        # modification is handled in obj bridge
-        for term in f.terms
-            MOI.modify(b, obj, DecisionCoefficientChange(term.variable_index, change.new_coefficient))
-        end
-    end
+    # Continue modification with mapped variable
+    MOI.modify(b, obj, DecisionCoefficientChange(only(f.terms).variable_index, change.new_coefficient))
     return nothing
 end
 
 function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionMultirowChange)
     f = MOIB.bridged_variable_function(b, change.decision)
-    # Variable part
-    if iszero(f.constant)
-        # Decision has been mapped to a MOI variable, so
-        # fallback to a MultirowChange.
-        for term in f.terms
-            MOI.modify(b, obj, MOI.MultirowChange(term.variable_index, change.new_coefficients))
-        end
-    else
-        # Decision has been mapped to a fixed value, so
-        # modification is handled in obj bridge
-        for term in f.terms
-            MOI.modify(b, obj, DecisionMultirowChange(term.variable_index, change.new_coefficients))
-        end
-    end
+    # Continue modification with mapped variable
+    MOI.modify(b, obj, DecisionMultirowChange(only(f.terms).variable_index, change.new_coefficients))
     return nothing
 end

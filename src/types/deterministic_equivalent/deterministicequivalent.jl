@@ -50,7 +50,10 @@ function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractConstrain
     return MOI.get(backend(structure.model), attr, cindex)
 end
 
-MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute, value) = MOI.set(backend(structure.model), attr, value)
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute, value)
+    MOI.set(backend(structure.model), attr, value)
+    return nothing
+end
 function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     MOI.set(backend(structure.model), attr, index, value)

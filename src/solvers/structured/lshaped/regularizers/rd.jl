@@ -90,6 +90,20 @@ function restore_regularized_master!(lshaped::AbstractLShaped, rd::RegularizedDe
     return nothing
 end
 
+function filter_variables!(rd::RegularizedDecomposition, list::Vector{MOI.VariableIndex})
+    # Filter projection targets
+    filter!(vi -> !(vi in rd.projection_targets), list)
+    # Filter any auxilliary penaltyterm variables
+    remove_penalty_variables!(rd.penaltyterm, list)
+    return nothing
+end
+
+function filter_constraints!(rd::RegularizedDecomposition, list::Vector{<:CI})
+    # Filter any auxilliary penaltyterm constraints
+    remove_penalty_constraints!(rd.penaltyterm, list)
+    return nothing
+end
+
 function log_regularization!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
     @unpack Q̃,σ,incumbent = rd.data
     push!(rd.Q̃_history, Q̃)

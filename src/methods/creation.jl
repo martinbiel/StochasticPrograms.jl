@@ -716,13 +716,13 @@ macro stage(stage, args)
             end
             for var in args
                 varkey = Meta.quot(var)
-                push!(code.args, :($var = scenario.data[$varkey]))
-            end
-            code = @q begin
-                try
+                code = @q begin
                     $code
-                catch err
-                    error("Given scenario $scenario does not match @uncertain declaration.")
+                    $var = try
+                        $var = scenario.data[$varkey]
+                    catch err
+                        error("Given scenario $scenario does not match @uncertain declaration.")
+                    end
                 end
             end
             return code

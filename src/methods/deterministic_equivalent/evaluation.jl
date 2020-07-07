@@ -3,18 +3,23 @@ function evaluate_decision(structure::DeterministicEquivalent{2}, decision::Abst
     take_decisions!(structure.model, structure.decision_variables[1], decision)
     # Optimize model
     optimize!(structure.model)
-    # Return result
+    # Switch on return status
     status = termination_status(structure.model)
-    if status != MOI.OPTIMAL
-        if status == MOI.INFEASIBLE
-            return objective_sense(structure.model) == MOI.MAX_SENSE ? -Inf : Inf
+    result = if status in AcceptableTermination
+        result = objective_value(structure.model)
+    else
+        result = if status == MOI.INFEASIBLE
+            result = objective_sense(structure.model) == MOI.MAX_SENSE ? -Inf : Inf
         elseif status == MOI.DUAL_INFEASIBLE
-            return objective_sense(structure.model) == MOI.MAX_SENSE ? Inf : -Inf
+            result = objective_sense(structure.model) == MOI.MAX_SENSE ? Inf : -Inf
         else
             error("Deterministically equivalent model could not be solved, returned status: $status")
         end
     end
-    return objective_value(structure.model)
+    # Revert back to untaken decisions
+    untake_decisions!(structure.model, structure.decision_variables[1])
+    # Return evaluation result
+    return result
 end
 
 function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, decision::AbstractVector)
@@ -24,7 +29,9 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
     optimize!(structure.model)
     # Get sense-correted objective value
     status = termination_status(structure.model)
-    Q̂ = if status != MOI.OPTIMAL
+    Q̂ = if status in AcceptableTermination
+        Q̂ = objective_value(structure.model)
+    else
         Q̂ = if status == MOI.INFEASIBLE
             return objective_sense(structure.model) == MOI.MAX_SENSE ? (-Inf, 0) : (Inf, 0)
         elseif status == MOI.DUAL_INFEASIBLE
@@ -32,8 +39,6 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
         else
             error("Deterministically equivalent model could not be solved, returned status: $status")
         end
-    else
-        objective_value(structure.model)
     end
     # Calculate subobjectives
     N = num_scenarios(structure)

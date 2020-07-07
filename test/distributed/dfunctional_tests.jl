@@ -13,7 +13,7 @@
             set_optimizer_attribute(sp, FeasibilityCuts(), true)
         end
         @testset "Distributed Sanity Check: $name" begin
-            sp_nondist = copy(sp, instantiation = BlockVertical())
+            sp_nondist = copy(sp, instantiation = Vertical())
             add_scenarios!(sp_nondist, scenarios(sp))
             set_optimizer(sp_nondist, LShaped.Optimizer)
             set_silent(sp_nondist)

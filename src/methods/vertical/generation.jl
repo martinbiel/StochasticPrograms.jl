@@ -1,6 +1,6 @@
-# Block-vertical generation #
+# Vertical generation #
 # ========================== #
-function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalBlockStructure{N}) where N
+function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalStructure{N}) where N
     # Generate all stages
     for stage in 1:N
         generate!(stochasticprogram, structure, stage)
@@ -8,7 +8,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalB
     return nothing
 end
 
-function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalBlockStructure{N}, stage::Integer) where N
+function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalStructure{N}, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     if stage == 1
         # Check generators
@@ -99,7 +99,7 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
     return nothing
 end
 
-function clear!(structure::VerticalBlockStructure{N}) where N
+function clear!(structure::VerticalStructure{N}) where N
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)
@@ -107,7 +107,7 @@ function clear!(structure::VerticalBlockStructure{N}) where N
     return nothing
 end
 
-function clear_stage!(structure::VerticalBlockStructure{N}, s::Integer) where N
+function clear_stage!(structure::VerticalStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     if s == 1
         empty!(structure.first_stage)
@@ -119,7 +119,7 @@ end
 
 # Getters #
 # ========================== #
-function first_stage(stochasticprogram::StochasticProgram, structure::VerticalBlockStructure; optimizer = nothing)
+function first_stage(stochasticprogram::StochasticProgram, structure::VerticalStructure; optimizer = nothing)
     if optimizer == nothing
         return structure.first_stage
     end

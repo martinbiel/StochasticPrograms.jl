@@ -1,9 +1,9 @@
-struct VerticalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
+struct VerticalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
     decisions::NTuple{N, Decisions}
     first_stage::JuMP.Model
     scenarioproblems::SP
 
-    function VerticalBlockStructure(scenarioproblems::NTuple{M,AbstractScenarioProblems}) where M
+    function VerticalStructure(scenarioproblems::NTuple{M,AbstractScenarioProblems}) where M
         N = M + 1
         decisions = ntuple(Val(N)) do i
             Decisions()
@@ -13,23 +13,23 @@ struct VerticalBlockStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <
     end
 end
 
-function StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
+function StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::Union{Vertical, DistributedVertical}) where M
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end
-    return VerticalBlockStructure(scenarioproblems)
+    return VerticalStructure(scenarioproblems)
 end
 
-function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{BlockVertical, DistributedBlockVertical}) where M
+function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Vertical, DistributedVertical}) where M
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenarios[i], instantiation)
     end
-    return VerticalBlockStructure(scenarioproblems)
+    return VerticalStructure(scenarioproblems)
 end
 
 # Base overloads #
 # ========================== #
-function Base.print(io::IO, structure::VerticalBlockStructure{N}) where N
+function Base.print(io::IO, structure::VerticalStructure{N}) where N
     print(io, "Stage 1\n")
     print(io, "============== \n")
     print(io, structure.first_stage)
@@ -43,7 +43,7 @@ function Base.print(io::IO, structure::VerticalBlockStructure{N}) where N
         end
     end
 end
-function Base.print(io::IO, structure::VerticalBlockStructure{2})
+function Base.print(io::IO, structure::VerticalStructure{2})
     print(io, "First-stage \n")
     print(io, "============== \n")
     print(io, structure.first_stage)
@@ -59,44 +59,47 @@ end
 
 # MOI #
 # ========================== #
-function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractModelAttribute)
+function MOI.get(structure::VerticalStructure, attr::MOI.AbstractModelAttribute)
     return MOI.get(backend(structure.first_stage), attr)
 end
-function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
+function MOI.get(structure::VerticalStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     return MOI.get(backend(structure.first_stage), attr, index)
 end
-function MOI.get(structure::VerticalBlockStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
+function MOI.get(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
     return MOI.get(backend(structure.first_stage), attr, cindex)
 end
 
-MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractModelAttribute, value) = MOI.set(backend(structure.first_stage), attr, value)
-function MOI.set(structure::VerticalBlockStructure, attr::MOI.Silent, flag)
+function MOI.set(structure::VerticalStructure, attr::MOI.AbstractModelAttribute, value)
+    MOI.set(backend(structure.first_stage), attr, value)
+    return nothing
+end
+function MOI.set(structure::VerticalStructure, attr::MOI.Silent, flag)
     # Silence master
     MOI.set(backend(structure.first_stage), attr, flag)
     # Silence subproblems
     MOI.set(scenarioproblems(structure), attr, flag)
     return nothing
 end
-function MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractVariableAttribute,
+function MOI.set(structure::VerticalStructure, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     MOI.set(backend(structure.first_stage), attr, index, value)
     return nothing
 end
-function MOI.set(structure::VerticalBlockStructure, attr::MOI.AbstractConstraintAttribute,
+function MOI.set(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute,
                  cindex::MOI.ConstraintIndex, value)
     MOI.set(backend(structure.first_stage), attr, cindex, value)
     return nothing
 end
 
-function MOI.is_valid(structure::VerticalBlockStructure, index::MOI.VariableIndex)
+function MOI.is_valid(structure::VerticalStructure, index::MOI.VariableIndex)
     return MOI.is_valid(backend(structure.first_stage), index)
 end
 
-function MOI.add_constraint(structure::VerticalBlockStructure, f::MOI.AbstractFunction, s::MOI.AbstractSet)
+function MOI.add_constraint(structure::VerticalStructure, f::MOI.AbstractFunction, s::MOI.AbstractSet)
     return MOI.add_constraint(backend(structure.first_stage), f, s)
 end
 
-function MOI.delete(structure::VerticalBlockStructure, index::MOI.Index)
+function MOI.delete(structure::VerticalStructure, index::MOI.Index)
     # TODO: more to do if index is decision
     MOI.delete(backend(structure.first_stage), index)
     return nothing
@@ -104,14 +107,14 @@ end
 
 # Getters #
 # ========================== #
-function structure_name(structure::VerticalBlockStructure)
-    return "Block vertical"
+function structure_name(structure::VerticalStructure)
+    return "Vertical"
 end
-deferred_first_stage(structure::VerticalBlockStructure, ::Val{1}) = num_variables(first_stage(structure)) == 0
+deferred_first_stage(structure::VerticalStructure, ::Val{1}) = num_variables(first_stage(structure)) == 0
 # ========================== #
 
 # Setters
 # ========================== #
-function update_decisions!(structure::VerticalBlockStructure, change::DecisionModification)
+function update_decisions!(structure::VerticalStructure, change::DecisionModification)
     update_decisions!(structure.first_stage, change)
 end

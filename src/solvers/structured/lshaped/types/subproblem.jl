@@ -117,12 +117,12 @@ function collect_linking_constraints(model::JuMP.Model,
                                      ::Type{T}) where T <: AbstractFloat
     linking_constraints = Vector{MOI.ConstraintIndex}()
     masterterms = Vector{Vector{Tuple{Int,T}}}()
-    F = CombinedAffExpr{Float64}
+    F = DecisionAffExpr{Float64}
     for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
         for cref in all_constraints(model, F, S)
             push!(linking_constraints, cref.index)
             coeffs = Vector{Tuple{Int,T}}()
-            aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::CombinedAffExpr
+            aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::DecisionAffExpr
             for (coef, kvar) in linear_terms(aff.knowns)
                 # Map known decisions to master decision,
                 # assuming sorted order

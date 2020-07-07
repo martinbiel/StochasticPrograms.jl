@@ -12,7 +12,7 @@ using JuMP
 using MathOptInterface
 using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
-using StochasticPrograms: UnspecifiedInstantiation, HorizontalBlockStructure, BlockHorizontal, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
+using StochasticPrograms: UnspecifiedInstantiation, HorizontalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
 using StochasticPrograms: AbstractExecution, ExecutionParameter, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, SubproblemOptimizer
 using StochasticPrograms: get_decisions, set_known_decision!, SingleKnownSet
@@ -33,6 +33,7 @@ export
     DualTolerance,
     Penalizer,
     PenalizationParameter,
+    RawPenalizationParameter,
     set_penalization_attribute,
     set_penalization_attributes,
     Penaltyterm,

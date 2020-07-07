@@ -23,6 +23,7 @@ import JuMP: optimize!, termination_status, index, value
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
+const VI = MOI.VariableIndex
 const CI = MOI.ConstraintIndex
 const AcceptableTermination = [MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.ALMOST_OPTIMAL, MOI.ALMOST_LOCALLY_SOLVED]
 
@@ -77,13 +78,14 @@ export
     AbstractStructuredOptimizer,
     AbstractSampledOptimizer,
     optimizer_name,
+    optimizer,
     optimizer_constructor,
     AbstractStochasticStructure,
     Deterministic,
-    BlockVertical,
-    BlockHorizontal,
-    DistributedBlockVertical,
-    DistributedBlockHorizontal,
+    Vertical,
+    Horizontal,
+    DistributedVertical,
+    DistributedHorizontal,
     Crash,
     distributed,
     initialize!,
@@ -104,18 +106,20 @@ export
     VectorAffineDecisionFunction,
     DecisionRef,
     KnownRef,
-    CombinedAffExpr,
-    CombinedQuadExpr,
+    DecisionAffExpr,
+    DecisionQuadExpr,
     SingleDecision,
     VectorOfDecisions,
     AffineDecisionFunction,
     VectorAffineDecisionFunction,
     decision,
+    state,
     decisions,
     num_decisions,
     decision_names,
+    all_decision_variables,
     recourse_length,
-    first_stage_nconstraints,
+    first_stage_num_constraints,
     first_stage_dims,
     num_stages,
     scenario,

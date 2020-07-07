@@ -34,6 +34,8 @@ function invalidate_cache!(stochasticprogram::StochasticProgram)
     cache = problemcache(stochasticprogram)
     delete!(cache, :evp)
     delete!(cache, :dep)
+    cache = solutioncache(stochasticprogram)
+    delete!(cache, :solution)
     return nothing
 end
 
@@ -83,6 +85,7 @@ function supports_expected(types::Vector, provided_def::Bool)
 end
 
 problemcache(stochasticprogram::StochasticProgram) = stochasticprogram.problemcache
+solutioncache(stochasticprogram::StochasticProgram) = stochasticprogram.solutioncache
 function get_problem(stochasticprogram::StochasticProgram, key::Symbol)
     haskey(stochasticprogram.problemcache, key)|| error("No $key in problem cache")
     return stochasticprogram.problemcache[key]

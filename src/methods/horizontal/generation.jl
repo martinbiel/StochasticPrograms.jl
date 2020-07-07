@@ -1,6 +1,6 @@
-# Block-horizontal generation #
+# Horizontal generation #
 # ========================== #
-function generate!(stochasticprogram::StochasticProgram{N}, structure::HorizontalBlockStructure{N}) where N
+function generate!(stochasticprogram::StochasticProgram{N}, structure::HorizontalStructure{N}) where N
     # Generate all stages
     for stage in 1:N
         generate!(stochasticprogram, structure, stage)
@@ -8,7 +8,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Horizonta
     return nothing
 end
 
-function generate!(stochasticprogram::TwoStageStochasticProgram, structure::HorizontalBlockStructure{2}, stage::Integer)
+function generate!(stochasticprogram::TwoStageStochasticProgram, structure::HorizontalStructure{2}, stage::Integer)
     if stage == 1
         # Check generators
         has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
@@ -88,7 +88,7 @@ function generate_horizontal!(scenarioproblems::DistributedScenarioProblems,
     return nothing
 end
 
-function clear!(structure::HorizontalBlockStructure{N}) where N
+function clear!(structure::HorizontalStructure{N}) where N
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)
@@ -96,7 +96,7 @@ function clear!(structure::HorizontalBlockStructure{N}) where N
     return nothing
 end
 
-function clear_stage!(structure::HorizontalBlockStructure{N}, s::Integer) where N
+function clear_stage!(structure::HorizontalStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     clear!(scenarioproblems(structure, s))
     return nothing

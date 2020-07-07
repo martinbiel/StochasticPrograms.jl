@@ -4,6 +4,8 @@ abstract type AbstractRegularizer end
 # ------------------------------------------------------------
 initialize_regularization!(lshaped::AbstractLShaped) = initialize_regularization!(lshaped, lshaped.regularization)
 restore_regularized_master!(lshaped::AbstractLShaped) = restore_regularized_master!(lshaped, lshaped.regularization)
+filter_variables!(lshaped::AbstractLShaped, list) = filter_variables!(lshaped.regularization, list)
+filter_constraints!(lshaped::AbstractLShaped, list) = filter_constraints!(lshaped.regularization, list)
 log_regularization!(lshaped::AbstractLShaped) = log_regularization!(lshaped, lshaped.regularization)
 log_regularization!(lshaped::AbstractLShaped, t::Integer) = log_regularization!(lshaped, t, lshaped.regularization)
 take_step!(lshaped::AbstractLShaped) = take_step!(lshaped, lshaped.regularization)

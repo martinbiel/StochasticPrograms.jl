@@ -63,7 +63,9 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     outcome = outcome_model(stochasticprogram, decision, scenario, sub_optimizer(stochasticprogram))
     optimize!(outcome)
     status = termination_status(outcome)
-    if status != MOI.OPTIMAL
+    if status in AcceptableTermination
+        return objective_value(outcome)
+    else
         if status == MOI.INFEASIBLE
             return objective_sense(outcome) == MOI.MAX_SENSE ? -Inf : Inf
         elseif status == MOI.DUAL_INFEASIBLE
@@ -71,8 +73,6 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
         else
             error("Outcome model could not be solved, returned status: $status")
         end
-    else
-        return objective_value(outcome)
     end
 end
 """

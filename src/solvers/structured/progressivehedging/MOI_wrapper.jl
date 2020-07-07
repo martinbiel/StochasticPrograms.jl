@@ -42,6 +42,7 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     parameters::ProgressiveHedgingParameters{Float64}
 
     status::MOI.TerminationStatusCode
+    solve_time::Float64
     progressivehedging::Union{AbstractProgressiveHedging, Nothing}
 
     function Optimizer(; subproblem_optimizer = nothing,
@@ -56,49 +57,57 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                    penaltyterm,
                    ProgressiveHedgingParameters{Float64}(; kw...),
                    MOI.OPTIMIZE_NOT_CALLED,
+                   NaN,
                    nothing)
     end
 end
 
 # Interface #
 # ========================== #
-function supports_structure(optimizer::Optimizer, ::HorizontalBlockStructure{2, 1, <:Tuple{ScenarioProblems}})
-    if optimizer.execution isa Serial
-        return true
-    end
-    @warn "Distributed execution policies are not compatible with a single-core horizontal structure. Consider setting the execution policy to `Serial` or re-instantiate the stochastic program on worker cores."
-    return false
-end
-
-function supports_structure(optimizer::Optimizer, ::HorizontalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
-    if optimizer.execution isa Serial
-        @warn "Serial execution not compatible with distributed horizontal structure. Consider setting the execution policy to `Synchronous` or `Asynchronous` or re-instantiate the stochastic program on a single core."
-        return false
-    end
+function supports_structure(optimizer::Optimizer, ::HorizontalStructure)
     return true
 end
 
 function default_structure(::UnspecifiedInstantiation, optimizer::Optimizer)
     if optimizer.execution isa Serial && nworkers() == 1
-        return BlockHorizontal()
+        return Horizontal()
     else
-        return DistributedBlockHorizontal()
+        return DistributedHorizontal()
     end
 end
 
-function check_loadable(optimizer::Optimizer, ::HorizontalBlockStructure)
+function check_loadable(optimizer::Optimizer, ::HorizontalStructure)
     if optimizer.subproblem_optimizer === nothing
         msg = "Subproblem optimizer not set. Consider setting `SubproblemOptimizer` attribute."
-        throw(UnloadableStructure{Optimizer, HorizontalBlockStructure}(msg))
+        throw(UnloadableStructure{Optimizer, HorizontalStructure}(msg))
     end
     return nothing
 end
 
-function load_structure!(optimizer::Optimizer, structure::HorizontalBlockStructure, x₀::AbstractVector)
+function ensure_compatible_execution!(optimizer::Optimizer, ::HorizontalStructure{2, 1, <:Tuple{ScenarioProblems}})
+    if !(optimizer.execution isa Serial)
+        @warn "Distributed execution policies are not compatible with a single-core horizontal structure. Switching to `Serial` execution by default."
+        MOI.set(optimizer, Execution(), Serial())
+    end
+    return nothing
+end
+
+function ensure_compatible_execution!(optimizer::Optimizer, ::HorizontalStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
+    if optimizer.execution isa Serial
+        @warn "Serial execution not compatible with distributed horizontal structure. Switching to `Synchronous` execution by default."
+        MOI.set(optimizer, Execution(), Synchronous())
+    end
+    return nothing
+end
+
+function load_structure!(optimizer::Optimizer, structure::HorizontalStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
     # Restore structure if optimization has been run before
     restore_structure!(optimizer)
+    # Ensure that execution policy is compatible
+    ensure_compatible_execution!(optimizer, structure)
+    # Create new progressive-hedging algorithm
     optimizer.progressivehedging = ProgressiveHedgingAlgorithm(structure,
                                                                x₀,
                                                                optimizer.execution,
@@ -118,21 +127,13 @@ function restore_structure!(optimizer::Optimizer)
     return nothing
 end
 
-function reload_structure!(optimizer::Optimizer)
-    if optimizer.progressivehedging !== nothing
-        x₀ = copy(optimizer.progressivehedging.ξ)
-        structure = optimizer.progressivehedging.structure
-        restore_structure!(optimizer)
-        load_structure!(optimizer, structure, x₀)
-    end
-    return nothing
-end
-
 function MOI.optimize!(optimizer::Optimizer)
     if optimizer.progressivehedging === nothing
         throw(StochasticProgram.UnloadedStructure{Optimizer}())
     end
+    start_time = time()
     optimizer.status = optimizer.progressivehedging()
+    optimizer.solve_time = time() - start_time
     return nothing
 end
 
@@ -153,9 +154,6 @@ end
 function MOI.set(optimizer::Optimizer, attr::MOI.Silent, flag::Bool)
     MOI.set(optimizer, MOI.RawParameter("log"), !flag)
     optimizer.sub_params[attr] = flag
-    if optimizer.progressivehedging != nothing
-        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, flag)
-    end
     return nothing
 end
 
@@ -173,9 +171,6 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
         error("Unrecognized parameter name: $(name).")
     end
     setfield!(optimizer.parameters, name, value)
-    if optimizer.progressivehedging != nothing
-        setfield!(optimizer.progressivehedging.parameters, name, value)
-    end
     return nothing
 end
 
@@ -214,8 +209,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
@@ -230,9 +223,6 @@ end
 function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, value)
     moi_param = MOI.RawParameter(param.name)
     optimizer.sub_params[moi_param] = value
-    if optimizer.progressivehedging != nothing
-        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), moi_param, value)
-    end
     return nothing
 end
 
@@ -242,8 +232,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::Execution, execution::AbstractExecution)
     optimizer.execution = execution
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
@@ -253,8 +241,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::Penalizer, penalizer::AbstractPenalizer)
     optimizer.penalizer = penalizer
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
@@ -264,8 +250,6 @@ end
 
 function MOI.set(optimizer::Optimizer, ::Penaltyterm, penaltyterm::AbstractPenaltyterm)
     optimizer.penaltyterm = penaltyterm
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
@@ -275,8 +259,6 @@ end
 
 function MOI.set(optimizer::Optimizer, param::ExecutionParameter, value)
     MOI.set(optimizer.execution, param, value)
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
@@ -286,13 +268,19 @@ end
 
 function MOI.set(optimizer::Optimizer, param::PenalizationParameter, value)
     MOI.set(optimizer.penalizer, param, value)
-    # Trigger reload
-    reload_structure!(optimizer)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
+end
+
+function MOI.get(optimizer::Optimizer, attr::MOI.ListOfVariableIndices)
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    list = MOI.get(optimizer.progressivehedging.structure.proxy, attr)
+    return list
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.VariableIndex)
@@ -307,6 +295,18 @@ function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
         throw(StochasticProgram.UnloadedStructure{Optimizer}())
     end
     return objective_value(optimizer.progressivehedging)
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
+    return optimizer.solve_time
+end
+
+function MOI.get(optimizer::Optimizer, attr::Union{MOI.AbstractOptimizerAttribute, MOI.AbstractModelAttribute})
+    # Catch-all in case the proxy model supports it
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.progressivehedging.structure.proxy, attr)
 end
 
 function MOI.is_empty(optimizer::Optimizer)

@@ -14,7 +14,7 @@ struct SynchronousExecution{H <: AbstractFeasibilityHandler,
     metadata::Vector{MetaData}
     cutqueue::CutQueue{T}
 
-    function SynchronousExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+    function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                   ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                           T <: AbstractFloat,
                                                                           A <: AbstractVector}
@@ -80,7 +80,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+function (execution::Synchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                   ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                           T <: AbstractFloat,
                                                                           A <: AbstractVector}

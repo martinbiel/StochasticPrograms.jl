@@ -184,6 +184,12 @@ See also: [`EVPI`](@ref), [`EWS`](@ref)
 function VRP(stochasticprogram::StochasticProgram)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
+    # Check if cached solution is available
+    cache = solutioncache(stochasticprogram)
+    if haskey(cache, :solution)
+        # Return cached value
+        return MOI.get(cache[:solution], MOI.ObjectiveValue())
+    end
     # Solve DEP
     optimize!(stochasticprogram)
     # Return optimal value
@@ -243,13 +249,13 @@ function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     # Get parameters
     confidence = MOI.get(stochasticmodel, Confidence())
     # Modify confidence for two-sided interval
-    α = (1-confidence)/2
+    α = (1 - confidence) / 2
     MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Calculate confidence interval around VRP
     optimize!(stochasticmodel, sampler)
     # Check return status
     status = termination_status(stochasticmodel)
-    if status != MOI.OPTIMAL
+    if !(status in AcceptableTermination)
         error("Stochastic model could not be solved to optimality, returned status $status.")
     end
     vrp = objective_value(stochasticmodel)
@@ -426,7 +432,7 @@ function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; conf
     optimize!(stochasticmodel, sampler)
     # Check return status
     status = termination_status(stochasticmodel)
-    if status != MOI.OPTIMAL
+    if !(status in AcceptableTermination)
         error("Stochastic model could not be solved to optimality, returned status $status.")
     end
     vrp = objective_value(stochasticmodel)

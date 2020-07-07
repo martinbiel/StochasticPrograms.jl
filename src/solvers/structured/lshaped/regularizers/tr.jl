@@ -102,6 +102,26 @@ function restore_regularized_master!(lshaped::AbstractLShaped, tr::TrustRegion)
     return nothing
 end
 
+function filter_variables!(tr::TrustRegion, list::Vector{MOI.VariableIndex})
+    # Filter projection targets
+    filter!(vi -> !(vi in tr.projection_targets), list)
+    # Filter Δ
+    i = something(findfirst(isequal(tr.data.Δ), list), 0)
+    if !iszero(i)
+        MOI.deleteat!(list, i)
+    end
+    return nothing
+end
+
+function filter_constraints!(tr::TrustRegion, list::Vector{<:CI})
+    # Filter trust-region constraint
+    i = something(findfirst(isequal(tr.data.constraint), list), 0)
+    if !iszero(i)
+        MOI.deleteat!(list, i)
+    end
+    return nothing
+end
+
 function log_regularization!(lshaped::AbstractLShaped, tr::TrustRegion)
     @unpack Q̃, Δ, incumbent = tr.data
     push!(tr.Q̃_history, Q̃)

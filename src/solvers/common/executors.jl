@@ -26,7 +26,7 @@ function set_execution_attribute(stochasticprogram::StochasticProgram, name::Uni
 end
 function set_execution_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
-        set_execution_attributes(stochasticprogram, name, value)
+        set_execution_attribute(stochasticprogram, name, value)
     end
 end
 function set_execution_attributes(stochasticprogram::StochasticProgram; kw...)

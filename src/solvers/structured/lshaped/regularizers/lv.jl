@@ -90,6 +90,25 @@ function restore_regularized_master!(lshaped::AbstractLShaped, lv::LevelSet)
     return nothing
 end
 
+function filter_variables!(lv::LevelSet, list::Vector{MOI.VariableIndex})
+    # Filter projection targets
+    filter!(vi -> !(vi in lv.projection_targets), list)
+    # Filter any auxilliary penaltyterm variables
+    remove_penalty_variables!(lv.penaltyterm, list)
+    return nothing
+end
+
+function filter_constraints!(lv::LevelSet, list::Vector{<:CI})
+    # Filter any auxilliary penaltyterm constraints
+    remove_penalty_constraints!(lv.penaltyterm, list)
+    # Filter level-set constraint
+    i = something(findfirst(isequal(lv.data.constraint), list), 0)
+    if !iszero(i)
+        MOI.deleteat!(list, i)
+    end
+    return nothing
+end
+
 function log_regularization!(lshaped::AbstractLShaped, lv::LevelSet)
     @unpack Q̃,incumbent = lv.data
     push!(lv.Q̃_history, Q̃)

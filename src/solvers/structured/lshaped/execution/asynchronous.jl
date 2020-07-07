@@ -30,7 +30,7 @@ struct AsynchronousExecution{H <: AbstractFeasibilityHandler,
     max_active::Int
     κ::T
 
-    function AsynchronousExecution(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+    function AsynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                    max_active::Int, κ::T,
                                    ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                            T <: AbstractFloat,
@@ -327,7 +327,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Asynchronous)(structure::VerticalBlockStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+function (execution::Asynchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                    ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
                                                                            T <: AbstractFloat,
                                                                            A <: AbstractVector}
