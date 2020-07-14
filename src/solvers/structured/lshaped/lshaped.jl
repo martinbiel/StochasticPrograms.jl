@@ -31,6 +31,8 @@ const CI = MOI.ConstraintIndex
 const CutConstraint = CI{AffineDecisionFunction{Float64}, MOI.GreaterThan{Float64}}
 
 export
+    AbstractLShapedAttribute,
+    LShapedAlgorithm,
     num_cuts,
     num_iterations,
     FeasibilityCuts,

@@ -23,7 +23,7 @@ end
 end
 
 """
-    SAA
+    SampleAverageApproximation
 
 Functor object for the sample average approximation algorithm.
 """

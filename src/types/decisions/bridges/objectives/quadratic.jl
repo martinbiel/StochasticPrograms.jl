@@ -371,48 +371,50 @@ end
 
 function MOI.modify(model::MOI.ModelLike, bridge::QuadraticDecisionObjectiveBridge{T,QuadraticPart{T}}, ::DecisionsStateChange) where T
     f = bridge.decision_function
+    lq = f.linear_quadratic_terms
     # Remove mapped variables to properly unbridge
     from_decision(v) = begin
         result = any(t -> t.variable_index == v,
-                     f.decision_part.affine_terms)
+                     lq.decision_part.affine_terms)
         result |= any(t -> t.variable_index_1 == v || t.variable_index_2 == v,
-                      f.decision_part.quadratic_terms)
+                      lq.decision_part.quadratic_terms)
         result |= any(t -> t.variable_index_1 == v,
-                      f.cross_terms.quadratic_terms)
+                      lq.cross_terms.quadratic_terms)
     end
     # Unbridge the objective function and cache
     # all occuring decisions.
     unbridged_func = QuadraticDecisionFunction(
-        MOIU.filter_variables(v -> !from_decision(v), f.variable_part),
-        convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
+        QuadraticPart(
+            MOIU.filter_variables(v -> !from_decision(v), lq.variable_part),
+            convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
+            convert(MOI.ScalarQuadraticFunction{T}, zero(T))),
         copy(f.known_part),
-        convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
         copy(f.known_variable_terms),
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
     # Affine terms
-    unbridged_affine_terms = map(f.decision_part.affine_terms) do term
+    unbridged_affine_terms = map(lq.decision_part.affine_terms) do term
         unbridged = MOIB.unbridged_variable_function(model, term.variable_index)
         MOI.ScalarAffineTerm(term.coefficient, unbridged.variable)
     end
-    append!(unbridged_func.decision_part.affine_terms, unbridged_affine_terms)
+    append!(unbridged_func.linear_quadratic_terms.decision_part.affine_terms, unbridged_affine_terms)
     # Quadratic terms
-    unbridged_quad_terms = map(f.decision_part.quadratic_terms) do term
+    unbridged_quad_terms = map(lq.decision_part.quadratic_terms) do term
         unbridged_1 = MOIB.unbridged_variable_function(model, term.variable_index_1)
         unbridged_2 = MOIB.unbridged_variable_function(model, term.variable_index_2)
         MOI.ScalarQuadraticTerm(term.coefficient, unbridged_1.variable, unbridged_2.variable)
     end
-    append!(unbridged_func.decision_part.quadratic_terms, unbridged_quad_terms)
+    append!(unbridged_func.linear_quadratic_terms.decision_part.quadratic_terms, unbridged_quad_terms)
     # Cross terms
-    for term in f.cross_terms.affine_terms
+    for term in lq.cross_terms.affine_terms
         # Subtract any added variable/decision cross terms
-        remove_term!(unbridged_func.variable_part.affine_terms, term)
+        remove_term!(unbridged_func.linear_quadratic_terms.variable_part.affine_terms, term)
     end
     # Add unbridged decision/variable cross terms for rebridge
-    unbridged_cross_terms = map(f.cross_terms.quadratic_terms) do term
+    unbridged_cross_terms = map(lq.cross_terms.quadratic_terms) do term
         unbridged = MOIB.unbridged_variable_function(model, term.variable_index_1)
         MOI.ScalarQuadraticTerm(term.coefficient, unbridged.variable, term.variable_index_2)
     end
-    append!(unbridged_func.cross_terms.quadratic_terms, unbridged_cross_terms)
+    append!(unbridged_func.linear_quadratic_terms.cross_terms.quadratic_terms, unbridged_cross_terms)
     # Known/variable cross terms
     for term in f.known_variable_terms.affine_terms
         # Subtract any added variable/decision cross terms

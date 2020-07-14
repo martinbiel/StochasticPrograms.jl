@@ -54,7 +54,7 @@ end
 
 Calculate the optimizer of the **wait-and-see** (`WS`) model of the two-stage `stochasticprogram`, corresponding to `scenario`.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`WS`](@ref)
 """
@@ -74,7 +74,7 @@ Calculate the **expected wait-and-see result** (`EWS`) of the `stochasticprogram
 
 In other words, calculate the expectated result of all possible wait-and-see models, using the provided scenarios in `stochasticprogram`.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
@@ -105,7 +105,7 @@ Approximately calculate the **expected wait-and-see result** (`EWS`) of the two-
 
 The attribute [`NumEWSSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`WS`](@ref)
 """
@@ -177,7 +177,7 @@ Calculate the **value of the recouse problem** (`VRP`) in `stochasticprogram`.
 
 In other words, optimize the stochastic program and return the optimal value.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
@@ -200,7 +200,7 @@ end
 
 Return a confidence interval around the **value of the recouse problem** (`VRP`) of `stochasticmodel` to the given `confidence` level.
 
-If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVPI`](@ref), [`VSS`](@ref), [`EWS`](@ref)
 """
@@ -216,7 +216,7 @@ end
 
 Calculate the **expected value of perfect information** (`EVPI`) of the two-stage `stochasticprogram`.
 
-In other words, calculate the gap between `VRP` and `EWS`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, calculate the gap between `VRP` and `EWS`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
@@ -237,9 +237,9 @@ Approximately calculate the **expected value of perfect information** (`EVPI`) o
 
 In other words, calculate confidence intervals around `VRP` and `EWS`. If they do not overlap, the EVPI is statistically significant, and a confidence interval is calculated and returned.
 
-The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalSamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`EWS`](@ref), [`VSS`](@ref)
 """
@@ -309,7 +309,7 @@ end
 
 Calculate the optimizer of the `EVP` of the two-stage `stochasticprogram`.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVP`](@ref), [`EV`](@ref), [`EEV`](@ref)
 """
@@ -327,7 +327,7 @@ end
 
 Calculate the optimal value of the `EVP` of the two-stage `stochasticprogram`.
 
-If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVP`](@ref), [`expected_value_decision`](@ref), [`EEV`](@ref)
 """
@@ -345,7 +345,7 @@ end
 
 Calculate the **expected value of the expected value solution** (`EEV`) of the two-stage `stochasticprogram`.
 
-In other words, evaluate the `EVP` decision. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, evaluate the `EVP` decision. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
@@ -366,7 +366,7 @@ Approximately calculate the **expected value of the expected value decision** (`
 
 The attribute [`NumEEVSamples`](@ref) is the size of the sampled models used in the eev calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`EVP`](@ref), [`EV`](@ref)
 """
@@ -395,7 +395,7 @@ end
 
 Calculate the **value of the stochastic solution** (`VSS`) of the two-stage `stochasticprogram`.
 
-In other words, calculate the gap between `EEV` and `VRP`. If an optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+In other words, calculate the gap between `EEV` and `VRP`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
 function VSS(stochasticprogram::StochasticProgram{2})
     # Throw NoOptimizer error if no recognized optimizer has been provided
@@ -416,7 +416,7 @@ In other words, calculate confidence intervals around `EEV` and `VRP`. If they d
 
 The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The same size is used to generate the expected value decision. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalSamples`](@ref) is the size of the sampled models used in the upper bound calculation and the attribute [`NumEEVSamples`] is the size of the sampled models used in the `EEV` calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
-If a sample-based optimizer has not been set yet (see [`set_optimizer!`](@ref)), a `NoOptimizer` error is thrown.
+If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 
 See also: [`VRP`](@ref), [`EEV`](@ref), [`EVPI`](@ref)
 """

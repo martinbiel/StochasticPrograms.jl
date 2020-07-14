@@ -2,195 +2,101 @@
 
 A stochastic program has a structure that can be exploited in solver algorithms through decomposition. This can heavily reduce the computation time required to optimize the stochastic program, compared to solving the extensive form directly. Moreover, a distributed stochastic program is by definition decomposed and a structured solver that can operate in parallel will be much more efficient.
 
+## Stochastic structure
+
+StochasticPrograms provides multiple alternatives for how finite stochastic program instances are represented and stored in memory. We refer to these alternatives as the structure of the stochastic program. Certain operations are more efficient in certain structures. We summarize the available structures in the following. For code examples, see the [Quick start](@ref).
+
+### Deterministic Equivalent
+
+The [`DeterministicEquivalent`](@ref), instantiated using [`Deterministic`](@ref), is the default structure in StochasticPrograms. A stochastic program instance is represented by one large optimization problem that considers all scenarios at once. This structure is supported by any standard third-party `MathOptInterface` solver. Moreover, it is the most efficient choice for smaller problem sizes.
+
+### Vertical block-decomposition
+
+The [`VerticalStructure`](@ref), instantiated using [`Vertical`](@ref), decomposes the stochastic program into stages. It is the structure induced by the L-shaped algorithm and is efficient for larger instances. It is especially efficient for decision evaluation problem, such as when calculating [`VSS`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed vertical structure is instantiated using [`DistributedVertical`](@ref).
+
+### Horizontal block-decomposition
+
+The [`HorizontalStructure`](@ref), instantiated using [`Horizontal`](@ref), decomposes the stochastic program by scenarios. It is the structure induced by the progressive-hedging algorithm and is efficient for larger instances. It is especially efficient for solving wait-and-see type problems, such as when calculating [`EVPI`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed vertical structure is instantiated using [`DistributedVertical`](@ref).
+
 ## Solver interface
 
-The structured solver interface mimics that of `MathProgBase`, and it needs to be implemented by any structured solver to be compatible with StochasticPrograms. We distinguish between structure-exploiting solvers for solving finite stochastic programs and sampled-bases solvers for approximately solving stochastic models, even though they can be based on the same algorithm.
-
-Some procedures in StochasticPrograms require a `MathProgBase` solver. It is common that structured solvers rely internally on some `MathProgBase` solver. Hence, for convenience, a solver can implement [`internal_solver`](@ref) to return any internal `MathProgBase` solver. A stochastic program that has an loaded structured solver that implements this method can then make use of that solver for those procedures, instead of requiring an external solver to be supplied. Finally, a structured solver can optionally implement [`solverstr`](@ref) to return an informative description string for printouts.
+The structured solver interface mimics that of `MathOptInterface`, and it needs to be implemented by any structured solver to be compatible with StochasticPrograms. We distinguish between structure-exploiting solvers for solving finite stochastic programs and sampled-bases solvers for approximately solving stochastic models, even though they can be based on the same algorithm.
 
 ### Stochastic programs
 
-To interface a new structure-exploiting solver, define a shallow object of type [`AbstractStructuredSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize!`](@ref). Define a new structured solver as a subtype of [`AbstractStructuredModel`](@ref). Next, implement [`StructuredModel`](@ref), that takes the stochastic program and the [`AbstractStructuredSolver`](@ref) object and return an instance of [`AbstractStructuredModel`](@ref) which internal state depends on the given stochastic program. Next, the solver algorithm should be run when calling [`optimize_structured!`](@ref) on the [`AbstractStructuredModel`](@ref). After successfuly optimizing the model, the solver must be able to fill in the optimal solution in the first stage and all second stages through [`fill_solution!`](@ref).
+To interface a new structure-exploiting solver, define a [`AbstractStructuredOptimizer`](@ref) object. To follow the style of `MathOptInterface`, name the object `Optimizer` so that users can `set_optimizer(sp, SOLVER_MODULE.Optimizer)` to use the optimizer. Next, implement [`load_structure!`](@ref), which loads any stochastic structure supported by the solver. Define [`supports_structure`](@ref) to inform StochasticPrograms what structures are supported by the solver and define [`default_structure`](@ref) to ensure that an appropriate structure is used when instantiating a stochastic program with your solver. After a call to [`load_structure!`](@ref), [`optimize!`](@ref) should solve the stochastic program or otherwise throw [`UnloadedStructure`](@ref). After a call to [`optimize!`](@ref), calling [`restore_structure!`](@ref) should remove any changes made to the model by the solver. For example, calling this method after running an L-shaped procedure removes all cutting planes from the first stage. The solver should at least be able to return a solver for solving subproblems through [`subproblem_optimizer`](@ref) and can also optionally support a [`master_optimizer`](@ref). Finally, the solver can optionally support a custom solver name through [`optimizer_name`](@ref).
 
-In summary, the solver interface that a new [`AbstractStructuredModel`](@ref) and [`AbstractStructuredSolver`](@ref) pair should adhere to is given by
+In summary, the solver interface that a new [`AbstractStructuredOptimizer`](@ref) should adhere to is given by
+ - [`supports_structure`](@ref)
+ - [`default_structure`](@ref)
+ - [`check_loadable`](@ref)
+ - [`load_structure!`](@ref)
+ - [`restore_structure!`](@ref)
+ - [`optimize!`](@ref)
+ - [`optimizer_name`](@ref)
+ - [`master_optimizer`](@ref)
+ - [`subproblem_optimizer`](@ref)
 
- - [`StructuredModel`](@ref)
- - [`optimize_structured!`](@ref)
- - [`fill_solution!`](@ref)
- - [`internal_solver`](@ref)
- - [`solverstr`](@ref)
-
-As an example, a simplified version of the implementation of the structured solver interface for [`LShaped`](@ref) is given below:
-```julia
-abstract AbstractLShapedSolver <: AbstractStructuredModel end
-
-const MPB = MathProgBase
-
-mutable struct LShapedSolver <: AbstractStructuredSolver
-    lpsolver::MPB.AbstractMathProgSolver
-    subsolver::S
-    feasibility_cuts::Bool
-    execution::E
-    regularize::R
-    aggregate::A
-    consolidate::C
-    crash::CrashMethod
-    parameters::Dict{Symbol,Any}
-
-    function LShapedSolver(lpsolver::MPB.AbstractMathProgSolver;
-                           execution::Execution = Serial(),
-                           feasibility_cuts::Bool = true,
-                           regularize::AbstractRegularizer = DontRegularize(),
-                           aggregate::AbstractAggregator = DontAggregate(),
-                           consolidate::AbstractConsolidator = DontConsolidate(),
-                           crash::CrashMethod = Crash.None(),
-                           subsolver::SubSolver = lpsolver, kwargs...)
-        return new(lpsolver, subsolver, feasibility_cuts, execution, regularize, aggregate, consolidate, crash, Dict{Symbol,Any}(kwargs))
-    end
-end
-
-function StructuredModel(stochasticprogram::StochasticProgram, solver::LShapedSolver)
-    x₀ = solver.crash(stochasticprogram, solver.lpsolver)
-    return LShaped(stochasticprogram, x₀, solver.lpsolver, get_solver(solver.subsolver), solver.feasibility_cuts, solver.execution, solver.regularize, solver.aggregate, solver.consolidate; solver.parameters...)
-end
-
-function internal_solver(solver::LShapedSolver)
-    return solver.lpsolver
-end
-
-function optimize_structured!(lshaped::AbstractLShapedSolver)
-    return lshaped()
-end
-
-function fill_solution!(stochasticprogram::StochasticProgram, lshaped::AbstractLShapedSolver)
-    # First stage
-    first_stage = StochasticPrograms.get_stage_one(stochasticprogram)
-    nrows, ncols = first_stage_dims(stochasticprogram)
-    StochasticPrograms.set_decision!(stochasticprogram, decision(lshaped))
-    μ = try
-        MPB.getreducedcosts(lshaped.mastersolver.lqmodel)[1:ncols]
-    catch
-        fill(NaN, ncols)
-    end
-    StochasticPrograms.set_first_stage_redcosts!(stochasticprogram, μ)
-    λ = try
-        MPB.getconstrduals(lshaped.mastersolver.lqmodel)[1:nrows]
-    catch
-        fill(NaN, nrows)
-    end
-    StochasticPrograms.set_first_stage_duals!(stochasticprogram, λ)
-    # Second stage
-    fill_submodels!(lshaped, scenarioproblems(stochasticprogram))
-end
-
-function solverstr(solver::LShapedSolver)
-    return "L-shaped solver"
-end
-```
+In addition, the solver can include support getting/setting/modiyfing any `MathOptInterface` attributes. See also the subtypes of [`AbstractStructuredOptimizerAttribute`](@ref) for special attributes defined by the framework. For more thorough examples of implementing the structured solver interface, see the [L-shaped](https://github.com/martinbiel/StochasticPrograms.jl/tree/master/src/solvers/structured/lshaped/MOI_wrapper) or [Progressive-hedging](https://github.com/martinbiel/StochasticPrograms.jl/tree/master/src/solvers/structured/progressivehedging/MOI_wrapper) implementations.
 
 ### Stochastic models
 
-To interface a new sampled-based solver, define a shallow object of type [`AbstractSampledSolver`](@ref). This object is intended to be the interface to end users of the solver and is what should be passed to [`optimize!`](@ref).Similar to finite programs, define a new sampled-based solver as a subtype of [`AbstractSampledModel`](@ref). Next, implement [`SampledModel`](@ref), that takes a stochastic model and the [`AbstractStructuredSolver`](@ref) object and returns an instance of [`AbstractSampledModel`](@ref). Next, the solver algorithm should be run when calling [`optimize_sampled!`](@ref) on the [`AbstractSampledModel`](@ref), some [`AbstractSampler`](@ref) and a desired confidence level. After successfuly optimizing the model, a [`StochasticSolution`](@ref) should be retrivable from the [`AbstractSampledModel`](@ref) using [`stochastic_solution`](@ref)
+To interface a new structure-exploiting solver, define a [`AbstractSampledOptimizer`](@ref) object. Next, implement [`load_model!`](@ref), which should load a provided `StochasticModel` object into the solver. A call to [`optimize!`](@ref) should then approximately solve the model. Afterwards, a call to [`optimal_instance`](@ref) can optionally return a sampled instance with an optimal value within the confidence interval of the solution. Again, a custom solver name can be provided in [`optimizer_name`](@ref).
 
-In summary, the solver interface that a new [`AbstractSampledModel`](@ref) and [`AbstractStructuredSolver`](@ref) pair should adhere to is given by
+In summary, the solver interface that a new [`AbstractSampledOptimizer`](@ref) should adhere to is given by
 
- - [`SampledModel`](@ref)
- - [`optimize_sampled!`](@ref)
- - [`stochastic_solution`](@ref)
- - [`internal_solver`](@ref)
- - [`solverstr`](@ref)
+ - [`load_model!`](@ref)
+ - [`optimize!`](@ref)
+ - [`optimizer_name`](@ref)
+ - [`optimal_instance`](@ref)
 
-As an example, consider the implementation of [`SAA`](@ref):
-```julia
-struct SAA{S <: SPSolverType} <: AbstractStructuredSolver
-    internal_solver::S
+See also the subtypes of [`AbstractSampledOptimizerAttribute`](@ref) for special attributes defined by the framework. For a thorough example, consider the [SAA](https://github.com/martinbiel/StochasticPrograms.jl/tree/master/src/solvers/sampled/SAA/MOI_wrapper) implementation.
 
-    function SAA(solver::SPSolverType)
-        if isa(solver, JuMP.UnsetSolver)
-            error("Cannot solve emerging SAA problems without functional solver.")
-        end
-        S = typeof(solver)
-        return new{S}(solver)
-    end
-end
-function SAA(; solver::SPSolverType = JuMP.UnsetSolver())
-    return SAA(solver)
-end
+## Crash methods
 
-mutable struct SAAModel{M <: StochasticModel, S <: SPSolverType} <: AbstractSampledModel
-    stochasticmodel::M
-    solver::S
-    solution::StochasticSolution
-end
+Some structure-exploiting algorithms benefit from crash starting in various ways. For example, a good initial guess in combination with a regularization procedure can improve convergence.
 
-function SampledModel(stochasticmodel::StochasticModel, solver::SAA)
-    return SAAModel(stochasticmodel, solver.internal_solver, EmptySolution())
-end
+The following [`Crash`](@ref) methods are available in StochasticPrograms:
+- [`Crash.None`](@ref) (default)
+- [`Crash.EVP`](@ref)
+- [`Crash.Scenario`](@ref)
+- [`Crash.Custom`](@ref)
 
-function optimize_sampled!(saamodel::SAAModel, sampler::AbstractSampler, confidence::AbstractFloat; M::Integer = 10, tol::AbstractFloat = 1e-1, Nmax::Integer = 5000)
-    sm = saamodel.stochasticmodel
-    solver = saamodel.solver
-    n = 16
-    α = 1-confidence
-    while true
-        CI = confidence_interval(sm, sampler; solver = solver, confidence = 1-α, N = N, M = M, Ñ = max(N, Ñ), T = T)
-        Q = (upper(CI) + lower(CI))/2
-        gap = length(CI)/abs(Q+1e-10)
-        if gap <= tol
-            sp = sample(sm, sampler, N)
-            optimize!(sp, solver = solver)
-            Q = optimal_value(sp)
-            while !(Q ∈ CI)
-                sp = sample(sm, sampler, N)
-                optimize!(sp, solver = solver)
-                Q = optimal_value(sp)
-            end
-            saamodel.solution = StochasticSolution(optimal_decision(saa), Q, N, CI)
-            saamodel.saa = saa
-            return :Optimal
-        end
-        N = N * 2
-        if N > Nmax
-            return :LimitReached
-        end
-        solver_config(solver, N)
-    end
-end
-
-function stochastic_solution(saamodel::SAAModel)
-    return saamodel.solution
-end
-```
+To use a Crash procedure, set the `crash` keyword in the call to [`optimize!`](@ref).
 
 ## L-shaped solvers
 
-StochasticPrograms includes a collection of L-shaped algorithms in the submodule `LShapedSolvers`. All algorithm variants are based on the L-shaped method by Van Slyke and Wets. `LShapedSolvers` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`LShaped`](@ref), and are instanced using the factory object [`LShapedSolver`](@ref).
+StochasticPrograms includes a collection of L-shaped algorithms in the submodule `LShaped`. All algorithm variants are based on the L-shaped method by Van Slyke and Wets. `LShaped` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`LShapedAlgorithm`](@ref), and are instanced using the API object [`LShaped.Optimizer`](@ref). Consider subtypes of [`AbstractLShapedAttribute`](@ref) for a summary of available configurations.
 
 As an example, we solve the simple problem introduced in the [Quick start](@ref):
 ```julia
-using LShapedSolvers
-using GLPKMathProgInterface
-
-optimize!(sp, solver = LShapedSolver(GLPKSolverLP()))
+set_optimizer(sp, LShaped.Optimizer)
+set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+optimize!(sp)
 ```
 ```julia
-L-Shaped Gap  Time: 0:00:01 (6 iterations)
+L-Shaped Gap  Time: 0:00:02 (6 iterations)
   Objective:       -855.8333333333358
   Gap:             0.0
   Number of cuts:  8
-:Optimal
+  Iterations:      6
 ```
-Note, that an LP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
+Note, that an LP capable `AbstractOptimizer` is required to solve emerging subproblems.
 
-`LShapedSolvers` uses a policy-based design. This allows combinatorially many variants of the original algorithm to be instanced by supplying linearly many policies to the factory function [`LShapedSolver`](@ref). We briefly describe the various policies in the following.
+`LShaped` uses a policy-based design. This allows combinatorially many variants of the original algorithm to be instanced by supplying linearly many policies to the factory function [`LShaped.Optimizer`](@ref). We briefly describe the various policies in the following.
 
 ### Feasibility cuts
 
-If the stochastic program does not have complete, or relatively complete, recourse then subproblems may be infeasible for some master iterates. Convergence can be maintained through the use of feasibility cuts. To reduce overhead and memory usage, feasibility issues are ignored by default. If you know that your problem does not have complete recourse, or if the algorithm terminates due to infeasibility, supply `feasibility_cuts = true` to the factory function to turn on this feature.
+If the stochastic program does not have complete, or relatively complete, recourse then subproblems may be infeasible for some master iterates. Convergence can be maintained through the use of feasibility cuts. To reduce overhead and memory usage, feasibility issues are ignored by default. If you know that your problem does not have complete recourse, or if the algorithm terminates due to infeasibility, set the [`FeasibilityCuts`](@ref) attribute to `true`:
+```julia
+set_optimizer_attribute(sp, FeasibilityCuts(), true)
+optimize!(sp)
+```
 
 ### Regularization
 
-A Regularization procedure can improve algorithm performance. The idea is to limit the candidate search to a neighborhood of the current best iterate in the master problem. This can result in more effective cutting planes. Moreover, regularization enables warm-starting the L-shaped procedure with [`Crash`](@ref) decisions. Regularization is enabled by supplying a factory object through `regularize` to [`LShapedSolver`](@ref).
+A Regularization procedure can improve algorithm performance. The idea is to limit the candidate search to a neighborhood of the current best iterate in the master problem. This can result in more effective cutting planes. Moreover, regularization enables warm-starting the L-shaped procedure with [`Crash`](@ref) decisions. Regularization is enabled by setting the [`Regularizer`](@ref) attribute.
 
 The following L-shaped regularizations are available:
 - [`NoRegularization`](@ref) (default)
@@ -198,7 +104,7 @@ The following L-shaped regularizations are available:
 - [`TrustRegion`](@ref)
 - [`LevelSet`](@ref)
 
-Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractMathProgSolver` capable of solving QP problems. Alternatively, the 2-norm penalty term in the objective can be approximated through various linear terms. This is achieved by supplying a `PenaltyTerm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
+Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractOptimizer` capable of solving QP problems. Alternatively, the quadratic proximal term in the objective can be approximated through various linear terms. This is achieved by supplying a `AbstractPenaltyterm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
 
 - [`Quadratic`](@ref) (default)
 - [`Linearized`](@ref)
@@ -207,7 +113,7 @@ Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an 
 
 ### Aggregation
 
-Cut aggregation can be applied to reduce communication latency and load imbalance. This can yield major performance improvements in distributed settings. Aggregation is enabled by supplying a factory object through `aggregate` to the factory function.
+Cut aggregation can be applied to reduce communication latency and load imbalance. This can yield major performance improvements in distributed settings. Aggregation is enabled by setting the [`Aggregator`](@ref) attribute.
 
 The following aggregation schemes are available:
 - [`NoAggregation`](@ref) (default)
@@ -218,27 +124,49 @@ The following aggregation schemes are available:
 
 ### Consolidation
 
-If cut consolidation is enabled, cuts from previous iterations that are no longer active are aggregated to reduce the size of the master. Consolidation is enabled by supplying `consolidate = Consolidate()` to the factory function. See [`Consolidation`](@ref) for further details.
-
-### Crash
-
-The L-shaped algorithm can be crash started in various way. A good initial guess in combination with a regularization procedure can improve convergence.
-
-The following [`Crash`](@ref) methods can be used through the `crash` option in the factory function.
-- [`Crash.None`](@ref) (default)
-- [`Crash.EVP`](@ref)
-- [`Crash.Scenario`](@ref)
-- [`Crash.Custom`](@ref)
+If cut consolidation is enabled, cuts from previous iterations that are no longer active are aggregated to reduce the size of the master. Consolidation is enabled by setting the [`Consolidator`](@ref) attribute to [`Consolidate`](@ref). See [`Consolidation`](@ref) for further details.
 
 ### Execution
 
-There are three available modes of execution:
+There are three currently available modes of execution:
 
 - [`Serial`](@ref) (default)
 - [`Synchronous`](@ref)
 - [`Asynchronous`](@ref)
 
-Running a distributed L-shaped algorithm, either synchronously or asynchronously, required adding Julia worker cores with [`addprocs`].
+Running a distributed L-shaped algorithm, either synchronously or asynchronously, required adding Julia worker cores with [`addprocs`]. The execution policy can be changed by setting the [`Execution`](@ref) attribute.
+
+### Solver examples
+
+Below are a few examples of L-shaped algorithm with advanced policy configurations:
+
+```julia
+function tr_with_partial_aggregation()
+    opt = LShaped.Optimizer()
+    MOI.set(opt, MasterOptimizer(), GLPK.Optimizer)
+    MOI.set(opt, SubproblemOptimizer(), GLPK.Optimizer)
+    MOI.set(opt, Regularizer(), TR()) # Set regularization to trust-region
+    MOI.set(opt, Aggregator(), PartialAggregate(36)) # Use partial aggregation in groups of 36 cuts
+    return opt
+end
+
+function lv_with_kmedoids_aggregation_and_consolidation()
+    opt = LShaped.Optimizer()
+    MOI.set(opt, MasterOptimizer(), Gurobi.Optimizer)
+    MOI.set(opt, SubproblemOptimizer(), Gurobi.Optimizer)
+    MOI.set(opt, Regularizer(), LV()) # Use level-set regularization
+    MOI.set(opt, Aggregator(), ClusterAggregate(Kmedoids(20, distance = angular_distance) # Use K-medoids cluster aggregation
+    MOI.set(opt, Consolidator(), Consolidate()) # Enable consolidation
+    return opt
+end
+
+# Employ advanced solvers
+set_optimizer(sp, tr_with_partial_aggregation)
+optimize!(sp)
+
+set_optimizer(sp, lv_with_kmedoids_aggregation_and_consolidation)
+optimize!(sp)
+```
 
 ### References
 
@@ -256,26 +184,26 @@ Running a distributed L-shaped algorithm, either synchronously or asynchronously
 
 7. Biel, M. and Johansson, M. (2019), [Dynamic cut aggregation in L-shaped algorithms](https://arxiv.org/abs/1910.13752), arXiv preprint arXiv:1910.13752.
 
-## ProgressiveHedgingSolvers.jl
+## Progressive-hedging solvers
 
-StochasticPrograms also includes a collection of progressive-hedging algorithms in the submodule `ProgressiveHedgingSolvers`. All algorithm variants are based on the original progressive-hedging algorithm by Rockafellar and Wets. `ProgressiveHedgingSolvers` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`ProgressiveHedging`](@ref), and are instanced using the factory object [`ProgressiveHedgingSolver`](@ref).
+StochasticPrograms also includes a collection of progressive-hedging algorithms in the submodule `ProgressiveHedging`. All algorithm variants are based on the original progressive-hedging algorithm by Rockafellar and Wets. `ProgressiveHedging` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`ProgressiveHedgingAlgorithm`](@ref), and are instanced using the API object [`ProgressiveHedging.Optimizer`](@ref). Consider subtypes of [`AbstractProgressiveHedgingAttribute`](@ref) for a summary of available configurations.
 
 As an example, we solve the simple problem introduced in the [Quick start](@ref):
 ```julia
-using ProgressiveHedgingSolvers
-using GLPKMathProgInterface
-
-optimize!(sp, solver = ProgressiveHedgingSolver(GLPKSolverLP, penaltyterm = Linearized(nbreakpoints=30))
+set_optimizer(sp, ProgressiveHedging.Optimizer)
+set_optimizer_attribute(sp, SubproblemOptimizer(), Ipopt.Optimizer)
 ```
 ```julia
-Progressive Hedging Time: 0:00:00 (91 iterations)
-  Objective:  -855.8017375415484
-  δ:          9.700002687897287e-6
+Progressive Hedging Time: 0:00:05 (303 iterations)
+  Objective:   -855.5842547490254
+  Primal gap:  7.2622997706326046e-6
+  Dual gap:    8.749063651111478e-6
+  Iterations:  302
 :Optimal
 ```
-Note, that an QP/LP capable `AbstractMathProgSolver` is required to solve emerging subproblems.
+Note, that an QP/LP capable `AbstractOptimizer` is required to solve emerging subproblems.
 
-`ProgressiveHedgingSolvers` also uses a policy-based design. See [`ProgressiveHedgingSolver`](@ref) for options. We briefly describe the various policies in the following.
+`ProgressiveHedging` also uses a policy-based design. See [`ProgressiveHedging.Optimizer`](@ref) for options. We briefly describe the various policies in the following.
 
 ### Penalty
 
@@ -286,7 +214,7 @@ There are two options for the penalty parameter used in the progressive-hedging 
 
 ### Execution
 
-The same execution policies as for `LShapedSolvers` are available in `ProgressiveHedgingSolvers`, i.e.
+The same execution policies as for `LShaped` are available in `ProgressiveHedging`, i.e.
 
 - [`Serial`](@ref) (default)
 - [`Synchronous`](@ref)
@@ -294,7 +222,7 @@ The same execution policies as for `LShapedSolvers` are available in `Progressiv
 
 ### Penalty term
 
-As with the L-shaped variants with quadratic 2-norm terms, the 2-norm term in progressive-hedging subproblems can be approximated. This enables the use of `AbstractMathProgSolver` that only solve linear problems. The alternatives are as before:
+As with the L-shaped variants with quadratic 2-norm terms, the 2-norm term in progressive-hedging subproblems can be approximated. This enables the use of an `AbstractOptimizer` that only support linear problems. The alternatives are as before:
 
 - [`Quadratic`](@ref) (default)
 - [`Linearized`](@ref)

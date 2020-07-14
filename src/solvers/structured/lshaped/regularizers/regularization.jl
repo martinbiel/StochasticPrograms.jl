@@ -16,10 +16,24 @@ process_cut!(lshaped::AbstractLShaped, cut::AbstractHyperPlane) = process_cut!(l
 # ------------------------------------------------------------
 # Attributes #
 # ------------------------------------------------------------
+"""
+    RawRegularizationParameter
+
+An optimizer attribute used for raw parameters of the regularizer. Defers to `RawParameter`.
+"""
 struct RawRegularizationParameter <: RegularizationParameter
     name::Any
 end
+"""
+    RegularizationPenaltyterm
 
+An optimizer attribute used to set the proximal term in regulariztion procedures (RD/LV). Options are:
+
+- [`Quadratic`](@ref) (default)
+- [`Linearized`](@ref)
+- [`InfNorm`](@ref)
+- [`ManhattanNorm`](@ref)
+"""
 struct RegularizationPenaltyterm <: RegularizationParameter end
 
 include("common.jl")

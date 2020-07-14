@@ -155,7 +155,7 @@ function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintInd
     return nothing
 end
 
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{QuadraticDecisionFunction{T}, S}, change::Union{DecisionModification, KnownModification}) where {T,S}
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{<:QuadraticDecisionFunction{T}, S}, change::Union{DecisionModification, KnownModification}) where {T,S}
     MOI.modify(model, ci, change)
     return nothing
 end

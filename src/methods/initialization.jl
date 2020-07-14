@@ -8,7 +8,7 @@ function initialize!(stochasticprogram::StochasticProgram, ::UnrecognizedOptimiz
 end
 
 function initialize!(stochasticprogram::StochasticProgram, ::NoOptimizerProvided)
-    @warn "Cannot initialize without optimizer. Consider [`set_optimizer!`](@ref)."
+    @warn "Cannot initialize without optimizer. Consider [`set_optimizer`](@ref)."
     # Do not initialize anything if no optimizer is attached
     return
 end

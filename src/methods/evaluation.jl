@@ -60,7 +60,7 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     length(decision) == num_decisions(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(stochasticprogram))
     all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
     # Generate and solve outcome model
-    outcome = outcome_model(stochasticprogram, decision, scenario, sub_optimizer(stochasticprogram))
+    outcome = outcome_model(stochasticprogram, decision, scenario; optimizer = subproblem_optimizer(stochasticprogram))
     optimize!(outcome)
     status = termination_status(outcome)
     if status in AcceptableTermination
@@ -240,7 +240,7 @@ end
 
 Generate a confidence interval around the true optimum of the two-stage `stochasticmodel` at level `confidence` using SAA, over the scenario distribution induced by `sampler`.
 
-The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalSamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
 If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
@@ -273,7 +273,7 @@ end
 
 Generate a confidence interval around the gap between the result of using `decision` and the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
-The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalsamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
+The attribute [`NumSamples`](@ref) is the size of the sampled models used to generate the interval and generally governs how tight it is. The attribute [`NumLowerTrials`](@ref) is the number of sampled models used in the lower bound calculation and the attribute [`NumUpperTrials`](@ref) is the number of sampled models used in the upper bound calculation. The attribute [`NumEvalSamples`](@ref) is the size of the sampled models used in the upper bound calculation. The confidence level can be set through the [`Confidence`](@ref) attribute.
 
 The supplied `decision` must match the defined decision variables in `stochasticmodel`. If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """

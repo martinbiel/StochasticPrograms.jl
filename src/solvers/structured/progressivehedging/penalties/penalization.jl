@@ -8,6 +8,11 @@ update_penalty!(ph::AbstractProgressiveHedging) = update_penalty!(ph, ph.penaliz
 # ------------------------------------------------------------
 # Attributes #
 # ------------------------------------------------------------
+"""
+    RawPenalizationParameter
+
+An optimizer attribute used for raw parameters of the penalizer. Defers to `RawParameter`.
+"""
 struct RawPenalizationParameter <: PenalizationParameter
     name::Any
 end

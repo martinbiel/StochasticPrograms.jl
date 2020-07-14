@@ -4,17 +4,17 @@ The [`@stochastic_model`](@ref) command is now introduced in more detail. The di
 ```julia
 simple_model = @stochastic_model begin
     @stage 1 begin
-        @variable(model, x₁ >= 40)
-        @variable(model, x₂ >= 20)
+        @decision(model, x₁ >= 40)
+        @decision(model, x₂ >= 20)
         @objective(model, Min, 100*x₁ + 150*x₂)
         @constraint(model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
-        @decision x₁ x₂
+        @known x₁ x₂
         @uncertain q₁ q₂ d₁ d₂
         @variable(model, 0 <= y₁ <= d₁)
         @variable(model, 0 <= y₂ <= d₂)
-        @objective(model, Min, q₁*y₁ + q₂*y₂)
+        @objective(model, Max, q₁*y₁ + q₂*y₂)
         @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
         @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
     end
@@ -56,11 +56,17 @@ Values supplied to `instantiate` are always used, and otherwise the default valu
 
 ## [`@decision`](@ref) blocks
 
-The `@decision` blocks are used to annotate linking variables between stages. The `@decision` block in the simple example above is given by
+The `@decision` blocks are used to annotate linking variables between stages. Their usage is identical syntax-wise to JuMP's `@variable` macros. Internally, they create specialized JuMP variables with context-dependent behaviour.
+
+## [`@known`](@ref) blocks
+
+A `@known` annotation is used in subsequent stages to bring a decision defined in a previous stage into scope. Any decision defined by `@decision` inside a `@stochastic_model` automatically annotates subsequent stages with appropriate `@known` lines.
+
+The `@known` block in the simple example above is given by
 ```julia
-@decision x₁ x₂
+@known x₁ x₂
 ```
-This states that the second stage of the stochastic model depends on the decisions `x₁` and `x₂` taken in the previous stage. The only restriction is that any variable annotated by `@decision` in stage `N` must have been annotated by `@variable` in stage `N-1`.
+This states that the second stage of the stochastic model depends on the decisions `x₁` and `x₂` taken in the previous stage. Note again that this lines is implicitly added by `@stochastic_model` and is not required.
 
 ## [`@uncertain`](@ref) blocks
 
@@ -72,11 +78,19 @@ The most simple approach is to use the [`Scenario`](@ref) type, which is based o
 ```
 This will ensure that `Scenario`s that are expected to have the fields `q₁`, `q₂`, `d₁` and `d₂` are injected when constructing second-stage models. Each such scenario must be supplied or sampled using a supplied sampler object. It is the responsibility of the user to ensure that each supplied or sampled `Scenario` has the correct fields. For example, the following yields a `Scenario` compatible with the above `@uncertain` line:
 ```julia
-Scenario(q₁ = -24.0,
-         q₂ = -28.0,
+Scenario(q₁ = 24.0,
+         q₂ = 28.0,
          d₁ = 500.0,
          d₂ = 100.0,
          probability = 0.4)
+```
+We can also use JuMP's container syntax:
+```julia
+@uncertain ξ[i in 1:5]
+```
+and then use the [`@container_scenario`](@ref) macro to generate scenarios:
+```julia
+ξ = @container_scenario([i in 1:5], i^2)
 ```
 
 As shown in [Stochastic data](@ref), it is also possible to introduce other scenario types, either using [`@scenario`](@ref) or manally as explained in [Custom scenarios](@ref) and demonstrated in the [Continuous scenario distribution](@ref) example. If we instead define the necessary scenario structure as follows:
@@ -146,7 +160,7 @@ Here, `scenarios` is a vector of scenarios consistent with the `@uncertain` anno
 
 If the scenarios are instead associated with a continuous random variable, with finite second moments, over an infinite sample space, then the corresponding stochastic program is not finite and must be approximated. The only supported way of doing so in StochasticPrograms is by using sampled average approximations. A finite stochastic program that approximates the stochastic model is obtained through
 ```julia
-sp = sample(sm, sampler, n)
+sp = instantiate(sm, sampler, n)
 ```
 where `sampler` is an [`AbstractSampler`](@ref), as outlined in [Sampling](@ref), and `n` is the number of samples to include.
 
@@ -167,9 +181,9 @@ end
 ```
 Next, an unmodeled stochastic program can be instantiated using the two created scenarios:
 ```@example instant
-sp = StochasticProgram([ξ₁, ξ₂])
+sp = StochasticProgram([ξ₁, ξ₂], Deterministic())
 ```
-A slightly diferrent modeling syntax is now used to define the stage models of `sp`:
+Note that we must provide the instantiation type explicitly as well. A slightly diferrent modeling syntax is now used to define the stage models of `sp`:
 ```@example instant
 @first_stage sp = begin
     @variable(model, x₁ >= 40)
@@ -178,7 +192,7 @@ A slightly diferrent modeling syntax is now used to define the stage models of `
     @constraint(model, x₁ + x₂ <= 120)
 end
 @second_stage sp = begin
-    @decision x₁ x₂
+    @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
     @variable(model, 0 <= y₁ <= d₁)
     @variable(model, 0 <= y₂ <= d₂)
@@ -187,14 +201,14 @@ end
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 ```
-Here, `@first_stage` and `@second_stage` are just syntactic sugar for `@stage 1` and `@stage 2`. This is is the definition syntax used internally by `StochasticModel` objects when instantiating stochastic programs. We can verify that this approach yields the same stochastic program by printing and comparing to the [Quick start](@ref):
+Here, `@first_stage` and `@second_stage` are just syntactic sugar for `@stage 1` and `@stage 2`. This is is the definition syntax used internally by `StochasticModel` objects when instantiating stochastic programs. Note, that we must explicitly add the `@known` annotations to the second stage with this approach. We can verify that this approach yields the same stochastic program by printing and comparing to the [Quick start](@ref):
 ```@example instant
 print(sp)
 ```
 As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and reinstantiates all internal problems. For example, the following increases the lower bound on the second stage variables to 2:
 ```@example instant
 @second_stage sp = begin
-    @decision x₁ x₂
+    @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
     @variable(model, 2 <= y₁ <= d₁)
     @variable(model, 2 <= y₂ <= d₂)

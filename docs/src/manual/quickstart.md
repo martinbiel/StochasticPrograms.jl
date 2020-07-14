@@ -61,70 +61,69 @@ and the stochastic variable
      q_1(\omega) & q_2(\omega) & d_1(\omega) & d_2(\omega)
   \end{pmatrix}^T
 ```
-takes on the value
-```math
-  \xi_1 = \begin{pmatrix}
-    -24 & -28 & 500 & 100
-  \end{pmatrix}^T
-```
-with probability ``0.4`` and
-```math
-  \xi_1 = \begin{pmatrix}
-    -28 & -32 & 300 & 300
-  \end{pmatrix}^T
-```
-with probability ``0.6``. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms. In many examples, a MathProgBase solver is required. Hence, we load the GLPK solver.
+parameterizes the second-stage model. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms. In many examples, a `MathOptInterface` solver is required. Hence, we load the GLPK solver:
 ```@example simple
-using GLPKMathProgInterface
+using GLPK
+```
+We also load Ipopt to solve quadratic problems:
+```julia
+using Ipopt
 ```
 
 ## Stochastic model definition
 
 First, we define a stochastic model that describes the introduced stochastic program above.
-
 ```@example simple
 simple_model = @stochastic_model begin
     @stage 1 begin
-        @variable(model, x₁ >= 40)
-        @variable(model, x₂ >= 20)
+        @decision(model, x₁ >= 40)
+        @decision(model, x₂ >= 20)
         @objective(model, Min, 100*x₁ + 150*x₂)
         @constraint(model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
-        @decision x₁ x₂
         @uncertain q₁ q₂ d₁ d₂
         @variable(model, 0 <= y₁ <= d₁)
         @variable(model, 0 <= y₂ <= d₂)
-        @objective(model, Min, q₁*y₁ + q₂*y₂)
+        @objective(model, Max, q₁*y₁ + q₂*y₂)
         @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
         @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
     end
 end
 ```
-The optimization models in the first and second stage are defined using JuMP syntax inside `@stage` blocks. Every first-stage variable that occurs in the second stage model is annotated with `@decision` at the beginning of the definition. Moreover, the `@uncertain` annotation specifies that the variables `q₁`, `q₂`, `d₁` and `d₂` are uncertain. Instances of the uncertain variables will later be injected to create instances of the second stage model.
+The optimization models in the first and second stage are defined using JuMP syntax inside `@stage` blocks. Every first-stage variable is annotated with `@decision`. This allows us to use the variable in the second stage. The `@uncertain` annotation specifies that the variables `q₁`, `q₂`, `d₁` and `d₂` are uncertain. Instances of the uncertain variables will later be injected to create instances of the second stage model. We will consider two stochastic models of the uncertainty and showcase the main functionality of the framework for each.
 
-## Instantiating the stochastic program
+## Finite sample space
 
-Next, we create the two instances ``\xi_1`` and ``\xi_2`` of the random variable. For simple models this is conveniently achieved through the [`Scenario`](@ref) type. ``\xi_1`` and ``\xi_2`` can be created as follows:
+First, let ``\xi`` be a discrete distribution, taking on the value
+```math
+  \xi_1 = \begin{pmatrix}
+    24 & 28 & 500 & 100
+  \end{pmatrix}^T
+```
+with probability ``0.4`` and
+```math
+  \xi_1 = \begin{pmatrix}
+    28 & 32 & 300 & 300
+  \end{pmatrix}^T
+```
+with probability ``0.6``.
+
+### Instantiation
+
+First, we create the two instances ``\xi_1`` and ``\xi_2`` of the random variable. For simple models this is conveniently achieved through the [`Scenario`](@ref) type. ``\xi_1`` and ``\xi_2`` can be created as follows:
 ```@example simple
-ξ₁ = Scenario(q₁ = -24.0, q₂ = -28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
+ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
 ```
 and
 ```@example simple
-ξ₂ = Scenario(q₁ = -28.0, q₂ = -32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
 ```
 where the variable names should match those given in the `@uncertain` annotation. We are now ready to instantiate the stochastic program introduced above.
 ```@example simple
-sp = instantiate(simple_model, [ξ₁, ξ₂], solver = GLPKSolverLP())
+sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 ```
-The above command creates an instance of the first stage model and second stage model instances for each of the supplied scenarios. The provided solver will be used internally when necessary. For clarity, we will still explicitly supply a solver when it is required. We can print the stochastic program and confirm that it indeed models the example recourse problem given above:
-```@example simple
-print(sp)
-```
-
-## Deterministically equivalent problem
-
-Since the example problem is small it is straightforward to work out the extended form:
+By default, the stochastic program is instantiated with a deterministic equivalent structure. It is straightforward to work out the extended form because the example problem is small:
 ```math
 \begin{aligned}
  \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} & \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
@@ -141,60 +140,127 @@ Since the example problem is small it is straightforward to work out the extende
  & \quad 0 \leq y_{22} \leq 300
 \end{aligned}
 ```
-which is also commonly referred to as the deterministically equivalent problem. This construct is available in StochasticPrograms through:
+We can print the stochastic program and confirm that it indeed models the example recourse problem given above:
 ```@example simple
-dep = DEP(sp)
-print(dep)
+print(sp)
 ```
 
-## Sampled average approximation
+### Optimization
 
-In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that ``\xi`` follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let ``\xi \sim \mathcal{N}(\mu, \Sigma)`` with
-```math
-\mu = \begin{pmatrix}
- -28 \\
- -32 \\
- 300 \\
- 300
-\end{pmatrix}, \quad \Sigma = \begin{pmatrix}
- 2 & 0.5 & 0 & 0 \\
- 0.5 & 1 & 0 & 0 \\
- 0 & 0 & 50 & 20 \\
- 0 & 0 & 20 & 30
-\end{pmatrix}
-```
-To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the [`@sampler`](@ref) macro:
+The most common operation is to solve the instantiated stochastic program for an optimal first-stage decision. We instantiated the problem with the `GLPK` optimizer, so we can solve the problem directly:
 ```@example simple
-@sampler SimpleSampler = begin
-    N::StochasticPrograms.MvNormal
-
-    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
-
-    @sample Scenario begin
-        x = rand(sampler.N)
-        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4], probability = StochasticPrograms.pdf(sampler.N, x))
-    end
-end
-
-μ = [-28, -32, 300, 300]
-Σ = [2 0.5 0 0
-     0.5 1 0 0
-     0 0 50 20
-     0 0 20 30]
-
-sampler = SimpleSampler(μ, Σ)
+optimize!(sp)
 ```
-Now, we can use the same stochastic model created before and the created sampler object to generate a sampled approximation of the stochastic program. For now, we create a small sampled model of just 5 scenarios:
+We can then query the resulting optimal value:
 ```@example simple
-sampled_sp = sample(simple_model, sampler, 5)
+objective_value(sp)
 ```
-Typically, a large number of scenarios are required to accurately represent the stochastic program. We will consider this in more depth below. Let us first also print the sampled model:
+and the optimal first-stage decision:
 ```@example simple
-print(sampled_sp)
+optimal_decision(sp)
 ```
-In the subsequent discussions, note that `sp` represents the finite simple stochastic program with known closed form, `simple_model` contains the mathematical representation of the general stochastic model, and `sampled_sp` are approximated instances of the general model.
+Alternatively, we can solve the problem with a structure-exploiting solver. The framework provides both `LShaped` and `ProgressiveHedging` solvers. We first re-instantiate the problem using an L-shaped optimizer:
+```@example simple
+sp_lshaped = instantiate(simple_model, [ξ₁, ξ₂], optimizer = LShaped.Optimizer)
+```
+It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program in a vertical block form that decomposes the problem into stages:
+```@example simple
+print(sp_lshaped)
+```
+To solve the problem with L-shaped, we must first specify internal optimizers that can solve emerging subproblems:
+```@example simple
+set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp_lshaped, SubproblemOptimizer(), GLPK.Optimizer)
+```
+We can now run the optimization procedure:
+```@example simple
+optimize!(sp_lshaped)
+```
+and verify that we get the same results:
+```@example simple
+objective_value(sp_lshaped)
+```
+and
+```@example simple
+optimal_decision(sp_lshaped)
+```
+Likewise, we can solve the problem with progressive-hedging. Consider:
+```julia
+sp_progressivehedging = instantiate(simple_model, [ξ₁, ξ₂], optimizer = ProgressiveHedging.Optimizer)
+```
+Now, the induced structure is the horizontal structure that decomposes the stochastic program completely into subproblems over the scenarios. Consider the printout:
+```julia
+print(sp_progressivehedging)
+```
+```julia
+Horizontal scenario problems
+==============
+Subproblem 1 (p = 0.40):
+Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
+Subject to
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
 
-## Evaluate decisions
+Subproblem 2 (p = 0.60):
+Min 100 x₁ + 150 x₂ - 28 y₁ - 32 y₂
+Subject to
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 300.0
+ y₂ ≤ 300.0
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Solver name: Progressive-hedging with fixed penalty
+```
+To solve the problem with progressive-hedging, we must also specify an internal optimizers that can solve the subproblems:
+```julia
+set_optimizer_attribute(sp_progressivehedging, SubproblemOptimizer(), Ipopt.Optimizer)
+set_suboptimizer_attribute(sp_progressivehedging, MOI.RawParameter("print_level"), 0) # Silence Ipopt
+```
+We can now run the optimization procedure:
+```julia
+optimize!(sp_progressivehedging)
+```
+```julia
+Progressive Hedging Time: 0:00:07 (303 iterations)
+  Objective:   -855.5842547490254
+  Primal gap:  7.2622997706326046e-6
+  Dual gap:    8.749063651111478e-6
+  Iterations:  302
+```
+and verify that we get the same results:
+```julia
+objective_value(sp_progressivehedging)
+```
+```julia
+-855.5842547490254
+```
+and
+```julia
+optimal_decision(sp_progressivehedging)
+```
+```julia
+2-element Array{Float64,1}:
+ 46.65459574079722
+ 36.24298005619633
+```
+
+### Decision evaluation
 
 Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision ``x`` is given by
 ```math
@@ -206,116 +272,255 @@ x = [40., 20.]
 ```
 The expected result of taking this decision in the simple finite model can be determined through:
 ```@example simple
-evaluate_decision(sp, x, solver = GLPKSolverLP())
+evaluate_decision(sp, x)
 ```
-The supplied solver is used to solve all available second stage models, with fixed first-stage values. These outcome models can be built manually by supplying a scenario and the first-stage decision.
+Internally, this fixes all occurances of the first-stage variables in the deterministic equivalent and solves the resulting problem. An equivalent approach is to fix the decisions manually:
+```@example simple
+another_sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
+fix.(all_decision_variables(another_sp), x)
+optimize!(another_sp)
+objective_value(another_sp)
+```
+Decision evaluation is supported by the other storage structures as well:
+```@example simple
+evaluate_decision(sp_lshaped, x)
+```
+and
+```julia
+evaluate_decision(sp_progressivehedging, x)
+```
+```julia
+-470.40000522896185
+```
+In a vertical structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:
 ```@example simple
 print(outcome_model(sp, x, ξ₁))
 ```
 Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:
 ```@example simple
-evaluate_decision(sp, x, ξ₁, solver = GLPKSolverLP())
-```
-If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the sampled model created above:
-```@example simple
-evaluate_decision(sampled_sp, x, solver = GLPKSolverLP())
-```
-and compare it to the result of evaluating it on another SAA model of similar size:
-```@example simple
-another_sp = sample(simple_model, sampler, 5)
-evaluate_decision(another_sp, x, solver = GLPKSolverLP())
-```
-which, if any, of these values should be a candidate for the true value of ``V(x)``? A more precise result is obtained by evaluating the decision using a sampled-based approach. Such querys are instead made to the `simple_model` object by supplying an appropriate [`AbstractSampler`](@ref) and a desired confidence level. Consider:
-```@example simple
-evaluate_decision(simple_model, x, sampler, solver = GLPKSolverLP(), confidence = 0.9)
-```
-The result is a 90% confidence interval around ``V(x)``. Consult [`evaluate_decision`](@ref) for the tweakable parameters that govern the resulting confidence interval.
-
-## Optimal first-stage decision
-
-The optimal first-stage decision is the decision that gives the best expected result over all available scenarios. This decision can be determined by solving the deterministically equivalent problem, by supplying a capable solver. Structure exploiting solvers are outlined in [Structured solvers](@ref). In addition, it is possible to give a MathProgBase solver capable of solving linear programs. For example, we can solve `sp` with the GLPK solver as follows:
-```@example simple
-optimize!(sp, solver = GLPKSolverLP())
-```
-Internally, this generates and solves the extended form of `sp`. We can now inspect the optimal first-stage decision through:
-```@example simple
-x_opt = optimal_decision(sp)
-```
-Moreover, the optimal value, i.e. the expected outcome of using the optimal decision, is acquired through:
-```@example simple
-optimal_value(sp)
-```
-which of course coincides with the result of evaluating the optimal decision:
-```@example simple
-evaluate_decision(sp, x_opt, solver = GLPKSolverLP())
-```
-This value is commonly referred to as the *value of the recourse problem* (VRP). We can also calculate it directly through:
-```@example simple
-VRP(sp, solver = GLPKSolverLP())
+evaluate_decision(sp, x, ξ₁)
 ```
 
-If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, the value of the recourse problem can not be computed exactly. However, by supplying an [`AbstractSampler`](@ref) we can use sample-based techniques to compute a confidence interval around the true optimum:
-```@example simple
-confidence_interval(simple_model, sampler, solver = GLPKSolverLP(), N = 200)
-```
-Similarly, a first-stage decision is only optimal in a stochastic sense. Such solutions can be obtained from running [`optimize!`](@ref) on the stochastic model object, supplying a sample-based solver. Sample-based solvers are also outlined in [Structured solvers](@ref). StochasticPrograms includes the [`SAA`](@ref) solver, which approximately solves the stochastic program using sample average approximation (SAA). Emerging sampled instances are solved by a supplied [`AbstractStructuredSolver`](@ref) or by a `MathProgBase` solver through the extensive form. Consider the following:
-```@example simple
-solution = optimize!(simple_model, sampler, solver = SAA(GLPKSolverLP()), confidence = 0.9)
-```
-The result is a [`StochasticSolution`](@ref), which includes an optimal solution estimate as well as a confidence interval around the solution. The approximately optimal first-stage decision is obtained by
-```@example simple
-decision(solution)
-```
+### Stochastic performance
 
-## Wait-and-see models
-
-If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if ``ξ₁`` is believed to be the actual outcome, we can define a wait-and-see model as follows:
+Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:
+```math
+\mathrm{EWS} = \operatorname{\mathbb{E}}_{\omega}\left[
+    \begin{aligned}
+      \min_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\xi(\omega)) \\
+      \st & \quad Ax = b \\
+      & \quad x \geq 0.
+    \end{aligned}\right]
+```
+Now, the first- and second-stage decisions are taken with knowledge about the uncertainty. If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if ``ξ₁`` is believed to be the actual outcome, we can define a wait-and-see model as follows:
 ```@example simple
 ws = WS(sp, ξ₁)
 print(ws)
 ```
 The optimal first-stage decision in this scenario can be determined through:
 ```@example simple
-x₁ = WS_decision(sp, ξ₁, solver = GLPKSolverLP())
+x₁ = wait_and_see_decision(sp, ξ₁)
 ```
 We can evaluate this decision:
 ```@example simple
-evaluate_decision(sp, x₁, solver = GLPKSolverLP())
+evaluate_decision(sp, x₁)
 ```
 The outcome is of course worse than taking the optimal decision. However, it would perform better if ``ξ₁`` is the actual outcome:
 ```@example simple
-evaluate_decision(sp, x₁, ξ₁, solver = GLPKSolverLP())
+evaluate_decision(sp, x₁, ξ₁)
 ```
 as compared to:
 ```@example simple
-evaluate_decision(sp, x_opt, ξ₁, solver = GLPKSolverLP())
+evaluate_decision(sp, optimal_decision(sp), ξ₁)
 ```
-Another important concept is the wait-and-see model corresponding to the expected future scenario. This is referred to as the *expected value problem* and can be generated through:
-```@example simple
-evp = EVP(sp)
-print(evp)
+The difference between the expected wait-and-see value and the value of the recourse problem is known as the **expected value of perfect information**:
+```math
+\mathrm{EVPI} = \mathrm{EWS} - \mathrm{VRP}.
 ```
-Internally, this generates the expected scenario out of the available scenarios and forms the respective wait-and-see model. The optimal first-stage decision associated with the expected value problem is conviently determined using
+The EVPI measures the expected loss of not knowing the exact outcome beforehand. It quantifies the value of having access to an accurate forecast. We calculate it in the framework through:
 ```@example simple
-x̄ = EVP_decision(sp, solver = GLPKSolverLP())
+EVPI(sp)
 ```
-Again, we can evaluate this decision:
+EVPI is supported in the other structures as well:
 ```@example simple
-evaluate_decision(sp, x̄, solver = GLPKSolverLP())
+EVPI(sp_lshaped)
 ```
-This value is often referred to as *the expected result of using the expected value solution* (EEV), and is also available through:
+and
+```julia
+EVPI(sp_progressivehedging)
+```
+```julia
+Progressive Hedging Time: 0:00:05 (303 iterations)
+  Objective:   -855.5842547490254
+  Primal gap:  7.2622997706326046e-6
+  Dual gap:    8.749063651111478e-6
+  Iterations:  302
+663.165763660815
+```
+We can also compute EWS directly using [`EWS`](@ref). Note, that the horizontal structure is ideal for solving wait-and-see type problems.
+
+If the expectation in the original model is instead taken inside the second-stage objective function ``Q``, we obtain the expected-value-problem:
+```math
+\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+    \minimize_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\operatorname{\mathbb{E}}_{\omega}[\xi(\omega)]) \\
+    \sbj & \quad Ax = b \\
+    & \quad x \geq 0.
+  \end{aligned}
+```
+The solution to the expected-value-problem is known as the **expected value decision**, and is denote by ``\bar{x}``. We can compute it through
 ```@example simple
-EEV(sp, solver = GLPKSolverLP())
+x̄ = expected_value_decision(sp)
+```
+The expected result of taking the expected value decision is known as the **expected result of the expected value decision**:
+```math
+\mathrm{EEV} = c^T \bar{x} + \expect[\xi]{Q(\bar{x},\xi(\omega))}.
+```
+The difference between the value of the recourse problem and the expected result of the expected value decision is known as the **value of the stochastic solution**:
+```math
+\mathrm{VSS} = \mathrm{EEV} - \mathrm{VRP}.
+```
+The VSS measures the expected loss of ignoring the uncertainty in the problem. A large VSS indicates that the second stage is sensitive to the stochastic data. We calculate it using
+```@example simple
+VSS(sp)
+```
+VSS is supported in the other structures as well:
+```@example simple
+VSS(sp_lshaped)
+```
+and
+```julia
+VSS(sp_progressivehedging)
+```
+```julia
+Progressive Hedging Time: 0:00:06 (303 iterations)
+  Objective:   -855.5842547490254
+  Primal gap:  7.2622997706326046e-6
+  Dual gap:    8.749063651111478e-6
+  Iterations:  302
+286.6675823650668
+```
+We can also compute EEV directly using [`EEV`](@ref). Note, that the vertical structure is ideal for solving VSS type problems.
+
+## Infinite sample space
+
+In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that ``\xi`` follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let ``\xi \sim \mathcal{N}(\mu, \Sigma)`` with
+```math
+\mu = \begin{pmatrix}
+ 24 \\
+ 32 \\
+ 400 \\
+ 200
+\end{pmatrix}, \quad \Sigma = \begin{pmatrix}
+ 2 & 0.5 & 0 & 0 \\
+ 0.5 & 1 & 0 & 0 \\
+ 0 & 0 & 50 & 20 \\
+ 0 & 0 & 20 & 30
+\end{pmatrix}
 ```
 
-## Stochastic performance
+### Instantiation
+To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the [`@sampler`](@ref) macro:
+```@example simple
+@sampler SimpleSampler = begin
+    N::StochasticPrograms.MvNormal
 
-Finally, we consider some performance measures of the defined model. The *expected value of perfect information* is the difference between the value of the recourse problem and the expected result of having perfect knowledge. In other words, it involes solving the recourse problem as well as every wait-and-see model that can be formed from the available scenarios. We calculate it as follows:
-```@example simple
-EVPI(sp, solver = GLPKSolverLP())
+    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
+
+    @sample Scenario begin
+        x = rand(sampler.N)
+        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4])
+    end
+end
+
+μ = [24, 32, 400, 200]
+Σ = [2 0.5 0 0
+     0.5 1 0 0
+     0 0 50 20
+     0 0 20 30]
+
+sampler = SimpleSampler(μ, Σ)
 ```
-The resulting value indicates the expected gain of having perfect information about future scenarios. Another concept is the *value of the stochastic solution*, which is the difference between the value of the recourse problem and the EEV. We calculate it as follows:
+Now, we can use the same stochastic model created before and the created sampler object to generate a sampled approximation of the stochastic program. For now, we create a small sampled model of just 5 scenarios:
 ```@example simple
-VSS(sp, solver = GLPKSolverLP())
+sampled_sp = instantiate(simple_model, sampler, 5, optimizer = GLPK.Optimizer)
 ```
-The resulting value indicates the gain of including uncertainty in the model formulation.
+An optimal solution to this sampled model approximates the optimal solution to the infinite model in the sense that the empirical average second-stage cost converges pointwise with probability one to the true optimal value as the number of sampled scenarios goes to infinity. Moreoever, we can apply a central limit theorem to calculate confidence intervals around the objective value, as well as around the EVPI and VSS. This is the basis for the technique known as sample average approximation. In the following, we show how we can achieve approximations of the finite sample space functionality. Note that most operations are now performed directly on the `simple_model` object together with a supplied sampler object.
+
+### Optimization
+
+To approximately solve the stochastic program over normally distributed scenarios, we must first set a sample-based solver. The framework provides the `SAA` solver:
+```@example simple
+set_optimizer(simple_model, SAA.Optimizer)
+```
+We must first set an instance optimizer that can solve emerging sampled instances:
+```@example simple
+set_optimizer_attribute(simple_model, InstanceOptimizer(), GLPK.Optimizer)
+```
+Note, that we can use a structure-exploiting solver for the instance optimizer. We now set a desired confidence level and the number of samples:
+```@example simple
+set_optimizer_attribute(simple_model, Confidence(), 0.9)
+set_optimizer_attribute(simple_model, NumSamples(), 100)
+set_optimizer_attribute(simple_model, NumEvalSamples(), 300)
+```
+We can now calculate a confidence interval around the optimal value through:
+```@example simple
+confidence_interval(simple_model, sampler)
+```
+The optimization procedure provided by `SAA` iteratively calculates confidence intervals for growing sample sizes until a desired relative tolerance is reached:
+```@example simple
+set_optimizer_attribute(simple_model, RelativeTolerance(), 5e-2)
+```
+We can now optimize the model:
+```julia
+optimize!(simple_model, sampler)
+```
+```julia
+SAA gap Time: 0:00:03 (4 iterations)
+  Confidence interval:  Confidence interval (p = 95%): [-1095.65 − -1072.36]
+  Relative error:       0.021487453807842415
+  Sample size:          64
+```
+and query the result:
+```julia
+objective_value(simple_model);objective_value(simple_model);
+```
+```julia
+objective_value(simple_model) = Confidence interval (p = 95%): [-1095.65 − -1072.36]
+```
+Note, that we can just replace the sampler object to use another model of the uncertainty.
+
+### Decision evaluation
+
+If the sample space is infinite, or if the underlying random variable ``\xi`` is continuous, a first-stage decision also can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the sampled model created above:
+```@example simple
+evaluate_decision(sampled_sp, x)
+```
+and compare it to the result of evaluating it on another sampled model of similar size:
+```@example simple
+another_sp = instantiate(simple_model, sampler, 5, optimizer = GLPK.Optimizer)
+evaluate_decision(another_sp, x)
+```
+which, if any, of these values should be a candidate for the true value of ``V(x)``? A more precise result is obtained by evaluating the decision using a sampled-based approach:
+```@example simple
+evaluate_decision(simple_model, x, sampler)
+```
+
+### Stochastic performance
+
+Using the same techniques as above, we can calculate confidence intervals around the EVPI and VSS:
+```julia
+EVPI(simple_model, sampler)
+```
+```julia
+Confidence interval (p = 99%): [32.96 − 144.51]
+```
+and
+```julia
+VSS(simple_model, sampler)
+```
+```julia
+Warning: VSS is not statistically significant to the chosen confidence level and tolerance
+Confidence interval (p = 95%): [-0.05 − 0.05]
+```
+Note, that the VSS is not statistically significant. This is not surprising for a normally distributed uncertainty model. The expected value decision is expected to perform well.

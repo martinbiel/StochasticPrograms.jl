@@ -108,7 +108,7 @@ function _outcome_model!(outcome_model::JuMP.Model,
     decision_generator(outcome_model, decision_params)
     generator(outcome_model, stage_params, scenario)
     # Update the known decision values
-    update_known_decisions!(outcome_model, decision)
+    update_known_decisions!(outcome_model, decisions)
     return nothing
 end
 """

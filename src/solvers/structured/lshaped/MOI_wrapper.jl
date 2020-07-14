@@ -1,57 +1,18 @@
 """
-    Optimizer(lpsolver::AbstractMathProgSolver; <keyword arguments>)
+    Optimizer(; <keyword arguments>)
 
-Return an L-shaped algorithm object that can optimize a two-stage `StochasticPrograms`. Supply `lpsolver`, a MathProgBase solver capable of solving linear-quadratic problems.
-
-The following L-shaped regularizations are available
-- [`NoRegularization`](@ref):  L-shaped algorithm (default)
-- [`RegularizedDecomposition`](@ref):  Regularized decomposition ?RegularizedDecomposition for parameter descriptions.
-- [`TrustRegion`](@ref):  Trust-region ?TrustRegion for parameter descriptions.
-- [`LevelSet`](@ref):  Level-set ?LevelSet for parameter descriptions.
-
-The following aggregation schemes are available
-- [`NoAggregation`](@ref):  Multi-cut L-shaped algorithm (default)
-- [`PartialAggregation`](@ref):  ?PartialAggregation for parameter descriptions.
-- [`FullAggregation`](@ref):  ?FullAggregation for parameter descriptions.
-- [`DynamicAggregation`](@ref):  ?DynamicAggregation for parameter descriptions.
-- [`ClusterAggregation`](@ref):  ?ClusterAggregation for parameter descriptions.
-- [`HybridAggregation`](@ref):  ?HybridAggregation for parameter descriptions.
-
-The following consolidation schemes are available
-- [`NoConsolidation`](@ref)
-- [`Consolidation`](@ref)
-
-The following execution policies are available
-- [`Serial`](@ref):  Classical L-shaped (default)
-- [`Synchronous`](@ref): Classical L-shaped run in parallel
-- [`Asynchronous`](@ref): Asynchronous L-shaped ?Asynchronous for parameter descriptions.
-
+Return an L-shaped optimizer.
 ...
 # Arguments
-- `lpsolver::AbstractMathProgSolver`: MathProgBase solver capable of solving linear (and possibly quadratic) programs.
+- `master_optimizer::AbstractOptimizer`: MathOptInterface solver capable of solving linear (and possibly quadratic) programs.
+- `subproblem_optimizer::AbstractOptimizer`: Optionally specify a different solver for the subproblems.
 - `feasibility_cuts::Bool = false`: Specify if feasibility cuts should be used
-- `subsolver::AbstractMathProgSolver = lpsolver`: Optionally specify a different solver for the subproblems.
 - `regularize::AbstractRegularizer = DontRegularize()`: Specify regularization procedure (DontRegularize, RegularizedDecomposition/RD/WithRegularizedDecomposition, TrustRegion/TR/WithTrustRegion, LevelSet/LV/WithLevelSets).
 - `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate)
 - `consolidate::AbstractConsolidator = DontConsolidate()`: Specify consolidation procedure (DontConsolidate, Consolidate)
 - `execution::Execution = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
-- `crash::CrashMethod = Crash.None`: Crash method used to generate an initial decision. See ?Crash for alternatives.
 - <keyword arguments>: Algorithm specific parameters, See `?LShaped` for list of possible arguments and default values.
 ...
-
-## Examples
-
-The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using the L-shaped algorithm with GLPK as an `lpsolver`.
-
-```jldoctest
-julia> optimize!(sp, solver = LShaped.Optimizer(GLPKSolverLP()))
-L-Shaped Gap  Time: 0:00:00 (6 iterations)
-  Objective:       -855.8333333333339
-  Gap:             0.0
-  Number of cuts:  8
-  Iterations:      6
-:Optimal
-```
 """
 mutable struct Optimizer <: AbstractStructuredOptimizer
     master_optimizer
@@ -241,11 +202,32 @@ function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
 end
 
 function MOI.get(optimizer::Optimizer, ::MasterOptimizer)
-    return optimizer.master_optimizer
+    if optimizer.master_optimizer === nothing
+        return nothing
+    end
+    return () -> begin
+        opt = optimizer.master_optimizer()
+        for (attr, value) in optimizer.master_params
+            MOI.set(opt, attr, value)
+        end
+        return opt
+    end
 end
 
 function MOI.set(optimizer::Optimizer, ::MasterOptimizer, optimizer_constructor)
     optimizer.master_optimizer = optimizer_constructor
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::MasterOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
+    if !haskey(optimizer.master_params, attr)
+        error("Master optimizer attribute $(attr) has not been set.")
+    end
+    return optimizer.master_params[attr]
+end
+
+function MOI.set(optimizer::Optimizer, ::MasterOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
+    optimizer.master_params[attr] = value
     return nothing
 end
 
@@ -265,13 +247,31 @@ end
 
 function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
     if optimizer.subproblem_optimizer === nothing
-        return optimizer.master_optimizer
+        return MOI.get(optimizer, MasterOptimizer())
     end
-    return optimizer.subproblem_optimizer
+    return () -> begin
+        opt = optimizer.subproblem_optimizer()
+        for (attr, value) in optimizer.sub_params
+            MOI.set(opt, attr, value)
+        end
+        return opt
+    end
 end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
+    if !haskey(optimizer.sub_params, attr)
+        error("Subproblem optimizer attribute $(attr) has not been set.")
+    end
+    return optimizer.sub_params[attr]
+end
+
+function MOI.set(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
+    optimizer.sub_params[attr] = value
     return nothing
 end
 
@@ -451,9 +451,32 @@ MOI.supports(::Optimizer, ::AbstractLShapedAttribute) = true
 
 # High-level attribute setting #
 # ========================== #
+"""
+    get_regularization_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the regularization-specific attribute named `name` in `stochasticprogram`.
+
+See also: [`set_regularization_attribute`](@ref), [`set_regularization_attributes`](@ref).
+"""
+function get_regularization_attribute(stochasticprogram::StochasticProgram, name::String)
+    return return MOI.get(optimizer(stochasticprogram), RawRegularizationParameter(name))
+end
+"""
+    set_regularization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets the regularization-specific attribute identified by `name` to `value`.
+
+"""
 function set_regularization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
     return set_optimizer_attribute(stochasticprogram, RawRegularizationParameter(String(name)), value)
 end
+"""
+    set_regularization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_regularization_attribute(stochasticprogram, attribute, value)` for each pair.
+
+"""
 function set_regularization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_regularization_attribute(stochasticprogram, name, value)
@@ -464,9 +487,32 @@ function set_regularization_attributes(stochasticprogram::StochasticProgram; kw.
         set_regularization_attribute(stochasticprogram, name, value)
     end
 end
+"""
+    get_aggregation_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the aggregation-specific attribute named `name` in `stochasticprogram`.
+
+See also: [`set_aggregation_attribute`](@ref), [`set_aggregation_attributes`](@ref).
+"""
+function get_aggregation_attribute(stochasticprogram::StochasticProgram, name::String)
+    return MOI.get(optimizer(stochasticprogram), RawAggregationParameter(name))
+end
+"""
+    set_aggregation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets the aggregation-specific attribute identified by `name` to `value`.
+
+"""
 function set_aggregation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
     return set_optimizer_attribute(stochasticprogram, RawAggregationParameter(String(name)), value)
 end
+"""
+    set_aggregation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_aggregation_attribute(stochasticprogram, attribute, value)` for each pair.
+
+"""
 function set_aggregation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_aggregation_attribute(stochasticprogram, name, value)
@@ -477,9 +523,32 @@ function set_aggregation_attributes(stochasticprogram::StochasticProgram; kw...)
         set_aggregation_attribute(stochasticprogram, name, value)
     end
 end
+"""
+    get_consolidation_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the consolidation-specific attribute named `name` in `stochasticprogram`.
+
+See also: [`set_consolidation_attribute`](@ref), [`set_consolidation_attributes`](@ref).
+"""
+function get_consolidation_attribute(stochasticprogram::StochasticProgram, name::String)
+    return return MOI.get(optimizer(stochasticprogram), RawConsolidationParameter(name))
+end
+"""
+    set_consolidation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets the consolidation-specific attribute identified by `name` to `value`.
+
+"""
 function set_consolidation_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
     return set_optimizer_attribute(stochasticprogram, RawConsolidationParameter(String(name)), value)
 end
+"""
+    set_consolidation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_consolidation_attribute(stochasticprogram, attribute, value)` for each pair.
+
+"""
 function set_consolidation_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_consolidation_attribute(stochasticprogram, name, value)

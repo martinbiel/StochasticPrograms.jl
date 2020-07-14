@@ -27,7 +27,7 @@ and the stochastic variable
 takes on the value ``1`` or ``-1`` with equal probability. Here, the first stage contains the two parameters: ``l_1`` and ``u_1``. The second stage contains the three scenario-independent parameters: ``U``, ``l_2``, and ``u_2``. The following defines this problem in StochasticPrograms, with some chosen deault parameter values:
 ```@example parameters
 using StochasticPrograms
-using GLPKMathProgInterface
+using GLPK
 
 sm = @stochastic_model begin
     @stage 1 begin
@@ -35,7 +35,7 @@ sm = @stochastic_model begin
             l₁ = -1.
             u₁ = 1.
         end
-        @variable(model, l₁ <= x <= u₁)
+        @decision(model, l₁ <= x <= u₁)
         @objective(model, Max, x)
     end
     @stage 2 begin
@@ -44,7 +44,6 @@ sm = @stochastic_model begin
             l₂ = -1.
             u₂ = 1.
         end
-        @decision x
         @uncertain q
         @variable(model, l₂ <= y <= u₂)
         @objective(model, Max, q*y)
@@ -55,19 +54,19 @@ end
 ξ₁ = Scenario(q = 1., probability = 0.5)
 ξ₂ = Scenario(q = -1., probability = 0.5)
 
-sp = instantiate(sm, [ξ₁,ξ₂])
+sp = instantiate(sm, [ξ₁,ξ₂], optimizer = GLPK.Optimizer)
 
 print(sp)
 
-print("VRP = $(VRP(sp, solver = GLPKSolverLP()))")
+print("VRP = $(VRP(sp))")
 ```
 Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to `instantiate`:
 ```@example parameters
-sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5)
+sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5, optimizer = GLPK.Optimizer)
 
 print(sp)
 
-print("VRP = $(VRP(sp, solver = GLPKSolverLP()))")
+print("VRP = $(VRP(sp))")
 ```
 
 ## Scenario data
@@ -87,13 +86,13 @@ end
 ```
 Now, ``\xi_1`` and ``\xi_2`` can be created through:
 ```@example simple
-ξ₁ = SimpleScenario(-24.0, -28.0, 500.0, 100.0, probability = 0.4)
+ξ₁ = SimpleScenario(24.0, 28.0, 500.0, 100.0, probability = 0.4)
 ```
 and
 ```@example simple
-ξ₂ = SimpleScenario(-28.0, -32.0, 300.0, 300.0, probability = 0.6)
+ξ₂ = SimpleScenario(28.0, 32.0, 300.0, 300.0, probability = 0.6)
 ```
-The define `SimpleScenario`s automatically have the [`AbstractScenario`] functionality. For example, we can check the discrete probability of a given scenario occuring:
+The defined `SimpleScenario`s automatically have the [`AbstractScenario`] functionality. For example, we can check the discrete probability of a given scenario occuring:
 ```@example simple
 probability(ξ₁)
 ```
@@ -242,11 +241,10 @@ Now, lets create a stochastic model using the `ExampleScenario` type:
 ```@example sampling
 sm = @stochastic_model begin
     @stage 1 begin
-        @variable(model, x >= 0)
+        @decision(model, x >= 0)
         @objective(model, Min, x)
     end
     @stage 2 begin
-        @decision x
         @uncertain w from ExampleScenario
         @variable(model, y)
         @objective(model, Min, y)
@@ -256,7 +254,7 @@ end
 ```
 Now, we can sample ``5`` scenarios using the first sampler to generate ``5`` subproblems:
 ```@example sampling
-sp = sample(sm, sampler, 5)
+sp = instantiate(sm, sampler, 5)
 ```
 Printing yields:
 ```@example sampling
@@ -264,12 +262,14 @@ print(sp)
 ```
 Sampled stochastic programs are solved as usual:
 ```@example sampling
-using GLPKMathProgInterface
+using GLPK
 
-optimize!(sp, solver = GLPKSolverLP())
+set_optimizer(sp, GLPK.Optimizer)
+
+optimize!(sp)
 
 println("optimal decision: $(optimal_decision(sp))")
-println("optimal value: $(optimal_value(sp))")
+println("optimal value: $(objective_value(sp))")
 ```
 Again, if the functionality offered by [`@sampler`](@ref) is not adequate, consider [Custom scenarios](@ref).
 

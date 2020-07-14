@@ -1,6 +1,10 @@
 abstract type AbstractConsolidation end
 abstract type AbstractConsolidator end
+"""
+    RawConsolidationParameter
 
+An optimizer attribute used for raw parameters of the consolidator. Defers to `RawParameter`.
+"""
 struct RawConsolidationParameter <: ConsolidationParameter
     name::Any
 end

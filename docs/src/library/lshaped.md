@@ -8,65 +8,79 @@ Documentation for `StochasticPrograms.jl`'s L-shaped solvers.
 Pages = ["lshaped.md"]
 ```
 
-## L-shaped solver factory
+## API
 
 ```@docs
-LShapedSolver
-LShaped
+LShapedAlgorithm
+```
+```@autodocs
+Modules = [LShaped]
+Pages   = ["attributes.jl", "MOI_wrapper.jl"]
 ```
 
 ## Execution
 
 ```@docs
-LShapedSolvers.SerialExecution
-LShapedSolvers.SynchronousExecution
-LShapedSolvers.AsynchronousExecution
+LShaped.SerialExecution
+LShaped.SynchronousExecution
+LShaped.AsynchronousExecution
 ```
 
 ## Regularization
 
 ```@docs
-LShapedSolvers.NoRegularization
-LShapedSolvers.DontRegularize
-LShapedSolvers.RegularizedDecomposition
-LShapedSolvers.RD
-LShapedSolvers.TrustRegion
-LShapedSolvers.TR
-LShapedSolvers.LevelSet
-LShapedSolvers.LV
+LShaped.set_regularization_attribute
+LShaped.set_regularization_attributes
+LShaped.RawRegularizationParameter
+LShaped.NoRegularization
+LShaped.DontRegularize
+LShaped.RegularizedDecomposition
+LShaped.RD
+LShaped.TrustRegion
+LShaped.TR
+LShaped.LevelSet
+LShaped.LV
 ```
 
 ## Aggregation
 
+```@docs
+LShaped.set_aggregation_attribute
+LShaped.set_aggregation_attributes
+```
 ```@autodocs
-Modules = [LShapedSolvers]
+Modules = [LShaped]
 Pages   = ["no_aggregation.jl", "partial_aggregation.jl", "dynamic_aggregation.jl", "cluster_aggregation.jl", "hybrid_aggregation.jl"]
 ```
 
 ### Selection rules
 
 ```@autodocs
-Modules = [LShapedSolvers]
+Modules = [LShaped]
 Pages   = ["selection_rules.jl"]
 ```
 
 ### Cluster rules
 
 ```@autodocs
-Modules = [LShapedSolvers]
+Modules = [LShaped]
 Pages   = ["cluster_rules.jl"]
 ```
 
 ### Distance measures
 
 ```@autodocs
-Modules = [LShapedSolvers]
+Modules = [LShaped]
 Pages   = ["distance_measures.jl"]
 ```
 
 ## Consolidation
 
+```@docs
+LShaped.set_consolidation_attribute
+LShaped.set_consolidation_attributes
+```
 ```@autodocs
-Modules = [LShapedSolvers]
+Modules = [LShaped]
 Pages   = ["consolidation.jl"]
 ```

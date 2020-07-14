@@ -1,3 +1,9 @@
+"""
+    DeterministicEquivalent
+
+Deterministic equivalent memory structure. Stochastic program is stored as one large optimization problem. Supported by any standard `AbstractOptimizer`.
+
+"""
 struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStochasticStructure{N}
     decisions::Decisions
     decision_variables::NTuple{M, Vector{DecisionRef}}
@@ -46,10 +52,17 @@ end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     return MOI.get(backend(structure.model), attr, index)
 end
+function MOI.get(structure::DeterministicEquivalent, attr::Type{MOI.VariableIndex}, name::String)
+    return MOI.get(backend(structure.model), attr, name)
+end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
     return MOI.get(backend(structure.model), attr, cindex)
 end
 
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.Silent, flag)
+    MOI.set(backend(structure.model), attr, flag)
+    return nothing
+end
 function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute, value)
     MOI.set(backend(structure.model), attr, value)
     return nothing

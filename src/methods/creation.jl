@@ -364,8 +364,8 @@ The following defines the first stage model given by:
 
 ```julia
 @first_stage sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
+    @decision(model, x₁ >= 40)
+    @decision(model, x₂ >= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
     @constraint(model, x₁ + x₂ <= 120)
 end
@@ -383,9 +383,9 @@ end
 Add a second stage model generation recipe to `stochasticprogram` using the syntax
 ```julia
 @second_stage stochasticprogram::StochasticProgram = begin
-    @decision var1 var2 ...
+    @known var1 var2 ...
     ...
-end [defer]
+end
 ```
 where JuMP syntax is used inside the block to define the second stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
 
@@ -403,7 +403,7 @@ where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` a
 
 ```julia
 @second_stage sp = begin
-    @decision x₁ x₂
+    @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂
     @variable(model, 0 <= y₁ <= d₁)
     @variable(model, 0 <= y₂ <= d₂)
@@ -425,7 +425,7 @@ Define the problem parameters in a @stage block
 ```julia
 @parameters param1, param2, ...
 ```
-possibly with default values. Any defined parameter without a default value must be supplied as a keyword argument to [`instantiate`](@ref) or [`SAA`](@ref) when creating models.
+possibly with default values. Any defined parameter without a default value must be supplied as a keyword argument to [`instantiate`](@ref) when creating models.
 
 ## Examples
 
@@ -443,17 +443,14 @@ See also [`@decision`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
 macro parameters(def) @warn "@parameters should be used inside a @stage block." end
 """
-    @decision(def)
+    @decision(model, expr, args..., kw_args...)
 
-In a @stage block, annotate each decision taken in the previous stage using the syntax
-```julia
-@decision var1, var2, ...
-```
+Add a decision variable to `model` described by the expression `expr`. If used inside a [`@stage`](@ref) block, the created variable can be used in subsequent stage blocks. See `@variable` for syntax details.
 
 ## Examples
 
 ```julia
-@decision x₁, x₂
+@decision(model, x >= 40)
 ```
 
 See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
@@ -462,10 +459,7 @@ macro decision(def...) @warn "@decision should be used inside a @stage block." e
 """
     @known(def)
 
-In a @stage block, annotate each decision taken in the previous stage using the syntax
-```julia
-@known var1, var2, ...
-```
+Annotate each decision taken in the previous stage. Any [`@decision`](@ref) included in a [`@stochastic_model`](@ref) definition will implicitly add `@known` annotations to subsequent stages.
 
 ## Examples
 
@@ -489,6 +483,10 @@ end
 In a @stage block, annotate each uncertain variable using the syntax
 ```julia
 @uncertain var1, var2, ...
+```
+or using JuMP's container syntax
+```julia
+@uncertain ξ[i=..., j=..., ...]
 ```
 This assumes that the [`Scenario`] type is used. Alternatively, user-defined scenarios can be specified by annotating the type. Also, inside a @stochastic_model block, user-defined scenarios can be created during the @uncertain annotation, following [`@scenario`](@ref).
 
@@ -527,11 +525,11 @@ Add a stage model generation recipe to `stochasticprogram` using the syntax
 ```julia
 @stage stage stochasticprogram::StochasticProgram = begin
     @parameters param1 param2 ...
-    @decision var1 var2 ...
+    @decision(model, var) ...
     @uncertain ξ
     ... JuMPdef ...
     ...
-end [defer]
+end
 ```
 where JuMP syntax is used inside the block to define the stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
 
@@ -546,7 +544,7 @@ The following defines the first stage model given by:
 ```
 and the second-stage model given by:
 ```math
-  minimize q₁(ξ)y₁ + q₂(ξ)y₂
+  maximize q₁(ξ)y₁ + q₂(ξ)y₂
     s.t  6y₁ + 10y₂ ≤ 60x₁
          8y₁ + 5y₂ ≤ 60x₂
          0 ≤ y₁ ≤ d₁(ξ)
@@ -555,24 +553,23 @@ and the second-stage model given by:
 where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables. Two scenarios are added so that two second stage models are generated.
 
 ```jldoctest
-ξ₁ = Scenario(q₁ = -24.0, q₂ = -28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
-ξ₂ = Scenario(q₁ = -28.0, q₂ = -32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
+ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
 
 sp = StochasticProgram([ξ₁, ξ₂])
 
 @stage 1 sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
+    @decision(model, x₁ >= 40)
+    @decision(model, x₂ >= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
     @constraint(model, x₁ + x₂ <= 120)
 end
 
 @stage 2 sp = begin
-    @decision x₁ x₂
     @uncertain q₁ q₂ d₁ d₂
     @variable(model, 0 <= y₁ <= d₁)
     @variable(model, 0 <= y₂ <= d₂)
-    @objective(model, Min, q₁*y₁ + q₂*y₂)
+    @objective(model, Max, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
@@ -581,7 +578,6 @@ end
 
 Stochastic program with:
  * 2 decision variables
- * 2 recourse variables
  * 2 scenarios of type Scenario
 Solver is default solver
 

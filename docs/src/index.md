@@ -54,7 +54,7 @@ Pages = ["manual/quickstart.md", "manual/data.md", "manual/model.md", "manual/di
 ## Library Outline
 
 ```@contents
-Pages = ["library/public.md", "library/solverinterface.md", "library/crash.md", "library/lshaped.md", "library/progressivehedging.md"]
+Pages = ["library/public.md", "library/solverinterface.md", "library/crash.md", "library/lshaped.md", "library/progressivehedging.md", "library/SAA.md"]
 ```
 
 ### [Index](@id main-index)

@@ -1,37 +1,16 @@
 """
-    Optimizer(solver::AbstractMathProgSolver; <keyword arguments>)
+    Optimizer(; <keyword arguments>)
 
-Return a progressive-hedging algorithm object specified. Supply `qpsolver`, a MathProgBase solver capable of solving linear-quadratic problems.
-
-The following penalty parameter update procedures are available
-- [`Fixed`](@ref):  Fixed penalty (default) ?Fixed for parameter descriptions.
-- [`Adaptive`](@ref): Adaptive penalty update ?Adaptive for parameter descriptions.
-
-The following execution policies are available
-- [`Serial`](@ref):  Classical progressive-hedging (default)
-- [`Synchronous`](@ref): Classical progressive-hedging run in parallel
-- [`Asynchronous`](@ref): Asynchronous progressive-hedging ?Asynchronous for parameter descriptions.
+Return a progressive-hedging optimizer.
 
 ...
 # Arguments
-- `qpsolver::AbstractMathProgSolver`: MathProgBase solver capable of solving quadratic programs.
+- `subproblem_optimizer::AbstractOptimizer`: MathOptInterface solver capable of solving quadratic programs.
 - `penalty::AbstractPenalizer = Fixed()`: Specify penalty update procedure (Fixed, Adaptive)
 - `execution::AbstractExecuter = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 - <keyword arguments>: Algorithm specific parameters, consult individual docstrings (see above list) for list of possible arguments and default values.
 ...
-
-## Examples
-
-The following solves a stochastic program `sp` created in `StochasticPrograms.jl` using the progressive-hedging algorithm with Ipopt as an `qpsolver`.
-
-```jldoctest
-julia> solve(sp,solver=ProgressiveHedgingSolver(IpoptSolver(print_level=0)))
-Progressive Hedging Time: 0:00:06 (1315 iterations)
-  Objective:  -855.8332803469432
-  δ:          9.436947935542464e-7
-:Optimal
-```
 """
 mutable struct Optimizer <: AbstractStructuredOptimizer
     subproblem_optimizer
@@ -203,12 +182,37 @@ function MOI.set(optimizer::Optimizer, ::DualTolerance, limit::Real)
     return nothing
 end
 
+function MOI.get(optimizer::Optimizer, ::MasterOptimizer)
+    return MOI.get(optimizer, SubproblemOptimizer())
+end
+
 function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
-    return optimizer.subproblem_optimizer
+    if optimizer.subproblem_optimizer === nothing
+        return MOI.get(optimizer, MasterOptimizer())
+    end
+    return () -> begin
+        opt = optimizer.subproblem_optimizer()
+        for (attr, value) in optimizer.sub_params
+            MOI.set(opt, attr, value)
+        end
+        return opt
+    end
 end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
+    if !haskey(optimizer.sub_params, attr)
+        error("Subproblem optimizer attribute $(attr) has not been set.")
+    end
+    return optimizer.sub_params[attr]
+end
+
+function MOI.set(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
+    optimizer.sub_params[attr] = value
     return nothing
 end
 
@@ -317,16 +321,38 @@ MOI.supports(::Optimizer, ::MOI.Silent) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
 MOI.supports(::Optimizer, ::MOI.RawParameter) = true
 MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
-MOI.supports(::Optimizer, ::MasterOptimizer) = false
 MOI.supports(::Optimizer, ::RelativeTolerance) = false
 MOI.supports(::Optimizer, ::RawInstanceOptimizerParameter) = true
 MOI.supports(::Optimizer, ::AbstractProgressiveHedgingAttribute) = true
 
 # High-level attribute setting #
 # ========================== #
+"""
+    get_penalization_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the penalization-specific attribute named `name` in `stochasticprogram`.
+
+See also: [`set_penalization_attribute`](@ref), [`set_penalization_attributes`](@ref).
+"""
+function get_penalization_attribute(stochasticprogram::StochasticProgram, name::String)
+    return return MOI.get(optimizer(stochasticprogram), RawPenalizationParameter(name))
+end
+"""
+    set_penalization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets the penalization-specific attribute identified by `name` to `value`.
+
+"""
 function set_penalization_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
     return set_optimizer_attribute(stochasticprogram, RawPenalizationParameter(String(name)), value)
 end
+"""
+    set_penalization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_penalization_attribute(stochasticprogram, attribute, value)` for each pair.
+
+"""
 function set_penalization_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_penalization_attribute(stochasticprogram, name, value)

@@ -161,10 +161,13 @@ function MOI.get(optimizer::Optimizer, ::InstanceOptimizer)
         for (attr, value) in optimizer.optimizer_params
             MOI.set(instance_opt, attr, value)
         end
-        MOI.set(instance_opt, MOI.RawParameter("log"), optimizer.parameters.log)
-        MOI.set(instance_opt, MOI.RawParameter("keep"), optimizer.parameters.keep)
-        MOI.set(instance_opt, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
-        MOI.set(instance_opt, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
+        try
+            MOI.set(instance_opt, MOI.RawParameter("log"), optimizer.parameters.log)
+            MOI.set(instance_opt, MOI.RawParameter("keep"), optimizer.parameters.keep)
+            MOI.set(instance_opt, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
+            MOI.set(instance_opt, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
+        catch
+        end
         return instance_opt
     end
 end
@@ -174,14 +177,14 @@ function MOI.set(optimizer::Optimizer, ::InstanceOptimizer, optimizer_constructo
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::InstanceOptimizer, attr::MOI.AbstractOptimizerAttribute)
+function MOI.get(optimizer::Optimizer, ::InstanceOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
     if !haskey(optimizer.optimizer_params, attr)
         error("Instance optimizer attribute $(typeof(attr)) has not been set.")
     end
     return optimizer.optimizer_params[attr]
 end
 
-function MOI.set(optimizer::Optimizer, ::InstanceOptimizer, attr::MOI.AbstractOptimizerAttribute, value)
+function MOI.set(optimizer::Optimizer, ::InstanceOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
     optimizer.optimizer_params[attr] = value
     return nothing
 end

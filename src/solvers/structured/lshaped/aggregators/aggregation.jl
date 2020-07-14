@@ -1,6 +1,10 @@
 abstract type AbstractAggregation end
 abstract type AbstractAggregator end
+"""
+    RawAggregationParameter
 
+An optimizer attribute used for raw parameters of the aggregator. Defers to `RawParameter`.
+"""
 struct RawAggregationParameter <: AggregationParameter
     name::Any
 end

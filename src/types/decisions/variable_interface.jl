@@ -1,8 +1,17 @@
+"""
+    DecisionRef <: AbstractVariableRef
+
+Holds a reference to the model and the corresponding MOI.VariableIndex.
+"""
 struct DecisionRef <: JuMP.AbstractVariableRef
     model::JuMP.Model
     index::MOI.VariableIndex
 end
+"""
+    KnownRef <: AbstractVariableRef
 
+Holds a reference to the model and the corresponding MOI.VariableIndex.
+"""
 struct KnownRef <: JuMP.AbstractVariableRef
     model::JuMP.Model
     index::MOI.VariableIndex
@@ -24,26 +33,44 @@ function all_known_decisions(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return all_known_decisions(decisions)
 end
+"""
+    all_decision_variables(model::JuMP.Model)
 
+Returns a list of all decisions currently in the `model`. The decisions are
+ordered by creation time.
+"""
 function all_decision_variables(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return map(decisions.undecided) do index
         DecisionRef(model, index)
     end
 end
+"""
+    all_known_decision_variables(model::JuMP.Model)
 
+Returns a list of all known decisions currently in the `model`. The decisions are
+ordered by creation time.
+"""
 function all_known_decision_variables(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return map(decisions.knowns) do index
         KnownRef(model, index)
     end
 end
+"""
+    num_decisions(model::JuMP.Model)
 
+Return the number of decisions in `model`.
+"""
 function num_decisions(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return num_decisions(decisions)
 end
+"""
+    num_decisions(model::JuMP.Model)
 
+Return the number of known decisions in `model`.
+"""
 function num_known_decisions(model::JuMP.Model)
     decisions = get_decisions(model)::Decisions
     return num_known_decisions(decisions)
@@ -59,12 +86,20 @@ end
 function get_decisions(kref::KnownRef)
     return get_decisions(kref.model)
 end
+"""
+    decision(dref::Union{DecisionRef, KnownRef})
 
+Return the internal `Decision` associated with `dref`.
+"""
 function decision(dref::Union{DecisionRef, KnownRef})
     decisions = get_decisions(dref)::Decisions
     return decision(decisions, index(dref))
 end
+"""
+    state(dref::DecisionRef)
 
+Return the `DecisionState` of `dref`.
+"""
 function state(dref::DecisionRef)
     return decision(dref).state
 end
@@ -250,7 +285,13 @@ end
 function JuMP.unfix(kref::KnownRef)
     error("Decision with known value cannot be unfixed.")
 end
+"""
+    fix(dref::DecisionRef, val::Number)
 
+Fix the decision associated with `dref` to `val`.
+
+See also [`unfix`](@ref).
+"""
 function JuMP.fix(dref::DecisionRef, val::Number)
     d = decision(dref)
     if state(dref) == NotTaken
@@ -270,7 +311,11 @@ function JuMP.fix(dref::DecisionRef, val::Number)
     update_decisions!(JuMP.owner_model(dref), change)
     return nothing
 end
+"""
+    fix(kref::KnownRef, val::Number)
 
+Update the known decision value of `kref` to `val`.
+"""
 function JuMP.fix(kref::KnownRef, val::Number)
     d = decision(kref)
     # Prepare modification

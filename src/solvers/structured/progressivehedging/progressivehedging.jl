@@ -27,8 +27,8 @@ const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 
 export
-    ProgressiveHedgingSolver,
-    ProgressiveHedging,
+    AbstractProgressiveHedgingAttribute,
+    ProgressiveHedgingAlgorithm,
     PrimalTolerance,
     DualTolerance,
     Penalizer,

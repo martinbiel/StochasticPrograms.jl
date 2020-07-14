@@ -27,7 +27,7 @@ sm = @stochastic_model begin
     ...
 end
 ```
-where the inner blocks are [`@stage`](@ref) blocks. At least two stages must be specified in consecutive order. A stochastic model object can later be used to [`instantiate`](@ref) stochastic programs using a given set of scenarios or to create [`SAA`](@ref) models using samplers.
+where the inner blocks are [`@stage`](@ref) blocks. At least two stages must be specified in consecutive order. A stochastic model object can later be used to [`instantiate`](@ref) stochastic programs using a given set of scenarios or by using samplers.
 
 ## Examples
 

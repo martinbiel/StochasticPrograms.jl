@@ -1,16 +1,11 @@
-function EWS(::StochasticProgram, structure::HorizontalStructure)
+function EWS(stochasticprogram::StochasticProgram, structure::HorizontalStructure)
+    # Restore structure if optimization has been run before
+    restore_structure!(optimizer(stochasticprogram))
+    # Dispatch on scenarioproblems
     return EWS_horizontal(scenarioproblems(structure))
 end
 function EWS_horizontal(scenarioproblems::ScenarioProblems)
-    num_subproblems(scenarioproblems) == 0 && return 0.0
-    return mapreduce(+, 1:length(num_subproblems(scenarioproblems))) do i
-        subprob = subproblem(scenarioproblems, i)
-        # Ensure that no decisions are fixed
-        untake_decisions!(subprob)
-        # Solve subproblem
-        optimize!(subprob)
-        probability(scenarioproblems, i)*objective_value(subprob)
-    end
+    return outcome_mean(subproblems(scenarioproblems), probability.(scenarios(scenarioproblems)))
 end
 function EWS_horizontal(scenarioproblems::DistributedScenarioProblems)
     partial_ews = Vector{Float64}(undef, nworkers())
@@ -19,7 +14,10 @@ function EWS_horizontal(scenarioproblems::DistributedScenarioProblems)
             @async partial_ews[i] = remotecall_fetch(
                 w,
                 scenarioproblems[w-1]) do sp
-                    EWS_horizontal(fetch(sp))
+                    scenarioproblems = fetch(sp)
+                    num_scenarios(scenarioproblems) == 0 && return 0.0
+                    return outcome_mean(subproblems(scenarioproblems),
+                                        probability.(scenarios(scenarioproblems)))
                 end
         end
     end
@@ -30,8 +28,6 @@ function statistical_EWS(::StochasticProgram, structure::HorizontalStructure)
     return statistical_EWS_horizontal(scenarioproblems(structure))
 end
 function statistical_EWS_horizontal(scenarioproblems::ScenarioProblems)
-    # Ensure that no decisions are fixed
-    map(subprob -> untake_decisions!(subprob), subproblems(scenarioproblems))
     # Welford algorithm on WS subproblems
     return welford(subproblems(scenarioproblems),
                    probability.(scenarios(scenarioproblems)))
@@ -43,7 +39,10 @@ function statistical_EWS_horizontal(scenarioproblems::DistributedScenarioProblem
             @async partial_welfords[i] = remotecall_fetch(
                 w,
                 scenarioproblems[w-1]) do sp
-                    statistical_EWS_horizontal(fetch(sp))
+                    scenarioproblems = fetch(sp)
+                    num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
+                    return welford(subproblems(scenarioproblems),
+                                   probability.(scenarios(scenarioproblems)))
                 end
         end
     end

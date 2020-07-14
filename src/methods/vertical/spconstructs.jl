@@ -13,7 +13,7 @@ function EWS(stochasticprogram::StochasticProgram,
                 sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return zero(T)
-                    return mapreduce(+, scenarios(scenarioproblems)) do scenario
+                    subproblems = map(scenarios(scenarioproblems)) do scenario
                         ws = _WS(gen_one,
                                  gen_two,
                                  one_params,
@@ -21,9 +21,9 @@ function EWS(stochasticprogram::StochasticProgram,
                                  scenario,
                                  Decisions(),
                                  opt)
-                        optimize!(ws)
-                        probability(scenario)*objective_value(ws)
+                        return ws
                     end
+                    return outcome_mean(subproblems, probability.(subproblems))
                 end
         end
     end
@@ -53,6 +53,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram,
                                  scenario,
                                  Decisions(),
                                  opt)
+                        return ws
                     end
                     return welford(ws_models, probability.(scenarios(scenarioproblems)))
                 end

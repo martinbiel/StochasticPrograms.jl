@@ -28,7 +28,16 @@ function set_master_optimizer!(structure::DeterministicEquivalent, optimizer)
     return nothing
 end
 
+function set_master_optimizer_attribute!(structure::DeterministicEquivalent, attr::MOI.AbstractOptimizerAttribute, value)
+    MOI.set(backend(structure.model), attr, value)
+    return nothing
+end
+
 function set_subproblem_optimizer!(structure::DeterministicEquivalent, optimizer)
+    return nothing
+end
+
+function set_subproblem_optimizer_attribute!(::DeterministicEquivalent, ::MOI.AbstractOptimizerAttribute, value)
     return nothing
 end
 

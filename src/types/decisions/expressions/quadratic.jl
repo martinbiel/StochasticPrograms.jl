@@ -129,11 +129,11 @@ function Base.convert(::Type{DecisionQuadExpr{C}}, expr::_KnownQuadExpr) where C
         OrderedDict{KnownVariableCrossTerm, C}(),
         OrderedDict{KnownDecisionCrossTerm, C}())
 end
-function Base.convert(::Type{DecisionQuadExpr{C}}, aff::DecisionAffExpr) where C
+function Base.convert(::Type{DecisionQuadExpr{C}}, aff::DecisionAffExpr{C}) where C
     return DecisionQuadExpr{C}(
-        _VariableQuadExpr(aff.variables),
-        _DecisionQuadExpr(aff.decisions),
-        _KnownQuadExpr(aff.knowns),
+        convert(_VariableQuadExpr{C}, aff.variables),
+        convert(_DecisionQuadExpr{C}, aff.decisions),
+        convert(_KnownQuadExpr{C}, aff.knowns),
         OrderedDict{DecisionCrossTerm, C}(),
         OrderedDict{KnownVariableCrossTerm, C}(),
         OrderedDict{KnownDecisionCrossTerm, C}())
@@ -157,13 +157,13 @@ Base.hash(quad::DecisionQuadExpr, h::UInt) =
          hash(quad.known_decision_terms, h))
 
 function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_VAE})
-    sizehint!(quad.variables.affine.terms, n)
+    Base.sizehint!(quad.variables.aff, n)
 end
 function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_DAE})
-    sizehint!(quad.decisions.affine.terms, n)
+    Base.sizehint!(quad.decisions.aff, n)
 end
 function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_KAE})
-    sizehint!(quad.knowns.affine.terms, n)
+    Base.sizehint!(quad.knowns.aff, n)
 end
 
 # JuMP overrides #
@@ -199,16 +199,23 @@ function JuMP.map_coefficients_inplace!(f::Function, quad::DecisionQuadExpr)
     JuMP.map_coefficients_inplace!(f, quad.variables)
     JuMP.map_coefficients_inplace!(f, quad.decisions)
     JuMP.map_coefficients_inplace!(f, quad.knowns)
-    _map_cross_terms(quad.cross_terms)
-    _map_cross_terms(quad.known_variable_terms)
-    _map_cross_terms(quad.known_decision_terms)
+    _map_cross_terms!(quad.cross_terms)
+    _map_cross_terms!(quad.known_variable_terms)
+    _map_cross_terms!(quad.known_decision_terms)
     return quad
 end
 
-function _map_cross_terms(f::Function, terms)
+function _map_cross_terms!(f::Function, terms)
     for (key, value) in terms
-        quad.terms[key] = f(value)
+        terms[key] = f(value)
     end
+    return nothing
+end
+
+function _map_cross_terms(f::Function, terms)
+    res = copy(terms)
+    _map_cross_terms!(f, res)
+    return res
 end
 
 function JuMP.map_coefficients(f::Function, quad::DecisionQuadExpr)
@@ -719,7 +726,13 @@ function JuMP.add_to_expression!(quad::DQE,
     if !iszero(lhs.constant)
         c = lhs.constant
         for (rhscoef, rhsvar) in linear_terms(rhs)
-            add_to_expression!(quad.aff, c*rhscoef, rhsvar)
+            if rhs isa _VAE
+                add_to_expression!(quad.variables.aff, c*rhscoef, rhsvar)
+            elseif rhs isa _DAE
+                add_to_expression!(quad.decisions.aff, c*rhscoef, rhsvar)
+            elseif rhs isa _KAE
+                add_to_expression!(quad.knowns.aff, c*rhscoef, rhsvar)
+            end
         end
     end
 
@@ -727,7 +740,13 @@ function JuMP.add_to_expression!(quad::DQE,
     if !iszero(rhs.constant)
         c = rhs.constant
         for (lhscoef, lhsvar) in linear_terms(lhs)
-            add_to_expression!(quad.aff, c*lhscoef, lhsvar)
+            if lhs isa _VAE
+                add_to_expression!(quad.variables.aff, c*lhscoef, lhsvar)
+            elseif lhs isa _DAE
+                add_to_expression!(quad.decisions.aff, c*lhscoef, lhsvar)
+            elseif lhs isa _KAE
+                add_to_expression!(quad.knowns.aff, c*lhscoef, lhsvar)
+            end
         end
     end
 

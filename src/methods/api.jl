@@ -8,7 +8,7 @@
                 defer::Bool = false,
                 kw...)
 
-Instantiate a new two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel`, and the given collection of `scenarios`.
+Instantiate a new two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel`, and the given collection of `scenarios`. Optionally, supply an `optimizer`. If no explicit `instantiation` is provided, the structure is induced by the optimizer. The structure is `Deterministic` by default.
 """
 function instantiate(sm::StochasticModel{2},
                      scenarios::Vector{<:AbstractScenario};
@@ -46,7 +46,7 @@ end
                 defer::Bool = false,
                 kw...) where S <: AbstractScenario
 
-Instantiate a deferred two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel` over the scenario type `S`.
+Instantiate a deferred two-stage stochastic program using the model definition stored in the two-stage `stochasticmodel` over the scenario type `S`. Optionally, supply an `optimizer`. If no explicit `instantiation` is provided, the structure is induced by the optimizer. The structure is `Deterministic` by default.
 """
 function instantiate(sm::StochasticModel{2};
                      instantiation::StochasticInstantiation = UnspecifiedInstantiation(),
@@ -70,7 +70,7 @@ end
                 defer::Bool = false,
                 kw...)
 
-Instantiate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`.
+Instantiate a new stochastic program using the model definition stored in `stochasticmodel`, and the given collection of `scenarios`. Optionally, supply an `optimizer`. If no explicit `instantiation` is provided, the structure is induced by the optimizer. The structure is `Deterministic` by default.
 """
 function instantiate(sm::StochasticModel{N},
                      scenarios::NTuple{M,Vector{<:AbstractScenario}};
@@ -103,7 +103,7 @@ end
                 defer::Bool = false,
                 kw...)
 
-Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`.
+Generate a sampled instance of size `n` using the model stored in the two-stage `stochasticmodel`, and the provided `sampler`. Optionally, supply an `optimizer`. If no explicit `instantiation` is provided, the structure is induced by the optimizer. The structure is `Deterministic` by default.
 
 """
 function instantiate(stochasticmodel::StochasticModel{2},
@@ -163,26 +163,25 @@ end
 """
     optimize!(stochasticprogram::StochasticProgram; crash::AbstractCrash = Crash.None(); kw...)
 
-Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
+Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown. An optional crash procedure can be set to warm-start.
 
 ## Examples
 
 The following solves the stochastic program `sp` using the L-shaped algorithm.
 
 ```julia
-using LShapedSolvers
-using GLPK
-
 set_optimizer(sp, LShaped.Optimizer)
 set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
 optimize!(sp);
 
 # output
 
-L-Shaped Gap  Time: 0:00:01 (4 iterations)
-  Objective:       -855.8333333333339
+L-Shaped Gap  Time: 0:00:02 (6 iterations)
+  Objective:       -855.8333333333358
   Gap:             0.0
-  Number of cuts:  7
+  Number of cuts:  8
+  Iterations:      6
 ```
 
 The following solves the stochastic program `sp` using GLPK on the extended form.
@@ -640,29 +639,23 @@ end
 """
     get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
 
-Return the value associated with the solver-specific attribute named `name`.
+Return the value associated with the solver-specific attribute named `name` in `stochasticprogram`.
 
 See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
 function get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
     return get_optimizer_attribute(stochasticprogram, MOI.RawParameter(name))
 end
-
 """
-    get_optimizer_attribute(
-        stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute
-    )
+    get_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
 
 Return the value of the solver-specific attribute `attr` in `stochasticprogram`.
 
 See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
-function get_optimizer_attribute(
-    stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute
-)
+function get_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
     return MOI.get(stochasticprogram, attr)
 end
-
 # ========================== #
 
 # Setters
@@ -703,12 +696,34 @@ function JuMP.set_optimizer(stochasticprogram::StochasticProgram, optimizer)
     end
     return nothing
 end
+"""
+    set_optimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets solver-specific attribute identified by `name` to `value` in the `stochasticprogram`.
+
+See also: [`get_optimizer_attribute`](@ref)
+"""
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
     return set_optimizer_attribute(stochasticprogram, MOI.RawParameter(String(name)), value)
 end
+"""
+    set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
+
+Set the solver-specific attribute `attr` in `stochasticprogram` to `value`.
+
+See also: [`get_optimizer_attribute`](@ref)
+"""
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
     return MOI.set(stochasticprogram, attr, value)
 end
+"""
+    set_optimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_optimizer_attribute(stochasticprogram, attribute, value)` for each pair.
+
+See also: [`get_optimizer_attribute`](@ref)
+"""
 function JuMP.set_optimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
     for (name, value) in pairs
         set_optimizer_attribute(stochasticprogram, name, value)

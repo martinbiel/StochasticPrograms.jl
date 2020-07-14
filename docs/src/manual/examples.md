@@ -6,39 +6,9 @@ The following defines the well-known "Farmer problem", first outlined in [Introd
 
 ```@example farmer
 using StochasticPrograms
-using GLPKMathProgInterface
+using GLPK
 ```
-We begin by introducing some variable indices:
-```@example farmer
-Crops = [:wheat, :corn, :beets];
-Purchased = [:wheat, :corn];
-Sold = [:wheat, :corn, :beets_quota, :beets_extra];
-```
-The price of beets drops after a certain quantity (6000), so we introduce an extra variable to handle the excess beets. Using the variable indices, we define the deterministic problem parameters:
-```@example farmer
-Cost = Dict(:wheat=>150, :corn=>230, :beets=>260);
-Required = Dict(:wheat=>200, :corn=>240, :beets=>0);
-PurchasePrice = Dict(:wheat=>238, :corn=>210);
-SellPrice = Dict(:wheat=>170, :corn=>150, :beets_quota=>36, :beets_extra=>10);
-Budget = 500;
-```
-In the first stage, the farmer needs to know what crops to plant, the cost of planting them, and the available land. Therefore, we introduce the first stage data:
-```@example farmer
-first_stage_data = (Crops, Cost, Budget)
-```
-In the second stage, the farmer needs to know the required quantity of each crop, the purchase price, and the sell price:
-```@example farmer
-second_stage_data = (Required, PurchasePrice, SellPrice)
-```
-The uncertainty lies in the future yield of each crop. We define a scenario type to capture this:
-```julia
-@scenario Yield = begin
-    wheat::Float64
-    corn::Float64
-    beets::Float64
-end
-```
-All of the above definitions can be included directly in the definition of the stochastic model of the farmer problem. Consider
+An example implementation of the farmer problem is given by:
 ```@example farmer
 farmer_model = @stochastic_model begin
     @stage 1 begin
@@ -47,45 +17,39 @@ farmer_model = @stochastic_model begin
             Cost = Dict(:wheat=>150, :corn=>230, :beets=>260)
             Budget = 500
         end
-        @variable(model, x[c = Crops] >= 0)
+        @decision(model, x[c in Crops] >= 0)
         @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
         @constraint(model, sum(x[c] for c in Crops) <= Budget)
     end
     @stage 2 begin
-        @decision x
         @parameters begin
-            Purchased  = [:wheat, :corn]
-            Sold = [:wheat, :corn, :bquota, :bextra]
+            Crops = [:wheat, :corn, :beets]
             Required = Dict(:wheat=>200, :corn=>240, :beets=>0)
             PurchasePrice = Dict(:wheat=>238, :corn=>210)
-            SellPrice = Dict(:wheat=>170, :corn=>150, :bquota=>36, :bextra=>10)
+            SellPrice = Dict(:wheat=>170, :corn=>150, :beets=>36, :extra_beets=>10)
         end
-        @uncertain ξ::YieldScenario = begin
-            wheat::Float64
-            corn::Float64
-            beets::Float64
-        end
-        @variable(model, y[p = Purchased] >= 0)
-        @variable(model, w[s = Sold] >= 0)
-        @objective(model, Min, sum( PurchasePrice[p] * y[p] for p = Purchased) - sum( SellPrice[s] * w[s] for s in Sold))
-
-        @constraint(model, const_minreq[p=Purchased],
+        @uncertain ξ[c in Crops]
+        @variable(model, y[p in setdiff(Crops, [:beets])] >= 0)
+        @variable(model, w[s in Crops ∪ [:extra_beets]] >= 0)
+        @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
+                   - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
+        @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
             ξ[p] * x[p] + y[p] - w[p] >= Required[p])
-        @constraint(model, const_minreq_beets,
-            ξ[:beets] * x[:beets] - w[:bquota] - w[:bextra] >= Required[:beets])
-        @constraint(model, const_aux, w[:bquota] <= 6000)
+        @constraint(model, minimum_requirement_beets,
+            ξ[:beets] * x[:beets] - w[:beets] - w[:extra_beets] >= Required[:beets])
+        @constraint(model, beets_quota, w[:beets] <= 6000)
     end
 end
 ```
-The three predicted outcomes can be defined through:
+The three yield scenarios can be defined through:
 ```@example farmer
-ξ₁ = YieldScenario(3.0, 3.6, 24.0, probability = 1/3)
-ξ₂ = YieldScenario(2.5, 3.0, 20.0, probability = 1/3)
-ξ₃ = YieldScenario(2.0, 2.4, 16.0, probability = 1/3)
+ξ₁ = Scenario(wheat = 3.0, corn = 3.6, beets = 24.0, probability = 1/3)
+ξ₂ = Scenario(wheat = 2.5, corn = 3.0, beets = 20.0, probability = 1/3)
+ξ₃ = Scenario(wheat = 2.0, corn = 2.4, beets = 16.0, probability = 1/3)
 ```
 We can now instantiate the farmer problem using the defined stochastic model and the three yield scenarios:
 ```@example farmer
-farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃])
+farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], optimizer = GLPK.Optimizer)
 ```
 Printing:
 ```@example farmer
@@ -93,17 +57,17 @@ print(farmer)
 ```
 We can now optimize the model:
 ```@example farmer
-optimize!(farmer, solver = GLPKSolverLP())
-x = optimal_decision(farmer, :x)
-println("Wheat: $(x[:wheat])")
-println("Corn: $(x[:corn])")
-println("Beets: $(x[:beets])")
-println("Profit: $(optimal_value(farmer))")
+optimize!(farmer)
+x = optimal_decision(farmer)
+println("Wheat: $(x[1])")
+println("Corn: $(x[2])")
+println("Beets: $(x[3])")
+println("Profit: $(objective_value(farmer))")
 ```
 Finally, we calculate the stochastic performance of the model:
 ```@example farmer
-println("EVPI: $(EVPI(farmer, solver = GLPKSolverLP()))")
-println("VSS: $(VSS(farmer, solver = GLPKSolverLP()))")
+println("EVPI: $(EVPI(farmer))")
+println("VSS: $(VSS(farmer))")
 ```
 
 ## Continuous scenario distribution
@@ -157,14 +121,11 @@ using Ipopt
 
 sm = @stochastic_model begin
     @stage 1 begin
-        @variable(model, x)
+        @decision(model, x)
     end
     @stage 2 begin
-        @decision x
         @uncertain ξ from DistributionScenario
-        @variable(model, y)
-        @constraint(model, y == (x - ξ)^2)
-        @objective(model, Min, y)
+        @objective(model, Min, (x - ξ)^2)
     end
 end
 ```
@@ -183,7 +144,7 @@ The mean of the given exponential distribution is ``2.0``, which is the optimal 
 ```julia
 sampler = ExponentialSampler(2.) # Create a sampler
 
-sp = sample(sm, sampler, 1000) # Sample 1000 exponentially distributed scenarios and create a sampled model
+sp = instantiate(sm, sampler, 1000, optimizer = Ipopt.Optimizer) # Sample 1000 exponentially distributed scenarios and create a sampled model
 ```
 ```julia
 Stochastic program with:
@@ -194,22 +155,22 @@ Solver is default solver
 ```
 By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:
 ```julia
-optimize!(sp, solver = IpoptSolver(print_level=0))
+optimize!(sp)
 
 println("Optimal decision: $(optimal_decision(sp))")
-println("Optimal value: $(optimal_value(sp))")
+println("Optimal value: $(objective_value(sp))")
 ```
 ```julia
-Optimal decision: [2.07583]
+Optimal decision: [2.0397762891884894]
 Optimal value: 4.00553678799426
 ```
 Now, due to the special implementation of the [`expected`](@ref) function, it actually holds that the expected value solution solves the generalized problem. Consider:
 ```julia
-println("EVP decision: $(EVP_decision(sp, solver = IpoptSolver(print_level=0)))")
-println("VSS: $(VSS(sp, solver = IpoptSolver(print_level=0)))")
+println("Expected value decision: $(expected_value_decision(sp)")
+println("VSS: $(VSS(sp))")
 ```
 ```julia
 EVP decision: [2.0]
-VSS: 0.005750340653017716
+VSS: 0.00022773669794418083
 ```
 Accordingly, the VSS is small.

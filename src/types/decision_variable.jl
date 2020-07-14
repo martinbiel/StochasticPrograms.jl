@@ -1,3 +1,8 @@
+"""
+    DecisionVariable <: AbstractVariableRef
+
+Holds a reference to the stochastic program and the corresponding MOI.VariableIndex.
+"""
 struct DecisionVariable <: JuMP.AbstractVariableRef
     stochasticprogram::StochasticProgram
     index::MOI.VariableIndex
@@ -8,12 +13,20 @@ end
 function get_decisions(dvar::DecisionVariable)
     return decisions(structure(owner_model(dvar)))
 end
+"""
+    decision(dvar::DecisionVariable)
 
+Return the internal `Decision` associated with `dvar`.
+"""
 function decision(dvar::DecisionVariable)
     decisions = get_decisions(dvar)::Decisions
     return decision(decisions, index(dvar))
 end
+"""
+    state(dvar::DecisionVariable)
 
+Return the `DecisionState` of `dvar`.
+"""
 function state(dvar::DecisionVariable)
     return decision(dvar).state
 end
@@ -164,7 +177,13 @@ function JuMP.is_fixed(dvar::DecisionVariable)
     end
     return false
 end
+"""
+    unfix(dvar::DecisionVariable)
 
+Unfix the decision associated with `dvar`. If the decision is already in a `NotTaken` state, this does nothing.
+
+See also [`fix`](@ref).
+"""
 function JuMP.unfix(dvar::DecisionVariable)
     if state(dvar) == NotTaken
         # Nothing to do, just return
@@ -179,7 +198,13 @@ function JuMP.unfix(dvar::DecisionVariable)
     update_decisions!(JuMP.owner_model(dvar), change)
     return nothing
 end
+"""
+    fix(dvar::DecisionVariable, val::Number)
 
+Fix the decision associated with `dvar` to `val`. In contexts where `dvar` is a variable, the variable is fixed to the value. In contexts where `dvar` is a known parameter value, the value is updated.
+
+See also [`unfix`](@ref).
+"""
 function JuMP.fix(dvar::DecisionVariable, val::Number)
     d = decision(dvar)
     if state(dvar) == NotTaken

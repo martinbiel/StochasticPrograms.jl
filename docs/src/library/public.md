@@ -22,6 +22,25 @@ Modules = [StochasticPrograms]
 Pages   = ["stochasticprogram.jl"]
 ```
 
+## Structures
+
+```@autodocs
+Modules = [StochasticPrograms]
+Pages   = ["stochasticstructure.jl"]
+```
+```@docs
+DeterministicEquivalent
+VerticalStructure
+HorizontalStructure
+```
+
+## Decisions
+
+```@autodocs
+Modules = [StochasticPrograms]
+Pages   = ["decision_variable.jl", "variable_interface.jl"]
+```
+
 ## Scenarios
 
 ```@autodocs
@@ -43,6 +62,7 @@ end
 
 ```@docs
 @scenario
+@container_scenario
 @zero
 @expectation
 @sampler
@@ -56,6 +76,7 @@ end
 @first_stage
 @second_stage
 @decision
+@known
 @parameters
 @uncertain
 @stochastic_model
@@ -65,7 +86,7 @@ end
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["api.jl", "stochasticsolution.jl", "SAA.jl", "generation.jl", "evaluation.jl"]
+Pages   = ["api.jl", "generation.jl", "evaluation.jl"]
 ```
 
 ## Stochastic programming constructs

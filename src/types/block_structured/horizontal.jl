@@ -1,3 +1,9 @@
+"""
+    HorizontalStructure
+
+Horizontal memory structure. Decomposes stochastic program by scenario.
+
+"""
 struct HorizontalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
     decisions::NTuple{M, Decisions}
     proxy::JuMP.Model
@@ -46,6 +52,9 @@ function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractModelAttribut
 end
 function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     return MOI.get(backend(structure.proxy), attr, index)
+end
+function MOI.get(structure::HorizontalStructure, attr::Type{MOI.VariableIndex}, name::String)
+    return MOI.get(backend(structure.proxy), attr, name)
 end
 function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
     return MOI.get(backend(structure.proxy), attr, cindex)

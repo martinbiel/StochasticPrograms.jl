@@ -11,16 +11,27 @@ Pages = ["solverinterface.md"]
 ## Interface
 
 ```@docs
-AbstractStructuredSolver
-AbstractStructuredModel
-AbstractSampledSolver
-AbstractSampledModel
+AbstractStructuredOptimizer
+AbstractSampledOptimizer
 ```
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["spinterface.jl"]
+Pages   = ["optimizer_interface.jl"]
 ```
+
+## Attributes
+
+```@docs
+AbstractStructuredOptimizerAttribute
+AbstractSampledOptimizerAttribute
+```
+
+```@autodocs
+Modules = [StochasticPrograms]
+Pages   = ["attributes.jl"]
+```
+
 
 ## Execution
 

@@ -1,3 +1,9 @@
+"""
+    VerticalStructure
+
+Vertical memory structure. Decomposes stochastic program by stages.
+
+"""
 struct VerticalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
     decisions::NTuple{N, Decisions}
     first_stage::JuMP.Model
@@ -64,6 +70,9 @@ function MOI.get(structure::VerticalStructure, attr::MOI.AbstractModelAttribute)
 end
 function MOI.get(structure::VerticalStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     return MOI.get(backend(structure.first_stage), attr, index)
+end
+function MOI.get(structure::VerticalStructure, attr::Type{MOI.VariableIndex}, name::String)
+    return MOI.get(backend(structure.first_stage), attr, name)
 end
 function MOI.get(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
     return MOI.get(backend(structure.first_stage), attr, cindex)

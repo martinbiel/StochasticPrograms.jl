@@ -8,26 +8,33 @@ Documentation for `StochasticPrograms.jl`'s progressive-hedging solvers.
 Pages = ["progressivehedging.md"]
 ```
 
-## Progressive-hedging solver factory
+## API
 
 ```@docs
-ProgressiveHedgingSolver
-ProgressiveHedging
+ProgressiveHedgingAlgorithm
+```
+```@autodocs
+Modules = [ProgressiveHedging]
+Pages   = ["attributes.jl", "MOI_wrapper.jl"]
 ```
 
 ## Execution
 
 ```@docs
-ProgressiveHedgingSolvers.SerialExecution
-ProgressiveHedgingSolvers.SynchronousExecution
-ProgressiveHedgingSolvers.AsynchronousExecution
+ProgressiveHedging.SerialExecution
+ProgressiveHedging.SynchronousExecution
+ProgressiveHedging.AsynchronousExecution
 ```
 
 ## Penalties
 
+
 ```@docs
-ProgressiveHedgingSolvers.FixedPenalization
-ProgressiveHedgingSolvers.Fixed
-ProgressiveHedgingSolvers.AdaptivePenalization
-ProgressiveHedgingSolvers.Adaptive
+ProgressiveHedging.set_penalization_attribute
+ProgressiveHedging.set_penalization_attributes
+ProgressiveHedging.RawPenalizationParameter
+ProgressiveHedging.FixedPenalization
+ProgressiveHedging.Fixed
+ProgressiveHedging.AdaptivePenalization
+ProgressiveHedging.Adaptive
 ```
