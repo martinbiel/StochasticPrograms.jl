@@ -151,10 +151,10 @@ end
 function readd_cuts!(lshaped::AbstractLShaped, consolidation::Consolidation, execution::AsynchronousExecution)
     for i in eachindex(consolidation.cuts)
         for cut in consolidation.cuts[i]
-            add_cut!(lshaped, cut, execution.θs[i], execution.subobjectives[i], sum(execution.subobjectives[i]), fetch(execution.decisions, i), check = false)
+            add_cut!(lshaped, cut, execution.model_objectives[i], execution.subobjectives[i], sum(execution.subobjectives[i]), fetch(execution.decisions, i), check = false)
         end
         for cut in consolidation.feasibility_cuts[i]
-            add_cut!(lshaped, cut, execution.θs[i], execution.subobjectives[i], Inf)
+            add_cut!(lshaped, cut, execution.model_objectives[i], execution.subobjectives[i], Inf)
         end
     end
     return nothing
@@ -316,6 +316,9 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{H,T
             push!(execution.finished, 0)
             push!(execution.triggered, false)
             push!(execution.added, false)
+            if lshaped.consolidation isa Consolidation
+                allocate!(lshaped.consolidation)
+            end
             # Log progress
             log!(lshaped)
             lshaped.θ_history[t+1] = -Inf

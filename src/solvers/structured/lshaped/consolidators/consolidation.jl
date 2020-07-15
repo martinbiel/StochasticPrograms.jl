@@ -116,6 +116,11 @@ function consolidate!(lshaped::AbstractLShaped, consolidation::Consolidation{T})
         lshaped.data.consolidations += 1
     end
     # Prepare memory for next iteration
+    allocate!(consolidation)
+    return nothing
+end
+
+function allocate!(consolidation::Consolidation{T}) where T <: AbstractFloat
     push!(consolidation.cuts, Vector{AnySparseOptimalityCut{T}}())
     push!(consolidation.feasibility_cuts, Vector{SparseFeasibilityCut{T}}())
     push!(consolidation.consolidated, false)
