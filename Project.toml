@@ -21,6 +21,8 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
 Clustering = "0.13"
+Distributions = "0.23.4"
+OrderedCollections = "1.2.0"
 MathOptInterface = "0.9.1"
 MutableArithmetics = "0.2.2"
 JuMP = "0.21"
