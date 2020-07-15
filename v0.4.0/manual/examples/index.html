@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">StochasticPrograms.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../quickstart/">Quick start</a></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Farmer-problem"><span>Farmer problem</span></a></li><li><a class="tocitem" href="#Continuous-scenario-distribution"><span>Continuous scenario distribution</span></a></li></ul></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Farmer-problem"><a class="docs-heading-anchor" href="#Farmer-problem">Farmer problem</a><a id="Farmer-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Farmer-problem" title="Permalink"></a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><pre><code class="language-julia">using StochasticPrograms
+using GLPK</code></pre><p>An example implementation of the farmer problem is given by:</p><pre><code class="language-julia">farmer_model = @stochastic_model begin
+    @stage 1 begin
+        @parameters begin
+            Crops = [:wheat, :corn, :beets]
+            Cost = Dict(:wheat=&gt;150, :corn=&gt;230, :beets=&gt;260)
+            Budget = 500
+        end
+        @decision(model, x[c in Crops] &gt;= 0)
+        @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
+        @constraint(model, sum(x[c] for c in Crops) &lt;= Budget)
+    end
+    @stage 2 begin
+        @parameters begin
+            Crops = [:wheat, :corn, :beets]
+            Required = Dict(:wheat=&gt;200, :corn=&gt;240, :beets=&gt;0)
+            PurchasePrice = Dict(:wheat=&gt;238, :corn=&gt;210)
+            SellPrice = Dict(:wheat=&gt;170, :corn=&gt;150, :beets=&gt;36, :extra_beets=&gt;10)
+        end
+        @uncertain ξ[c in Crops]
+        @variable(model, y[p in setdiff(Crops, [:beets])] &gt;= 0)
+        @variable(model, w[s in Crops ∪ [:extra_beets]] &gt;= 0)
+        @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
+                   - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
+        @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
+            ξ[p] * x[p] + y[p] - w[p] &gt;= Required[p])
+        @constraint(model, minimum_requirement_beets,
+            ξ[:beets] * x[:beets] - w[:beets] - w[:extra_beets] &gt;= Required[:beets])
+        @constraint(model, beets_quota, w[:beets] &lt;= 6000)
+    end
+end</code></pre><pre><code class="language-none">Two-Stage Stochastic Model
+
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)
+</code></pre><p>The three yield scenarios can be defined through:</p><pre><code class="language-julia">ξ₁ = Scenario(wheat = 3.0, corn = 3.6, beets = 24.0, probability = 1/3)
+ξ₂ = Scenario(wheat = 2.5, corn = 3.0, beets = 20.0, probability = 1/3)
+ξ₃ = Scenario(wheat = 2.0, corn = 2.4, beets = 16.0, probability = 1/3)</code></pre><pre><code class="language-none">Scenario with probability 0.3333333333333333
+  wheat: 2.0
+  corn: 2.4
+  beets: 16.0</code></pre><p>We can now instantiate the farmer problem using the defined stochastic model and the three yield scenarios:</p><pre><code class="language-julia">farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], optimizer = GLPK.Optimizer)</code></pre><pre><code class="language-none">Stochastic program with:
+ * 3 decision variables
+ * 3 scenarios of type Scenario
+Structure: Deterministic equivalent
+Solver name: GLPK</code></pre><p>Printing:</p><pre><code class="language-julia">print(farmer)</code></pre><pre><code class="language-none">Deterministic equivalent problem
+Min 150 x[wheat] + 230 x[corn] + 260 x[beets] + 79.33333333333333 y₃[wheat] + 70 y₃[corn] - 56.666666666666664 w₃[wheat] - 50 w₃[corn] - 12 w₃[beets] - 3.333333333333333 w₃[extra_beets] + 79.33333333333333 y₂[wheat] + 70 y₂[corn] - 56.666666666666664 w₂[wheat] - 50 w₂[corn] - 12 w₂[beets] - 3.333333333333333 w₂[extra_beets] + 79.33333333333333 y₁[wheat] + 70 y₁[corn] - 56.666666666666664 w₁[wheat] - 50 w₁[corn] - 12 w₁[beets] - 3.333333333333333 w₁[extra_beets]
+Subject to
+ beets_quota : w₁[beets] ≤ 6000.0
+ beets_quota : w₂[beets] ≤ 6000.0
+ beets_quota : w₃[beets] ≤ 6000.0
+ y₁[wheat] ≥ 0.0
+ y₁[corn] ≥ 0.0
+ w₁[wheat] ≥ 0.0
+ w₁[corn] ≥ 0.0
+ w₁[beets] ≥ 0.0
+ w₁[extra_beets] ≥ 0.0
+ y₂[wheat] ≥ 0.0
+ y₂[corn] ≥ 0.0
+ w₂[wheat] ≥ 0.0
+ w₂[corn] ≥ 0.0
+ w₂[beets] ≥ 0.0
+ w₂[extra_beets] ≥ 0.0
+ y₃[wheat] ≥ 0.0
+ y₃[corn] ≥ 0.0
+ w₃[wheat] ≥ 0.0
+ w₃[corn] ≥ 0.0
+ w₃[beets] ≥ 0.0
+ w₃[extra_beets] ≥ 0.0
+ x[wheat] ∈ Decisions
+ x[corn] ∈ Decisions
+ x[beets] ∈ Decisions
+ x[wheat] ≥ 0.0
+ x[corn] ≥ 0.0
+ x[beets] ≥ 0.0
+ x[wheat] + x[corn] + x[beets] ≤ 500.0
+ minimum_requirement[wheat] : 3 x[wheat] + y₁[wheat] - w₁[wheat] ≥ 200.0
+ minimum_requirement[corn] : 3.6 x[corn] + y₁[corn] - w₁[corn] ≥ 240.0
+ minimum_requirement_beets : 24 x[beets] - w₁[beets] - w₁[extra_beets] ≥ 0.0
+ minimum_requirement[wheat] : 2.5 x[wheat] + y₂[wheat] - w₂[wheat] ≥ 200.0
+ minimum_requirement[corn] : 3 x[corn] + y₂[corn] - w₂[corn] ≥ 240.0
+ minimum_requirement_beets : 20 x[beets] - w₂[beets] - w₂[extra_beets] ≥ 0.0
+ minimum_requirement[wheat] : 2 x[wheat] + y₃[wheat] - w₃[wheat] ≥ 200.0
+ minimum_requirement[corn] : 2.4 x[corn] + y₃[corn] - w₃[corn] ≥ 240.0
+ minimum_requirement_beets : 16 x[beets] - w₃[beets] - w₃[extra_beets] ≥ 0.0
+Solver name: GLPK</code></pre><p>We can now optimize the model:</p><pre><code class="language-">optimize!(farmer)
+x = optimal_decision(farmer)
+println(&quot;Wheat: $(x[1])&quot;)
+println(&quot;Corn: $(x[2])&quot;)
+println(&quot;Beets: $(x[3])&quot;)
+println(&quot;Profit: $(objective_value(farmer))&quot;)</code></pre><p>Finally, we calculate the stochastic performance of the model:</p><pre><code class="language-">println(&quot;EVPI: $(EVPI(farmer))&quot;)
+println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><h2 id="Continuous-scenario-distribution"><a class="docs-heading-anchor" href="#Continuous-scenario-distribution">Continuous scenario distribution</a><a id="Continuous-scenario-distribution-1"></a><a class="docs-heading-anchor-permalink" href="#Continuous-scenario-distribution" title="Permalink"></a></h2><p>As an example, consider the following generalized stochastic program:</p><div>\[\DeclareMathOperator*{\minimize}{minimize}
+\begin{aligned}
+ \minimize_{x \in \mathbb{R}} &amp; \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
+\end{aligned}\]</div><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><pre><code class="language-julia">using StochasticPrograms
+using Distributions
+
+struct DistributionScenario{D &lt;: UnivariateDistribution} &lt;: AbstractScenario
+    probability::Probability
+    distribution::D
+    ξ::Float64
+
+    function DistributionScenario(distribution::UnivariateDistribution, val::AbstractFloat)
+        return new{typeof(distribution)}(Probability(pdf(distribution, val)), distribution, Float64(val))
+    end
+end
+
+function StochasticPrograms.expected(scenarios::Vector{&lt;:DistributionScenario{D}}) where D &lt;: UnivariateDistribution
+    isempty(scenarios) &amp;&amp; return DistributionScenario(D(), 0.0)
+    distribution = scenarios[1].distribution
+    return ExpectedScenario(DistributionScenario(distribution, mean(distribution)))
+end</code></pre><p>The fallback <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a> method is viable as long as the scenario type contains a <a href="../../library/public/#StochasticPrograms.Probability"><code>Probability</code></a> field named <code>probability</code>. The implementation of <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is somewhat unconventional as it returns the mean of the distribution regardless of how many scenarios are given.</p><p>We can implement a sampler that generates exponentially distributed scenarios as follows:</p><pre><code class="language-julia">struct ExponentialSampler &lt;: AbstractSampler{DistributionScenario{Exponential{Float64}}}
+    distribution::Exponential
+
+    ExponentialSampler(θ::AbstractFloat) = new(Exponential(θ))
+end
+
+function (sampler::ExponentialSampler)()
+    ξ = rand(sampler.distribution)
+    return DistributionScenario(sampler.distribution, ξ)
+end</code></pre><p>Now, lets attempt to define the generalized stochastic program using the available modeling tools:</p><pre><code class="language-julia">using Ipopt
+
+sm = @stochastic_model begin
+    @stage 1 begin
+        @decision(model, x)
+    end
+    @stage 2 begin
+        @uncertain ξ from DistributionScenario
+        @objective(model, Min, (x - ξ)^2)
+    end
+end</code></pre><pre><code class="language-julia">Two-Stage Stochastic Model
+
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)</code></pre><p>The mean of the given exponential distribution is <span>$2.0$</span>, which is the optimal solution to the general problem. Now, lets create a finite sampled model of 1000 exponentially distributed numbers:</p><pre><code class="language-julia">sampler = ExponentialSampler(2.) # Create a sampler
+
+sp = instantiate(sm, sampler, 1000, optimizer = Ipopt.Optimizer) # Sample 1000 exponentially distributed scenarios and create a sampled model</code></pre><pre><code class="language-julia">Stochastic program with:
+ * 1 decision variable
+ * 1 recourse variable
+ * 1000 scenarios of type DistributionScenario
+Solver is default solver</code></pre><p>By the law of large numbers, we approach the generalized formulation with increasing sample size. Solving yields:</p><pre><code class="language-julia">optimize!(sp)
+
+println(&quot;Optimal decision: $(optimal_decision(sp))&quot;)
+println(&quot;Optimal value: $(objective_value(sp))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.0397762891884894]
+Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;Expected value decision: $(expected_value_decision(sp)&quot;)
+println(&quot;VSS: $(VSS(sp))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
+VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 15 July 2020 23:53">Wednesday 15 July 2020</span>. Using Julia version 1.0.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
