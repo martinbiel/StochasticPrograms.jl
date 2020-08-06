@@ -65,7 +65,7 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
     end
     if !isempty(seen_decisions)
         # Sanity check
-        length(seen_decisions) == length(decision.scalar_variables) || error("Inconsistency in number of seen decisions and created variables.")
+        length(seen_decisions) == length(variable.scalar_variables) || error("Inconsistency in number of seen decisions and created variables.")
         # Update decision set for reuse
         set_type = typeof(variable.set)
         MOI.set(backend(model), MOI.ConstraintSet(), con_index, set_type(seen_decisions))
