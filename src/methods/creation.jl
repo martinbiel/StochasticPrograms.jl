@@ -595,6 +595,7 @@ macro stage(stage, args)
             @capture(x, @decision(m_Symbol, knowndef__)) ||
             @capture(x, @known(m_Symbol, variabledef__)) ||
             @capture(x, @constraint(m_Symbol, constdef__)) ||
+            @capture(x, @expression(m_Symbol, expressiondef__)) ||
             @capture(x, @objective(m_Symbol, objdef__)) ||
             @capture(x, @parameters args__) ||
             @capture(x, @uncertain args__)

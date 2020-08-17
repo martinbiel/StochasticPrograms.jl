@@ -2,7 +2,8 @@ simple = @stochastic_model begin
     @stage 1 begin
         @decision(model, x₁ >= 40)
         @decision(model, x₂ >= 20)
-        @objective(model, Min, 100*x₁ + 150*x₂)
+        objective = @expression(model, 100*x₁ + 150*x₂)
+        @objective(model, Min, objective)
         @constraint(model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
