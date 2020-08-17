@@ -15,9 +15,8 @@ using StochasticPrograms
 
 Consider some probability space ``(\Omega,\mathcal{F},\pi)`` where ``\Omega`` is a sample space, ``\mathcal{F}`` is a ``\sigma``-algebra over ``\Omega`` and ``\pi: \mathcal{F} \to [0,1]`` is a probability measure. Let ``\xi(\omega): \Omega \to \mathbb{R}^{N}`` be some random variable on ``\Omega`` with finite second moments. A two-stage linear stochastic program has the following mathematical representation:
 ```math
-\DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
- \minimize_{x \in \mathbb{R}^n} & \quad c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right] \\
+ \operatorname*{minimize}_{x \in \mathbb{R}^n} & \quad c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right] \\
  \text{s.t.} & \quad Ax = b \\
  & \quad x \geq 0
 \end{aligned}
@@ -37,9 +36,8 @@ If the sample space ``\Omega`` is finite, stochastic program has a closed form t
 To showcase the use of StochasticPrograms we will walk through a simple example. Consider the following stochastic program: (taken from [Introduction to Stochastic Programming](https://link.springer.com/book/10.1007%2F978-1-4614-0237-4)).
 
 ```math
-\DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
- \minimize_{x_1, x_2 \in \mathbb{R}} & \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi(\omega))\right] \\
+ \operatorname*{minimize}_{x_1, x_2 \in \mathbb{R}} & \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi(\omega))\right] \\
  \text{s.t.} & \quad x_1+x_2 \leq 120 \\
  & \quad x_1 \geq 40 \\
  & \quad x_2 \geq 20
@@ -126,7 +124,7 @@ sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 By default, the stochastic program is instantiated with a deterministic equivalent structure. It is straightforward to work out the extended form because the example problem is small:
 ```math
 \begin{aligned}
- \minimize_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} & \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
+ \operatorname*{minimize}_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} & \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
  \text{s.t.} & \quad x_1 + x_2 \leq 120 \\
  & \quad 6 y_{11} + 10 y_{21} \leq 60 x_1 \\
  & \quad 8 y_{11} + 5 y_{21} \leq 80 x_2 \\
@@ -306,11 +304,11 @@ evaluate_decision(sp, x, ξ₁)
 Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:
 ```math
 \mathrm{EWS} = \operatorname{\mathbb{E}}_{\omega}\left[
-    \begin{aligned}
-      \min_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\xi(\omega)) \\
-      \st & \quad Ax = b \\
-      & \quad x \geq 0.
-    \end{aligned}\right]
+  \begin{aligned}
+    \min_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\xi(\omega)) \\
+    \text{s.t.} & \quad Ax = b \\
+    & \quad x \geq 0.
+  \end{aligned}\right]
 ```
 Now, the first- and second-stage decisions are taken with knowledge about the uncertainty. If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if ``ξ₁`` is believed to be the actual outcome, we can define a wait-and-see model as follows:
 ```@example simple
@@ -361,10 +359,9 @@ We can also compute EWS directly using [`EWS`](@ref). Note, that the horizontal 
 
 If the expectation in the original model is instead taken inside the second-stage objective function ``Q``, we obtain the expected-value-problem:
 ```math
-\DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
-    \minimize_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\operatorname{\mathbb{E}}_{\omega}[\xi(\omega)]) \\
-    \sbj & \quad Ax = b \\
+    \operatorname*{minimize}_{x \in \mathbb{R}^n} & \quad c^T x + Q(x,\operatorname{\mathbb{E}}_{\omega}[\xi(\omega)]) \\
+    \text{s.t.} & \quad Ax = b \\
     & \quad x \geq 0.
   \end{aligned}
 ```

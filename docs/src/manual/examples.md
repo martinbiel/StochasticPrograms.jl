@@ -74,9 +74,8 @@ println("VSS: $(VSS(farmer))")
 
 As an example, consider the following generalized stochastic program:
 ```math
-\DeclareMathOperator*{\minimize}{minimize}
 \begin{aligned}
- \minimize_{x \in \mathbb{R}} & \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
+ \operatorname*{minimize}_{x \in \mathbb{R}} & \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
 \end{aligned}
 ```
 where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:

@@ -6,9 +6,8 @@ Decoupling data design and model design is a fundamental principle in Stochastic
 
 Stage data is related to parameters that always appear in the first or second stage of a stochastic program. These parameters are deterministic and are the same across all scenarios. Such parameters are conviently included in stochastic models using `@parameters`. To showcase, we consider a minimal stochastic program:
 ```math
-\DeclareMathOperator*{\maximize}{maximize}
 \begin{aligned}
- \maximize_{x \in \mathbb{R}} & \quad x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x, \xi(\omega))\right] \\
+ \operatorname*{maximize}_{x \in \mathbb{R}} & \quad x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x, \xi(\omega))\right] \\
  \text{s.t.} & \quad l_1 \leq x \leq u_1
 \end{aligned}
 ```
