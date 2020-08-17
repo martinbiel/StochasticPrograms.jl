@@ -151,7 +151,7 @@ end
 function readd_cuts!(lshaped::AbstractLShaped, consolidation::Consolidation, execution::AsynchronousExecution)
     for i in eachindex(consolidation.cuts)
         for cut in consolidation.cuts[i]
-            add_cut!(lshaped, cut, execution.model_objectives[i], execution.subobjectives[i], sum(execution.subobjectives[i]), fetch(execution.iterates, i), check = false)
+            add_cut!(lshaped, cut, execution.model_objectives[i], execution.subobjectives[i], fetch(execution.iterates, i), check = false)
         end
         for cut in consolidation.feasibility_cuts[i]
             add_cut!(lshaped, cut, execution.model_objectives[i], execution.subobjectives[i], Inf)
