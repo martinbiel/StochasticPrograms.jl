@@ -1,7 +1,7 @@
 name = "StochasticPrograms"
 uuid = "8b8459f2-c380-502b-8633-9aed2d6c2b35"
 authors = ["Martin Biel <martinbiel93@gmail.com>"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
