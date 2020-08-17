@@ -9,6 +9,7 @@ using Printf
 
 # External libraries
 using JuMP
+using Compat
 using OrderedCollections
 using MathOptInterface
 using Distributions
