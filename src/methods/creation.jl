@@ -592,27 +592,27 @@ macro stage(stage, args)
     vardefs = Expr(:block)
     decisiondefs = postwalk(def) do x
         if  @capture(x, @variable(m_Symbol, variabledef__)) ||
-            @capture(x, @decision(m_Symbol, knowndef__)) ||
             @capture(x, @known(m_Symbol, variabledef__)) ||
             @capture(x, @constraint(m_Symbol, constdef__)) ||
             @capture(x, @expression(m_Symbol, expressiondef__)) ||
             @capture(x, @objective(m_Symbol, objdef__)) ||
             @capture(x, @parameters args__) ||
             @capture(x, @uncertain args__)
-            # Skip any line related to the JuMP model, stochastics, or unhandled @decision/@parameter lines
+            # Skip any line related to the JuMP model, stochastics, or unhandled @@parameter lines
             return Expr(:block)
+        elseif @capture(x, @decision(args__))
+            # Handle @decision
+            return @q begin
+                @variable $((args)...) set = StochasticPrograms.KnownSet()
+            end
         else
-            # Everything else could be required for decision variable construction, and is therefore saved
+            # Anything else could be required for decision variable construction, and is therefore saved
             return x
         end
     end
-    # Next, handle @decision annotations
+    # Next, handle @decision annotations in main definition
     def = postwalk(def) do x
         if @capture(x, @decision args__)
-            decisiondef = @q begin
-                @variable $((args)...) set = StochasticPrograms.KnownSet()
-            end
-            push!(decisiondefs.args, decisiondef)
             return @q begin
                 @variable $((args)...) set = StochasticPrograms.DecisionSet()
             end
