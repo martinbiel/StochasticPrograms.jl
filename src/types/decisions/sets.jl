@@ -40,7 +40,7 @@ function JuMP.in_set_string(print_mode, ::MultipleDecisionSet)
 end
 
 function JuMP.in_set_string(print_mode, set::MultipleKnownSet)
-    return string(JuMP._math_symbol(print_mode, :in), " Known(values  = $(set.known.values))")
+    return string(JuMP._math_symbol(print_mode, :in), " Known(values = $([k.value for k in set.knowns]))")
 end
 
 function VariableRef(model::Model, index::MOI.VariableIndex, ::Union{SingleDecisionSet, MultipleDecisionSet})
