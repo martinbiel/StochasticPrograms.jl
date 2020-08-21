@@ -327,7 +327,7 @@ function MOIB.bridged_function(bridge::KnownsBridge{T}, i::MOIB.Variable.IndexIn
     known = bridge.knowns[i.value]
     # Give the value of the known decision in the
     # known part constant given to the objective/constraint bridges
-    return convert(MOI.ScalarAffineFunction{T}, bridge.known.value)
+    return convert(MOI.ScalarAffineFunction{T}, known.value)
 end
 function MOIB.Variable.unbridged_map(bridge::KnownsBridge, vi::MOI.VariableIndex, i::MOIB.Variable.IndexInVector)
     # Ignore unbridging without errors
