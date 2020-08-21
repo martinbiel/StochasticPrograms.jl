@@ -602,6 +602,14 @@ macro stage(stage, args)
             return Expr(:block)
         elseif @capture(x, @decision(args__))
             # Handle @decision
+            set = NoSpecifiedConstraint()
+            for (i, arg) in enumerate(args)
+                set, arg, found = extract_set(arg)
+                if found
+                    args[i] = arg
+                    break
+                end
+            end
             return @q begin
                 @variable $((args)...) set = StochasticPrograms.KnownSet()
             end
@@ -613,8 +621,16 @@ macro stage(stage, args)
     # Next, handle @decision annotations in main definition
     def = postwalk(def) do x
         if @capture(x, @decision args__)
+            set = NoSpecifiedConstraint()
+            for (i, arg) in enumerate(args)
+                set, arg, found = extract_set(arg)
+                if found
+                    args[i] = arg
+                    break
+                end
+            end
             return @q begin
-                @variable $((args)...) set = StochasticPrograms.DecisionSet()
+                @variable $((args)...) set = StochasticPrograms.DecisionSet(constraint = $set)
             end
         end
         return x

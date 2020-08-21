@@ -114,4 +114,31 @@ function unicode_subscript(subscript::Integer)
     end
     return join('₀'+d for d in reverse(digits(subscript)))
 end
+
+function extract_set(expr)
+    set = NoSpecifiedConstraint()
+    found = false
+    new_expr = prewalk(expr) do x
+        if @capture(x, var_Symbol in constrset_) && !found
+            set = constrset
+            found = true
+            return :($var)
+        elseif @capture(x, var_Symbol[ids_] in constrset_) && !found
+            set = constrset
+            found = true
+            return :($var[$ids])
+        elseif @capture(x, set = constrset_) && !found
+            set = constrset
+            found = true
+            return :()
+        elseif @capture(x, var_Symbol[ids_])
+            # Break here to prevent indices from being filtered
+            found = true
+            return x
+        else
+            return x
+        end
+    end
+    return set, new_expr, found
+end
 # ========================== #

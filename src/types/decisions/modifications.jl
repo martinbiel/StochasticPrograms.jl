@@ -34,4 +34,6 @@ end
 struct KnownValuesChange <: MOI.AbstractFunctionModification end
 
 const DecisionModification = Union{DecisionCoefficientChange, DecisionStateChange, DecisionsStateChange}
+const VectorDecisionModification = Union{DecisionMultirowChange, DecisionStateChange, DecisionsStateChange}
 const KnownModification = Union{KnownCoefficientChange, KnownValueChange, KnownValuesChange}
+const VectorKnownModification = Union{KnownMultirowChange, KnownValueChange, KnownValuesChange}

@@ -254,6 +254,7 @@ function VectorAffineDecisionFunction(affs::Vector{DAE})
         for (coef, kvar) in linear_terms(aff.knowns)
             # Any known decision is set in the known bridge
             known_terms[offset+j] = MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(coef, index(kvar)))
+            j += 1
         end
         offset += length(linear_terms(aff.knowns))
     end

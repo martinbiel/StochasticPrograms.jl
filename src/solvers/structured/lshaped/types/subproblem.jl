@@ -4,7 +4,7 @@ struct SubProblem{H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     optimizer::MOI.AbstractOptimizer
     feasibility_handler::H
     linking_constraints::Vector{MOI.ConstraintIndex}
-    masterterms::Vector{Vector{Tuple{Int, T}}}
+    masterterms::Vector{Vector{Tuple{Int, Int, T}}}
 
     function SubProblem(model::JuMP.Model,
                         id::Integer,
@@ -62,40 +62,101 @@ function prepare!(model::MOI.ModelLike, handler::FeasibilityHandler)
     i = 1
     # Create auxiliary feasibility variables
     for (F, S) in MOI.get(model, MOI.ListOfConstraints())
-        if F <: AffineDecisionFunction
-            for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
-                # Positive feasibility variable
-                pos_aux_var = MOI.add_variable(model)
-                name = add_subscript(:v⁺, i)
-                MOI.set(model, MOI.VariableName(), pos_aux_var, name)
-                push!(handler.feasibility_variables, pos_aux_var)
-                # Nonnegativity constraint
-                MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
-                           MOI.GreaterThan{Float64}(0.0))
-                # Add to objective
-                MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                           MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
-                # Add to constraint
-                MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
-                # Negative feasibility variable
-                neg_aux_var = MOI.add_variable(model)
-                name = add_subscript(:v⁻, i)
-                MOI.set(model, MOI.VariableName(), neg_aux_var, name)
-                push!(handler.feasibility_variables, neg_aux_var)
-                # Nonnegativity constraint
-                MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
-                           MOI.GreaterThan{Float64}(0.0))
-                # Add to objective
-                MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                           MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
-                # Add to constraint
-                MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
-                # Update identification index
-                i += 1
-            end
-        end
+        i = add_auxilliary_variables!(model, handler, F, S, i)
     end
     return nothing
+end
+
+function add_auxilliary_variables!(model::MOI.ModelLike,
+                                   handler::FeasibilityHandler,
+                                   F::Type{<:MOI.AbstractFunction},
+                                   S::Type{<:MOI.AbstractSet},
+                                   idx::Integer)
+    # Nothing to do for most most constraints
+    return idx
+end
+
+function add_auxilliary_variables!(model::MOI.ModelLike,
+                                   handler::FeasibilityHandler,
+                                   F::Type{<:AffineDecisionFunction},
+                                   S::Type{<:MOI.AbstractScalarSet},
+                                   idx::Integer)
+    G = MOI.ScalarAffineFunction{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
+        # Positive feasibility variable
+        pos_aux_var = MOI.add_variable(model)
+        name = add_subscript(:v⁺, idx)
+        MOI.set(model, MOI.VariableName(), pos_aux_var, name)
+        push!(handler.feasibility_variables, pos_aux_var)
+        # Nonnegativity constraint
+        MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+                           MOI.GreaterThan{Float64}(0.0))
+        # Add to objective
+        MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                   MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+        # Add to constraint
+        MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+        # Negative feasibility variable
+        neg_aux_var = MOI.add_variable(model)
+        name = add_subscript(:v⁻, idx)
+        MOI.set(model, MOI.VariableName(), neg_aux_var, name)
+        push!(handler.feasibility_variables, neg_aux_var)
+        # Nonnegativity constraint
+        MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+                           MOI.GreaterThan{Float64}(0.0))
+        # Add to objective
+        MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                   MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
+        # Add to constraint
+        MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
+        # Update identification index
+        idx += 1
+    end
+    return idx + 1
+end
+
+function add_auxilliary_variables!(model::MOI.ModelLike,
+                                   handler::FeasibilityHandler,
+                                   F::Type{<:VectorAffineDecisionFunction},
+                                   S::Type{<:MOI.AbstractVectorSet},
+                                   idx::Integer)
+    G = MOI.ScalarAffineFunction{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
+        n = MOI.dimension(MOI.get(model, MOI.ConstraintSet(), ci))
+        for (i, id) in enumerate(idx:(idx + n - 1))
+            # Positive feasibility variable
+            pos_aux_var = MOI.add_variable(model)
+            name = add_subscript(:v⁺, id)
+            MOI.set(model, MOI.VariableName(), pos_aux_var, name)
+            push!(handler.feasibility_variables, pos_aux_var)
+            # Nonnegativity constraint
+            MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+                               MOI.GreaterThan{Float64}(0.0))
+            # Add to objective
+            MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                       MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+            # Add to constraint
+            MOI.modify(model, ci, MOI.MultirowChange(pos_aux_var, [(i, 1.0)]))
+        end
+        for (i, id) in enumerate(idx:(idx + n - 1))
+            # Negative feasibility variable
+            neg_aux_var = MOI.add_variable(model)
+            name = add_subscript(:v⁻, id)
+            MOI.set(model, MOI.VariableName(), neg_aux_var, name)
+            push!(handler.feasibility_variables, neg_aux_var)
+            # Nonnegativity constraint
+            MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+                               MOI.GreaterThan{Float64}(0.0))
+            # Add to objective
+            MOI.modify(model, MOI.ObjectiveFunction{G}(),
+                       MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
+            # Add to constraint
+            MOI.modify(model, ci, MOI.MultirowChange(neg_aux_var, [(i, -1.0)]))
+        end
+        # Update identification index
+        idx += n
+    end
+    return idx + 1
 end
 
 function restore!(model::MOI.ModelLike, handler::FeasibilityHandler)
@@ -116,20 +177,43 @@ function collect_linking_constraints(model::JuMP.Model,
                                      master_indices::Vector{MOI.VariableIndex},
                                      ::Type{T}) where T <: AbstractFloat
     linking_constraints = Vector{MOI.ConstraintIndex}()
-    masterterms = Vector{Vector{Tuple{Int,T}}}()
+    masterterms = Vector{Vector{Tuple{Int, Int, T}}}()
+    # Parse single rows
     F = DecisionAffExpr{Float64}
     for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
         for cref in all_constraints(model, F, S)
-            push!(linking_constraints, cref.index)
-            coeffs = Vector{Tuple{Int,T}}()
+            coeffs = Vector{Tuple{Int, Int, T}}()
             aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::DecisionAffExpr
             for (coef, kvar) in linear_terms(aff.knowns)
                 # Map known decisions to master decision,
                 # assuming sorted order
-                idx = master_indices[index(kvar).value].value
-                push!(coeffs, (idx, T(coef)))
+                col = master_indices[index(kvar).value].value
+                push!(coeffs, (1, col, T(coef)))
             end
-            push!(masterterms, coeffs)
+            if !isempty(coeffs)
+                push!(masterterms, coeffs)
+                push!(linking_constraints, cref.index)
+            end
+        end
+    end
+    # Parse vector rows
+    F = Vector{DecisionAffExpr{Float64}}
+    for S in [MOI.Zeros, MOI.Nonpositives, MOI.Nonnegatives]
+        for cref in all_constraints(model, F, S)
+            coeffs = Vector{Tuple{Int, Int, T}}()
+            affs = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::Vector{DecisionAffExpr{T}}
+            for (row, aff) in enumerate(affs)
+                for (coef, kvar) in linear_terms(aff.knowns)
+                    # Map known decisions to master decision,
+                    # assuming sorted order
+                    col = master_indices[index(kvar).value].value
+                    push!(coeffs, (row, col, T(coef)))
+                end
+            end
+            if !isempty(coeffs)
+                push!(masterterms, coeffs)
+                push!(linking_constraints, cref.index)
+            end
         end
     end
     return linking_constraints, masterterms
@@ -193,19 +277,23 @@ end
 
 # Cuts #
 # ========================== #
-function OptimalityCut(subproblem::SubProblem, x::AbstractVector)
+function OptimalityCut(subproblem::SubProblem{H, T}, x::AbstractVector) where {H, T}
     π = subproblem.probability
-    nterms = mapreduce(+, subproblem.masterterms) do terms
-        length(terms)
+    nterms = if isempty(subproblem.masterterms)
+        nterms = 0
+    else
+        nterms = mapreduce(+, subproblem.masterterms) do terms
+            length(terms)
+        end
     end
-    cols = zeros(nterms)
-    vals = zeros(nterms)
+    cols = zeros(Int, nterms)
+    vals = zeros(T, nterms)
     j = 1
     for (i, ci) in enumerate(subproblem.linking_constraints)
         λ = MOI.get(subproblem.optimizer, MOI.ConstraintDual(), ci)
-        for (idx, coeff) in subproblem.masterterms[i]
-            cols[j] = idx
-            vals[j] = π*λ*coeff
+        for (row, col, coeff) in subproblem.masterterms[i]
+            cols[j] = col
+            vals[j] = π * λ[row] * coeff
             j += 1
         end
     end
@@ -218,18 +306,18 @@ function OptimalityCut(subproblem::SubProblem, x::AbstractVector)
     return OptimalityCut(δQ, q, subproblem.id)
 end
 
-function FeasibilityCut(subproblem::SubProblem, x::AbstractVector)
+function FeasibilityCut(subproblem::SubProblem{H, T}, x::AbstractVector) where {H, T}
     nterms = mapreduce(+, subproblem.masterterms) do terms
         length(terms)
     end
-    cols = zeros(nterms)
-    vals = zeros(nterms)
+    cols = zeros(Int, nterms)
+    vals = zeros(T, nterms)
     j = 1
     for (i, ci) in enumerate(subproblem.linking_constraints)
         λ = MOI.get(subproblem.optimizer, MOI.ConstraintDual(), ci)
-        for (idx, coeff) in subproblem.masterterms[i]
-            cols[j] = idx
-            vals[j] = λ*coeff
+        for (row, col, coeff) in subproblem.masterterms[i]
+            cols[j] = col
+            vals[j] = λ[row] * coeff
             j += 1
         end
     end

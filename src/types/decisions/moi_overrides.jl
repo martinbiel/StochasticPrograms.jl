@@ -28,7 +28,7 @@ function MOIU.modify_function(f::QuadraticDecisionFunction, change::Union{MOI.Sc
                      copy(f.known_decision_terms))
 end
 
-function MOIU.modify_function(f::VectorAffineDecisionFunction, change::MOI.VectorConstantChange)
+function MOIU.modify_function(f::VectorAffineDecisionFunction, change::Union{MOI.VectorConstantChange, MOI.MultirowChange})
     return typeof(f)(MOIU.modify_function(f.variable_part, change),
                      copy(f.decision_part),
                      copy(f.known_part))
@@ -39,7 +39,6 @@ function MOIU.modify_function(f::AffineDecisionFunction, change::DecisionCoeffic
                      MOIU.modify_function(f.decision_part,
                                           MOI.ScalarCoefficientChange(change.decision, change.new_coefficient)),
                      copy(f.known_part))
-    return
 end
 
 function MOIU.modify_function(f::QuadraticDecisionFunction, change::DecisionCoefficientChange)
@@ -50,6 +49,13 @@ function MOIU.modify_function(f::QuadraticDecisionFunction, change::DecisionCoef
                      copy(f.cross_terms),
                      copy(f.known_variable_terms),
                      copy(f.known_decision_terms))
+end
+
+function MOIU.modify_function(f::VectorAffineDecisionFunction, change::DecisionMultirowChange)
+    return typeof(f)(copy(f.variable_part),
+                     MOIU.modify_function(f.decision_part,
+                                          DecisionMultirowChange(change.decision, change.new_coefficients)),
+                     copy(f.known_part))
 end
 
 function MOIU.modify_function(f::AffineDecisionFunction, change::KnownCoefficientChange)
@@ -67,6 +73,13 @@ function MOIU.modify_function(f::QuadraticDecisionFunction, change::KnownCoeffic
                      copy(f.cross_terms),
                      copy(f.known_variable_terms),
                      copy(f.known_decision_terms))
+end
+
+function MOIU.modify_function(f::VectorAffineDecisionFunction, change::KnownMultirowChange)
+    return typeof(f)(copy(f.variable_part),
+                     copy(f.decision_part),
+                     MOIU.modify_function(f.known_part,
+                                          KnownMultirowChange(change.known, change.new_coefficients)))
 end
 
 function MOIU.modify_function(f::Union{SingleDecision, AffineDecisionFunction, QuadraticDecisionFunction}, ::Union{DecisionStateChange, DecisionsStateChange})

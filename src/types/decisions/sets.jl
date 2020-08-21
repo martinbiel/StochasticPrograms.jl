@@ -1,19 +1,32 @@
-# Helper struct to dispatch known decision variable construction
-struct DecisionSet <: MOI.AbstractScalarSet end
+# Helper structs to dispatch known decision variable construction
+struct NoSpecifiedConstraint <: MOI.AbstractSet end
+struct DecisionSet{S <: MOI.AbstractSet} <: MOI.AbstractScalarSet
+    constraint::S
+
+    function DecisionSet(; constraint::MOI.AbstractSet = NoSpecifiedConstraint())
+        S = typeof(constraint)
+        return new{S}(constraint)
+    end
+end
 struct KnownSet <: MOI.AbstractScalarSet end
 
-struct SingleDecisionSet{T} <: MOI.AbstractScalarSet
+struct SingleDecisionSet{T, S} <: MOI.AbstractScalarSet
     decision::Decision{T}
+    constraint::S
 end
 
 struct SingleKnownSet{T} <: MOI.AbstractScalarSet
     known::Decision{T}
 end
 
+set_constraint(set::SingleDecisionSet) = set.constraint
+set_constraint(::SingleKnownSet) = NoSpecifiedConstraint()
+
 struct FreeDecision <: MOI.AbstractScalarSet end
 
-struct MultipleDecisionSet{T} <: MOI.AbstractVectorSet
+struct MultipleDecisionSet{T, S} <: MOI.AbstractVectorSet
     decisions::Vector{Decision{T}}
+    constraint::S
 end
 MOI.dimension(set::MultipleDecisionSet) = length(set.decisions)
 
@@ -43,6 +56,22 @@ function JuMP.in_set_string(print_mode, set::MultipleKnownSet)
     return string(JuMP._math_symbol(print_mode, :in), " Known(values = $([k.value for k in set.knowns]))")
 end
 
+function reuse(set::SingleDecisionSet, decision::Decision)
+    return SingleDecisionSet(decision, set.constraint)
+end
+
+function reuse(set::SingleKnownSet, decision::Decision)
+    return SingleKnownSet(decision)
+end
+
+function reuse(set::MultipleDecisionSet, decisions::Vector{<:Decision})
+    return MultipleDecisionSet(decisions, set.constraint)
+end
+
+function reuse(set::MultipleKnownSet, decisions::Vector{<:Decision})
+    return MultipleKnownSet(decisions)
+end
+
 function VariableRef(model::Model, index::MOI.VariableIndex, ::Union{SingleDecisionSet, MultipleDecisionSet})
     return DecisionRef(model, index)
 end
@@ -51,11 +80,11 @@ function VariableRef(model::Model, index::MOI.VariableIndex, ::Union{SingleKnown
     return KnownRef(model, index)
 end
 
-function set(variable::JuMP.ScalarVariable, ::Type{DecisionRef})
-    return SingleDecisionSet(Decision(variable.info, Float64))
+function set(variable::JuMP.ScalarVariable, ::Type{DecisionRef}, constraint::MOI.AbstractSet)
+    return SingleDecisionSet(Decision(variable.info, Float64), constraint)
 end
 
-function set(variable::JuMP.ScalarVariable, ::Type{KnownRef})
+function set(variable::JuMP.ScalarVariable, ::Type{KnownRef}, ::NoSpecifiedConstraint)
     return SingleKnownSet(KnownDecision(variable.info, Float64))
 end
 

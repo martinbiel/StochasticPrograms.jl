@@ -14,8 +14,12 @@ problems = Vector{Tuple{StochasticModel,Vector{<:AbstractScenario},SPResult,Stri
 include("simple.jl")
 @info "Loading instant simple..."
 include("instant_simple.jl")
+@info "Loading vectorized simple..."
+include("vectorized_simple.jl")
 @info "Loading infeasible..."
 include("infeasible.jl")
+@info "Loading vectorized infeasible..."
+include("vectorized_infeasible.jl")
 @info "Loading farmer..."
 include("farmer.jl")
 @info "Loading sampler..."

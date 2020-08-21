@@ -36,8 +36,8 @@ function MOIB.added_constraint_types(::Type{<:VectorAffineDecisionConstraintBrid
     return [(MOI.VectorAffineFunction{T}, S)]
 end
 function MOIB.Constraint.concrete_bridge_type(::Type{<:VectorAffineDecisionConstraintBridge{T}},
-                              ::Type{<:VectorAffineDecisionFunction{T}},
-                              S::Type{<:MOI.AbstractVectorSet}) where T
+                                              ::Type{<:VectorAffineDecisionFunction{T}},
+                                              S::Type{<:MOI.AbstractVectorSet}) where T
     return VectorAffineDecisionConstraintBridge{T, S}
 end
 

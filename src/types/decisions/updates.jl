@@ -102,24 +102,26 @@ function update_decision_variable_constraints!(::JuMP.Model, ::Union{DecisionMod
 end
 
 function update_decision_variable_constraints!(model::JuMP.Model, change::DecisionStateChange)
-    F = DecisionRef
-    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
-        for cref in all_constraints(model, F, S)
-            update_decision_constraint!(cref, change)
+    for F in [DecisionRef, ]
+        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
+            for cref in all_constraints(model, F, S)
+                update_decision_constraint!(cref, change)
+            end
         end
     end
     return nothing
 end
 
 function update_decision_variable_constraints!(model::JuMP.Model, ::DecisionsStateChange)
-    F = DecisionRef
-    for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
-        for cref in all_constraints(model, F, S)
-            # Fetch the decision
-            dref = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))
-            # Perform specific decision state change
-            change = DecisionStateChange(index(dref), state(dref), 0.0)
-            update_decision_constraint!(cref, change)
+    for F in [DecisionRef, ]
+        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
+            for cref in all_constraints(model, F, S)
+                # Fetch the decision
+                dref = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))
+                # Perform specific decision state change
+                change = DecisionStateChange(index(dref), state(dref), 0.0)
+                update_decision_constraint!(cref, change)
+            end
         end
     end
     return nothing
@@ -128,6 +130,13 @@ end
 function update_decision_constraints!(model::JuMP.Model, change::Union{DecisionModification, KnownModification})
     for F in [DecisionAffExpr{Float64}, DecisionQuadExpr{Float64}]
         for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
+            for cref in all_constraints(model, F, S)
+                update_decision_constraint!(cref, change)
+            end
+        end
+    end
+    for F in [Vector{DecisionAffExpr{Float64}}]
+        for S in [MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives]
             for cref in all_constraints(model, F, S)
                 update_decision_constraint!(cref, change)
             end
@@ -146,12 +155,26 @@ function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintInd
     return nothing
 end
 
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorOfDecisions, S}, change::VectorDecisionModification) where {T,S}
+    MOI.modify(model, ci, change)
+    return nothing
+end
+
 function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionCoefficientChange, KnownModification}) where {T,S}
     MOI.modify(model, ci, change)
     return nothing
 end
 
 function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionStateChange, DecisionsStateChange}) where {T,S}
+    return nothing
+end
+
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorAffineDecisionFunction{T}, S}, change::Union{DecisionMultirowChange, KnownModification}) where {T,S}
+    MOI.modify(model, ci, change)
+    return nothing
+end
+
+function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorAffineDecisionFunction{T}, S}, change::Union{DecisionStateChange, DecisionsStateChange}) where {T,S}
     return nothing
 end
 

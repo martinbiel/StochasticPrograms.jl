@@ -12,13 +12,20 @@ end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
                                                    model::MOI.ModelLike,
-                                                   set::SingleDecisionSet{T}) where T
+                                                   set::SingleDecisionSet{T,NoSpecifiedConstraint}) where T
     variable = MOI.add_variable(model)
     return DecisionBridge(set.decision, variable)
 end
 
+function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
+                                                   model::MOI.ModelLike,
+                                                   set::SingleDecisionSet{T,S}) where {T, S}
+    variable = MOI.add_constrained_variable(model, set.constraint)
+    return DecisionBridge(set.decision, variable)
+end
+
 function MOIB.Variable.supports_constrained_variable(
-    ::Type{DecisionBridge{T}}, ::Type{SingleDecisionSet{T}}) where T
+    ::Type{DecisionBridge{T}}, ::Type{SingleDecisionSet{T,S}}) where {T, S}
     return true
 end
 
@@ -172,13 +179,20 @@ end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
                                                    model::MOI.ModelLike,
-                                                   set::MultipleDecisionSet{T}) where T
-    variables = [MOI.add_variable(model) for _ in 1:length(set.decisions)]
+                                                   set::MultipleDecisionSet{T,NoSpecifiedConstraint}) where T
+    variables = MOI.add_variables(model, length(set.decisions))
+    return DecisionsBridge(set.decisions, variables)
+end
+
+function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
+                                                   model::MOI.ModelLike,
+                                                   set::MultipleDecisionSet{T,S}) where {T, S}
+    variables = MOI.add_constrained_variables(model, set.constraint)
     return DecisionsBridge(set.decisions, variables)
 end
 
 function MOIB.Variable.supports_constrained_variable(
-    ::Type{DecisionsBridge{T}}, ::Type{MultipleDecisionSet{T}}) where T
+    ::Type{DecisionsBridge{T}}, ::Type{MultipleDecisionSet{T,S}}) where {T, S}
     return true
 end
 
@@ -251,7 +265,7 @@ function MOIB.bridged_function(bridge::DecisionsBridge{T}, i::MOIB.Variable.Inde
         # in order to unbridge properly. Give the value of the taken decision in the
         # decision part constant given to the objective/constraint bridges
         return MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), bridge.variables[i.value])],
-                                        bridge.decision.value)
+                                           decision.value)
     end
 end
 function MOIB.Variable.unbridged_map(bridge::DecisionsBridge, vi::MOI.VariableIndex, i::MOIB.Variable.IndexInVector)
@@ -315,7 +329,7 @@ end
 function MOI.get(model::MOI.ModelLike,
                  attr::Union{MOI.VariablePrimal, MOI.VariablePrimalStart},
                  bridge::KnownsBridge, i::MOIB.Variable.IndexInVector)
-    return bridge.knowns[i].value
+    return bridge.knowns[i.value].value
 end
 
 function MOI.set(model::MOI.ModelLike, attr::MOI.ConstraintSet,
@@ -345,7 +359,7 @@ end
 
 function MOIB.is_bridged(b::MOIB.AbstractBridgeOptimizer,
                          change::Union{DecisionStateChange, DecisionsStateChange,
-                                       KnownCoefficientChange,
+                                       KnownCoefficientChange, KnownMultirowChange,
                                        KnownValueChange, KnownValuesChange})
     # These modifications should not be handled by the variable bridges
     return false
