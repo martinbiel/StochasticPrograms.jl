@@ -247,7 +247,7 @@ function VectorAffineDecisionFunction(affs::Vector{DAE})
     end
     # Known part
     klength = sum(aff -> length(linear_terms(aff.knowns)), affs)
-    decision_terms = Vector{MOI.VectorAffineTerm{Float64}}(undef, klength)
+    known_terms = Vector{MOI.VectorAffineTerm{Float64}}(undef, klength)
     offset = 0
     for (i, aff) in enumerate(affs)
         j = 1
@@ -255,14 +255,14 @@ function VectorAffineDecisionFunction(affs::Vector{DAE})
             # Any known decision is set in the known bridge
             known_terms[offset+j] = MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(coef, index(kvar)))
         end
-        offset += length(linear_terms(aff))
+        offset += length(linear_terms(aff.knowns))
     end
-    VectorAffineDecisionFunction(JuMP.moi_function([aff.variables for aff in affs],
+    VectorAffineDecisionFunction(JuMP.moi_function([aff.variables for aff in affs]),
                                                    MOI.VectorAffineFunction(decision_terms, zeros(length(affs))),
-                                                   MOI.VectorAffineFunction(known_terms, zeros(length(affs)))))
+                                                   MOI.VectorAffineFunction(known_terms, zeros(length(affs))))
 end
-JuMP.moi_function(affs::Vector{<:_DecisionAffExpr}) = VectorAffineDecisionFunction(affs)
-function JuMP.moi_function_type(::Type{<:Vector{<:_DecisionAffExpr{T}}}) where {T}
+JuMP.moi_function(affs::Vector{<:DecisionAffExpr}) = VectorAffineDecisionFunction(affs)
+function JuMP.moi_function_type(::Type{<:Vector{<:DecisionAffExpr{T}}}) where {T}
     return VectorAffineDecisionFunction{T}
 end
 
