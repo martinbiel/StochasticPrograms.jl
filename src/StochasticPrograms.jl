@@ -89,6 +89,8 @@ export
     optimizer,
     optimizer_constructor,
     AbstractStochasticStructure,
+    StochasticInstantiation,
+    UnspecifiedInstantiation,
     Deterministic,
     DeterministicEquivalent,
     Vertical,
@@ -231,5 +233,6 @@ include("methods/methods.jl")
 include("optimizer_interface.jl")
 include("crash.jl")
 include("solvers/solvers.jl")
+include("io/io.jl")
 
 end # module
