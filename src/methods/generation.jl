@@ -38,7 +38,6 @@ function stage_model(stochasticprogram::StochasticProgram{N},
                      stage::Integer,
                      scenario::AbstractScenario;
                      optimizer = nothing) where N
-
     1 <= stage <= N || error("Stage $stage not in range 1 to $N")
     stage == 1 && return stage_one_model(stochasticprogram, optimizer)
     # Check generators
@@ -88,6 +87,8 @@ function generate!(stochasticprogram::StochasticProgram{N}) where N
     end
     # Check generators
     check_generators(stochasticprogram::StochasticProgram{N})
+    # Do nothing if there are no scenarios
+    num_scenarios(stochasticprogram) == 0 && return nothing
     # Dispatch generation on stochastic structure
     generate!(stochasticprogram, structure(stochasticprogram))
     return nothing

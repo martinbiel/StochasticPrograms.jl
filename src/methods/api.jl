@@ -770,7 +770,7 @@ Store the second stage `scenario` in the `stochasticprogram` at `stage`. Default
 If the `stochasticprogram` is distributed, the scenario will be defined on the node that currently has the fewest scenarios.
 """
 function add_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, stage::Integer = 2)
-    add_scenario!(structure(stochasticprogram), stage, scenario)
+    add_scenario!(structure(stochasticprogram), scenario, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -780,7 +780,7 @@ end
 Store the second stage `scenario` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenario!(stochasticprogram::StochasticProgram, scenario::AbstractScenario, w::Integer, stage::Integer = 2)
-    add_scenario!(structure(stochasticprogram), stage, scenario, w)
+    add_scenario!(structure(stochasticprogram), scenario, w, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -800,7 +800,7 @@ end
 Store the second stage scenario returned by `scenariogenerator` in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenario!(scenariogenerator::Function, stochasticprogram::StochasticProgram, w::Integer, stage::Integer = 2)
-    add_scenario!(scenariogenerator, structure(stochasticprogram), stage, w)
+    add_scenario!(scenariogenerator, structure(stochasticprogram), w, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end
@@ -820,7 +820,7 @@ end
 Store the collection of second stage `scenarios` in in worker node `w` of the `stochasticprogram` at `stage`. Defaults to the second stage.
 """
 function add_worker_scenarios!(stochasticprogram::StochasticProgram, scenarios::Vector{<:AbstractScenario}, w::Integer, stage::Integer = 2)
-    add_scenarios!(structure(stochasticprogram), stage, scenarios, w)
+    add_scenarios!(structure(stochasticprogram), scenarios, w, stage)
     invalidate_cache!(stochasticprogram)
     return stochasticprogram
 end

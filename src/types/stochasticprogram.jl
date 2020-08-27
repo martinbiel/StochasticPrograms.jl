@@ -171,7 +171,12 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
         end
     end
     if deferred(stochasticprogram)
-        return print(io, "Deferred stochastic program")
+        n = num_scenarios(stochasticprogram)
+        if n == 0
+            return print(io, "Deferred stochastic program")
+        else
+            return print(io, "Deferred stochastic program with $n scenario$(plural(n))")
+        end
     end
     if N == 2 && distributed(stochasticprogram)
         println(io, "Distributed stochastic program with:")
