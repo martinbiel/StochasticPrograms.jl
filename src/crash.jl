@@ -64,11 +64,36 @@ function (::EVP)(stochasticprogram::StochasticProgram)
     return expected_value_decision(stochasticprogram)
 end
 
-function (::EVP)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+function (crash::EVP)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
     # Get instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
     sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
-    return expected_value_decision(sp)
+    return crash(sp)
+end
+
+"""
+    FeasiblePoint
+
+Generate a feasible first-stage decision as initial decision.
+
+"""
+struct FeasiblePoint <: AbstractCrash end
+
+function (::FeasiblePoint)(stochasticprogram::StochasticProgram)
+    # Generate first-stage
+    m = stage_one_model(stochasticprogram, optimizer = master_optimizer(stochasticprogram))
+    # Solve feasibility problem
+    @objective(m, MOI.FEASIBILITY_SENSE, 0)
+    optimize!(m)
+    # Return feasible point
+    return JuMP.value.(all_decision_variables(m))
+end
+
+function (crash::FeasiblePoint)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
+    return crash(sp)
 end
 
 """
@@ -93,7 +118,7 @@ function (crash::Scenario)(stochasticmodel::StochasticModel, sampler::AbstractSa
     # Get instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
     sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
-    return wait_and_see_decision(sp, crash.scenario)
+    return crash(sp)
 end
 
 """

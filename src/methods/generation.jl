@@ -26,6 +26,9 @@ Return a generated copy of the first stage model in `stochasticprogram`. Optiona
 function stage_one_model(stochasticprogram::StochasticProgram; optimizer = nothing)
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     model = optimizer == nothing ? Model() : Model(optimizer)
+    # Prepare decisions
+    model.ext[:decisions] = Decisions()
+    add_decision_bridges!(model)
     generator(stochasticprogram, :stage_1)(model, stage_parameters(stochasticprogram, 1))
     return model
 end
@@ -48,7 +51,7 @@ function stage_model(stochasticprogram::StochasticProgram{N},
     # Create stage model
     stage_model = optimizer == nothing ? Model() : Model(optimizer)
     # Prepare decisions
-    stage_model.ext[:decisionvariables] = Decision()
+    stage_model.ext[:decisions] = Decisions()
     add_decision_bridges!(stage_model)
     # Generate and return the stage model
     generator(stochasticprogram, decision_key)(stage_model, decision_params)
