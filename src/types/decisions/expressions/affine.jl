@@ -103,6 +103,12 @@ end
 function JuMP._affine_coefficient(f::DecisionAffExpr, known::KnownRef)
     return JuMP._affine_coefficient(f.knowns, known)
 end
+function JuMP._affine_coefficient(f::_VariableAffExpr{C}, decision::DecisionRef) where C
+    return zero(C)
+end
+function JuMP._affine_coefficient(f::_VariableAffExpr{C}, known::KnownRef) where C
+    return zero(C)
+end
 
 function JuMP.map_coefficients_inplace!(f::Function, aff::DecisionAffExpr)
     JuMP.map_coefficients_inplace!(f, aff.variables)
