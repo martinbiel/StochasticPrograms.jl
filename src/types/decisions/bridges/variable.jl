@@ -246,7 +246,7 @@ function MOI.get(model::MOI.ModelLike,
 end
 
 function MOI.set(model::MOI.ModelLike, attr::MOI.VariablePrimalStart,
-                 bridge::KnownBridge{T}, val, i::MOIB.Variable.IndexInVector) where T
+                 bridge::DecisionsBridge{T}, val, i::MOIB.Variable.IndexInVector) where T
     MOI.set(model, attr, bridge.variables[i.value], val)
 end
 
