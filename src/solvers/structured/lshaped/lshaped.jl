@@ -83,6 +83,8 @@ export
     ClusterAggregation,
     HybridAggregate,
     HybridAggregation,
+    GranulatedAggregate,
+    GranulatedAggregation,
     SelectUniform,
     SelectDecaying,
     SelectRandom,
