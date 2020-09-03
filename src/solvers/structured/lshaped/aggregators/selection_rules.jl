@@ -120,7 +120,7 @@ function select(rule::SelectClosest, aggregates::Vector{<:AggregatedOptimalityCu
     if dist > rule.τ
         zero_idx = findfirst(iszero, aggregates)
          if zero_idx == nothing
-            return idx, true
+            return idx, false
         end
         return zero_idx, false
     end
