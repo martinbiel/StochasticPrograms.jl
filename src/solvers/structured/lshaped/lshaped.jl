@@ -89,7 +89,7 @@ export
     SelectDecaying,
     SelectRandom,
     SelectClosest,
-    SelectClosestToReference,
+    SortByReference,
     StaticCluster,
     ClusterByReference,
     Kmedoids,

@@ -132,7 +132,7 @@ function str(::SelectClosest)
 end
 
 """
-    SelectClosestToReference(τ::AbstractFloat; distance::Function = absolute_distance)
+    SortByReference(τ::AbstractFloat; distance::Function = absolute_distance)
 
 Incoming cuts are placed into an aggregate based on the distance to a reference cut, according the supplied `distance` function. Behaves as [`SelectClosest`](@ref) if not withing the tolerance `τ` to the reference cut.
 
@@ -142,52 +142,38 @@ The following distance measures are available
 - [`spatioangular_distance`](@ref
 
 """
-mutable struct SelectClosestToReference{T <: AbstractFloat} <: AbstractSelectionRule
-    τ::T
+mutable struct SortByReference <: AbstractSelectionRule
     distance::Function
-    reference::AggregatedOptimalityCut{T}
-    buffer::AggregatedOptimalityCut{T}
+    reference::AggregatedOptimalityCut{Float64}
+    buffer::AggregatedOptimalityCut{Float64}
 end
 
-function SelectClosestToReference(τ::AbstractFloat; distance::Function = absolute_distance)
-    T = typeof(τ)
-    return SelectClosestToReference{T}(τ, distance, zero(AggregatedOptimalityCut{T}), zero(AggregatedOptimalityCut{T}))
+function SortByReference(; distance::Function = absolute_distance)
+    return SortByReference(distance, zero(AggregatedOptimalityCut{Float64}), zero(AggregatedOptimalityCut{Float64}))
 end
 
-function select(rule::SelectClosestToReference, aggregates::Vector{<:AggregatedOptimalityCut}, cut::HyperPlane{OptimalityCut})
+function select(rule::SortByReference, aggregates::Vector{<:AggregatedOptimalityCut}, cut::HyperPlane{OptimalityCut})
     # Fill buffer with total aggregate each iteration
     rule.buffer += cut
     if iszero(rule.reference)
-        # Multicut before reference has been calculated
-        return 1, true
-    elseif rule.distance(cut, rule.reference) <= rule.τ
-        # Distance to reference within tolerance
+        # Single-cut before reference has been calculated
         return 1, false
     else
-        for i = 2:length(aggregates)
-            agg = aggregates[i]
-            dist = rule.distance(cut, agg)
-            if iszero(agg) || dist <= rule.τ / (num_subproblems(rule.reference) -
-                                                num_subproblems(agg) + 1)
-                if i == length(aggregates)
-                    # Last position operates as multicut
-                    return i, true
-                end
-                # Aggregate at i if within number adjusted tolerance
-                return i, false
-            end
-        end
+        τs = LinRange(0., 1., length(aggregates))
+        dist = rule.distance(cut, agg)
+        i = something(findfirst(τ -> dist <= τ, τs), 1)
+        return i, false
     end
 end
 
-function reset!(rule::SelectClosestToReference{T}) where T <: AbstractFloat
+function reset!(rule::SortByReference)
     # Swap in buffer and reset when all cuts have been seen
-    rule.reference = zero(AggregatedOptimalityCut{T})
+    rule.reference = zero(AggregatedOptimalityCut{Float64})
     rule.reference += rule.buffer
-    rule.buffer = zero(AggregatedOptimalityCut{T})
+    rule.buffer = zero(AggregatedOptimalityCut{Float64})
     return nothing
 end
 
-function str(::SelectClosestToReference)
-    return "distance to reference based selection"
+function str(::SortByReference)
+    return "sort by reference based selection"
 end

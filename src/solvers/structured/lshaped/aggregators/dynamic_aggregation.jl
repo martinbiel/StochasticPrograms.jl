@@ -8,7 +8,7 @@ The following selection rules are available
 - [`SelectDecaying`](@ref)
 - [`SelectRandom`](@ref
 - [`SelectClosest`](@ref)
-- [`SelectClosestToReference`](@ref)
+- [`SortByReference`](@ref)
 
 ...
 # Parameters
