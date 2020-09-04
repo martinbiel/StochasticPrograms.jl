@@ -223,7 +223,7 @@ macro container_scenario(args...)
     @assert isempty(kw_args)
     var, value = args
     code = Containers.parse_container(error, var, esc(value), requested_container)
-    return :(Scenario($code, probability = $probability))
+    return :(Scenario($code, probability = $(esc(probability))))
 end
 function _extract_kw_args(args)
     kw_args = filter(x -> isexpr(x, :(=)) && x.args[1] != :container && x.args[1] != :probability, collect(args))
