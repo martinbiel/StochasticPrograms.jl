@@ -76,14 +76,10 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                         set_name(var, @sprintf("%s[%s", add_subscript(varname,i), splitname[2]))
                     end
                     newkey = Symbol(arrayname)
-                elseif isa(obj, JuMP.ConstraintRef)
-                    arrayname = if N > 2
-                        arrayname = add_subscript(add_subscript(objkey, stage), i)
-                    else
-                        arrayname = add_subscript(objkey, i)
-                    end
-                    newkey = Symbol(arrayname)
-                elseif isa(obj, AbstractArray{<:ConstraintRef})
+                elseif isa(obj, JuMP.ConstraintRef) ||
+                       isa(obj, AbstractArray{<:ConstraintRef}) ||
+                       isa(obj, AbstractArray{<:GenericAffExpr}) ||
+                       isa(obj, AbstractArray{<:DecisionAffExpr})
                     arrayname = if N > 2
                         arrayname = add_subscript(add_subscript(objkey, stage), i)
                     else
