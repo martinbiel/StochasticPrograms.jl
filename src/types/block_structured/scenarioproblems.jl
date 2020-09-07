@@ -389,10 +389,12 @@ function add_scenarios!(scenarioproblems::DistributedScenarioProblems{S}, scenar
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     (nscen, extra) = divrem(length(scenarios), nworkers())
     start = 1
-    stop = nscen + (extra > 0)
+    stop = 0
     @sync begin
         for w in workers()
             n = nscen + (extra > 0)
+            stop += n
+            stop = min(stop, length(scenarios))
             scenario_range = start:stop
             @async remotecall_fetch(
                 w,
@@ -402,8 +404,6 @@ function add_scenarios!(scenarioproblems::DistributedScenarioProblems{S}, scenar
                 end
             scenarioproblems.scenario_distribution[w-1] += n
             start = stop + 1
-            stop += n
-            stop = min(stop, length(scenarios))
             extra -= 1
         end
     end
