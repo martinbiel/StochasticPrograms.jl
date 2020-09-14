@@ -118,22 +118,43 @@ end
 function extract_set(expr)
     set = NoSpecifiedConstraint()
     found = false
+    quit = false
     new_expr = prewalk(expr) do x
-        if @capture(x, var_Symbol in constrset_) && !found
+        if @capture(x, var_Symbol)
+            if var == :Bin
+                set = MOI.ZeroOne()
+                found = true
+                return :()
+            elseif var == :Int
+                set = MOI.Integer()
+                found = true
+                return :()
+            end
+        elseif @capture(x, var_Symbol = true)
+            if var == :binary
+                set = MOI.ZeroOne()
+                found = true
+                return :()
+            elseif var == :integer
+                set = MOI.Integer()
+                found = true
+                return :()
+            end
+        elseif @capture(x, var_Symbol in constrset_) && !found && !quit
             set = constrset
             found = true
             return :($var)
-        elseif @capture(x, var_Symbol[ids_] in constrset_) && !found
+        elseif @capture(x, var_Symbol[ids_] in constrset_) && !found && !quit
             set = constrset
             found = true
             return :($var[$ids])
-        elseif @capture(x, set = constrset_) && !found
+        elseif @capture(x, set = constrset_) && !found && !quit
             set = constrset
             found = true
             return :()
         elseif @capture(x, var_Symbol[ids_])
             # Break here to prevent indices from being filtered
-            found = true
+            quit = true
             return x
         else
             return x

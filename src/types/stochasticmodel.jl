@@ -118,11 +118,11 @@ macro stochastic_model(def)
             paramdefs[stage] = paramdef
         end
         if @capture(x, @decision arg__)
-            if @capture(x, @decision model_ var_Symbol) || @capture(x, @decision model_ var_Symbol[range__]) ||
-               @capture(x, @decision model_ var_Symbol <= ub_) || @capture(x, @decision model_ var_Symbol >= lb_) ||
-               @capture(x, @decision model_ var_Symbol[range__] <= ub_) || @capture(x, @decision model_ var_Symbol[range__] >= ln_) ||
-               @capture(x, @decision model_ var_Symbol in set_) || @capture(x, @decision model_ var_Symbol[range__] in set_) ||
-               @capture(x, @decision model_ lb_ <= var_Symbol <= ub_) || @capture(x, @decision model_ lb_ <= var_Symbol[range__] <= ub_)
+            if @capture(x, @decision model_ var_Symbol more__) || @capture(x, @decision model_ var_Symbol[range__] more__) ||
+               @capture(x, @decision model_ var_Symbol <= ub_ more__) || @capture(x, @decision model_ var_Symbol >= lb_ more__) ||
+               @capture(x, @decision model_ var_Symbol[range__] <= ub_ more__) || @capture(x, @decision model_ var_Symbol[range__] >= ln_ more__) ||
+               @capture(x, @decision model_ var_Symbol in set_ more__) || @capture(x, @decision model_ var_Symbol[range__] in set_ more__) ||
+               @capture(x, @decision model_ lb_ <= var_Symbol <= ub_ more__) || @capture(x, @decision model_ lb_ <= var_Symbol[range__] <= ub_ more__)
                 push!(decisiondefs[stage], var)
             end
         end

@@ -40,8 +40,12 @@ MOIU.variable_function_type(::Type{<:MultipleDecisionSet}) = VectorOfDecisions
 MOIU.variable_function_type(::Type{<:SingleKnownSet}) = SingleKnown
 MOIU.variable_function_type(::Type{<:MultipleKnownSet}) = VectorOfKnowns
 
-function JuMP.in_set_string(print_mode, ::SingleDecisionSet)
-    return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+function JuMP.in_set_string(print_mode, set::SingleDecisionSet)
+    if set.constraint == NoSpecifiedConstraint()
+        return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+    else
+        return string(JuMP._math_symbol(print_mode, :in), " Decisions($(JuMP.in_set_string(print_mode, set.constraint)))")
+    end
 end
 
 function JuMP.in_set_string(print_mode, set::SingleKnownSet)
@@ -49,7 +53,11 @@ function JuMP.in_set_string(print_mode, set::SingleKnownSet)
 end
 
 function JuMP.in_set_string(print_mode, ::MultipleDecisionSet)
-    return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+    if set.constraint == NoSpecifiedConstraint()
+        return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+    else
+        return string(JuMP._math_symbol(print_mode, :in), " Decisions($(JuMP.in_set_string(print_mode, set.constraint)))")
+    end
 end
 
 function JuMP.in_set_string(print_mode, set::MultipleKnownSet)

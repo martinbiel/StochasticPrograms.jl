@@ -598,15 +598,19 @@ macro stage(stage, args)
             @capture(x, @objective(m_Symbol, objdef__)) ||
             @capture(x, @parameters args__) ||
             @capture(x, @uncertain args__)
-            # Skip any line related to the JuMP model, stochastics, or unhandled @@parameter lines
+            # Skip any line related to the JuMP model, stochastics, or unhandled @parameter lines
             return Expr(:block)
-        elseif @capture(x, @decision(args__))
+        elseif @capture(x, @decision args__)
             # Handle @decision
             set = NoSpecifiedConstraint()
             for (i, arg) in enumerate(args)
                 set, arg, found = extract_set(arg)
                 if found
-                    args[i] = arg
+                    if arg == :()
+                        deleteat!(args, i)
+                    else
+                        args[i] = arg
+                    end
                     break
                 end
             end
@@ -625,7 +629,11 @@ macro stage(stage, args)
             for (i, arg) in enumerate(args)
                 set, arg, found = extract_set(arg)
                 if found
-                    args[i] = arg
+                    if arg == :()
+                        deleteat!(args, i)
+                    else
+                        args[i] = arg
+                    end
                     break
                 end
             end

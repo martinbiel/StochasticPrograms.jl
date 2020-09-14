@@ -20,7 +20,7 @@ end
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
                                                    model::MOI.ModelLike,
                                                    set::SingleDecisionSet{T,S}) where {T, S}
-    variable = MOI.add_constrained_variable(model, set.constraint)
+    variable, constraint = MOI.add_constrained_variable(model, set.constraint)
     return DecisionBridge(set.decision, variable)
 end
 
@@ -187,7 +187,7 @@ end
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
                                                    model::MOI.ModelLike,
                                                    set::MultipleDecisionSet{T,S}) where {T, S}
-    variables = MOI.add_constrained_variables(model, set.constraint)
+    variables, constraints = MOI.add_constrained_variables(model, set.constraint)
     return DecisionsBridge(set.decisions, variables)
 end
 
