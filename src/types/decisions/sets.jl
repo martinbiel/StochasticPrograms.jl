@@ -14,10 +14,12 @@ struct SingleDecisionSet{T, S} <: MOI.AbstractScalarSet
     decision::Decision{T}
     constraint::S
 end
+Base.copy(set::SingleDecisionSet) = reuse(set, set.decision)
 
 struct SingleKnownSet{T} <: MOI.AbstractScalarSet
     known::Decision{T}
 end
+Base.copy(set::SingleKnownSet) = reuse(set, set.decision)
 
 set_constraint(set::SingleDecisionSet) = set.constraint
 set_constraint(::SingleKnownSet) = NoSpecifiedConstraint()
@@ -29,11 +31,13 @@ struct MultipleDecisionSet{T, S} <: MOI.AbstractVectorSet
     constraint::S
 end
 MOI.dimension(set::MultipleDecisionSet) = length(set.decisions)
+Base.copy(set::MultipleDecisionSet) = reuse(set, set.decisions)
 
 struct MultipleKnownSet{T} <: MOI.AbstractVectorSet
     knowns::Vector{Decision{T}}
 end
 MOI.dimension(set::MultipleKnownSet) = length(set.knowns)
+Base.copy(set::MultipleKnownSet) = reuse(set, set.knowns)
 
 MOIU.variable_function_type(::Type{<:SingleDecisionSet}) = SingleDecision
 MOIU.variable_function_type(::Type{<:MultipleDecisionSet}) = VectorOfDecisions
@@ -65,7 +69,7 @@ function JuMP.in_set_string(print_mode, set::MultipleKnownSet)
 end
 
 function reuse(set::SingleDecisionSet, decision::Decision)
-    return SingleDecisionSet(decision, set.constraint)
+    return SingleDecisionSet(decision, copy(set.constraint))
 end
 
 function reuse(set::SingleKnownSet, decision::Decision)
@@ -73,7 +77,7 @@ function reuse(set::SingleKnownSet, decision::Decision)
 end
 
 function reuse(set::MultipleDecisionSet, decisions::Vector{<:Decision})
-    return MultipleDecisionSet(decisions, set.constraint)
+    return MultipleDecisionSet(decisions, copy(set.constraint))
 end
 
 function reuse(set::MultipleKnownSet, decisions::Vector{<:Decision})
