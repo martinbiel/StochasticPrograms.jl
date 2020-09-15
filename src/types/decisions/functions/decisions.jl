@@ -140,6 +140,8 @@ end
 MOIU.scalar_type(::Type{VectorOfDecisions}) = SingleDecision
 MOIU.scalar_type(::Type{VectorOfKnowns}) = SingleKnown
 
+MOIU.canonicalize!(f::Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}) = f
+
 function MOIU.filter_variables(keep::Function, f::SingleDecision)
     if !keep(f.decision)
         error("Cannot remove decision from a `SingleDecision` function of the",
