@@ -1,5 +1,7 @@
 # Helper structs to dispatch known decision variable construction
 struct NoSpecifiedConstraint <: MOI.AbstractSet end
+Base.copy(set::NoSpecifiedConstraint) = set
+
 struct DecisionSet{S <: MOI.AbstractSet} <: MOI.AbstractScalarSet
     constraint::S
 
