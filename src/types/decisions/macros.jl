@@ -125,7 +125,7 @@ function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP
 end
 
 function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, ::KnownSet)
-    return DecisionSpareAxisArray{KnownRef}(variables, NoSpecifiedConstraint())
+    return DecisionSparseAxisArray{KnownRef}(variables, NoSpecifiedConstraint())
 end
 
 function JuMP.add_variable(model::Model, variable::DecisionDenseAxisArray{V}, names::DenseAxisArray{String}) where V <: Union{DecisionRef, KnownRef}

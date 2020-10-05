@@ -21,7 +21,7 @@ Base.copy(set::SingleDecisionSet) = reuse(set, set.decision)
 struct SingleKnownSet{T} <: MOI.AbstractScalarSet
     known::Decision{T}
 end
-Base.copy(set::SingleKnownSet) = reuse(set, set.decision)
+Base.copy(set::SingleKnownSet) = reuse(set, set.known)
 
 set_constraint(set::SingleDecisionSet) = set.constraint
 set_constraint(::SingleKnownSet) = NoSpecifiedConstraint()
