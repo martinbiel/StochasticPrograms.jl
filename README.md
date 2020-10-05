@@ -2,7 +2,7 @@
 
 *A modeling framework for stochastic programming problems*
 
-[![Build Status](https://travis-ci.org/martinbiel/StochasticPrograms.jl.svg?branch=master)](https://travis-ci.org/martinbiel/StochasticPrograms.jl)
+[![Build Status](https://travis-ci.com/martinbiel/StochasticPrograms.jl.svg?branch=master)](https://travis-ci.com/martinbiel/StochasticPrograms.jl)
 [![Coverage Status](https://coveralls.io/repos/martinbiel/StochasticPrograms.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/martinbiel/StochasticPrograms.jl?branch=master)
 [![codecov.io](http://codecov.io/github/martinbiel/StochasticPrograms.jl/coverage.svg?branch=master)](http://codecov.io/github/martinbiel/StochasticPrograms.jl?branch=master)
 [![](https://img.shields.io/badge/docs-stable-blue.svg)](https://martinbiel.github.io/StochasticPrograms.jl/stable)
@@ -20,7 +20,7 @@ StochasticPrograms models recourse problems where an initial decision is taken, 
 
 ## Project Status
 
-The package is tested against Julia `1.4` branch on Linux, macOS, and Windows. See [NEWS](https://github.com/martinbiel/StochasticPrograms.jl/blob/master/NEWS.md) for release notes.
+The package is tested against Julia the `1.0`, `1.5` and `nightly` branches on Linux, macOS, and Windows. See [NEWS](https://github.com/martinbiel/StochasticPrograms.jl/blob/master/NEWS.md) for release notes.
 
 An older version for Julia `0.6` is available on the `compat-0.6` branch, but backwards compatibility can not be promised.
 
