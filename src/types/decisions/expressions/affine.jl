@@ -306,3 +306,17 @@ function JuMP.add_to_expression!(aff::DAE, new_kae::_KAE, new_coef::_Constant)
     JuMP.add_to_expression!(aff.knowns, new_coef, new_kae)
     return aff
 end
+
+function JuMP.add_to_expression!(lhs_aff::DAE, new_coef::_Constant, rhs_aff::DAE)
+    JuMP.add_to_expression!(lhs_aff, new_coef, rhs_aff.variables)
+    JuMP.add_to_expression!(lhs_aff, new_coef, rhs_aff.decisions)
+    JuMP.add_to_expression!(lhs_aff, new_coef, rhs_aff.knowns)
+    return lhs_aff
+end
+
+function JuMP.add_to_expression!(lhs_aff::DAE, rhs_aff::DAE, new_coef::_Constant)
+    JuMP.add_to_expression!(lhs_aff, rhs_aff.variables, new_coef)
+    JuMP.add_to_expression!(lhs_aff, rhs_aff.decisions, new_coef)
+    JuMP.add_to_expression!(lhs_aff, rhs_aff.knowns, new_coef)
+    return lhs_aff
+end

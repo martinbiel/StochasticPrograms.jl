@@ -144,7 +144,7 @@ function extract_set(expr)
             set = constrset
             found = true
             return :($var)
-        elseif @capture(x, var_Symbol[ids_] in constrset_) && !found && !quit
+        elseif @capture(x, var_Symbol[ids__] in constrset_) && !found && !quit
             set = constrset
             found = true
             return :($var[$ids])
@@ -152,7 +152,7 @@ function extract_set(expr)
             set = constrset
             found = true
             return :()
-        elseif @capture(x, var_Symbol[ids_])
+        elseif @capture(x, var_Symbol[ids__])
             # Break here to prevent indices from being filtered
             quit = true
             return x
