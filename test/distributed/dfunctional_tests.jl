@@ -32,7 +32,6 @@
             @test num_scenarios(sp) == num_scenarios(sp_nondist)
             @test num_scenarios(sp) == length(scenarios(sp))
             @test num_subproblems(sp) == num_subproblems(sp_nondist)
-            @test num_subproblems(sp) == length(subproblems(sp))
             @test isapprox(optimal_decision(sp), optimal_decision(sp_nondist))
             @test isapprox(objective_value(sp), objective_value(sp_nondist))
         end
