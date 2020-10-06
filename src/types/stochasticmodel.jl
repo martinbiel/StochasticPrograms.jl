@@ -75,7 +75,7 @@ macro stochastic_model(def)
     scenariodef = Expr(:block)
     paramdefs = Vector{Expr}()
     decisiondefs = Vector{Vector{Symbol}}()
-    def = prewalk(prettify(def)) do x
+    def = prewalk(def) do x
         x = if @capture(x, @stage n_ arg_)
             if @capture(arg, sp_ = def_)
                 x
@@ -96,7 +96,7 @@ macro stochastic_model(def)
         paramdef = if @capture(x, @parameters arg_)
             names = Vector{Symbol}()
             default = Vector{Expr}()
-            for paramdef in block(arg).args
+            for paramdef in block(prettify(arg)).args
                 if @capture(paramdef, key_Symbol = val_)
                     push!(names, key)
                     push!(default, paramdef)
@@ -142,7 +142,7 @@ macro stochastic_model(def)
             $(esc(def))
         end
     end
-    return prettify(code)
+    return code
 end
 
 # Printing #

@@ -456,6 +456,38 @@ Add a decision variable to `model` described by the expression `expr`. If used i
 See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
 macro decision(def...) @warn "@decision should be used inside a @stage block." end
+macro _decision(args...)
+    args = [args...]
+    # Check context of decision definition
+    known = if args[1] isa Symbol && args[1] == :known
+        known = true
+    else
+        args[1] == :unknown || error("Incorrect usage of @_decision.")
+        known = false
+    end
+    # Remove context from args
+    deleteat!(args, 1)
+    # Move any set definitions
+    set = NoSpecifiedConstraint()
+    for (i, arg) in enumerate(args)
+        set, arg, found = extract_set(arg)
+        if found
+            if arg == :()
+                deleteat!(args, i)
+            else
+                args[i] = arg
+            end
+            break
+        end
+    end
+    # Return expression based on context
+    if known
+        return esc(:(@variable $((args)...) set = StochasticPrograms.KnownSet()))
+    else
+        return esc(:(@variable $((args)...) set = StochasticPrograms.DecisionSet(constraint = $set)))
+    end
+end
+
 """
     @known(def)
 
@@ -602,20 +634,8 @@ macro stage(stage, args)
             return Expr(:block)
         elseif @capture(x, @decision args__)
             # Handle @decision
-            set = NoSpecifiedConstraint()
-            for (i, arg) in enumerate(args)
-                set, arg, found = extract_set(arg)
-                if found
-                    if arg == :()
-                        deleteat!(args, i)
-                    else
-                        args[i] = arg
-                    end
-                    break
-                end
-            end
             return @q begin
-                @variable $((args)...) set = StochasticPrograms.KnownSet()
+                StochasticPrograms.@_decision known $((args)...)
             end
         else
             # Anything else could be required for decision variable construction, and is therefore saved
@@ -625,20 +645,8 @@ macro stage(stage, args)
     # Next, handle @decision annotations in main definition
     def = postwalk(def) do x
         if @capture(x, @decision args__)
-            set = NoSpecifiedConstraint()
-            for (i, arg) in enumerate(args)
-                set, arg, found = extract_set(arg)
-                if found
-                    if arg == :()
-                        deleteat!(args, i)
-                    else
-                        args[i] = arg
-                    end
-                    break
-                end
-            end
             return @q begin
-                @variable $((args)...) set = StochasticPrograms.DecisionSet(constraint = $set)
+                StochasticPrograms.@_decision unknown $((args)...)
             end
         end
         return x
@@ -647,7 +655,7 @@ macro stage(stage, args)
     def = postwalk(def) do x
         if @capture(x, @parameters arg_)
             code = Expr(:block)
-            for paramdef in block(arg).args
+            for paramdef in block(prettify(arg)).args
                 if @capture(paramdef, key_Symbol = val_) || @capture(paramdef, key_Symbol)
                     push!(code.args, :($key = stage.$key))
                 else
@@ -771,7 +779,7 @@ macro stage(stage, args)
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
         $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(prettify(decisiondefs)))
+            $(esc(decisiondefs))
 	        return $(esc(:model))
         end
         # Stage model generation code
@@ -779,6 +787,6 @@ macro stage(stage, args)
         $(esc(sp))
     end
     # Return code
-    return prettify(code)
+    return code
 end
 # ========================== #
