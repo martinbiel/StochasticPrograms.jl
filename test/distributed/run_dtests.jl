@@ -11,9 +11,9 @@ for w in workers()
 end
 
 @everywhere using StochasticPrograms
-using JuMP
-using LinearAlgebra
-using GLPK
+@everywhere using JuMP
+@everywhere using LinearAlgebra
+@everywhere using GLPK
 
 @everywhere using Distributions
 
