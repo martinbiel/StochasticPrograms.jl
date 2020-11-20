@@ -82,6 +82,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                                    S::Type{<:MOI.AbstractScalarSet},
                                    idx::Integer)
     G = MOI.ScalarAffineFunction{Float64}
+    obj_sense = MOI.get(model, MOI.ObjectiveSense())
     for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
         # Positive feasibility variable
         pos_aux_var = MOI.add_variable(model)
@@ -93,7 +94,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                            MOI.GreaterThan{Float64}(0.0))
         # Add to objective
         MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                   MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+                   MOI.ScalarCoefficientChange(pos_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
         # Add to constraint
         MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
         # Negative feasibility variable
@@ -106,7 +107,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                            MOI.GreaterThan{Float64}(0.0))
         # Add to objective
         MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                   MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
+                   MOI.ScalarCoefficientChange(neg_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
         # Add to constraint
         MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
         # Update identification index
@@ -121,6 +122,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                                    S::Type{<:MOI.AbstractVectorSet},
                                    idx::Integer)
     G = MOI.ScalarAffineFunction{Float64}
+    obj_sense = MOI.get(model, MOI.ObjectiveSense())
     for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
         n = MOI.dimension(MOI.get(model, MOI.ConstraintSet(), ci))
         for (i, id) in enumerate(idx:(idx + n - 1))
@@ -134,7 +136,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                                MOI.GreaterThan{Float64}(0.0))
             # Add to objective
             MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                       MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+                       MOI.ScalarCoefficientChange(pos_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
             # Add to constraint
             MOI.modify(model, ci, MOI.MultirowChange(pos_aux_var, [(i, 1.0)]))
         end
@@ -149,7 +151,7 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
                                MOI.GreaterThan{Float64}(0.0))
             # Add to objective
             MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                       MOI.ScalarCoefficientChange(neg_aux_var, 1.0))
+                       MOI.ScalarCoefficientChange(neg_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
             # Add to constraint
             MOI.modify(model, ci, MOI.MultirowChange(neg_aux_var, [(i, -1.0)]))
         end
@@ -263,7 +265,10 @@ function (subproblem::SubProblem{FeasibilityHandler})(x::AbstractVector)
     if !(status ∈ AcceptableTermination)
         error("Subproblem $(subproblem.id) was not solved properly during feasibility check, returned status code: $status")
     end
-    if MOI.get(model, MOI.ObjectiveValue()) > sqrt(eps())
+    obj_sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    w = MOI.get(model, MOI.ObjectiveValue())
+    w *= obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0
+    if w > sqrt(eps())
         # Subproblem is infeasible, create feasibility cut
         return FeasibilityCut(subproblem, x)
     end
