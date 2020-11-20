@@ -31,7 +31,7 @@ function JuMP.set_objective_coefficient(model::Model, decision_or_known::Union{D
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
-            KnownCoefficientChange(index(decision_or_known), coeff, value(decision_or_known)))
+            KnownCoefficientChange(index(decision_or_known), coeff))
     else
         error("Objective function type not supported: $(obj_fct_type)")
     end

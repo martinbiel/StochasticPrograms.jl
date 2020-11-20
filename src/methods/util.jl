@@ -8,32 +8,11 @@ function evaluate_objective(objective::JuMP.GenericAffExpr, x::AbstractVector)
     return val
 end
 
-# function calculate_objective_value!(stochasticprogram::StochasticProgram)
-#     first_stage = get_stage_one(stochasticprogram)
-#     objective_value = eval_objective(first_stage.obj, first_stage.colVal)
-#     objective_value += calculate_subobjectives(scenarioproblems(stochasticprogram))
-#     first_stage.objVal = objective_value
-#     return nothing
-# end
-# function calculate_subobjectives(scenarioproblems::ScenarioProblems)
-#     return sum([(probability(scenario)*eval_objective(subprob.obj,subprob.colVal))::Float64 for (scenario,subprob) in zip(scenarios(scenarioproblems),subproblems(scenarioproblems))])
-# end
-# function calculate_subobjectives(scenarioproblems::DScenarioProblems)
-#     partial_subobjectives = Vector{Float64}(undef, nworkers())
-#     @sync begin
-#         for (i,w) in enumerate(workers())
-#             @async partial_subobjectives[i] = remotecall_fetch((sp) -> calculate_subobjectives(fetch(sp)),
-#                                                                w,
-#                                                                scenarioproblems[w-1])
-#         end
-#     end
-#     return sum(partial_subobjectives)
-# end
-
 function invalidate_cache!(stochasticprogram::StochasticProgram)
     cache = problemcache(stochasticprogram)
     delete!(cache, :evp)
     delete!(cache, :dep)
+    delete!(cache, :stage_1)
     cache = solutioncache(stochasticprogram)
     delete!(cache, :solution)
     return nothing
@@ -58,6 +37,30 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     empty!(dest.generator)
     merge!(dest.generator, src.generator)
     return dest
+end
+
+function copy_decision_objective!(src::JuMP.Model, dest::JuMP.Model, vars::Vector{<:Union{DecisionRef, KnownRef}})
+    src_obj = objective_function(src)
+    src_obj_sense = objective_sense(src)
+    dest_obj_sense = objective_sense(dest)
+    for var in vars
+        src_var = decision_by_name(src, name(var))
+        src_var === nothing && error("Cannot copy objective function. Variable $var not in src model.")
+        coeff = JuMP._affine_coefficient(src_obj, src_var)
+        if dest_obj_sense == src_obj_sense
+            set_objective_coefficient(dest, var, coeff)
+        else
+            set_objective_coefficient(dest, var, -coeff)
+        end
+    end
+    dest_obj = objective_function(dest)
+    if dest_obj_sense == src_obj_sense
+        set_objective_function(dest, dest_obj + constant(src_obj))
+    else
+        set_objective_function(dest, -dest_obj + constant(src_obj))
+        set_objective_sense(dest, src_obj_sense)
+    end
+    return nothing
 end
 
 function supports_zero(types::Vector, provided_def::Bool)
@@ -89,15 +92,6 @@ solutioncache(stochasticprogram::StochasticProgram) = stochasticprogram.solution
 function get_problem(stochasticprogram::StochasticProgram, key::Symbol)
     haskey(stochasticprogram.problemcache, key)|| error("No $key in problem cache")
     return stochasticprogram.problemcache[key]
-end
-function get_stage_one(stochasticprogram::StochasticProgram)
-    haskey(stochasticprogram.problemcache, :stage_1) || error("First-stage problem not generated.")
-    return stochasticprogram.problemcache[:stage_1]
-end
-function get_stage(stochasticprogram::StochasticProgram, stage::Integer)
-    stage_key = Symbol(:stage_, stage)
-    haskey(stochasticprogram.problemcache, stage_key) || error("Stage problem $stage not generated.")
-    return stochasticprogram.problemcache[stage_key]
 end
 
 typename(dtype::UnionAll) = dtype.body.name.name

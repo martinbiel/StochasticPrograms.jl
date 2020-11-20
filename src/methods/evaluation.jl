@@ -1,7 +1,7 @@
 # Problem evaluation #
 # ========================== #
 function eval_first_stage(stochasticprogram::StochasticProgram, x::AbstractVector)
-    first_stage = get_stage_one(stochasticprogram)
+    first_stage = stage_one_model(stochasticprogram; optimizer = master_optimizer(stochasticprogram))
     return evaluate_objective(objective_function(first_stage), x)
 end
 # Evaluation API #

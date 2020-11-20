@@ -426,7 +426,7 @@ Return the number of constraints in the the first stage of `stochasticprogram`.
 """
 function first_stage_num_constraints(stochasticprogram::StochasticProgram)
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0
-    first_stage = get_stage_one(stochasticprogram)
+    first_stage = stage_one_model(stochasticprogram; optimizer = master_optimizer(stochasticprogram))
     return num_constraints(first_stage)
 end
 """
@@ -436,7 +436,7 @@ Return a the number of variables and the number of constraints in the the first 
 """
 function first_stage_dims(stochasticprogram::StochasticProgram)
     !haskey(stochasticprogram.problemcache, :stage_1) && return 0, 0
-    first_stage = get_stage_one(stochasticprogram)
+    first_stage = stage_one_model(stochasticprogram; optimizer = master_optimizer(stochasticprogram))
     return num_constraints(first_stage), num_variables(first_stage)
 end
 """
