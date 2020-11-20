@@ -72,6 +72,18 @@ function Base.convert(::Type{AffineDecisionFunction{T}},
                                   convert(MOI.ScalarAffineFunction{T}, zero(T)))
 end
 
+function Base.convert(::Type{AffineDecisionFunction{T}},
+                      f::AffineDecisionFunction{T}) where T
+    return f
+end
+
+function Base.convert(::Type{AffineDecisionFunction{T}},
+                      f::AffineDecisionFunction) where T
+    return AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, f.variable_part),
+                                  convert(MOI.ScalarAffineFunction{T}, f.decision_part),
+                                  convert(MOI.ScalarAffineFunction{T}, f.known_part))
+end
+
 function Base.convert(::Type{MOI.SingleVariable}, f::AffineDecisionFunction)
     if !iszero(f.variable_part.constant) || !isone(length(f.variable_part.terms)) || !isone(f.variable_part.terms[1].coefficient)
         throw(InexactError(:convert, MOI.SingleVariable, f))
@@ -485,6 +497,12 @@ function MOIU.filter_variables(keep::Function, f::Union{AffineDecisionFunction, 
     return typeof(f)(MOIU.filter_variables(keep, f.variable_part),
                      MOIU.filter_variables(keep, f.decision_part),
                      MOIU.filter_variables(keep, f.known_part))
+end
+
+function MOIU.operate_coefficients(f, func::Union{AffineDecisionFunction, VectorAffineDecisionFunction})
+    return typeof(func)(MOIU.operate_coefficients(f, func.variable_part),
+                        MOIU.operate_coefficients(f, func.decision_part),
+                        MOIU.operate_coefficients(f, func.known_part))
 end
 
 function MOIU.vectorize(funcs::AbstractVector{AffineDecisionFunction{T}}) where T

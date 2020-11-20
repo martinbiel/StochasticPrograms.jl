@@ -274,6 +274,40 @@ function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
     return f
 end
 
+MOIU.similar_type(::Type{<:AffineDecisionFunction}, ::Type{T}) where T = AffineDecisionFunction{T}
+MOIU.similar_type(::Type{<:QuadraticDecisionFunction}, ::Type{T}) where T = QuadraticDecisionFunction{T}
+MOIU.similar_type(::Type{<:VectorAffineDecisionFunction}, ::Type{T}) where T = VectorAffineDecisionFunction{T}
+
+MA.promote_operation(::typeof(real), T::Type{<:Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}}) = T
+function MA.promote_operation(::typeof(imag), ::Type{T}, ::Type{F}) where {T, F <: Union{SingleDecision, SingleKnown}}
+    return AffineDecisionFunction{T}
+end
+function MA.promote_operation(::typeof(imag), ::Type{T}, ::Type{F}) where {T, F <: Union{VectorOfDecisions, VectorOfKnowns}}
+    return VectorAffineDecisionFunction{T}
+end
+function MA.promote_operation(::typeof(conj), ::Type{T}, ::Type{F}) where {T, F <: Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}}
+    return T
+end
+function MA.promote_operation(op::Union{typeof(real), typeof(imag), typeof(conj)}, F::Type{<:TypedDecisionLike{T}}) where T
+    return MOIU.similar_type(F, MA.promote_operation(op, T))
+end
+
+function MOIU.operate(::typeof(imag), ::Type{T}, ::Union{SingleDecision, SingleKnown}) where T
+    return zero(AffineDecisionFunction{T})
+end
+function MOIU.operate(::typeof(imag), ::Type{T}, f::Union{VectorOfDecisions, VectorOfKnowns}) where T
+    zero_with_output_dimension(VectorAffineDecisionFunction{T}, MOIU.output_dimension(f))
+end
+function MOIU.operate(::typeof(imag), ::Type, f::TypedDecisionLike)
+    imag(f)
+end
+
+Base.real(f::Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}) = f
+Base.real(f::TypedDecisionLike) = operate_coefficients(real, f)
+Base.imag(f::TypedDecisionLike) = operate_coefficients(imag, f)
+Base.conj(f::Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}) = f
+Base.conj(f::TypedDecisionLike) = operate_coefficients(conj, f)
+
 function _operate_terms!(::typeof(+),
                          f::MOI.ScalarAffineFunction,
                          g::MOI.ScalarAffineFunction)

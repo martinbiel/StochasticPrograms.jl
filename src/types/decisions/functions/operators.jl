@@ -922,17 +922,33 @@ function MOIU.operate(::typeof(*), ::Type{T}, f::ScalarAffineLike{T},
     return MOIU.operate(*, T, g, convert(AffineDecisionFunction{T}, f))
 end
 
+MOIU.is_coefficient_type(::Type{<:Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}}, ::Type) = true
+MOIU.is_coefficient_type(::Type{<:TypedDecisionLike{T}}, ::Type{T}) where T = true
+MOIU.is_coefficient_type(::Type{<:TypedDecisionLike}, ::Type) = false
+
 function Base.:*(f::ScalarDecisionLike{T}, g::ScalarDecisionLike{T}, args::ScalarDecisionLike{T}...) where T
     return MOIU.operate(*, T, f, g, args...)
 end
-function Base.:*(f::T, g::TypedDecisionLike{T}) where T
-    return MOIU.operate(*, T, f, g)
+function Base.:*(α::T, g::TypedDecisionLike{T}) where T
+    return MOIU.operate_coefficients(β -> α * β, g)
+end
+function Base.:*(α::Number, g::TypedDecisionLike)
+    return MOIU.operate_coefficients(β -> α * β, g)
+end
+function Base.:*(α::T, g::TypedDecisionLike{T}) where T <: Number
+    return MOIU.operate_coefficients(β -> α * β, g)
 end
 function Base.:*(f::Number, g::Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns})
     return MOIU.operate(*, typeof(f), f, g)
 end
-function Base.:*(f::TypedDecisionLike{T}, g::T) where T
-    return MOIU.operate(*, T, g, f)
+function Base.:*(f::TypedDecisionLike{T}, α::T) where T
+    return MOIU.operate_coefficients(β -> α * β, f)
+end
+function Base.:*(f::TypedDecisionLike, α::Number)
+    return MOIU.operate_coefficients(β -> α * β, f)
+end
+function Base.:*(f::TypedDecisionLike{T}, α::T) where T <: Number
+    return MOIU.operate_coefficients(β -> α * β, f)
 end
 function Base.:*(f::Union{SingleDecision, SingleKnown, VectorOfDecisions, VectorOfKnowns}, g::Number)
     return MOIU.operate(*, typeof(g), f, g)

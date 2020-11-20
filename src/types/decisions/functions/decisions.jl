@@ -51,14 +51,6 @@ function JuMP.jump_function(model::Model, decision::SingleDecision)
 end
 
 SingleKnown(kref::KnownRef) = SingleKnown(index(kref))
-# function JuMP.moi_function(kref::KnownRef)
-#     return AffineDecisionFunction(convert(MOI.ScalarAffineFunction{Float64}, 0.0),
-#                                   convert(MOI.ScalarAffineFunction{Float64}, 0.0),
-#                                   MOI.ScalarAffineFunction([ScalarAffineTerm(1.0, index(kref))], 0.0))
-# end
-# function JuMP.moi_function_type(::Type{KnownRef})
-#     return AffineDecisionFunction{Float64}
-# end
 function JuMP.moi_function(kref::KnownRef)
     return SingleKnown(kref)
 end

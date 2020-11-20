@@ -726,6 +726,24 @@ function MOIU.filter_variables(keep::Function, f::QuadraticDecisionFunction)
                      MOIU.filter_variables(keep, f.known_decision_terms))
 end
 
+function MOIU.operate_coefficients(f, func::LinearPart)
+    return typeof(func)(MOIU.operate_coefficients(f, func.variable_part),
+                        MOIU.operate_coefficients(f, func.decision_part))
+end
+
+function MOIU.operate_coefficients(f, func::QuadraticPart)
+    return typeof(func)(MOIU.operate_coefficients(f, func.variable_part),
+                        MOIU.operate_coefficients(f, func.decision_part),
+                        MOIU.operate_coefficients(f, func.cross_terms))
+end
+
+function MOIU.operate_coefficients(f, func::QuadraticDecisionFunction)
+    return typeof(func)(MOIU.operate_coefficients(f, func.linear_quadratic_terms),
+                        MOIU.operate_coefficients(f, func.known_part),
+                        MOIU.operate_coefficients(f, func.known_variable_terms),
+                        MOIU.operate_coefficients(f, func.known_decision_terms))
+end
+
 function add_term!(terms::Vector{MOI.ScalarQuadraticTerm{T}},
                    term::MOI.ScalarQuadraticTerm{T}) where T
     index_1 = term.variable_index_1
