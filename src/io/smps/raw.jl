@@ -23,7 +23,7 @@ function Base.read(io::IO, ::Type{RawSMPS})
     cor = parse_cor(corfile)
     # Parse sto file
     stofile = path * ".sto"
-    sto = parse_sto(tim, stofile)
+    sto = parse_sto(tim, cor, stofile)
     return RawSMPS(tim, cor, sto)
 end
 
@@ -40,6 +40,6 @@ function Base.read(io::IO, ::Type{RawSMPS{T}}) where T <: AbstractFloat
     cor = parse_cor(T, corfile)
     # Parse sto file
     stofile = path * ".sto"
-    sto = parse_sto(T, tim, io)
+    sto = parse_sto(T, tim, cor, io)
     return RawSMPS(tim, cor, sto)
 end

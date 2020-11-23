@@ -1,14 +1,10 @@
 abstract type RandomVariable end
 abstract type RandomVector end
 
-const modes = ["INDEP", "BLOCKS"]
-const inclusions = [:REPLACE, :ADD, :MULTIPLY]
-const dist_options = [:UNIFORM, :NORMAL, :GAMMA, :BETA, :LOGNORM]
-
 struct RawStoch{N}
     name::String
     random_variables::NTuple{N, Dict{RowCol, RandomVariable}}
-    random_vectors::NTuple{N, Dict{Symbol, RandomVector}}
+    random_vectors::NTuple{N, Dict{Block, RandomVector}}
 
     function RawStoch(name::String, ran_vars::NTuple{N, Dict{RowCol, RandomVariable}}, ran_vectors::NTuple{N, Dict{Symbol, RandomVector}}) where N
         return new{N}(name, ran_vars, ran_vectors)
@@ -16,45 +12,45 @@ struct RawStoch{N}
 end
 
 struct IndepDiscrete{T <: AbstractFloat} <: RandomVariable
-    inclusion::Symbol
+    inclusion::InclusionType
     support::Vector{T}
     probabilities::Vector{T}
 
-    function IndepDiscrete(::Type{T}, inclusion::Symbol) where T <: AbstractFloat
-        inclusion in inclusions || error("Unknown keyword $inclusion")
+    function IndepDiscrete(::Type{T}, inclusion::InclusionType) where T <: AbstractFloat
+        inclusion in INCLUSIONS || error("Unknown inclusion $inclusion")
         return new{T}(inclusion, Vector{T}(), Vector{T}())
     end
 end
 
 struct IndepDistribution{T <: AbstractFloat} <: RandomVariable
-    inclusion::Symbol
-    distribution::Symbol
+    inclusion::InclusionType
+    distribution::DistributionType
     parameters::Pair{T}
 
-    function IndepDistribution(inclusion::Symbol, distribution::Symbol, parameters::Pair{T}) where T <: AbstractFloat
-        inclusion in inclusions || error("Unknown keyword $inclusion")
-        distribution in dist_options || error("Unknown distribution $distribution")
+    function IndepDistribution(inclusion::InclusionType, distribution::DistributionType, parameters::Pair{T}) where T <: AbstractFloat
+        inclusion in INCLUSIONS || error("Unknown inclusion $inclusion")
+        distribution in DISTRIBUTIONS || error("Unknown distribution $distribution")
         return new{T}(inclusion, distribution, parameters)
     end
 end
 
 struct BlockDiscrete{T <: AbstractFloat} <: RandomVector
-    inclusion::Symbol
-    support::Vector{Vector{RowColVal{T}}}
+    inclusion::InclusionType
+    support::Vector{Dict{RowCol,T}}
     probabilities::Vector{T}
 
-    function BlockDiscrete(::Type{T}, inclusion) where T
-        inclusion in inclusions || error("Unknown keyword $inclusion")
-        return new{T}(inclusion, Vector{Vector{RowColVal{T}}}(), Vector{T}())
+    function BlockDiscrete(::Type{T}, inclusion::InclusionType) where T
+        inclusion in INCLUSIONS || error("Unknown inclusion $inclusion")
+        return new{T}(inclusion, Vector{Dict{RowCol,T}}(), Vector{T}())
     end
 end
 
-function parse_sto(::Type{T}, tim::RawTime, filename::AbstractString; N::Integer = 2) where T <: AbstractFloat
+function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractString; N::Integer = 2) where T <: AbstractFloat
     # Initialize auxiliary variables
     name      = "SLP"
-    mode      = :STOCH
-    dist      = :DISCRETE
-    inclusion = :REPLACE
+    mode      = INDEP
+    dist      = DISCRETE
+    inclusion = REPLACE
     N         = num_stages(tim)
     stage     = 2
     v₁        = zero(T)
@@ -73,20 +69,33 @@ function parse_sto(::Type{T}, tim::RawTime, filename::AbstractString; N::Integer
         if Symbol(firstline[1]) == :STOCH
             name = join(firstline[2:end], " ")
         else
-            throw(ArgumentError("`STOCH` field is expected on the first line"))
+            throw(ArgumentError("`STOCH` field is expected on the first line."))
         end
         for line in eachline(io)
+            if mode == END
+                # Parse finished
+                break
+            end
             words = split(line)
-            length(words) == 1 && (mode = Symbol(words[1]); continue)
-            if length(words) == 2 || (length(words) == 3 && words[1] in modes)
-                mode = Symbol(words[1])
-                dist = Symbol(words[2])
-                length(words) == 3 && (inclusion = Symbol(words[3]))
-                continue
-            elseif mode == :INDEP
-                length(words) == 4 || length(words) == 5 || error("Malformed sto file at line $words")
-                col = Symbol(words[1])
-                row = Symbol(words[2])
+            first_word = Symbol(words[1])
+            if first_word in STO_MODES
+                mode = first_word
+                if length(words) == 2
+                    dist = DistributionType(words[2])
+                    dist in DISTRIBUTIONS || error("Unknown distribution $dist.")
+                elseif length(words) == 3
+                    dist = DistributionType(words[2])
+                    dist in DISTRIBUTIONS || error("Unknown distribution $dist.")
+                    inclusion = InclusionType(words[3])
+                    inclusion in INCLUSIONS || error("Unknown inclusion $inclusion.")
+                end
+                 continue
+            end
+            if mode == INDEP
+                length(words) == 4 || length(words) == 5 || error("Malformed sto file at line $words.")
+                col = Col(words[1])
+                col = col == cor.rhsname ? RHS : col
+                row = Row(words[2])
                 if length(words) == 4
                     v₁ = parse(Float64, words[3])
                     v₂ = parse(Float64, words[4])
@@ -99,7 +108,7 @@ function parse_sto(::Type{T}, tim::RawTime, filename::AbstractString; N::Integer
                 else
                     error("Malformed sto file at line $words")
                 end
-                if dist == :DISCRETE
+                if dist == DISCRETE
                     # Check if random variable exists already
                     ran_var = get(random_vars[stage - 1], (row, col), nothing)
                     if ran_var === nothing
@@ -116,12 +125,14 @@ function parse_sto(::Type{T}, tim::RawTime, filename::AbstractString; N::Integer
                     haskey(random_vars[stage - 1], (row, col)) || error("Random variable at $((row, col)) has more than one specified distribution.")
                     random_vars[stage - 1][(row, col)] = IndepDistribution(inclusion, dist, Pair(v₁, v₂))
                 end
-            elseif mode == :BLOCKS
-                if dist == :DISCRETE
+            elseif mode == BLOCKS
+                if dist == DISCRETE
                     if words[1] == "BL"
-                        length(words) == 4 || error("Malformed sto file at line $words")
+                        length(words) == 4 || error("Malformed sto file at line $words.")
                         block = Symbol(words[2])
-                        stage = Symbol(words[3])
+                        stage_name = Symbol(words[3])
+                        haskey(tim.stages, stage_name) || error("Stage name $stage_name not specified in .tim file.")
+                        stage = tim.stages[stage_name]
                         prob = parse(Float64, words[4])
                         # Check if random vector exists already
                         ran_vec = get(random_vecs[stage - 1], block, nothing)
@@ -133,31 +144,30 @@ function parse_sto(::Type{T}, tim::RawTime, filename::AbstractString; N::Integer
                             ran_vec isa BlockDiscrete || error("Random vector at $block has more than one specified distribution.")
                         end
                         # Update probability
-                        push!(ran_vec.support, Vector{RowColVal{T}}())
+                        push!(ran_vec.support, Dict{RowCol,T}())
                         push!(ran_vec.probabilities, prob)
                         continue
                     else
-                        length(words) == 3 || error("Malformed sto file at line $words")
-                        col = Symbol(words[1])
-                        row = Symbol(words[2])
+                        length(words) == 3 || error("Malformed sto file at line $words.")
+                        col = Col(words[1])
+                        col = col == cor.rhsname ? RHS : col
+                        row = Row(words[2])
                         val = parse(Float64, words[3])
                         ran_vec = random_vecs[stage - 1][block]
-                        push!(ran_vec.support[end], (row, col, val))
+                        ran_vec.support[end][(row, col)] = val
                     end
                 else
                     error("Distribution $dist is not supported.")
                 end
-            elseif mode == :ENDATA
-                break
             else
-                throw(ArgumentError("$(mode) is not a valid word"))
+                throw(ArgumentError("$(mode) is not a valid sto file mode."))
             end
         end
     end
     # Return raw data
     return RawStoch(name, random_vars, random_vecs)
 end
-parse_sto(tim::RawTime, filename::AbstractString) = parse_sto(Float64, tim, filename)
+parse_sto(tim::RawTime, cor::RawCor, filename::AbstractString) = parse_sto(Float64, tim, cor, filename)
 
 function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Matrix{T}}, stage::Integer) where {N, T}
     1 <= stage <= N || error("$(stage.id + 1) not in range 2 to $(N + 1).")
@@ -169,37 +179,49 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Ma
     Δd₁ = zero(model.d₁)
     ΔC  = zero(model.C)
     Δd₂ = zero(model.d₂)
-    # Loop over all scenarios
+    # Collect rows, columns, and inclusions
+    uncertainty_structure = Dict{RowCol, InclusionType}()
     for (rowcol, ran_var) in sto.random_variables[stage]
+        uncertainty_structure[rowcol] = ran_var.inclusion
+    end
+    for (block, ran_vec) in sto.random_vectors[stage]
+        isempty(ran_vec.support[1]) && error("Block $block has empty support.")
+        for (rowcol, val) in ran_vec.support[1]
+            rowcol = (row, col)
+            uncertainty_structure[rowcol] = ran_vec.inclusion
+        end
+    end
+    # Loop over all scenarios
+    for (rowcol, inclusion) in uncertainty_structure
         (row, col) = rowcol
         rowsense = cor.rows[row][3]
-        if row == cor.objsymbol
+        if row == cor.objname
             # Objective
             j = map[rowcol][2]
-            if ran_var.inclusion == :REPLACE
+            if inclusion == REPLACE
                 Δc[j] = -model.c[j]
             else
                 Δc[j] = model.c[j]
             end
-        elseif col == :RHS
+        elseif col == RHS
             # RHS
             i = map[rowcol][1]
-            if rowsense == :eq
-                if ran_var.inclusion == :REPLACE
+            if rowsense == EQ
+                if inclusion == REPLACE
                     Δb[i] = -model.b[i]
                 else
                     Δb[i] = model.b[i]
                 end
-            elseif rowsense == :leq
-                if ran_var.inclusion == :REPLACE
+            elseif rowsense == LEQ
+                if inclusion == REPLACE
                     Δd₂[i] = -model.d₂[i]
                     haskey(cor.ranges, row) && (Δd₁[i] = -model.d₁[i])
                 else
                     Δd₂[i] = model.d₂[i]
                     haskey(cor.ranges, row) && (Δd₁[i] = model.d₁[i])
                 end
-            elseif rowsense == :geq
-                if ran_var.inclusion == :REPLACE
+            elseif rowsense == GEQ
+                if inclusion == REPLACE
                     Δd₁[i] = -model.d₁[i]
                     haskey(cor.ranges, row) && (Δd₂[i] = -model.d₂[i])
                 else
@@ -210,14 +232,14 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Ma
         else
             # Matrix coeffs
             (i, j, _) = map[rowcol]
-            if rowsense == :eq
-                if ran_var.inclusion == :REPLACE
+            if rowsense == EQ
+                if inclusion == REPLACE
                     ΔA[i,j] = -model.A[i,j]
                 else
                     ΔA[i] = model.A[i,j]
                 end
             else
-                if ran_var.inclusion == :REPLACE
+                if inclusion == REPLACE
                     ΔC[i,j] = -model.C[i,j]
                 else
                     ΔC[i,j] = model.C[i,j]
@@ -248,37 +270,48 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Sp
     ΔCᵢ = Vector{Int}()
     ΔCⱼ = Vector{Int}()
     ΔCᵥ = Vector{T}()
-    # Loop over all scenarios
+    # Collect rows, columns, and inclusions
+    uncertainty_structure = Dict{RowCol, InclusionType}()
     for (rowcol, ran_var) in sto.random_variables[stage]
+        uncertainty_structure[rowcol] = ran_var.inclusion
+    end
+    for (block, ran_vec) in sto.random_vectors[stage]
+        isempty(ran_vec.support[1]) && error("Block $block has empty support.")
+        for (rowcol, val) in ran_vec.support[1]
+            uncertainty_structure[rowcol] = ran_vec.inclusion
+        end
+    end
+    # Loop over all scenarios
+    for (rowcol, inclusion) in uncertainty_structure
         (row, col) = rowcol
         rowsense = cor.rows[row][3]
-        if row == cor.objsymbol
+        if row == cor.objname
             # Objective
             j = map[rowcol][2]
-            if ran_var.inclusion == :REPLACE
-                Δc[j] = -model.c[j]
+            if inclusion == REPLACE
+                Δc[j] = -model.c₁[j]
             else
-                Δc[j] = model.c[j]
+                Δc[j] = model.c₁[j]
             end
-        elseif col == :RHS
+        elseif col == RHS
             # RHS
             i = map[rowcol][1]
-            if rowsense == :eq
-                if ran_var.inclusion == :REPLACE
+            if rowsense == EQ
+                if inclusion == REPLACE
                     Δb[i] = -model.b[i]
                 else
                     Δb[i] = model.b[i]
                 end
-            elseif rowsense == :leq
-                if ran_var.inclusion == :REPLACE
+            elseif rowsense == LEQ
+                if inclusion == REPLACE
                     Δd₂[i] = -model.d₂[i]
                     haskey(cor.ranges, row) && (Δd₁[i] = -model.d₂[i])
                 else
                     Δd₂[i] = model.d₂[i]
                     haskey(cor.ranges, row) && (Δd₁[i] = model.d₂[i])
                 end
-            elseif rowsense == :geq
-                if ran_var.inclusion == :REPLACE
+            elseif rowsense == GEQ
+                if inclusion == REPLACE
                     Δd₁[i] = -model.d₁[i]
                     haskey(cor.ranges, row) && (Δd₂[i] = -model.d₁[i])
                 else
@@ -289,10 +322,10 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Sp
         else
             # Matrix coeffs
             (i, j, _) = map[rowcol]
-            if rowsense == :eq
+            if rowsense == EQ
                 push!(ΔAᵢ, i)
                 push!(ΔAⱼ, j)
-                if ran_var.inclusion == :REPLACE
+                if inclusion == REPLACE
                     push!(ΔAᵥ, -model.A[i,j])
                 else
                     push!(ΔAᵥ, model.A[i,j])
@@ -300,7 +333,7 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Sp
             else
                 push!(ΔCᵢ, i)
                 push!(ΔCⱼ, j)
-                if ran_var.inclusion == :REPLACE
+                if inclusion == REPLACE
                     push!(ΔCᵥ, -model.C[i,j])
                 else
                     push!(ΔCᵥ, model.C[i,j])

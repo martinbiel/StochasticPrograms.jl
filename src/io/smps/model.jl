@@ -124,6 +124,7 @@ function stochastic_model(smps::SMPSModel{2})
             n    = length(data.recourse)
             m₂   = data.model.indexmap.m₂
             q    = data.model.c₁[data.recourse]
+            Δq   = Δq[data.recourse]
             T    = data.model.A[:, data.technology]
             W    = data.model.A[:, data.recourse]
             h    = data.model.b

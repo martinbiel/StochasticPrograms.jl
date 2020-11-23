@@ -19,20 +19,26 @@ function parse_tim(filename::String)
         if Symbol(firstline[1]) == :TIME
             name = join(firstline[2:end], " ")
         else
-            throw(ArgumentError("`TIME` field is expected on the first line"))
+            throw(ArgumentError("`TIME` field is expected on the first line."))
         end
         for line in eachline(io)
+            if mode == END
+                # Parse finished
+                break
+            end
             words = split(line)
-            (length(words) == 1 || length(words) == 2) && (mode = Symbol(words[1]); continue)
-            if mode == :PERIODS
+            first_word = Symbol(words[1])
+            if first_word in TIM_MODES
+                mode = first_word
+                continue
+            end
+            if mode == PERIODS
                 push!(col_delims, Symbol(words[1]))
                 push!(row_delims, Symbol(words[2]))
                 stages[Symbol(words[3])] = stage
                 stage += 1
-            elseif mode == :ENDATA
-                break
             else
-                throw(ArgumentError("$(mode) is not a valid word"))
+                throw(ArgumentError("$(mode) is not a valid tim file mode."))
             end
         end
     end

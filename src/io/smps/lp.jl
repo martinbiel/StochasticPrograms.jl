@@ -127,7 +127,7 @@ function LPData(cor::RawCor{T};
                 include_constant = false) where T <: AbstractFloat
     # Compute sizes
     n = length(colrange)
-    m₁ = count(x -> x[3] == :eq, [cor.rows[row] for row in rowrange])
+    m₁ = count(x -> x[3] == EQ, [cor.rows[row] for row in rowrange])
     m₂ = length(rowrange) - m₁
     # Prepare index map
     map = IndexMap(n, m₁, m₂)
@@ -149,9 +149,9 @@ function LPData(cor::RawCor{T};
         if row in rowrange
             break
         end
-        if rowval[3] == :eq
+        if rowval[3] == EQ
             neqrows += 1
-        elseif rowval[3] == :leq || rowval[3] == :geq
+        elseif rowval[3] == LEQ || rowval[3] == GEQ
             nineqrows += 1
         end
     end
@@ -166,44 +166,44 @@ function LPData(cor::RawCor{T};
             if rowidx == 0
                 j = colidx - ncols
                 c₁[j] = rowval
-                map[rowcol] = (0,j,:obj)
-            elseif rowsense == :eq
+                map[rowcol] = (0,j,OBJ)
+            elseif rowsense == EQ
                 i = rowidx - neqrows
                 j = colidx - ncols
                 A[i, j] = rowval
                 b[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:eq)
-                map[(row,:RHS)] = (i,0,:eq)
-            elseif rowsense == :leq
+                map[rowcol] = (i,j,EQ)
+                map[(row,RHS)] = (i,0,EQ)
+            elseif rowsense == LEQ
                 i = rowidx - nineqrows
                 j = colidx - ncols
                 C[i, j] = rowval
                 d₂[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:leq)
-                map[(row,:RHS)] = (i,0,:leq)
+                map[rowcol] = (i,j,LEQ)
+                map[(row,RHS)] = (i,0,LEQ)
                 if haskey(cor.ranges, row)
                     d₁[i] = d₂[i] - abs(cor.ranges[row])
-                    map[rowcol] = (i,j,:range)
-                    map[(row,:RHS)] = (i,0,:range)
+                    map[rowcol] = (i,j,RANGE)
+                    map[(row,RHS)] = (i,0,RANGE)
                 end
             else
                 i = rowidx - nineqrows
                 j = colidx - ncols
                 C[i, j] = rowval
                 d₁[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:geq)
-                map[(row,:RHS)] = (i,0,:geq)
+                map[rowcol] = (i,j,GEQ)
+                map[(row,RHS)] = (i,0,GEQ)
                 if haskey(cor.ranges, rowsymbol)
                     d₂[i] = d₁[i] + abs(cor.ranges[row])
-                    map[rowcol] = (i,j,:range)
-                    map[(row,:RHS)] = (i,0,:range)
+                    map[rowcol] = (i,j,RANGE)
+                    map[(row,RHS)] = (i,0,RANGE)
                 end
             end
         end
     end
     # Get any objective constant
     if cor.objgiven && include_constant
-        c₂ = -get(cor.rhs, cor.objsymbol, zero(T))
+        c₂ = -get(cor.rhs, cor.objname, zero(T))
     end
     # Fill bounds
     fill_bounds!(cor, lb, ub, colrange, map)
@@ -217,7 +217,7 @@ function SparseLPData(cor::RawCor{T};
                       include_constant = false) where T <: AbstractFloat
     # Compute sizes
     n = length(colrange)
-    m₁ = count(x -> x[3] == :eq, [cor.rows[row] for row in rowrange])
+    m₁ = count(x -> x[3] == EQ, [cor.rows[row] for row in rowrange])
     m₂ = length(rowrange) - m₁
     # Prepare index map
     map = IndexMap(n, m₁, m₂)
@@ -244,9 +244,9 @@ function SparseLPData(cor::RawCor{T};
         if row in rowrange
             break
         end
-        if rowval[3] == :eq
+        if rowval[3] == EQ
             neqrows += 1
-        elseif rowval[3] == :leq || rowval[3] == :geq
+        elseif rowval[3] == LEQ || rowval[3] == GEQ
             nineqrows += 1
         end
     end
@@ -255,35 +255,35 @@ function SparseLPData(cor::RawCor{T};
         col in colrange || (ncols += 1; continue)
         colidx = cor.vars[col]
         for (row, rowval) in val
-            row in rowrange || row == cor.objsymbol || continue
+            row in rowrange || row == cor.objname || continue
             idx, rowidx, rowsense = cor.rows[row]
             rowcol = (row, col)
             if rowidx == 0
                 j = colidx - ncols
                 c₁[j] = rowval
-                map[rowcol] = (0,j,:obj)
-            elseif rowsense == :eq
+                map[rowcol] = (0,j,OBJ)
+            elseif rowsense == EQ
                 i = rowidx - neqrows
                 j = colidx - ncols
                 push!(Aᵢ, i)
                 push!(Aⱼ, j)
                 push!(Aᵥ, rowval)
                 b[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:eq)
-                map[(row,:RHS)] = (i,0,:eq)
-            elseif rowsense == :leq
+                map[rowcol] = (i,j,EQ)
+                map[(row,RHS)] = (i,0,EQ)
+            elseif rowsense == LEQ
                 i = rowidx - nineqrows
                 j = colidx - ncols
                 push!(Cᵢ, i)
                 push!(Cⱼ, j)
                 push!(Cᵥ, rowval)
                 d₂[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:leq)
-                map[(row,:RHS)] = (i,0,:leq)
+                map[rowcol] = (i,j,LEQ)
+                map[(row,RHS)] = (i,0,LEQ)
                 if haskey(cor.ranges, row)
                     d₁[i] = d₂[i] - abs(cor.ranges[row])
-                    map[rowcol] = (i,j,:range)
-                    map[(row,:RHS)] = (i,0,:range)
+                    map[rowcol] = (i,j,RANGE)
+                    map[(row,RHS)] = (i,0,RANGE)
                 end
             else
                 i = rowidx - nineqrows
@@ -292,12 +292,12 @@ function SparseLPData(cor::RawCor{T};
                 push!(Cⱼ, j)
                 push!(Cᵥ, rowval)
                 d₁[i] = get(cor.rhs, row, zero(T))
-                map[rowcol] = (i,j,:geq)
-                map[(row,:RHS)] = (i,0,:geq)
+                map[rowcol] = (i,j,GEQ)
+                map[(row,RHS)] = (i,0,GEQ)
                 if haskey(cor.ranges, row)
                     d₂[i] = d₁[i] - abs(cor.ranges[row])
-                    map[rowcol] = (i,j,:range)
-                    map[(row,:RHS)] = (i,0,:range)
+                    map[rowcol] = (i,j,RANGE)
+                    map[(row,RHS)] = (i,0,RANGE)
                 end
             end
         end
@@ -307,7 +307,7 @@ function SparseLPData(cor::RawCor{T};
     C  = sparse(Cᵢ, Cⱼ, Cᵥ, m₂, n)
     # Get any objective constant
     if cor.objgiven && include_constant
-        c₂ = -get(cor.rhs, cor.objsymbol, zero(T))
+        c₂ = -get(cor.rhs, cor.objname, zero(T))
     end
     # Fill bounds
     fill_bounds!(cor, lb, ub, colrange, map)
@@ -322,19 +322,19 @@ function fill_bounds!(cor, lb, ub, colrange, map)
         colidx = cor.vars[col]
         j = colidx - ncols
         for (bndtype, bndval) in val
-            if bndtype == :lower
+            if bndtype == LOWER
                 lb[j] = bndval
-                map[(:LO,col)] = (0,j,:ub)
-            elseif bndtype == :upper
+                map[(LOWER,col)] = (0,j,GEQ)
+            elseif bndtype == UPPER
                 ub[j] = bndval
-                map[(:UP,col)] = (0,j,:ub)
-            elseif bndtype == :fixed
+                map[(UPPER,col)] = (0,j,LEQ)
+            elseif bndtype == FIXED
                 lb[j] = ub[j] = bndval
-                map[(:FX,col)] = (0,j,:lb)
-                map[(:FX,col)] = (0,j,:ub)
+                map[(FIXED,col)] = (0,j,LEQ)
+                map[(FIXED,col)] = (0,j,GEQ)
             else
                 lb[j] = convert(T, -Inf)
-                map[(:FR,col)] = (0,j,:lb)
+                map[(FREE,col)] = (0,j,FREE)
             end
         end
     end
