@@ -3,34 +3,36 @@ abstract type RandomVector end
 
 struct RawStoch{N}
     name::String
-    random_variables::NTuple{N, Dict{RowCol, RandomVariable}}
-    random_vectors::NTuple{N, Dict{Block, RandomVector}}
+    random_variables::NTuple{N, Vector{RandomVariable}}
+    random_vectors::NTuple{N, Vector{RandomVector}}
 
-    function RawStoch(name::String, ran_vars::NTuple{N, Dict{RowCol, RandomVariable}}, ran_vectors::NTuple{N, Dict{Symbol, RandomVector}}) where N
+    function RawStoch(name::String, ran_vars::NTuple{N, Vector{RandomVariable}}, ran_vectors::NTuple{N, Vector{RandomVector}}) where N
         return new{N}(name, ran_vars, ran_vectors)
     end
 end
 
 struct IndepDiscrete{T <: AbstractFloat} <: RandomVariable
+    rowcol::RowCol
     inclusion::InclusionType
     support::Vector{T}
     probabilities::Vector{T}
 
-    function IndepDiscrete(::Type{T}, inclusion::InclusionType) where T <: AbstractFloat
+    function IndepDiscrete(::Type{T}, rowcol::RowCol, inclusion::InclusionType) where T <: AbstractFloat
         inclusion in INCLUSIONS || error("Unknown inclusion $inclusion")
-        return new{T}(inclusion, Vector{T}(), Vector{T}())
+        return new{T}(rowcol, inclusion, Vector{T}(), Vector{T}())
     end
 end
 
 struct IndepDistribution{T <: AbstractFloat} <: RandomVariable
+    rowcol::RowCol
     inclusion::InclusionType
     distribution::DistributionType
     parameters::Pair{T}
 
-    function IndepDistribution(inclusion::InclusionType, distribution::DistributionType, parameters::Pair{T}) where T <: AbstractFloat
+    function IndepDistribution(rowcol::RowCol, inclusion::InclusionType, distribution::DistributionType, parameters::Pair{T}) where T <: AbstractFloat
         inclusion in INCLUSIONS || error("Unknown inclusion $inclusion")
         distribution in DISTRIBUTIONS || error("Unknown distribution $distribution")
-        return new{T}(inclusion, distribution, parameters)
+        return new{T}(rowcol, inclusion, distribution, parameters)
     end
 end
 
@@ -55,13 +57,20 @@ function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractStrin
     stage     = 2
     v₁        = zero(T)
     v₂        = zero(T)
-    block     = :BLOCK
+    block     = 1
     # Prepare sto data
     random_vars = ntuple(Val(N-1)) do i
-        Dict{RowCol, RandomVariable}()
+        Vector{RandomVariable}()
     end
     random_vecs = ntuple(Val(N-1)) do i
-        Dict{Symbol, RandomVector}()
+        Vector{RandomVector}()
+    end
+    # Bookkeeping
+    ranvar_indices = ntuple(Val(N-1)) do i
+        Dict{RowCol, Int}()
+    end
+    ranvec_indices = ntuple(Val(N-1)) do i
+        Dict{Int, Int}()
     end
     # Parse the file
     data = open(filename) do io
@@ -110,38 +119,52 @@ function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractStrin
                 end
                 if dist == DISCRETE
                     # Check if random variable exists already
-                    ran_var = get(random_vars[stage - 1], (row, col), nothing)
-                    if ran_var === nothing
-                        # Create new INDEP random variable
-                        ran_var = random_vars[stage - 1][(row, col)] = IndepDiscrete(T, inclusion)
-                    else
+                    idx = get(ranvar_indices[stage - 1], (row, col), 0)
+                    ran_var = if idx > 0
+                        ran_var = random_vars[stage - 1][idx]
                         # Sanity check
                         ran_var isa IndepDiscrete || error("Random variable at $((row, col)) has more than one specified distribution.")
+                        ran_var
+                    else
+                        # Create new INDEP random variable
+                        ran_var = IndepDiscrete(T, (row,col), inclusion)
+                        push!(random_vars[stage - 1], ran_var)
+                        # Bookkeep
+                        ranvar_indices[stage - 1][(row, col)] = length(random_vars[stage - 1])
+                        ran_var
                     end
                     # Update values
                     push!(ran_var.support, v₁)
                     push!(ran_var.probabilities, v₂)
                 else
-                    haskey(random_vars[stage - 1], (row, col)) || error("Random variable at $((row, col)) has more than one specified distribution.")
-                    random_vars[stage - 1][(row, col)] = IndepDistribution(inclusion, dist, Pair(v₁, v₂))
+                    haskey(ranvar_indices[stage - 1], (row, col)) && error("Random variable at $((row, col)) has more than one specified distribution.")
+                    push!(random_vars[stage - 1], IndepDistribution((row, col), inclusion, dist, Pair(v₁, v₂)))
+                    # Bookkeep
+                    ranvar_indices[(row, col)] = length(random_vars[stage - 1])
                 end
             elseif mode == BLOCKS
                 if dist == DISCRETE
                     if words[1] == "BL"
                         length(words) == 4 || error("Malformed sto file at line $words.")
-                        block = Symbol(words[2])
                         stage_name = Symbol(words[3])
                         haskey(tim.stages, stage_name) || error("Stage name $stage_name not specified in .tim file.")
                         stage = tim.stages[stage_name]
                         prob = parse(Float64, words[4])
                         # Check if random vector exists already
-                        ran_vec = get(random_vecs[stage - 1], block, nothing)
-                        if ran_vec === nothing
-                            # Create new DISCRETE random vector
-                            ran_vec = random_vecs[stage - 1][block] = BlockDiscrete(T, inclusion)
-                        else
+                        idx = get(ranvec_indices[stage - 1], block, 0)
+                        ran_vec = if idx > 0
+                            ran_vec = random_vecs[stage - 1][idx]
                             # Sanity check
                             ran_vec isa BlockDiscrete || error("Random vector at $block has more than one specified distribution.")
+                            ran_vec
+                        else
+                            # Create new DISCRETE random vector
+                            ran_vec = BlockDiscrete(T, inclusion)
+                            push!(random_vecs[stage - 1], ran_vec)
+                            # Bookkeep
+                            block += 1
+                            ranvec_indices[stage - 1][block] = length(random_vecs[stage - 1])
+                            ran_vec
                         end
                         # Update probability
                         push!(ran_vec.support, Dict{RowCol,T}())
@@ -153,7 +176,8 @@ function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractStrin
                         col = col == cor.rhsname ? RHS : col
                         row = Row(words[2])
                         val = parse(Float64, words[3])
-                        ran_vec = random_vecs[stage - 1][block]
+                        idx = ranvec_indices[stage - 1][block]
+                        ran_vec = random_vecs[stage - 1][idx]
                         ran_vec.support[end][(row, col)] = val
                     end
                 else
@@ -181,10 +205,10 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Ma
     Δd₂ = zero(model.d₂)
     # Collect rows, columns, and inclusions
     uncertainty_structure = Dict{RowCol, InclusionType}()
-    for (rowcol, ran_var) in sto.random_variables[stage]
-        uncertainty_structure[rowcol] = ran_var.inclusion
+    for ran_var in sto.random_variables[stage]
+        uncertainty_structure[ran_var.rowcol] = ran_var.inclusion
     end
-    for (block, ran_vec) in sto.random_vectors[stage]
+    for ran_vec in sto.random_vectors[stage]
         isempty(ran_vec.support[1]) && error("Block $block has empty support.")
         for (rowcol, val) in ran_vec.support[1]
             rowcol = (row, col)
@@ -272,10 +296,10 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Sp
     ΔCᵥ = Vector{T}()
     # Collect rows, columns, and inclusions
     uncertainty_structure = Dict{RowCol, InclusionType}()
-    for (rowcol, ran_var) in sto.random_variables[stage]
-        uncertainty_structure[rowcol] = ran_var.inclusion
+    for ran_var in sto.random_variables[stage]
+        uncertainty_structure[ran_var.rowcol] = ran_var.inclusion
     end
-    for (block, ran_vec) in sto.random_vectors[stage]
+    for ran_vec in sto.random_vectors[stage]
         isempty(ran_vec.support[1]) && error("Block $block has empty support.")
         for (rowcol, val) in ran_vec.support[1]
             uncertainty_structure[rowcol] = ran_vec.inclusion

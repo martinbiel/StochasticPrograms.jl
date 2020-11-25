@@ -1,11 +1,12 @@
 struct MultiDiscreteNonParametricSampler{T <: Real, S <: AbstractVector{T}, A <: AliasTable} <: Sampleable{Multivariate,Discrete}
     support::Vector{S}
+    probabilities::S
     aliastable::A
 
     function MultiDiscreteNonParametricSampler{T,S}(support::Vector{S}, probs::AbstractVector{<:Real}) where {T <: Real, S<:AbstractVector{T}}
         isempty(support) && "Empty support given."
         aliastable = AliasTable(probs)
-        new{T,S,typeof(aliastable)}(support, aliastable)
+        new{T,S,typeof(aliastable)}(support, convert(S, probs), aliastable)
     end
 end
 
@@ -27,40 +28,55 @@ struct SMPSSampler{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractSampler{S
     technology::UnitRange{Int}
     recourse::UnitRange{Int}
     random_variables::Dict{RowCol, Sampleable}
-    random_vectors::Dict{Block, Tuple{Vector{RowCol}, Sampleable}}
+    random_vectors::Dict{Vector{RowCol}, Sampleable}
     inclusions::Dict{RowCol, Symbol}
+end
+
+function finite_support(sampler::SMPSSampler{T}) where T <: AbstractFloat
+    return all(ran_var -> ran_var isa DiscreteNonParametric, values(sampler.random_variables)) &&
+        all(ran_vec -> ran_vec isa MultiDiscreteNonParametricSampler, values(sampler.random_vectors))
+end
+
+function support_size(sampler)
+    ran_var_sizes = map(values(sampler.random_variables)) do ran_var
+        return Float64(length(ran_var.support))
+    end
+    ran_vec_sizes = map(values(sampler.random_vectors)) do ran_vec
+        return Float64(length(ran_vec))
+    end
+    return reduce(*, vcat(ran_var_sizes, ran_vec_sizes))
 end
 
 function SMPSSampler(sto::RawStoch{N}, stage::SMPSStage{T}) where {N, T <: AbstractFloat}
     2 <= stage.id <= N + 1 || error("$(stage.id) not in range 2 to $(N + 1).")
     random_variables = Dict{RowCol, Sampleable}()
-    random_vectors = Dict{Block, Tuple{Vector{RowCol}, Sampleable}}()
+    random_vectors = Dict{Vector{RowCol}, Sampleable}()
     inclusions = Dict{RowCol, Symbol}()
-    for (rowcol, ran_var) in sto.random_variables[stage.id - 1]
-        inclusions[rowcol] = ran_var.inclusion
+    for ran_var in sto.random_variables[stage.id - 1]
+        inclusions[ran_var.rowcol] = ran_var.inclusion
         if ran_var isa IndepDiscrete
-            random_variables[rowcol] =
+            random_variables[ran_var.rowcol] =
                 DiscreteNonParametric(ran_var.support, ran_var.probabilities)
         elseif ran_var isa IndepDistribution
             if ran_var.distribution == UNIFORM
-                random_variables[rowcol] =
+                random_variables[ran_var.rowcol] =
                     Uniform(first(ran_var.parameters), second(ran_var.parameters))
             elseif ran_var.distribution == NORMAL
-                random_variables[rowcol] =
+                random_variables[ran_var.rowcol] =
                     Normal(first(ran_var.parameters), second(ran_var.parameters))
             elseif ran_var.distribution == GAMMA
-                random_variables[rowcol] =
+                random_variables[ran_var.rowcol] =
                     Gamma(first(ran_var.parameters), second(ran_var.parameters))
             elseif ran_var.distribution == BETA
-                random_variables[rowcol] =
+                random_variables[ran_var.rowcol] =
                     Beta(first(ran_var.parameters), second(ran_var.parameters))
             elseif ran_var.distribution == LOGNORM
-                random_variables[rowcol] =
+                random_variables[ran_var.rowcol] =
                     LogNormal(first(ran_var.parameters), second(ran_var.parameters))
             end
         end
     end
-    for (block, ran_vec) in sto.random_vectors[stage.id - 1]
+    for ran_vec in sto.random_vectors[stage.id - 1]
         if ran_vec isa BlockDiscrete
             isempty(ran_vec.support[1]) && error("Block $block has empty support.")
             rowcols = Vector{RowCol}()
@@ -81,8 +97,7 @@ function SMPSSampler(sto::RawStoch{N}, stage::SMPSStage{T}) where {N, T <: Abstr
                     end
                 end
             end
-            random_vectors[block] =
-                (rowcols, MultiDiscreteNonParametricSampler(support, ran_vec.probabilities))
+            random_vectors[rowcols] = MultiDiscreteNonParametricSampler(support, ran_vec.probabilities)
         end
     end
     return SMPSSampler(stage.uncertain,
@@ -94,6 +109,61 @@ function SMPSSampler(sto::RawStoch{N}, stage::SMPSStage{T}) where {N, T <: Abstr
 end
 
 function (sampler::SMPSSampler{T})() where T <: AbstractFloat
+    # Collect samples
+    samples = Dict{RowCol,T}()
+    for (rowcol, ran_var) in sampler.random_variables
+        samples[rowcol] = rand(ran_var)
+    end
+    for (rowcols, ran_vec) in sampler.random_vectors
+        block_sample = rand(ran_vec)
+        for (idx, rowcol) in enumerate(rowcols)
+            samples[rowcol] = block_sample[idx]
+        end
+    end
+    return create_scenario(sampler, samples)
+end
+
+function full_support(sampler::SMPSSampler{T}) where T <: AbstractFloat
+    # Sanity check
+    finite_support(sampler) || error("Sampler does not have finite support, cannot return full support.")
+    # Warn if support is large
+    nscenarios = support_size(sampler)
+    if nscenarios > 1e5
+        @warn "Generating full support of $nscenarios scenarios."
+    end
+    # Collect all realizations
+    all_realizations = Vector{Vector{Tuple{T,Dict{RowCol,T}}}}()
+    # Collect the full support of every random variable
+    for (rowcol, ran_var) in sampler.random_variables
+        push!(all_realizations, Vector{Tuple{T,Dict{RowCol,T}}}())
+        for (π,x) in zip(ran_var.p, ran_var.support)
+            push!(all_realizations[end], (π, Dict(rowcol => x)))
+        end
+    end
+    # Collect the full support of every random vector
+    for (rowcols, ran_vec) in sampler.random_vectors
+        push!(all_realizations, Vector{Tuple{T,Dict{RowCol,T}}}())
+        for (π,vec) in zip(ran_vec.probabilities, ran_vec.support)
+            d = Dict{RowCol,T}()
+            for (rowcol,x) in zip(rowcols,vec)
+                d[rowcol] = x
+            end
+            push!(all_realizations[end], (π, d))
+        end
+    end
+    # Generate scenario for every realization combination
+    return mapreduce(vcat, Base.Iterators.product(all_realizations...)) do realization
+        π = 1.0
+        samples = Dict{RowCol,T}()
+        for (ρ, outcome) in realization
+            samples = merge(samples, outcome)
+            π *= ρ
+        end
+        return create_scenario(sampler, samples; π)
+    end
+end
+
+function create_scenario(sampler::SMPSSampler{T}, samples::Dict{RowCol,T}; π::AbstractFloat = 1.0) where T <: AbstractFloat
     # Prepare scenario data
     Δq  = copy(sampler.template.c₁)
     A   = copy(sampler.template.A)
@@ -101,18 +171,6 @@ function (sampler::SMPSSampler{T})() where T <: AbstractFloat
     ΔC  = copy(sampler.template.C)
     Δd₂ = copy(sampler.template.d₂)
     Δh  = copy(sampler.template.b)
-    # Collect samples
-    samples = Dict{RowCol,T}()
-    for (rowcol, ran_var) in sampler.random_variables
-        samples[rowcol] = rand(ran_var)
-    end
-    for (block, ran_vec) in sampler.random_vectors
-        (rowcols, block_sampler) = ran_vec
-        block_sample = rand(block_sampler)
-        for (idx, rowcol) in enumerate(rowcols)
-            samples[rowcol] = block_sample[idx]
-        end
-    end
     # Fill scenario data
     for (rowcol, ξ) in samples
         (row, col) = rowcol
@@ -177,5 +235,5 @@ function (sampler::SMPSSampler{T})() where T <: AbstractFloat
     end
     ΔT = A[:,sampler.technology]
     ΔW = A[:,sampler.recourse]
-    return SMPSScenario(Probability(1.0), Δq, ΔT, ΔW, Δh, ΔC, Δd₁, Δd₂)
+    return SMPSScenario(Probability(π), Δq, ΔT, ΔW, Δh, ΔC, Δd₁, Δd₂)
 end
