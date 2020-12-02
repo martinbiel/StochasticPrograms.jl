@@ -1,0 +1,29 @@
+NAME          SIMPLE
+ROWS
+ N  OBJ
+ L  BOUND
+ L  LINK1
+ L  LINK2
+ L  Y1UP
+ L  Y2UP
+COLUMNS
+    X1        OBJ       100.0          BOUND     1.0
+    X2        OBJ       150.0          BOUND     1.0
+    X1        LINK1     -60.0
+    X2        LINK2     -80.0
+    Y1        OBJ       26.0           Y1UP      1.0
+    Y2        OBJ       30.0           Y2UP      1.0
+    Y1        LINK1     6.0            LINK2     8.0
+    Y2        LINK1     10.0           LINK2     5.0
+RHS
+    RHS       BOUND     120.0
+    RHS       LINK1     0.0
+    RHS       LINK2     0.0
+    RHS       Y1UP      400.0
+    RHS       Y2UP      200.0
+BOUNDS
+ LO X1LIM     X1        40.0
+ LO X2LIM     X2        20.0
+ LO Y1LIM     Y1        0.0
+ LO Y2LIM     Y2        0.0
+ENDATA

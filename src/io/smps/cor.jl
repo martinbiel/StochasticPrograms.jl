@@ -62,7 +62,7 @@ function parse_cor(::Type{T}, filename::AbstractString) where T <: AbstractFloat
             end
             words = split(line)
             first_word = Symbol(words[1])
-            if first_word in COR_MODES
+            if first_word in COR_MODES && first_word != mode
                 mode = first_word
                 continue
             end

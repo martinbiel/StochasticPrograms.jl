@@ -133,8 +133,8 @@ function stochastic_model(smps::SMPSModel{2})
                              data.model.d₂ + Δd₂)
             T̃    = C̃[:, data.technology]
             W̃    = C̃[:, data.recourse]
-            lb = data.model.lb
-            ub = data.model.ub
+            lb = data.model.lb[data.recourse]
+            ub = data.model.ub[data.recourse]
             # Define all recourse variables
             if any(isfinite.(lb))
                 if any(isfinite.(ub))

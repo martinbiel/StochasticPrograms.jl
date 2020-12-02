@@ -1,0 +1,5 @@
+TIME          SIMPLE
+PERIODS
+    X1        BOUND                    STAGE1
+    Y1        LINK1                    STAGE2
+ENDATA

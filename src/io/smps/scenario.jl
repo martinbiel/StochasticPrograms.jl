@@ -24,13 +24,13 @@ function StochasticPrograms.expected(scenarios::Vector{<:SMPSScenario{T}}) where
     isempty(scenarios) && return zero(SMPSScenario{T})
     expected = reduce(scenarios) do ξ₁, ξ₂
         SMPSScenario(Probability(1.0),
-                     probability(ξ₁) * ξ₁.Δq + probability(ξ₁) * ξ₂.Δq,
-                     probability(ξ₁) * ξ₁.ΔT + probability(ξ₁) * ξ₂.ΔT,
-                     probability(ξ₁) * ξ₁.ΔW + probability(ξ₁) * ξ₂.ΔW,
-                     probability(ξ₁) * ξ₁.Δh + probability(ξ₁) * ξ₂.Δh,
-                     probability(ξ₁) * ξ₁.ΔC + probability(ξ₁) * ξ₂.ΔC,
-                     probability(ξ₁) * ξ₁.Δd₁ + probability(ξ₁) * ξ₂.Δd₁,
-                     probability(ξ₁) * ξ₁.Δd₂ + probability(ξ₁) * ξ₂.Δd₂)
+                     probability(ξ₁) * ξ₁.Δq + probability(ξ₂) * ξ₂.Δq,
+                     probability(ξ₁) * ξ₁.ΔT + probability(ξ₂) * ξ₂.ΔT,
+                     probability(ξ₁) * ξ₁.ΔW + probability(ξ₂) * ξ₂.ΔW,
+                     probability(ξ₁) * ξ₁.Δh + probability(ξ₂) * ξ₂.Δh,
+                     probability(ξ₁) * ξ₁.ΔC + probability(ξ₂) * ξ₂.ΔC,
+                     probability(ξ₁) * ξ₁.Δd₁ + probability(ξ₂) * ξ₂.Δd₁,
+                     probability(ξ₁) * ξ₁.Δd₂ + probability(ξ₂) * ξ₂.Δd₂)
     end
     return StochasticPrograms.ExpectedScenario(expected)
 end
