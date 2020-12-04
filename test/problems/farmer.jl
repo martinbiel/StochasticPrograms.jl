@@ -29,9 +29,10 @@ farmer = @stochastic_model begin
     end
 end
 
-ξ₁ = Scenario(wheat = 3.0, corn = 3.6, beets = 24.0, probability = 1/3)
-ξ₂ = Scenario(wheat = 2.5, corn = 3.0, beets = 20.0, probability = 1/3)
-ξ₃ = Scenario(wheat = 2.0, corn = 2.4, beets = 16.0, probability = 1/3)
+Crops = [:wheat, :corn, :beets]
+ξ₁ = @scenario ξ[c in Crops] = [3.0, 3.6, 24.0] probability = 1/3
+ξ₂ = @scenario ξ[c in Crops] = [2.5, 3.0, 20.0] probability = 1/3
+ξ₃ = @scenario ξ[c in Crops] = [2.0, 2.4, 16.0] probability = 1/3
 
 farmer_res = SPResult([170,80,250], -108390, -115405.56, 7015.56, 1150, -118600, -107240)
 push!(problems, (farmer, [ξ₁,ξ₂,ξ₃], farmer_res,"Farmer"))

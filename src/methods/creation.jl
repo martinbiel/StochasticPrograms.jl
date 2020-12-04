@@ -1,11 +1,11 @@
 # Creation macros #
 # ========================== #
 """
-    @scenario(def)
+    @define_scenario(def)
 
 Define a scenario type compatible with StochasticPrograms using the syntax
 ```julia
-@scenario name = begin
+@define_scenario name = begin
     ...structdef...
 
     [@zero begin
@@ -19,7 +19,7 @@ Define a scenario type compatible with StochasticPrograms using the syntax
      end]
 end
 ```
-The generated type is referenced through `name` and a default constructor is always generated. This constructor accepts the keyword `probability` to set the probability of the scenario occuring. Otherwise, any internal variables and specialized constructors are defined in the @scenario block as they would be in any Julia struct.
+The generated type is referenced through `name` and a default constructor is always generated. This constructor accepts the keyword `probability` to set the probability of the scenario occuring. Otherwise, any internal variables and specialized constructors are defined in the @define_scenario block as they would be in any Julia struct.
 
 If possible, a `zero` method and an `expected` method will be generated for the defined type. Otherwise, or if the default implementation is not desired, these can be user provided through [`@zero`](@ref) and [`@expectation`](@ref).
 
@@ -30,7 +30,7 @@ The defined scenario type will be available on all Julia processes.
 The following defines a simple scenario ``ξ`` with a single value.
 
 ```jldoctest
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     ξ::Float64
 end
 
@@ -45,7 +45,7 @@ ExampleScenario with probability 0.5
 
 See also: [`@zero`](@ref), [`@expectation`](@ref), [`@sampler`](@ref)
 """
-macro scenario(arg)
+macro define_scenario(arg)
     @capture(arg, scenarioname_Symbol = scenariodef_) || error("Invalid syntax. Expected: scenarioname = begin scenariodef end")
     vars = Vector{Symbol}()
     vartypes = Vector{Union{Expr,Symbol}}()
@@ -175,7 +175,7 @@ end
 
 ## Examples
 
-The following defines a zero scenario for the example scenario defined in [`@scenario`](@ref)
+The following defines a zero scenario for the example scenario defined in [`@define_scenario`](@ref)
 
 ```julia
 @zero begin
@@ -183,13 +183,13 @@ The following defines a zero scenario for the example scenario defined in [`@sce
 end
 ```
 
-See also [`@scenario`](@ref)
+See also [`@define_scenario`](@ref)
 """
-macro zero(def) @warn "@zero should be used inside a @scenario block." end
+macro zero(def) @warn "@zero should be used inside a @define_scenario block." end
 """
     @expectation(def)
 
-Define how to form the expected scenario inside a @scenario block. The scenario collection is accessed through the reserved keyword `scenarios`.
+Define how to form the expected scenario inside a [`@define_scenario`](@ref) block. The scenario collection is accessed through the reserved keyword `scenarios`.
 
 ```julia
 @zero begin
@@ -208,22 +208,81 @@ The following defines expectation for the example scenario defined in [`@scenari
 end
 ```
 
-See also [`@scenario`](@ref)
+See also [`@define_scenario`](@ref)
 """
 macro expectation(def) @warn "@expectation should be used inside a @scenario block." end
 """
-    @container_scenario([i=..., j=..., ...], expr, probability = 1.0)
+    @scenario(args..., probability = )
 
-Wraps JuMP's `@container` macro to create [`Scenario`](@ref) instances with `DenseAxisArray` or `SparseAxisArray` as underlying data. See `@container` for syntax.
+Create [`Scenario`](@ref) matching some [`@uncertain`](@ref) declaration with a supplied probability.
+
+
+    @scenario(var1 = val1, var2 = val2, ..., probability = 1.0)
+
+Create [`Scenario`](@ref) matching [`@uncertain`](@ref) annotation of the form `@uncertain var1, var2, ...`
+
+
+    @scenario(ξ[i=..., j=..., ...] = values, probability = 1.0)
+
+Create [`Scenario`](@ref) matching [`@uncertain`](@ref) annotation of the form `@uncertain ξ[i=..., j=..., ...]`. `values` must have the same dimension as the specified index sets.
+
+
+    @scenario(ξ[i=..., j=..., ...], expr, probability = 1.0, requested_container = :Auto)
+
+Create [`Scenario`](@ref) matching [`@uncertain`](@ref) annotation of the form `@uncertain ξ[i=..., j=..., ...]`. Wraps JuMP's `@container` macro to create `DenseAxisArray` or `SparseAxisArray` as underlying data. See `@container` for further syntax information.
+
+## Examples
+
+The following are equivalent ways of creating an instance of the random vector ``[q₁(ξ) q₂(ξ) d₁(ξ) d₂(ξ)]``  of probability ``0.4`` and values ``[24.0 28.0 500.0 100.0]``.
+
+```julia
+@scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
+
+@scenario ξ[i in 1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4
+```
 
 """
-macro container_scenario(args...)
+macro scenario(args...)
     args, kw_args, probability, requested_container = _extract_kw_args(args)
+    if length(args) == 0
+        if length(kw_args) > 1 || @capture(kw_args[1], var_Symbol = val_)
+            return :(Scenario(; $(esc.(kw_args)...), probability = $(esc(probability))))
+        else
+            if @capture(kw_args[1], idx_ = val_)
+                idxvars, indices = Containers._build_ref_sets(error, idx)
+                values = @q begin
+                    if $indices isa VectorizedProductIterator && all(idx -> idx isa Base.OneTo, $indices.prod.iterators)
+                        $(esc(val))[$(esc.(idxvars)...)]
+                    else
+                        if $(esc(val)) isa Dict
+                            $(esc(val))[($(esc.(idxvars)...),)]
+                        elseif $(esc(val)) isa Array
+                            zero(eltype($(esc(val))))
+                        else
+                            error("Unsupported right hand side in @scenario assignment.")
+                        end
+                    end
+                end
+                code = Containers.container_code(idxvars, indices, :($values), requested_container)
+                return @q begin
+                    ξ = Scenario($code; probability = $(esc(probability)))
+                    if ξ.data isa Array
+                        size(ξ.data) == size($val) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
+                    elseif ξ.data isa DenseAxisArray
+                        ξ.data.data .= $val
+                    elseif ξ.data isa SparseAxisArray
+                        length(ξ.data.data) == length($val) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
+                    end
+                    ξ
+                end
+            end
+        end
+    end
     @assert length(args) == 2
     @assert isempty(kw_args)
-    var, value = args
-    code = Containers.parse_container(error, var, esc(value), requested_container)
-    return :(Scenario($code, probability = $(esc(probability))))
+    idx, values = args
+    code = Containers.parse_container(error, idx, esc(values), requested_container)
+    return :(Scenario($code; probability = $(esc(probability))))
 end
 function _extract_kw_args(args)
     kw_args = filter(x -> isexpr(x, :(=)) && x.args[1] != :container && x.args[1] != :probability, collect(args))
@@ -520,20 +579,29 @@ or using JuMP's container syntax
 ```julia
 @uncertain ξ[i=..., j=..., ...]
 ```
-This assumes that the [`Scenario`] type is used. Alternatively, user-defined scenarios can be specified by annotating the type. Also, inside a @stochastic_model block, user-defined scenarios can be created during the @uncertain annotation, following [`@scenario`](@ref).
+This assumes that the [`Scenario`] type is used. Matching scenario data is then conveniently created using [`@scenario`](@ref).
+
+Alternatively, user-defined scenarios can be specified by annotating the type. Also, inside a @stochastic_model block, user-defined scenarios can be created during the @uncertain annotation, using [`@define_scenario`](@ref) syntax.
 
 ## Examples
 
+The following are equivalent ways of declaring a random vector ``[q₁(ξ) q₂(ξ) d₁(ξ) d₂(ξ)]`` in a `@stage` block, and creating a matching scenario instance of probability ``0.4`` and values ``[24.0 28.0 500.0 100.0]``.ö
+
 ```julia
 @uncertain q₁ q₂ d₁ d₂
+ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
 
-@scenario Simple = begin
+@uncertain ξ[i in 1:4]
+ξ₁ = @scenario ξ[i in 1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4
+
+@define_scenario SimpleScenario = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64
     d₂::Float64
 end
 @uncertain ξ::SimpleScenario
+ξ₁ = SimpleScenario(24.0, 28.0, 500.0, 100.0, probability = 0.4)
 
 @stochastic_model begin
     ...
@@ -545,9 +613,10 @@ end
     end
     ...
 end
+ξ₁ = SimpleScenario(24.0, 28.0, 500.0, 100.0 probability = 0.4)
 ```
 
-See also [`@scenario`](@ref), [`@parameters`](@ref), [`@decision`](@ref), [`@stage`](@ref)
+See also [`@scenario`](@ref), [`@define_scenario`](@ref), [`@parameters`](@ref), [`@decision`](@ref), [`@stage`](@ref)
 """
 macro uncertain(def) @warn "@uncertain should be used inside a @stage block." end
 """
@@ -585,8 +654,8 @@ and the second-stage model given by:
 where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` and ``x₁, x₂`` are first stage variables. Two scenarios are added so that two second stage models are generated.
 
 ```jldoctest
-ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
-ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
+ξ₂ = @scenario q₁ = 28.0 q₂ = 32.0 d₁ = 300.0 d₂ = 300.0 probability = 0.6
 
 sp = StochasticProgram([ξ₁, ξ₂])
 
@@ -721,21 +790,24 @@ macro stage(stage, args)
                 push!(code.args, :($var = getproperty(scenvar, $varkey)))
             end
             return code
-        elseif @capture(x, @uncertain scenvar_Symbol[args__])
+        elseif @capture(x, @uncertain args_) && typeof(args) == Expr && args.head == :ref
             stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
-            idx = Expr(:tuple)
-            for idxdef in args
-                if @capture(idxdef, p_Symbol = set_) || @capture(idxdef, p_Symbol in set_)
-                    push!(idx.args, p)
-                end
-            end
+            scenvar = first(args.args)
+            reference = :(Containers.@container $args "uncertain value")
             code = @q begin
-                typeof(scenario) <: Scenario || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...]` only support scenarios of type `Scenario`. Consider declaring a custom scenario type.")
-                $scenvar = try
-                    $scenvar = Containers.@container([$(args...)], scenario.data[$idx...])
-                catch err
-                    error("Given scenario $scenario does not match @uncertain declaration.")
-                end
+                typeof(scenario) <: Scenario{D} where D <: Union{Array, StochasticPrograms.DenseAxisArray} || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...]` only support scenarios of type `Scenario` with Array or DenseAxisArray as underlying data. Consider declaring a custom scenario type.")
+                size(scenario.data) == size($reference) || error("Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
+                $scenvar = scenario.data
+            end
+            return code
+        elseif @capture(x, @uncertain args_) && typeof(args) == Expr && args.head == :typed_vcat
+            stage == 1 && error("@uncertain declarations cannot be used in the first stage.")
+            scenvar = first(args.args)
+            reference = :(Containers.@container $args "uncertain value")
+            code = @q begin
+                typeof(scenario) <: Scenario{D} where D <: StochasticPrograms.SparseAxisArray || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...; ...]` only support scenarios of type `Scenario` with SparseAxisArray as underlying data. Consider declaring a custom scenario type.")
+                keys(scenario.data.data) == keys($reference.data) || error("Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
+                $scenvar = scenario.data
             end
             return code
         elseif @capture(x, @uncertain args__)

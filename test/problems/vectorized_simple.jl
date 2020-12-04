@@ -18,17 +18,17 @@ vec_simple = @stochastic_model begin
             W  = [6. 10.;
                   8. 5.]
         end
-        @uncertain q₁ q₂ d₁ d₂
-        ub = [d₁, d₂]
-        q  = [q₁, q₂]
+        @uncertain ξ[1:4]
+        q  = [ξ[1], ξ[2]]
+        ub = [ξ[3], ξ[4]]
         @variable(model, lb[i] <= y[i in 1:2] <= ub[i])
         @objective(model, Max, dot(q, y))
         @constraint(model, T * x + W * y in MOI.Nonpositives(2))
     end
 end
 
-ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
-ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₁ = @scenario ξ[1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4
+ξ₂ = @scenario ξ[1:4] = [28.0, 32.0, 300.0, 300.0] probability = 0.6
 
 vec_simple_res = SPResult([46.67, 36.25], -855.83, -1518.75, 662.92, 286.92, -1445.92, -568.92)
 push!(problems, (vec_simple, [ξ₁,ξ₂], vec_simple_res, "Simple"))

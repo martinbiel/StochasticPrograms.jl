@@ -10,10 +10,11 @@ using GLPK
 ```
 An example implementation of the farmer problem is given by:
 ```@example farmer
+Crops = [:wheat, :corn, :beets]
 farmer_model = @stochastic_model begin
     @stage 1 begin
         @parameters begin
-            Crops = [:wheat, :corn, :beets]
+            Crops = Crops
             Cost = Dict(:wheat=>150, :corn=>230, :beets=>260)
             Budget = 500
         end
@@ -23,7 +24,7 @@ farmer_model = @stochastic_model begin
     end
     @stage 2 begin
         @parameters begin
-            Crops = [:wheat, :corn, :beets]
+            Crops = Crops
             Required = Dict(:wheat=>200, :corn=>240, :beets=>0)
             PurchasePrice = Dict(:wheat=>238, :corn=>210)
             SellPrice = Dict(:wheat=>170, :corn=>150, :beets=>36, :extra_beets=>10)
@@ -43,9 +44,9 @@ end
 ```
 The three yield scenarios can be defined through:
 ```@example farmer
-ξ₁ = Scenario(wheat = 3.0, corn = 3.6, beets = 24.0, probability = 1/3)
-ξ₂ = Scenario(wheat = 2.5, corn = 3.0, beets = 20.0, probability = 1/3)
-ξ₃ = Scenario(wheat = 2.0, corn = 2.4, beets = 16.0, probability = 1/3)
+ξ₁ = @scenario ξ[c in Crops] = [3.0, 3.6, 24.0] probability = 1/3
+ξ₂ = @scenario ξ[c in Crops] = [2.5, 3.0, 20.0] probability = 1/3
+ξ₃ = @scenario ξ[c in Crops] = [2.0, 2.4, 16.0] probability = 1/3
 ```
 We can now instantiate the farmer problem using the defined stochastic model and the three yield scenarios:
 ```@example farmer

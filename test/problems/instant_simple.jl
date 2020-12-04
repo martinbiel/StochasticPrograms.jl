@@ -1,4 +1,4 @@
-@scenario SimpleScenario = begin
+@define_scenario SimpleScenario = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64

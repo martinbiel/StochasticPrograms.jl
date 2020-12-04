@@ -4,7 +4,7 @@ Decoupling data design and model design is a fundamental principle in Stochastic
 
 ## Stage data
 
-Stage data is related to parameters that always appear in the first or second stage of a stochastic program. These parameters are deterministic and are the same across all scenarios. Such parameters are conviently included in stochastic models using `@parameters`. To showcase, we consider a minimal stochastic program:
+Stage data is related to parameters that always appear in the first or second stage of a stochastic program. These parameters are deterministic and are the same across all scenarios. Such parameters are conveniently included in stochastic models using [`@parameters`](@ref). To showcase, we consider a minimal stochastic program:
 ```math
 \begin{aligned}
  \operatorname*{maximize}_{x \in \mathbb{R}} & \quad x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x, \xi(\omega))\right] \\
@@ -50,33 +50,84 @@ sm = @stochastic_model begin
     end
 end
 
-ξ₁ = Scenario(q = 1., probability = 0.5)
-ξ₂ = Scenario(q = -1., probability = 0.5)
+ξ₁ = @scenario q = 1. probability = 0.5
+ξ₂ = @scenario q = -1. probability = 0.5
 
 sp = instantiate(sm, [ξ₁,ξ₂], optimizer = GLPK.Optimizer)
 
-print(sp)
+println(sp)
 
 print("VRP = $(VRP(sp))")
 ```
-Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to `instantiate`:
+Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to [`instantiate`](@ref):
 ```@example parameters
 sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5, optimizer = GLPK.Optimizer)
 
-print(sp)
+println(sp)
 
 print("VRP = $(VRP(sp))")
 ```
 
 ## Scenario data
 
-Any uncertain parameter in the second stage of a stochastic program should be included in some predefined [`AbstractScenario`](@ref) type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given [`AbstractScenario`](@ref) occurring should be returned from [`probability`](@ref). Also, the expected scenario out of a collection of given [`AbstractScenario`](@ref)s should be returned by [`expected`](@ref). The predefined [`Scenario`](@ref) type adheres to this abstraction and is the recommended option when uncertain variables is a set of scalar values, as exemplified in the [Quick start](@ref).
+Any uncertain parameter in the second stage of a stochastic program should be included in some predefined [`AbstractScenario`](@ref) type. Hence, all uncertain parameters in a stochastic program must be identified before defining the models. In brief, StochasticPrograms demands two functions from this abstraction. The discrete probability of a given [`AbstractScenario`](@ref) occurring should be returned from [`probability`](@ref). Also, the expected scenario out of a collection of given [`AbstractScenario`](@ref)s should be returned by [`expected`](@ref). The predefined [`Scenario`](@ref) type adheres to this abstraction and is the recommended option for most models, as exemplified in the [Quick start](@ref).
 
-In addition, StochasticPrograms provides a convenience macro, [`@scenario`](@ref), for creating scenario types that also adhere to the scenario abstraction. The following is an alternative way to define a scenario structure for the simple problem introduced in the [Quick start](@ref):
+Instances of [`Scenario`](@ref) that match an [`@uncertain`](@ref) declaration are conveniently created using the [`@scenario`](@ref) macro. The syntax of these macros match, as is shown in the examples below. The following is a declaration of four scalar uncertain values:
+```julia
+@uncertain q₁ q₂ d₁ d₂
+```
+which is paired with a matching instantiation of a scenario containing these scalars:
+```@example parameters
+ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
+```
+Below, an equivalent formulation is given that instead defines a random vector.
+```julia
+@uncertain ξ[i in 1:4]
+```
+paired with
+```@example parameters
+ξ₁ = @scenario ξ[i in 1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4
+```
+Multidimensional random data is also supported. A simple example is given below.
+```julia
+@uncertain ξ[i in 1:2, j in 1:3]
+```
+paired with
+```@example parameters
+ξ₁ = @scenario ξ[i in 1:2, j in 1:3] = rand(2, 3) probability = rand()
+```
+The assignment syntax is used to directly create the random matrix. The dimensions of the RHS must match the index declaration, which in turn must match the [`@uncertain`](@ref) declaration. It is also possible to construct more complex examples using JuMP's container syntax. For example,
+```julia
+@uncertain ξ[i in 1:3, k in [:a, :b, :c]]
+```
+and
+```@example parameters
+data = Dict((1, :a) => 1.0, (2, :a) => 2.0, (3, :a) => 3.0,
+            (1, :b) => 4.0, (2, :b) => 5.0, (3, :b) => 6.0,
+            (1, :c) => 7.0, (2, :c) => 8.0, (3, :c) => 9.0)
+ξ₁ = @scenario ξ[i in 1:3, k in [:a, :b, :c]] data[i,k] probability = rand()
+```
+or the shorthand:
+```@example parameters
+ξ₁ = @scenario ξ[i in 1:3, k in [:a, :b, :c]] = [1. 2. 3.;
+                                                 4. 5. 6.;
+                                                 7. 8. 9] probability = rand()
+```
+Triangular and conditional indexing work as well:
+```julia
+@uncertain ξ[i in 1:3, j in 1:3; i <= j]
+```
+and
+```@example parameters
+ξ₁ = @scenario ξ[i in 1:3, j in 1:3; i <= j] i+j probability = rand()
+```
+Error checking is performed during model instantiation to ensure that all provided scenarios adhere to the [`@uncertain`](@ref) declaration.
+
+In addition, StochasticPrograms provides a convenience macro, [`@define_scenario`](@ref), for creating scenario types that also adhere to the scenario abstraction. The following is an alternative way to define a scenario structure for the simple problem introduced in the [Quick start](@ref):
 ```@example simple
 using StochasticPrograms
 
-@scenario SimpleScenario = begin
+@define_scenario SimpleScenario = begin
     q₁::Float64
     q₂::Float64
     d₁::Float64
@@ -99,12 +150,16 @@ Moreover, we can form the expected scenario out of a given set:
 ```@example simple
 ξ̄ = expected([ξ₁, ξ₂])
 ```
+To use the defined scenario in a model, the following [`@uncertain`](@ref) syntax is used:
+```julia
+@uncertain ξ from SimpleScenario
+```
 
 There are some caveats to note. First, the autogenerated requires an additive zero element of the introduced scenario type. For simple numeric types this is autogenerated as well. However, say that we want to extend the above scenario with some vector parameter of size 2:
 ```@example
 using StochasticPrograms
 
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
 end
@@ -113,7 +168,7 @@ In this case, we must provide an implementation of `zero` using [`@zero`](@ref):
 ```@example
 using StochasticPrograms
 
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
 
@@ -137,7 +192,7 @@ Another caveat is that the [`expected`](@ref) function can only be auto generate
 ```@example
 using StochasticPrograms
 
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
     Z::Int
@@ -147,11 +202,11 @@ using StochasticPrograms
     end
 end
 ```
-Again, the solution is to provide an implementation of `expected`, this time using [`@expectation`](@ref):
+Again, the solution is to provide an implementation of [`expected`](@ref), this time using [`@expectation`](@ref):
 ```@example
 using StochasticPrograms
 
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     X::Float64
     Y::Vector{Float64}
     Z::Int
@@ -180,7 +235,7 @@ println("Expectated X: $(s.scenario.X)")
 println("Expectated Y: $(s.scenario.Y)")
 println("Expectated Z: $(s.scenario.Z)")
 ```
-For most problems, [`@scenario`](@ref) will probably be adequate. Otherwise consider defining [Custom scenarios](@ref).
+For most problems, [`@define_scenario`](@ref) will probably be adequate. Otherwise consider defining [Custom scenarios](@ref).
 
 ## Sampling
 
@@ -203,16 +258,16 @@ The most basic sampler is the included [`Sampler`](@ref), which is used to sampl
 using StochasticPrograms
 
 sampler = Sampler() do
-    return Scenario(q₁ = -24.0 + randn(), q₂ = -28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
+    return Scenario(q₁ = 24.0 + randn(), q₂ = 28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
 end
 
 sampler()
 ```
-Samplers can also be conviniently created using [`@sampler`](@ref). We can define a simple scenario type and a simple sampler as follows:
+Samplers can also be conveniently created using [`@sampler`](@ref). We can define a simple scenario type and a simple sampler as follows:
 ```@example sampling
 using StochasticPrograms
 
-@scenario ExampleScenario = begin
+@define_scenario ExampleScenario = begin
     w::Float64
 end
 
@@ -279,13 +334,13 @@ using Random
 Random.seed!(1)
 ```
 
-More complex scenario designs are probably not implementable using [`@scenario`](@ref). However, it is still possible to create a custom scenario type as long as:
+More complex scenario designs are probably not implementable using [`@define_scenario`](@ref). However, it is still possible to create a custom scenario type as long as:
 
  - The type is a subtype of [`AbstractScenario`](@ref)
  - The type implements [`probability`](@ref)
  - The type implements [`expected`](@ref), which should return an additive zero element if given an empty array
 
-The restriction on `expected` is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:
+The restriction on [`expected`](@ref) is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:
 
  - The sampler type is a subtype of [`AbstractSampler`](@ref)
  - The sampler type implements a functor call that performs the sampling

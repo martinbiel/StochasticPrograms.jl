@@ -89,7 +89,7 @@ simple_model = @stochastic_model begin
     end
 end
 ```
-The optimization models in the first and second stage are defined using JuMP syntax inside `@stage` blocks. Every first-stage variable is annotated with `@decision`. This allows us to use the variable in the second stage. The `@uncertain` annotation specifies that the variables `q₁`, `q₂`, `d₁` and `d₂` are uncertain. Instances of the uncertain variables will later be injected to create instances of the second stage model. We will consider two stochastic models of the uncertainty and showcase the main functionality of the framework for each.
+The optimization models in the first and second stage are defined using JuMP syntax inside [`@stage`](@ref) blocks. Every first-stage variable is annotated with [`@decision`](@ref). This allows us to use the variable in the second stage. The [`@uncertain`](@ref) annotation specifies that the variables `q₁`, `q₂`, `d₁` and `d₂` are uncertain. Instances of the uncertain variables will later be injected to create instances of the second stage model. We will consider two stochastic models of the uncertainty and showcase the main functionality of the framework for each.
 
 ## Finite sample space
 
@@ -111,13 +111,13 @@ with probability ``0.6``.
 
 First, we create the two instances ``\xi_1`` and ``\xi_2`` of the random variable. For simple models this is conveniently achieved through the [`Scenario`](@ref) type. ``\xi_1`` and ``\xi_2`` can be created as follows:
 ```@example simple
-ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
+ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
 ```
 and
 ```@example simple
-ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₂ = @scenario q₁ = 28.0 q₂ = 32.0 d₁ = 300.0 d₂ = 300.0 probability = 0.6
 ```
-where the variable names should match those given in the `@uncertain` annotation. We are now ready to instantiate the stochastic program introduced above.
+where the variable names should match those given in the [`@uncertain`](@ref) annotation. We are now ready to instantiate the stochastic program introduced above.
 ```@example simple
 sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 ```
@@ -171,16 +171,31 @@ set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
 set_optimizer_attribute(sp_lshaped, SubproblemOptimizer(), GLPK.Optimizer)
 ```
 We can now run the optimization procedure:
-```@example simple
+```julia
 optimize!(sp_lshaped)
 ```
+```julia
+L-Shaped Gap  Time: 0:00:01 (6 iterations)
+  Objective:       -855.8333333333339
+  Gap:             0.0
+  Number of cuts:  7
+  Iterations:      6
+```
 and verify that we get the same results:
-```@example simple
+```julia
 objective_value(sp_lshaped)
 ```
 and
-```@example simple
+```julia
+-855.8333333333339
+```
+```julia
 optimal_decision(sp_lshaped)
+```
+```julia
+2-element Array{Float64,1}:
+ 46.66666666666673
+ 36.25000000000003
 ```
 Likewise, we can solve the problem with progressive-hedging. Consider:
 ```julia
@@ -280,8 +295,11 @@ optimize!(another_sp)
 objective_value(another_sp)
 ```
 Decision evaluation is supported by the other storage structures as well:
-```@example simple
+```julia
 evaluate_decision(sp_lshaped, x)
+```
+```julia
+-470.39999999999964
 ```
 and
 ```julia
@@ -340,19 +358,17 @@ The EVPI measures the expected loss of not knowing the exact outcome beforehand.
 EVPI(sp)
 ```
 EVPI is supported in the other structures as well:
-```@example simple
+```julia
 EVPI(sp_lshaped)
+```
+```julia
+662.9166666666661
 ```
 and
 ```julia
 EVPI(sp_progressivehedging)
 ```
 ```julia
-Progressive Hedging Time: 0:00:05 (303 iterations)
-  Objective:   -855.5842547490254
-  Primal gap:  7.2622997706326046e-6
-  Dual gap:    8.749063651111478e-6
-  Iterations:  302
 663.165763660815
 ```
 We can also compute EWS directly using [`EWS`](@ref). Note, that the horizontal structure is ideal for solving wait-and-see type problems.
@@ -382,19 +398,17 @@ The VSS measures the expected loss of ignoring the uncertainty in the problem. A
 VSS(sp)
 ```
 VSS is supported in the other structures as well:
-```@example simple
+```julia
 VSS(sp_lshaped)
+```
+```julia
+286.91666666666606
 ```
 and
 ```julia
 VSS(sp_progressivehedging)
 ```
 ```julia
-Progressive Hedging Time: 0:00:06 (303 iterations)
-  Objective:   -855.5842547490254
-  Primal gap:  7.2622997706326046e-6
-  Dual gap:    8.749063651111478e-6
-  Iterations:  302
 286.6675823650668
 ```
 We can also compute EEV directly using [`EEV`](@ref). Note, that the vertical structure is ideal for solving VSS type problems.

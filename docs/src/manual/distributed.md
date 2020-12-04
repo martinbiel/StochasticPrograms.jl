@@ -1,6 +1,6 @@
 # Distributed stochastic programs
 
-Stochastic programs related to industrial applications are often associated with complex models and vast numbers of scenarios, often in the order of `1000-1000000`. Hence, the extensive form can have billions of variables and constraints, and often does not fit in memory on a single machine. This clarifies the need for solution approaches that work in parallel on distributed data when instansiating and optimizing large-scale stochastic programs.
+Stochastic programs related to industrial applications are often associated with complex models and vast numbers of scenarios, often in the order of `1000-1000000`. Hence, the extensive form can have billions of variables and constraints, and often does not fit in memory on a single machine. This clarifies the need for solution approaches that work in parallel on distributed data when instantiating and optimizing large-scale stochastic programs.
 
 If multiple Julia processes are available, locally or in a cluster, StochasticPrograms natively distributes any defined stochastic programs on the available processing nodes. Consider as before:
 ```julia
@@ -52,7 +52,7 @@ and instantiate a sampled model with 10 sceanarios:
 ```julia
 sp = instantiate(simple_model, sampler, 10)
 ```
-the lightweight model recipes are passed to all worker nodes. The worker nodes then use the recipes and lightweight sampler object to instansiate second stage models in parallel. This is one of the intended outcomes of the design choices made in StochasticPrograms. The separation between data design and model design allows us to minimize data passing in a natural way.
+the lightweight model recipes are passed to all worker nodes. The worker nodes then use the recipes and lightweight sampler object to instantiate second stage models in parallel. This is one of the intended outcomes of the design choices made in StochasticPrograms. The separation between data design and model design allows us to minimize data passing in a natural way.
 
 Many operations in StochasticPrograms are embarassingly parallel which is exploited throughout when a stochastic program is distributed. Notably:
  - [`evaluate_decision`](@ref)
@@ -62,7 +62,7 @@ Perform many subproblem independent operations in parallel. The best performance
 ```julia
 using GLPK
 
-sp = instansiate(simple_model, sampler, 10, optimizer = () -> LShaped.Optimizer(GLPK.Optimizer))
+sp = instantiate(simple_model, sampler, 10, optimizer = () -> LShaped.Optimizer(GLPK.Optimizer))
 
 optimize!(sp)
 ```

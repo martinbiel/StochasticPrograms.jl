@@ -87,9 +87,6 @@ end
 
 # Containers #
 # ========================== #
-const DenseAxisArray = JuMP.Containers.DenseAxisArray
-const SparseAxisArray = JuMP.Containers.SparseAxisArray
-
 struct DecisionDenseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: DenseAxisArray, S <: MOI.AbstractSet}
     array::A
     constraint::S

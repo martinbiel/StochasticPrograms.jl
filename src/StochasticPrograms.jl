@@ -21,6 +21,10 @@ using ProgressMeter
 import Base: getindex, length, in, issubset, show
 import JuMP: optimize!, termination_status, index, value
 
+const DenseAxisArray = JuMP.Containers.DenseAxisArray
+const SparseAxisArray = JuMP.Containers.SparseAxisArray
+const VectorizedProductIterator = JuMP.Containers.VectorizedProductIterator
+
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
@@ -190,8 +194,7 @@ export
     optimal_recourse_decision,
     optimal_value,
     calculate_objective_value,
-    @scenario,
-    @container_scenario,
+    @define_scenario,
     @sampler,
     @first_stage,
     @second_stage,
@@ -204,6 +207,7 @@ export
     @known,
     @parameters,
     @uncertain,
+    @scenario,
     WS,
     wait_and_see_decision,
     EWS,

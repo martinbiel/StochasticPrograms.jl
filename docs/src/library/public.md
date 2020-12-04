@@ -62,7 +62,7 @@ end
 
 ```@docs
 @scenario
-@container_scenario
+@define_scenario
 @zero
 @expectation
 @sampler

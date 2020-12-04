@@ -14,8 +14,8 @@ infeasible = @stochastic_model begin
     end
 end
 
-ξ₁ = Scenario(ξ₁ = 6., ξ₂ = 8., probability = 0.5)
-ξ₂ = Scenario(ξ₁ = 4., ξ₂ = 4., probability = 0.5)
+ξ₁ = @scenario ξ₁ = 6. ξ₂ = 8. probability = 0.5
+ξ₂ = @scenario ξ₁ = 4. ξ₂ = 4. probability = 0.5
 
 infeasible_res = SPResult([27.2,41.6], 36.4, 9.2, 27.2, Inf, 9.2, Inf)
 push!(problems, (infeasible, [ξ₁,ξ₂], infeasible_res, "Infeasible"))

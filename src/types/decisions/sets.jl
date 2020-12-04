@@ -59,7 +59,7 @@ function JuMP.in_set_string(print_mode, set::SingleKnownSet)
     return string(JuMP._math_symbol(print_mode, :in), " Known(value = $(set.known.value))")
 end
 
-function JuMP.in_set_string(print_mode, ::MultipleDecisionSet)
+function JuMP.in_set_string(print_mode, set::MultipleDecisionSet)
     if set.constraint == NoSpecifiedConstraint()
         return string(JuMP._math_symbol(print_mode, :in), " Decisions")
     else

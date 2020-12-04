@@ -16,8 +16,8 @@ simple = @stochastic_model begin
     end
 end
 
-ξ₁ = Scenario(q₁ = 24.0, q₂ = 28.0, d₁ = 500.0, d₂ = 100.0, probability = 0.4)
-ξ₂ = Scenario(q₁ = 28.0, q₂ = 32.0, d₁ = 300.0, d₂ = 300.0, probability = 0.6)
+ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
+ξ₂ = @scenario q₁ = 28.0 q₂ = 32.0 d₁ = 300.0 d₂ = 300.0 probability = 0.6
 
 simple_res = SPResult([46.67,36.25], -855.83, -1518.75, 662.92, 286.92, -1445.92, -568.92)
 push!(problems, (simple, [ξ₁,ξ₂], simple_res, "Simple"))
