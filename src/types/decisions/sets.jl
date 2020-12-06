@@ -27,6 +27,7 @@ set_constraint(set::SingleDecisionSet) = set.constraint
 set_constraint(::SingleKnownSet) = NoSpecifiedConstraint()
 
 struct FreeDecision <: MOI.AbstractScalarSet end
+Base.copy(set::FreeDecision) = set
 
 struct MultipleDecisionSet{T, S} <: MOI.AbstractVectorSet
     decisions::Vector{Decision{T}}
