@@ -276,7 +276,7 @@ end
 function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
                       f::QuadraticDecisionFunction{T},
                       g::ScalarQuadraticLike{T}) where T
-    MOIU.operate!(op, T, convert(QuadraticDecisionFunction{T,QuadraticPart{T}, f}), g)
+    MOIU.operate!(op, T, convert(QuadraticDecisionFunction{T,QuadraticPart{T}}, g), f)
 end
 
 # Base overloads

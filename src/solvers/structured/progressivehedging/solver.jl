@@ -58,7 +58,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
         # Sanity checks
         length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
         num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run progressive-hedging procedure.")
-        n = num_subproblems(structure)
+        n = num_subproblems(structure, 2)
         # Float types
         T = promote_type(eltype(x₀), Float32)
         x₀_ = convert(AbstractVector{T}, copy(x₀))

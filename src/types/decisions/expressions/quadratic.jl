@@ -43,6 +43,8 @@ const DQE = DecisionQuadExpr{Float64}
 
 DQE() = zero(DQE{Float64})
 
+is_decision_type(::Type{<:DecisionQuadExpr}) = true
+
 mutable struct BilinearDecisionExpr{C} <: JuMP.AbstractJuMPScalar
     variables::GenericAffExpr{C, VariableRef}
     decisions::GenericAffExpr{C, DecisionRef}
@@ -51,6 +53,8 @@ mutable struct BilinearDecisionExpr{C} <: JuMP.AbstractJuMPScalar
     known_decision_terms::OrderedDict{KnownDecisionCrossTerm, C}
 end
 const BDE = BilinearDecisionExpr{Float64}
+
+is_decision_type(::Type{<:BilinearDecisionExpr}) = true
 
 # Base overrides #
 # ========================== #
@@ -148,6 +152,15 @@ function Base.isequal(quad::DecisionQuadExpr{C}, other::DecisionQuadExpr{C}) whe
         isequal(quad.known_decision_terms, other.known_decision_terms)
 end
 
+function JuMP.isequal_canonical(quad::DecisionQuadExpr{C}, other::DecisionQuadExpr{C}) where {C}
+    return isequal_canonical(quad.variables, other.variables) &&
+        isequal_canonical(quad.decisions, other.decisions) &&
+        isequal_canonical(quad.knowns, other.knowns) &&
+        isequal(quad.cross_terms, other.cross_terms) &&
+        isequal(quad.known_variable_terms, other.known_variable_terms) &&
+        isequal(quad.known_decision_terms, other.known_decision_terms)
+end
+
 Base.hash(quad::DecisionQuadExpr, h::UInt) =
     hash(hash(quad.variables, h),
          hash(quad.decisions, h),
@@ -199,9 +212,9 @@ function JuMP.map_coefficients_inplace!(f::Function, quad::DecisionQuadExpr)
     JuMP.map_coefficients_inplace!(f, quad.variables)
     JuMP.map_coefficients_inplace!(f, quad.decisions)
     JuMP.map_coefficients_inplace!(f, quad.knowns)
-    _map_cross_terms!(quad.cross_terms)
-    _map_cross_terms!(quad.known_variable_terms)
-    _map_cross_terms!(quad.known_decision_terms)
+    _map_cross_terms!(f, quad.cross_terms)
+    _map_cross_terms!(f, quad.known_variable_terms)
+    _map_cross_terms!(f, quad.known_decision_terms)
     return quad
 end
 
@@ -666,7 +679,7 @@ end
 
 function JuMP.add_to_expression!(quad::DQE,
                                  var::Union{VariableRef, DecisionRef, KnownRef},
-                                 aff::_DAE)
+                                 aff::DAE)
     JuMP.add_to_expression!(quad, var, aff.variables)
     JuMP.add_to_expression!(quad, var, aff.decisions)
     JuMP.add_to_expression!(quad, var, aff.knowns)

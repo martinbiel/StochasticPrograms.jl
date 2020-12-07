@@ -499,8 +499,8 @@ function Base.:(-)(lhs::_DecisionAffExpr{C}, rhs::_VariableQuadExpr{C}) where C
 end
 
 # _DecisionAffExpr--_KnownAffExpr
-Base.:(+)(lhs::_DecisionAffExpr, rhs::_KnownAffExpr) = DecisionAffExpr{C}(zero(_VariableAffExpr{C}), copy(lhs), copy(rhs))
-Base.:(-)(lhs::_DecisionAffExpr, rhs::_KnownAffExpr) = DecisionAffExpr{C}(zero(_VariableAffExpr{C}), copy(lhs), -rhs)
+Base.:(+)(lhs::_DecisionAffExpr{C}, rhs::_KnownAffExpr{C}) where C = DecisionAffExpr{C}(zero(_VariableAffExpr{C}), copy(lhs), copy(rhs))
+Base.:(-)(lhs::_DecisionAffExpr{C}, rhs::_KnownAffExpr{C}) where C = DecisionAffExpr{C}(zero(_VariableAffExpr{C}), copy(lhs), -rhs)
 function Base.:(*)(lhs::_DecisionAffExpr{C}, rhs::_KnownAffExpr{C}) where C
     result = zero(DecisionQuadExpr{C})
     JuMP.add_to_expression!(result, lhs, rhs)
@@ -911,3 +911,13 @@ function Base.:(-)(lhs::DecisionQuadExpr{C}, rhs::DecisionQuadExpr{C}) where C
     return result
 end
 Base.:(*)(lhs::DecisionQuadExpr, rhs::DecisionQuadExpr) = error("Cannot multiply a quadratic expression by a quadratic expression")
+
+Base.promote_rule(V::Type{DecisionRef}, R::Type{<:Real}) = DecisionAffExpr{T}
+Base.promote_rule(V::Type{KnownRef}, R::Type{<:Real}) = DecisionAffExpr{T}
+Base.promote_rule(V::Type{DecisionRef}, ::Type{<:DecisionAffExpr{T}}) where {T} = DecisionAffExpr{T}
+Base.promote_rule(V::Type{KnownRef}, ::Type{<:DecisionAffExpr{T}}) where {T} = DecisionAffExpr{T}
+Base.promote_rule(V::Type{DecisionRef}, ::Type{<:DecisionQuadExpr{T}}) where {T} = DecisionQuadExpr{T}
+Base.promote_rule(V::Type{KnownRef}, ::Type{<:DecisionQuadExpr{T}}) where {T} = DecisionQuadExpr{T}
+Base.promote_rule(::Type{<:DecisionAffExpr{S}}, R::Type{<:Real}) where S = DecisionAffExpr{promote_type(S, R)}
+Base.promote_rule(::Type{<:DecisionAffExpr{S}}, ::Type{<:DecisionQuadExpr{T}}) where {S, T} = DecisionQuadExpr{promote_type(S, T)}
+Base.promote_rule(::Type{<:DecisionQuadExpr{S}}, R::Type{<:Real}) where S = DecisionQuadExpr{promote_type(S, R)}

@@ -2,23 +2,29 @@
 struct NoSpecifiedConstraint <: MOI.AbstractSet end
 Base.copy(set::NoSpecifiedConstraint) = set
 
-struct DecisionSet{S <: MOI.AbstractSet} <: MOI.AbstractScalarSet
-    constraint::S
+struct DecisionSet <: MOI.AbstractScalarSet
+    stage::Int
+    constraint::Union{MOI.AbstractSet, JuMP.AbstractVectorSet}
+    is_recourse::Bool
 
-    function DecisionSet(; constraint::MOI.AbstractSet = NoSpecifiedConstraint())
-        S = typeof(constraint)
-        return new{S}(constraint)
+    function DecisionSet(stage::Integer; constraint::Union{MOI.AbstractSet, JuMP.AbstractVectorSet} = NoSpecifiedConstraint(), is_recourse::Bool = false)
+        return new(stage, constraint, is_recourse)
     end
 end
-struct KnownSet <: MOI.AbstractScalarSet end
+struct KnownSet <: MOI.AbstractScalarSet
+    stage::Int
+end
 
-struct SingleDecisionSet{T, S} <: MOI.AbstractScalarSet
+struct SingleDecisionSet{T} <: MOI.AbstractScalarSet
+    stage::Int
     decision::Decision{T}
-    constraint::S
+    constraint::MOI.AbstractSet
+    is_recourse::Bool
 end
 Base.copy(set::SingleDecisionSet) = reuse(set, set.decision)
 
 struct SingleKnownSet{T} <: MOI.AbstractScalarSet
+    stage::Int
     known::Decision{T}
 end
 Base.copy(set::SingleKnownSet) = reuse(set, set.known)
@@ -29,14 +35,17 @@ set_constraint(::SingleKnownSet) = NoSpecifiedConstraint()
 struct FreeDecision <: MOI.AbstractScalarSet end
 Base.copy(set::FreeDecision) = set
 
-struct MultipleDecisionSet{T, S} <: MOI.AbstractVectorSet
+struct MultipleDecisionSet{T} <: MOI.AbstractVectorSet
+    stage::Int
     decisions::Vector{Decision{T}}
-    constraint::S
+    constraint::MOI.AbstractSet
+    is_recourse::Bool
 end
 MOI.dimension(set::MultipleDecisionSet) = length(set.decisions)
 Base.copy(set::MultipleDecisionSet) = reuse(set, set.decisions)
 
 struct MultipleKnownSet{T} <: MOI.AbstractVectorSet
+    stage::Int
     knowns::Vector{Decision{T}}
 end
 MOI.dimension(set::MultipleKnownSet) = length(set.knowns)
@@ -47,11 +56,18 @@ MOIU.variable_function_type(::Type{<:MultipleDecisionSet}) = VectorOfDecisions
 MOIU.variable_function_type(::Type{<:SingleKnownSet}) = SingleKnown
 MOIU.variable_function_type(::Type{<:MultipleKnownSet}) = VectorOfKnowns
 
+is_decision_type(::Type{SingleDecisionSet}) = true
+is_decision_type(::Type{MultipleDecisionSet}) = false
+
 function JuMP.in_set_string(print_mode, set::SingleDecisionSet)
-    if set.constraint == NoSpecifiedConstraint()
-        return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+    decision_str(set) = set.is_recourse ? "RecourseDecisions" : "Decisions"
+    if state(set.decision) == Taken
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))(value = $(set.decision.value))")
+    end
+    if set.constraint isa NoSpecifiedConstraint
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))")
     else
-        return string(JuMP._math_symbol(print_mode, :in), " Decisions($(JuMP.in_set_string(print_mode, set.constraint)))")
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
     end
 end
 
@@ -60,10 +76,14 @@ function JuMP.in_set_string(print_mode, set::SingleKnownSet)
 end
 
 function JuMP.in_set_string(print_mode, set::MultipleDecisionSet)
-    if set.constraint == NoSpecifiedConstraint()
-        return string(JuMP._math_symbol(print_mode, :in), " Decisions")
+    decision_str(set) = set.is_recourse ? "RecourseDecisions" : "Decisions"
+    if all(d -> state(d) == Taken, set.decisions)
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))(values = $([d.value for d in set.decisions]))")
+    end
+    if set.constraint isa NoSpecifiedConstraint
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))")
     else
-        return string(JuMP._math_symbol(print_mode, :in), " Decisions($(JuMP.in_set_string(print_mode, set.constraint)))")
+        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
     end
 end
 
@@ -72,19 +92,19 @@ function JuMP.in_set_string(print_mode, set::MultipleKnownSet)
 end
 
 function reuse(set::SingleDecisionSet, decision::Decision)
-    return SingleDecisionSet(decision, copy(set.constraint))
+    return SingleDecisionSet(set.stage, decision, copy(set.constraint), set.is_recourse)
 end
 
 function reuse(set::SingleKnownSet, decision::Decision)
-    return SingleKnownSet(decision)
+    return SingleKnownSet(set.stage, decision)
 end
 
 function reuse(set::MultipleDecisionSet, decisions::Vector{<:Decision})
-    return MultipleDecisionSet(decisions, copy(set.constraint))
+    return MultipleDecisionSet(set.stage, decisions, copy(set.constraint), set.is_recourse)
 end
 
 function reuse(set::MultipleKnownSet, decisions::Vector{<:Decision})
-    return MultipleKnownSet(decisions)
+    return MultipleKnownSet(set.stage, decisions)
 end
 
 function VariableRef(model::Model, index::MOI.VariableIndex, ::Union{SingleDecisionSet, MultipleDecisionSet})
@@ -95,12 +115,12 @@ function VariableRef(model::Model, index::MOI.VariableIndex, ::Union{SingleKnown
     return KnownRef(model, index)
 end
 
-function set(variable::JuMP.ScalarVariable, ::Type{DecisionRef}, constraint::MOI.AbstractSet)
-    return SingleDecisionSet(Decision(variable.info, Float64), constraint)
+function set(variable::JuMP.ScalarVariable, ::Type{DecisionRef}, stage::Integer, constraint::MOI.AbstractSet, is_recourse::Bool)
+    return SingleDecisionSet(stage, Decision(variable.info, Float64), constraint, is_recourse)
 end
 
-function set(variable::JuMP.ScalarVariable, ::Type{KnownRef}, ::NoSpecifiedConstraint)
-    return SingleKnownSet(KnownDecision(variable.info, Float64))
+function set(variable::JuMP.ScalarVariable, ::Type{KnownRef}, stage::Integer, ::NoSpecifiedConstraint, is_recourse::Bool)
+    return SingleKnownSet(stage, KnownDecision(variable.info, Float64))
 end
 
 function set_decision!(decisions::Decisions, index::MOI.VariableIndex, set::SingleDecisionSet)

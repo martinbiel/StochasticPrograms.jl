@@ -7,6 +7,9 @@
             optimize!(sp)
             @test termination_status(sp) == MOI.OPTIMAL
             @test isapprox(optimal_decision(sp), res.x̄, rtol = tol)
+            for i in 1:num_scenarios(sp)
+                @test isapprox(optimal_recourse_decision(sp, i), res.ȳ[i], rtol = tol)
+            end
             @test isapprox(objective_value(sp), res.VRP, rtol = tol)
             @test isapprox(EWS(sp), res.EWS, rtol = tol)
             @test isapprox(EVPI(sp), res.EVPI, rtol = tol)
@@ -32,6 +35,9 @@
             optimize!(sp_copy)
             @test termination_status(sp_copy) == MOI.OPTIMAL
             @test isapprox(optimal_decision(sp_copy), optimal_decision(sp), rtol = tol)
+            for i in 1:num_scenarios(sp)
+                @test isapprox(optimal_recourse_decision(sp_copy, i), optimal_recourse_decision(sp, i), rtol = tol)
+            end
             @test isapprox(objective_value(sp_copy), objective_value(sp), rtol = tol)
             @test isapprox(EWS(sp_copy), EWS(sp), rtol = tol)
             @test isapprox(EVPI(sp_copy), EVPI(sp), rtol = tol)
@@ -54,6 +60,9 @@
         optimize!(simple_sp)
         @test termination_status(simple_sp) == MOI.OPTIMAL
         @test isapprox(optimal_decision(simple_sp), simple_res.x̄, rtol = tol)
+        for i in 1:num_scenarios(simple_sp)
+            @test isapprox(optimal_recourse_decision(simple_sp, i), simple_res.ȳ[i], rtol = tol)
+        end
         @test isapprox(objective_value(simple_sp), simple_res.VRP, rtol = tol)
         @test isapprox(EWS(simple_sp), simple_res.EWS, rtol = tol)
         @test isapprox(EVPI(simple_sp), simple_res.EVPI, rtol = tol)
@@ -66,6 +75,9 @@
         optimize!(simple_smps)
         @test termination_status(simple_smps) == MOI.OPTIMAL
         @test isapprox(optimal_decision(simple_smps), simple_res.x̄, rtol = tol)
+        for i in 1:num_scenarios(simple_smps)
+            @test isapprox(optimal_recourse_decision(simple_smps, i), simple_res.ȳ[i], rtol = tol)
+        end
         @test isapprox(objective_value(simple_smps), simple_res.VRP, rtol = tol)
         @test isapprox(EWS(simple_smps), simple_res.EWS, rtol = tol)
         @test isapprox(EVPI(simple_smps), simple_res.EVPI, rtol = tol)

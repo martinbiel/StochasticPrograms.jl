@@ -94,6 +94,38 @@ function calculate_objective_value(ph::AbstractProgressiveHedging, execution::Sy
     return calculate_objective_value(execution.subworkers)
 end
 
+function scalar_subproblem_reduction(value::Function, execution::SynchronousExecution{T}) where T <: AbstractFloat
+    partial_results = Vector{T}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async partial_results[i] = remotecall_fetch(w, execution.subworkers[w-1], value) do sw, value
+                subproblems = fetch(sw)
+                return mapreduce(+, subproblems, init = zero(T)) do subproblem
+                    π = subproblem.probability
+                    return π * value(subproblem)
+                end
+            end
+        end
+    end
+    return sum(partial_results)
+end
+
+function vector_subproblem_reduction(value::Function, execution::SynchronousExecution{T,A}, n::Integer) where {T <: AbstractFloat, A <: AbstractVector}
+    partial_results = Vector{A}(undef, nworkers())
+    @sync begin
+        for (i,w) in enumerate(workers())
+            @async partial_results[i] = remotecall_fetch(w, execution.subworkers[w-1], value, n) do sw, value, n
+                subproblems = fetch(sw)
+                return mapreduce(+, subproblems, init = zero(T, n)) do subproblem
+                    π = subproblem.probability
+                    return π * value(subproblem)
+                end
+            end
+        end
+    end
+    return sum(partial_results)
+end
+
 # API
 # ------------------------------------------------------------
 function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,

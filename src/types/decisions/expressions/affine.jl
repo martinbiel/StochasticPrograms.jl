@@ -15,6 +15,8 @@ const DAE = DecisionAffExpr{Float64}
 
 DAE() = zero(DAE{Float64})
 
+is_decision_type(::Type{<:DecisionAffExpr}) = true
+
 # Base overrides #
 # ========================== #
 Base.iszero(aff::DecisionAffExpr) =
@@ -51,7 +53,7 @@ Base.convert(::Type{DecisionAffExpr{C}}, kv::KnownRef) where C =
                        zero(_DecisionAffExpr{C}),
                        GenericAffExpr{C, KnownRef}(zero(C), kv => one(C)))
 Base.convert(::Type{DecisionAffExpr{C}}, c::Number) where C =
-    DecisionAffExpr{C}(_VariableAffExpr{C}(convert(C, r)),
+    DecisionAffExpr{C}(_VariableAffExpr{C}(convert(C, c)),
                        zero(_DecisionAffExpr{C}),
                        zero(_KnownAffExpr{C}))
 Base.convert(::Type{DecisionAffExpr{C}}, aff::_VariableAffExpr{C}) where C =
@@ -77,6 +79,12 @@ function Base.isequal(aff::DecisionAffExpr{C}, other::DecisionAffExpr{C}) where 
     return isequal(aff.variables, other.variables) &&
         isequal(aff.decisions, other.decisions) &&
         isequal(aff.knowns, other.knowns)
+end
+
+function JuMP.isequal_canonical(aff::DecisionAffExpr{C}, other::DecisionAffExpr{C}) where {C}
+    return JuMP.isequal_canonical(aff.variables, other.variables) &&
+        JuMP.isequal_canonical(aff.decisions, other.decisions) &&
+        JuMP.isequal_canonical(aff.knowns, other.knowns)
 end
 
 Base.hash(aff::DecisionAffExpr, h::UInt) =

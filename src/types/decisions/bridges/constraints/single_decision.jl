@@ -65,22 +65,7 @@ MOI.get(b::SingleDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.
 MOI.get(b::SingleDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}) where {T} =
     b.fixing_constraint.value == 0 ? FixingConstraint{T}[] : [b.fixing_constraint]
 
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintFunction,
-                 bridge::SingleDecisionConstraintBridge)
-    return bridge.decision
-end
-
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintSet,
-                 bridge::SingleDecisionConstraintBridge)
-    return MOI.get(model, MOI.ConstraintSet(), bridge.constraint)
-end
-
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintPrimal,
-                 bridge::SingleDecisionConstraintBridge)
-    return MOI.get(model, attr, bridge.constraint)
-end
-
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintDual,
+function MOI.get(model::MOI.ModelLike, attr::MOI.AbstractConstraintAttribute,
                  bridge::SingleDecisionConstraintBridge)
     return MOI.get(model, attr, bridge.constraint)
 end

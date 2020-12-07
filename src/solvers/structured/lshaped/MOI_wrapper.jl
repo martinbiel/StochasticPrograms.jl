@@ -27,6 +27,9 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     parameters::LShapedParameters{Float64}
 
     status::MOI.TerminationStatusCode
+    primal_status::MOI.ResultStatusCode
+    dual_status::MOI.ResultStatusCode
+    raw_status::String
     solve_time::Float64
 
     lshaped::Union{AbstractLShaped, Nothing}
@@ -49,6 +52,9 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                    consolidate,
                    LShapedParameters{Float64}(; kw...),
                    MOI.OPTIMIZE_NOT_CALLED,
+                   MOI.NO_SOLUTION,
+                   MOI.NO_SOLUTION,
+                   "L-shaped optimizer has not been run.",
                    NaN,
                    nothing)
     end
@@ -137,6 +143,11 @@ function MOI.optimize!(optimizer::Optimizer)
     end
     start_time = time()
     optimizer.status = optimizer.lshaped()
+    if optimizer.status == MOI.OPTIMAL
+        optimizer.primal_status = MOI.FEASIBLE_POINT
+        optimizer.dual_status = MOI.FEASIBLE_POINT
+        optimizer.raw_status = "L-shaped procedure converged to optimal solution."
+    end
     optimizer.solve_time = time() - start_time
     return nothing
 end
@@ -374,11 +385,23 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
 end
 
+function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
+    return optimizer.primal_status
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
+    return optimizer.dual_status
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    return optimizer.raw_status
+end
+
 function MOI.get(optimizer::Optimizer, attr::MOI.ListOfVariableIndices)
     if optimizer.lshaped === nothing
         throw(UnloadedStructure{Optimizer}())
     end
-    list = MOI.get(optimizer.lshaped.structure.first_stage, attr)
+    list = MOI.get(optimizer.lshaped.structure, attr)
     # Remove the master variables
     filter!(vi -> !(vi in optimizer.lshaped.master_variables), list)
     # Remove any auxilliary variables from regularization
@@ -393,30 +416,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.Variable
     return decision(optimizer.lshaped, index)
 end
 
-function MOI.get(optimizer::Optimizer, attr::MOI.ListOfConstraints)
-    if optimizer.lshaped === nothing
-        throw(UnloadedStructure{Optimizer}())
-    end
-    return MOI.get(optimizer.lshaped.structure.first_stage, attr)
-end
-
 function MOI.get(optimizer::Optimizer, attr::MOI.ListOfConstraintIndices)
     if optimizer.lshaped === nothing
         throw(UnloadedStructure{Optimizer}())
     end
-    list = MOI.get(optimizer.lshaped.structure.first_stage, attr)
+    list = MOI.get(optimizer.lshaped.structure, attr)
     # Remove any cut constraints
     filter_cuts!(optimizer.lshaped, list)
     # Remove any penaltyterm constraints
     filter_constraints!(optimizer.lshaped.regularization, list)
     return list
-end
-
-function MOI.get(optimizer::Optimizer, attr::MOI.AbstractConstraintAttribute, ci::CI)
-    if optimizer.lshaped === nothing
-        throw(UnloadedStructure{Optimizer}())
-    end
-    return MOI.get(backend(optimizer.lshaped.structure.first_stage), attr, ci)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
@@ -431,11 +440,91 @@ function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
 end
 
 function MOI.get(optimizer::Optimizer, attr::Union{MOI.AbstractOptimizerAttribute, MOI.AbstractModelAttribute})
-    # Catch-all in case the first-stage model supports it
+    # Fallback to first-stage optimizer through structure
     if optimizer.lshaped === nothing
         throw(UnloadedStructure{Optimizer}())
     end
-    return MOI.get(optimizer.lshaped.structure.first_stage, attr)
+    return MOI.get(optimizer.lshaped.structure, attr)
+end
+
+function MOI.get(optimizer::Optimizer, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.lshaped.structure, attr, ci)
+end
+
+function MOI.set(optimizer::Optimizer, attr::Union{MOI.AbstractOptimizerAttribute, MOI.AbstractModelAttribute}, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, index, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, ci, value)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentModelAttribute)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.lshaped.structure, attr)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.lshaped.structure, attr, index)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.lshaped.structure, attr, ci)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentModelAttribute, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, index, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, ci::MOI.ConstraintIndex, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.lshaped.structure, attr, ci, value)
 end
 
 function MOI.is_empty(optimizer::Optimizer)

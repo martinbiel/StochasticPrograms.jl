@@ -92,6 +92,20 @@ function calculate_objective_value(ph::AbstractProgressiveHedging, execution::Se
     end
 end
 
+function scalar_subproblem_reduction(value::Function, execution::SerialExecution{T}) where T <: AbstractFloat
+    return mapreduce(+, execution.subproblems, init = zero(T)) do subproblem
+        π = subproblem.probability
+        return π * value(subproblem)
+    end
+end
+
+function vector_subproblem_reduction(value::Function, execution::SerialExecution{T}, n::Integer) where T <: AbstractFloat
+    return mapreduce(+, execution.subproblems, init = zero(T, n)) do subproblem
+        π = subproblem.probability
+        return π * value(subproblem)
+    end
+end
+
 # API
 # ------------------------------------------------------------
 function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}

@@ -21,7 +21,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
             end
         end
         # Prepare decisions
-        structure.first_stage.ext[:decisions] = structure.decisions[1]
+        structure.first_stage.ext[:decisions] = (structure.decisions[1],)
         add_decision_bridges!(structure.first_stage)
         # Generate first stage
         generator(stochasticprogram, :stage_1)(structure.first_stage, stage_parameters(stochasticprogram, 1))
@@ -38,6 +38,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
         end
         # Generate
         generate_vertical!(scenarioproblems(structure, stage),
+                           stage,
                            generator(stochasticprogram, decision_key),
                            generator(stochasticprogram, stage_key),
                            stage_parameters(stochasticprogram, stage - 1),
@@ -49,6 +50,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
 end
 
 function generate_vertical!(scenarioproblems::ScenarioProblems,
+                            stage::Integer,
                             decision_generator::Function,
                             generator::Function,
                             decision_params::Any,
@@ -59,7 +61,16 @@ function generate_vertical!(scenarioproblems::ScenarioProblems,
         # Create subproblem
         subproblem = optimizer == nothing ? Model() : Model(optimizer)
         # Prepare decisions
-        subproblem.ext[:decisions] = decisions
+        subproblem.ext[:decisions] = ntuple(Val{stage}()) do s
+            if s == stage - 1
+                # Known decisions from the previous stages are
+                # the same everywhere.
+                decisions
+            else
+                # Remaining decisions are unique to each subproblem
+                Decisions()
+            end
+        end
         add_decision_bridges!(subproblem)
         # Generate and return the stage model
         decision_generator(subproblem, decision_params)
@@ -69,6 +80,7 @@ function generate_vertical!(scenarioproblems::ScenarioProblems,
     return nothing
 end
 function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
+                            stage::Integer,
                             decision_generator::Function,
                             generator::Function,
                             decision_params::Any,
@@ -80,13 +92,15 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
             @async remotecall_fetch(
                 w,
                 scenarioproblems[w-1],
+                stage,
                 decision_generator,
                 generator,
                 decision_params,
                 stage_params,
                 scenarioproblems.decisions[w-1],
-                optimizer) do sp, dgenerator, generator, dparams, params, decisions, opt
+                optimizer) do sp, stage, dgenerator, generator, dparams, params, decisions, opt
                     generate_vertical!(fetch(sp),
+                                       stage,
                                        dgenerator,
                                        generator,
                                        dparams,
@@ -100,6 +114,8 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
 end
 
 function clear!(structure::VerticalStructure{N}) where N
+    # Clear decisions
+    map(clear!, structure.decisions)
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)

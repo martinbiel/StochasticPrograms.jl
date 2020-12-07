@@ -36,7 +36,7 @@ executions = [Synchronous(), Asynchronous()]
                     @testset "$(optimizer_name(sp)): $name" begin
                         set_optimizer_attribute(sp, MasterOptimizer(), subsolver)
                         set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
-                        if name == "Infeasible"
+                        if name == "Infeasible" || name == "Vectorized Infeasible"
                             with_logger(NullLogger()) do
                                 set_optimizer_attribute(sp, FeasibilityCuts(), false)
                                 optimize!(sp, crash = Crash.EVP())

@@ -70,6 +70,11 @@ function set_decision!(decisions::Decisions, index::MOI.VariableIndex, decision:
     return nothing
 end
 
+
+function remove_decision!(::IgnoreDecisions, ::MOI.VariableIndex)
+    return nothing
+end
+
 function remove_decision!(decisions::Decisions, index::MOI.VariableIndex)
     if !haskey(decisions.decisions, index)
         return nothing
@@ -91,6 +96,10 @@ function set_known_decision!(decisions::Decisions, index::MOI.VariableIndex, dec
     return nothing
 end
 
+function remove_known_decision!(::IgnoreDecisions, ::MOI.VariableIndex)
+    return nothing
+end
+
 function remove_known_decision!(decisions::Decisions, index::MOI.VariableIndex)
     if !haskey(decisions.decisions, index)
         return nothing
@@ -101,6 +110,13 @@ function remove_known_decision!(decisions::Decisions, index::MOI.VariableIndex)
     end
     deleteat!(decisions.knowns, i)
     delete!(decisions.decisions, index)
+    return nothing
+end
+
+function clear!(decisions::Decisions)
+    empty!(decisions.decisions)
+    empty!(decisions.undecided)
+    empty!(decisions.knowns)
     return nothing
 end
 
@@ -156,6 +172,8 @@ function update_known_decisions!(decisions::Decisions, x::AbstractVector)
     end
     return nothing
 end
+
+is_decision_type(::DataType) = false
 
 include("variable_interface.jl")
 include("expressions/expressions.jl")

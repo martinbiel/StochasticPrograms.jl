@@ -246,6 +246,8 @@ function JuMP.moi_function_type(::Type{DecisionAffExpr{T}}) where T
     return AffineDecisionFunction{T}
 end
 
+is_decision_type(::Type{<:AffineDecisionFunction}) = true
+
 AffineDecisionFunction(aff::_DAE) = AffineDecisionFunction(convert(DAE, aff))
 AffineDecisionFunction(aff::_KAE) = AffineDecisionFunction(convert(DAE, aff))
 
@@ -278,6 +280,8 @@ JuMP.moi_function(affs::Vector{<:DecisionAffExpr}) = VectorAffineDecisionFunctio
 function JuMP.moi_function_type(::Type{<:Vector{<:DecisionAffExpr{T}}}) where {T}
     return VectorAffineDecisionFunction{T}
 end
+
+is_decision_type(::Type{<:VectorAffineDecisionFunction}) = true
 
 JuMP.moi_function(aff::_DAE) = AffineDecisionFunction(aff)
 function JuMP.moi_function_type(::Type{_DecisionAffExpr{T}}) where T

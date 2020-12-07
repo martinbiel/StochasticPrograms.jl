@@ -32,7 +32,7 @@ penalizations = [Fixed(),
                 @testset "$(optimizer_name(sp)): $name" begin
                     set_optimizer_attribute(sp, MasterOptimizer(), subsolver)
                     set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
-                    if name == "Infeasible"
+                    if name == "Infeasible" || name == "Vectorized Infeasible"
                         with_logger(NullLogger()) do
                             set_optimizer_attribute(sp, FeasibilityCuts(), false)
                             optimize!(sp, crash = Crash.EVP())
@@ -44,6 +44,9 @@ penalizations = [Fixed(),
                     @test termination_status(sp) == MOI.OPTIMAL
                     @test isapprox(objective_value(sp), res.VRP, rtol = tol)
                     @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+                    for i in 1:num_scenarios(sp)
+                        @test isapprox(optimal_recourse_decision(sp, i), res.ȳ[i], rtol = sqrt(tol))
+                    end
                 end
             end
         end
@@ -68,6 +71,9 @@ penalizations = [Fixed(),
                     @test termination_status(sp) == MOI.OPTIMAL
                     @test isapprox(objective_value(sp), res.VRP, rtol = tol)
                     @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+                    for i in 1:num_scenarios(sp)
+                        @test isapprox(optimal_recourse_decision(sp, i), res.ȳ[i], rtol = sqrt(tol))
+                    end
                 end
             end
         end

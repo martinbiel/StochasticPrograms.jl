@@ -16,7 +16,7 @@ end
 function _eval_first_stage(structure::VerticalStructure, decision::AbstractVector)
     # Update decisions (checks handled by first-stage model)
     take_decisions!(structure.first_stage,
-                    all_decision_variables(structure.first_stage),
+                    all_decision_variables(structure.first_stage, 1),
                     decision)
     # Optimize first_stage model
     optimize!(structure.first_stage)
@@ -34,7 +34,7 @@ function _eval_first_stage(structure::VerticalStructure, decision::AbstractVecto
         end
     end
     # Revert back to untaken decisions
-    untake_decisions!(structure.first_stage, all_decision_variables(structure.first_stage))
+    untake_decisions!(structure.first_stage, all_decision_variables(structure.first_stage, 1))
     # Return evaluation result
     return result
 end

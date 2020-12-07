@@ -17,8 +17,8 @@ farmer = @stochastic_model begin
             SellPrice = Dict(:wheat=>170, :corn=>150, :beets=>36, :extra_beets=>10)
         end
         @uncertain ξ[c in Crops]
-        @variable(model, y[p in setdiff(Crops, [:beets])] >= 0)
-        @variable(model, w[s in Crops ∪ [:extra_beets]] >= 0)
+        @recourse(model, y[p in setdiff(Crops, [:beets])] >= 0)
+        @recourse(model, w[s in Crops ∪ [:extra_beets]] >= 0)
         @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
                    - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
         @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
@@ -34,5 +34,5 @@ Crops = [:wheat, :corn, :beets]
 ξ₂ = @scenario ξ[c in Crops] = [2.5, 3.0, 20.0] probability = 1/3
 ξ₃ = @scenario ξ[c in Crops] = [2.0, 2.4, 16.0] probability = 1/3
 
-farmer_res = SPResult([170,80,250], -108390, -115405.56, 7015.56, 1150, -118600, -107240)
+farmer_res = SPResult([170,80,250], Dict(1 => [0., 0., 310., 48, 6000, 0.], 2 => [0., 0., 225., 0., 5000, 0.], 3 => [0., 48., 140., 0., 4000, 0.]), -108390, -115405.56, 7015.56, 1150, -118600, -107240)
 push!(problems, (farmer, [ξ₁,ξ₂,ξ₃], farmer_res,"Farmer"))

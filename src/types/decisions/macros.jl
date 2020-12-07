@@ -1,23 +1,27 @@
 # Variables #
 # ========================== #
 function JuMP.build_variable(_error::Function, variable::JuMP.ScalarVariable, set::DecisionSet)
-    return VariableConstrainedOnCreation(variable, SingleDecisionSet(Decision(variable.info, Float64), set.constraint))
+    return VariableConstrainedOnCreation(variable, SingleDecisionSet(set.stage, Decision(variable.info, Float64), set.constraint, set.is_recourse))
 end
 
 function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVariable}, set::DecisionSet)
-    return VariablesConstrainedOnCreation(variables, MultipleDecisionSet([Decision(variable.info, Float64) for variable in variables], set.constraint))
+    if set.constraint isa JuMP.AbstractVectorSet
+        return VariablesConstrainedOnCreation(variables, MultipleDecisionSet(set.stage, [Decision(variable.info, Float64) for variable in variables], JuMP.moi_set(set.constraint, length(variables)), set.is_recourse))
+    else
+        return VariablesConstrainedOnCreation(variables, MultipleDecisionSet(set.stage, [Decision(variable.info, Float64) for variable in variables], set.constraint, set.is_recourse))
+    end
 end
 
-function JuMP.build_variable(_error::Function, variable::JuMP.ScalarVariable, ::KnownSet)
-    return VariableConstrainedOnCreation(variable, SingleKnownSet(KnownDecision(variable.info, Float64)))
+function JuMP.build_variable(_error::Function, variable::JuMP.ScalarVariable, set::KnownSet)
+    return VariableConstrainedOnCreation(variable, SingleKnownSet(set.stage, KnownDecision(variable.info, Float64)))
 end
 
-function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVariable}, ::KnownSet)
-    return VariablesConstrainedOnCreation(variables, MultipleKnownSet([KnownDecision(variable.info, Float64) for variable in variables]))
+function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVariable}, set::KnownSet)
+    return VariablesConstrainedOnCreation(variables, MultipleKnownSet(set.stage, [KnownDecision(variable.info, Float64) for variable in variables]))
 end
 
 function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:Union{SingleDecisionSet, SingleKnownSet}}, name::String)
-    decisions = get_decisions(model)
+    decisions = get_decisions(model, variable.set.stage)
     if decisions isa IgnoreDecisions
         # Create a regular JuMP variable if decisions are not handled
         return JuMP.add_variable(model, variable.scalar_variable, name)
@@ -42,7 +46,7 @@ function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation
 end
 
 function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreation{<:Union{MultipleDecisionSet, MultipleKnownSet}}, names)
-    decisions = get_decisions(model)
+    decisions = get_decisions(model, variable.set.stage)
     if decisions isa IgnoreDecisions
         # Create regular JuMP variables if decisions are not handled
         var_refs = map(zip(variable.scalar_variables, names)) do (scalar_variable, name)
@@ -87,42 +91,46 @@ end
 
 # Containers #
 # ========================== #
-struct DecisionDenseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: DenseAxisArray, S <: MOI.AbstractSet}
+struct DecisionDenseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: DenseAxisArray, S <: Union{MOI.AbstractSet, JuMP.AbstractVectorSet}}
+    stage::Int
     array::A
     constraint::S
+    is_recourse::Bool
 
-    function DecisionDenseAxisArray{V}(array::DenseAxisArray, constraint::MOI.AbstractSet) where V <: Union{DecisionRef, KnownRef}
+    function DecisionDenseAxisArray{V}(stage::Integer, array::DenseAxisArray, constraint::Union{MOI.AbstractSet, JuMP.AbstractVectorSet}; is_recourse::Bool = false) where V <: Union{DecisionRef, KnownRef}
         A = typeof(array)
         S = typeof(constraint)
-        return new{V, A, S}(array, constraint)
+        return new{V, A, S}(stage, array, constraint, is_recourse)
     end
 end
 
-struct DecisionSparseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: SparseAxisArray, S <: MOI.AbstractSet}
+struct DecisionSparseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: SparseAxisArray, S <: Union{MOI.AbstractSet, JuMP.AbstractVectorSet}}
+    stage::Int
     array::A
     constraint::S
+    is_recourse::Bool
 
-    function DecisionSparseAxisArray{V}(array::SparseAxisArray, constraint::MOI.AbstractSet) where V <: Union{DecisionRef, KnownRef}
+    function DecisionSparseAxisArray{V}(stage::Integer, array::SparseAxisArray, constraint::Union{MOI.AbstractSet, JuMP.AbstractVectorSet}; is_recourse::Bool = false) where V <: Union{DecisionRef, KnownRef}
         A = typeof(array)
         S = typeof(constraint)
-        return new{V, A, S}(array, constraint)
+        return new{V, A, S}(stage, array, constraint, is_recourse)
     end
 end
 
 function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, set::DecisionSet)
-    return DecisionDenseAxisArray{DecisionRef}(variables, set.constraint)
+    return DecisionDenseAxisArray{DecisionRef}(set.stage, variables, set.constraint; set.is_recourse)
 end
 
-function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, ::KnownSet)
-    return DecisionDenseAxisArray{KnownRef}(variables, NoSpecifiedConstraint())
+function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, set::KnownSet)
+    return DecisionDenseAxisArray{KnownRef}(set.stage, variables, NoSpecifiedConstraint())
 end
 
 function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, set::DecisionSet)
-    return DecisionSparseAxisArray{DecisionRef}(variables, set.constraint)
+    return DecisionSparseAxisArray{DecisionRef}(set.stage, variables, set.constraint; set.is_recourse)
 end
 
-function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, ::KnownSet)
-    return DecisionSparseAxisArray{KnownRef}(variables, NoSpecifiedConstraint())
+function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, set::KnownSet)
+    return DecisionSparseAxisArray{KnownRef}(set.stage, variables, NoSpecifiedConstraint())
 end
 
 function JuMP.add_variable(model::Model, variable::DecisionDenseAxisArray{V}, names::DenseAxisArray{String}) where V <: Union{DecisionRef, KnownRef}
@@ -130,8 +138,9 @@ function JuMP.add_variable(model::Model, variable::DecisionDenseAxisArray{V}, na
     refs = DenseAxisArray{V}(undef, array.axes...)
     for idx in eachindex(array)
         var = array[idx]
+        decision_set = set(var, V, variable.stage, variable.constraint, variable.is_recourse)
         refs[idx] = JuMP.add_variable(model,
-                                      VariableConstrainedOnCreation(var, set(var, V, variable.constraint)),
+                                      VariableConstrainedOnCreation(var, decision_set),
                                       names[idx])
     end
     return refs
@@ -142,8 +151,9 @@ function JuMP.add_variable(model::Model,
                            names::SparseAxisArray{String}) where {V <: Union{DecisionRef, KnownRef}, T, N, K}
     refs = SparseAxisArray(Dict{K,V}())
     for (idx, var) in variable.array.data
+        decision_set = set(var, V, variable.stage, variable.constraint, variable.is_recourse)
         refs[idx] = JuMP.add_variable(model,
-                                      VariableConstrainedOnCreation(var, set(var, V, variable.constraint)),
+                                      VariableConstrainedOnCreation(var, decision_set),
                                       names[idx])
     end
     return refs

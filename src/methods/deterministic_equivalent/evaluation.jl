@@ -1,6 +1,6 @@
 function evaluate_decision(structure::DeterministicEquivalent{2}, decision::AbstractVector)
     # Update decisions (checks handled by structure model)
-    take_decisions!(structure.model, structure.decision_variables[1], decision)
+    take_decisions!(structure.model, all_decision_variables(structure.model, 1), decision)
     # Optimize model
     optimize!(structure.model)
     # Switch on return status
@@ -17,14 +17,14 @@ function evaluate_decision(structure::DeterministicEquivalent{2}, decision::Abst
         end
     end
     # Revert back to untaken decisions
-    untake_decisions!(structure.model, structure.decision_variables[1])
+    untake_decisions!(structure.model, all_decision_variables(structure.model, 1))
     # Return evaluation result
     return result
 end
 
 function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, decision::AbstractVector)
     # Update decisions (checks handled by structure model)
-    take_decisions!(structure.model, structure.decision_variables[1], decision)
+    take_decisions!(structure.model, all_decision_variables(structure.model, 1), decision)
     # Optimize model
     optimize!(structure.model)
     # Get sense-correted objective value
@@ -43,11 +43,17 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
     # Calculate subobjectives
     N = num_scenarios(structure)
     Q = Vector{Float64}(undef, N)
+    obj_sense = objective_sense(structure.model)
     for (i, sub_objective) in enumerate(structure.sub_objectives[1])
+        (sense, func) = sub_objectives
         Qᵢ = MOIU.eval_variables(sub_objective) do idx
             return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
         end
-        Q[i] = Qᵢ
+        if obj_sense == sub_sense
+            Q[i] = Qᵢ
+        else
+            Q[i] = -Qᵢ
+        end
     end
     probabilities = map(1:num_scenarios(structure)) do i
         probability(structure, i)

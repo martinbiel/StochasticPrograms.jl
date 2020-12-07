@@ -115,7 +115,7 @@ function Base.zero(::Type{Scenario{D}}) where {T, N, D <: Array{T,N}}
     return Scenario(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end); probability = 1.0)
 end
 function Base.zero(::Type{Scenario{D}}) where {T, N, D <: DenseAxisArray{T,N}}
-    return Scenario(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end, ntuple(Val{N}())) do i end; probability = 1.0)
+    return Scenario(DenseAxisArray(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end), ntuple(Val{N}()) do i end); probability = 1.0)
 end
 function Base.zero(::Type{Scenario{D}}) where {T, N, K, D <: SparseAxisArray{T,N,K}}
     return Scenario(Dict{K,T}(); probability = 1.0)

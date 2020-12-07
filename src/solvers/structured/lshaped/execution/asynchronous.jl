@@ -249,6 +249,17 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{H,T
             take_step!(lshaped)
             # Early optimality check if using level sets
             if lshaped.regularization isa LevelSet && check_optimality(lshaped)
+                # Resolve subproblems with optimal vector
+                lshaped.x .= decision(lshaped)
+                t = lshaped.data.iterations
+                put!(execution.iterates, t+1, copy(lshaped.x))
+                for w in workers()
+                    if !isready(execution.active_workers[w-1])
+                        put!(execution.work[w-1], t+1)
+                        put!(execution.metadata[w-1], t+1, :gap, gap(lshaped))
+                    end
+                end
+                execution.data.timestamp = t + 1
                 # Optimal, final log
                 log!(lshaped; optimal = true)
                 return MOI.OPTIMAL

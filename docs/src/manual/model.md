@@ -219,9 +219,9 @@ Here, `@first_stage` and `@second_stage` are just syntactic sugar for `@stage 1`
 ```@example instant
 print(sp)
 ```
-As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and reinstantiates all internal problems. For example, the following increases the lower bound on the second stage variables to 2:
+As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and upon regeneration all internal problems. For example, the following increases the lower bound on the second stage variables to 2:
 ```@example instant
-@second_stage sp = begin
+@stage 2 sp = begin
     @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
     @variable(model, 2 <= y₁ <= d₁)
@@ -230,6 +230,8 @@ As a side note, it is possible to run stage definition macros on programs with e
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
 end
+
+generate!(sp)
 
 print(sp)
 ```

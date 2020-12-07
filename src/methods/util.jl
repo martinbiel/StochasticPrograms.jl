@@ -114,34 +114,18 @@ function extract_set(expr)
     found = false
     quit = false
     new_expr = prewalk(expr) do x
-        if @capture(x, var_Symbol)
-            if var == :Bin
-                set = MOI.ZeroOne()
-                found = true
-                return :()
-            elseif var == :Int
-                set = MOI.Integer()
-                found = true
-                return :()
-            end
-        elseif @capture(x, var_Symbol = true)
-            if var == :binary
-                set = MOI.ZeroOne()
-                found = true
-                return :()
-            elseif var == :integer
-                set = MOI.Integer()
-                found = true
-                return :()
-            end
-        elseif @capture(x, var_Symbol in constrset_) && !found && !quit
+        if @capture(x, var_Symbol in constrset_) && !found && !quit
             set = constrset
             found = true
             return :($var)
         elseif @capture(x, var_Symbol[ids__] in constrset_) && !found && !quit
             set = constrset
             found = true
-            return :($var[$ids])
+            return :($(x.args[2]))
+        elseif @capture(x, [ids__] in constrset_) && !found && !quit
+            set = constrset
+            found = true
+            return :($(x.args[2]))
         elseif @capture(x, set = constrset_) && !found && !quit
             set = constrset
             found = true
@@ -155,5 +139,84 @@ function extract_set(expr)
         end
     end
     return set, new_expr, found
+end
+
+function decision_variables_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    return get_decisions(proxy(stochasticprogram, s), s).undecided
+end
+
+function decision_constraints_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    return mapreduce(vcat, MOI.get(proxy(stochasticprogram, s), MOI.ListOfConstraints())) do (F, S)
+        if F <: SingleDecision || F <: AffineDecisionFunction || F <: QuadraticDecisionFunction
+            return MOI.get(proxy(stochasticprogram, s), MOI.ListOfConstraintIndices{F,S}())
+        end
+        return CI[]
+    end
+end
+
+function attach_mocks!(structure::DeterministicEquivalent)
+    MOIU.attach_optimizer(structure.model)
+    return nothing
+end
+
+function attach_mocks!(structure::VerticalStructure)
+    MOIU.attach_optimizer(structure.first_stage)
+    for s in subproblems(structure, 2)
+        MOIU.attach_optimizer(s)
+    end
+    return nothing
+end
+
+function attach_mocks!(structure::HorizontalStructure)
+    return nothing
+end
+
+function mock_index(dvar::DecisionVariable)
+    return MOIU.xor_index(optimizer_index(dvar))
+end
+function mock_index(dvar::DecisionVariable, scenario_index::Integer)
+    return MOIU.xor_index(optimizer_index(dvar, scenario_index))
+end
+function mock_index(sp_cref::SPConstraintRef{CI{AffineDecisionFunction{Float64},S}}) where S
+    idx = optimizer_index(sp_cref)
+    return MOIU.xor_index(CI{MOI.ScalarAffineFunction{Float64},S}(idx.value))
+end
+function mock_index(sp_cref::SPConstraintRef{CI{AffineDecisionFunction{Float64},S}}, scenario_index::Integer) where S
+    idx = optimizer_index(sp_cref, scenario_index)
+    return MOIU.xor_index(CI{MOI.ScalarAffineFunction{Float64},S}(idx.value))
+end
+function mock_index(sp_cref::SPConstraintRef{CI{SingleDecision,S}}) where S
+    idx = optimizer_index(sp_cref)
+    return MOIU.xor_index(CI{MOI.SingleVariable,S}(idx.value))
+end
+function mock_index(sp_cref::SPConstraintRef{CI{SingleDecision,S}}, scenario_index::Integer) where S
+    idx = optimizer_index(sp_cref, scenario_index)
+    return MOIU.xor_index(CI{MOI.SingleVariable,S}(idx.value))
+end
+
+function MOI.get(src::MOIU.MockOptimizer, attr::ScenarioDependentModelAttribute)
+    return MOI.get(src, attr.attr)
+end
+
+function MOI.get(src::MOIU.MockOptimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
+    return MOI.get(src, attr.attr, index)
+end
+
+function MOI.get(src::MOIU.MockOptimizer, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex)
+    return MOI.get(src, attr.attr, ci)
+end
+
+function MOI.set(src::MOIU.MockOptimizer, attr::ScenarioDependentModelAttribute, value)
+    return MOI.set(src, attr.attr, value)
+end
+
+function MOI.set(src::MOIU.MockOptimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex, value)
+    return MOI.set(src, attr.attr, index, value)
+end
+
+function MOI.set(src::MOIU.MockOptimizer, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex, value)
+    return MOI.set(src, attr.attr, ci, value)
 end
 # ========================== #

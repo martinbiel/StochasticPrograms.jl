@@ -35,7 +35,7 @@ function stage_one_model(stochasticprogram::StochasticProgram; optimizer = nothi
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     model = optimizer == nothing ? Model() : Model(optimizer)
     # Prepare decisions
-    model.ext[:decisions] = Decisions()
+    model.ext[:decisions] = (Decisions(),)
     add_decision_bridges!(model)
     # Generate and cache first-stage model
     generator(stochasticprogram, :stage_1)(model, stage_parameters(stochasticprogram, 1))
@@ -76,6 +76,34 @@ function generate_stage_one!(stochasticprogram::StochasticProgram)
     return nothing
 end
 
+function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
+    # First-stage decisions are unique (reuse)
+    stochasticprogram.proxy[1].ext[:decisions] = (stochasticprogram.decisions[1],)
+    # Generate first stage
+    has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
+    generator(stochasticprogram, :stage_1)(stochasticprogram.proxy[1], stage_parameters(stochasticprogram, 1))
+    # Generate remaining stages
+    for s in 2:N
+        # Initialize decisions
+        stochasticprogram.proxy[s].ext[:decisions] = ntuple(Val{s}()) do i
+            if i == s - 1
+                # Known decisions from the previous stages are
+                # the same everywhere.
+                return stochasticprogram.decisions[s]
+            end
+            return Decisions()
+        end
+        # Check generator
+        stage_key = Symbol(:stage_, s)
+        decision_key = Symbol(:stage_, s - 1, :_decisions)
+        has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
+        has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
+        # Generate
+        generator(stochasticprogram, decision_key)(stochasticprogram.proxy[s], stage_parameters(stochasticprogram, s-1))
+        generator(stochasticprogram, stage_key)(stochasticprogram.proxy[s], stage_parameters(stochasticprogram, s), scenario(stochasticprogram, s, 1))
+    end
+    return nothing
+end
 """
     clear!(stochasticprogram::StochasticProgram)
 
@@ -86,6 +114,16 @@ function clear!(stochasticprogram::StochasticProgram{N}) where N
     invalidate_cache!(stochasticprogram)
     # Dispatch clearup on stochastic structure
     clear!(structure(stochasticprogram))
+    # Clear proxy
+    for s in 1:N
+        proxy_ = proxy(stochasticprogram, s)
+        # Clear decisions
+        if haskey(proxy_.ext, :decisions)
+            map(clear!, proxy_.ext[:decisions])
+        end
+        # Clear model
+        empty!(proxy_)
+    end
     return nothing
 end
 """
@@ -94,14 +132,14 @@ end
 Generate the `stochasticprogram` using the model definitions from @stage and available data.
 """
 function generate!(stochasticprogram::StochasticProgram{N}) where N
-    if !deferred(stochasticprogram)
-        # Clear stochasticprogram before re-generation
-        clear!(stochasticprogram)
-    end
+    # Clear stochasticprogram before re-generation
+    clear!(stochasticprogram)
+    # Abort early if there are no scenarios
+    num_scenarios(stochasticprogram) == 0 && return nothing
     # Check generators
     check_generators(stochasticprogram::StochasticProgram{N})
-    # Do nothing if there are no scenarios
-    num_scenarios(stochasticprogram) == 0 && return nothing
+    # Generate proxy
+    generate_proxy!(stochasticprogram)
     # Dispatch generation on stochastic structure
     generate!(stochasticprogram, structure(stochasticprogram))
     return nothing
@@ -117,7 +155,7 @@ function _outcome_model!(outcome_model::JuMP.Model,
                          decisions::AbstractVector,
                          scenario::AbstractScenario)
     # Prepare decisions
-    outcome_model.ext[:decisions] = Decisions()
+    outcome_model.ext[:decisions] = (Decisions(), Decisions())
     add_decision_bridges!(outcome_model)
     # Generate the outcome model
     decision_generator(outcome_model, decision_params)
@@ -125,7 +163,7 @@ function _outcome_model!(outcome_model::JuMP.Model,
     # Copy first-stage objective
     copy_decision_objective!(stage_one_model,
                              outcome_model,
-                             all_known_decision_variables(outcome_model))
+                             all_known_decision_variables(outcome_model)[1])
     # Update the known decision values
     update_known_decisions!(outcome_model, decisions)
     return nothing

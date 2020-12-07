@@ -1,16 +1,17 @@
 """
     DecisionRef <: AbstractVariableRef
 
-Holds a reference to the model and the corresponding MOI.VariableIndex.
+Holds a reference to the model, the stage the decision is taken in, and the corresponding MOI.VariableIndex.
 """
 struct DecisionRef <: JuMP.AbstractVariableRef
     model::JuMP.Model
     index::MOI.VariableIndex
 end
+is_decision_type(::Type{DecisionRef}) = true
 """
     KnownRef <: AbstractVariableRef
 
-Holds a reference to the model and the corresponding MOI.VariableIndex.
+Holds a reference to the model, the stage the decision is taken in, and the corresponding MOI.VariableIndex.
 """
 struct KnownRef <: JuMP.AbstractVariableRef
     model::JuMP.Model
@@ -19,28 +20,44 @@ end
 
 # Getters (model) #
 # ========================== #
-function get_decisions(model::JuMP.Model)
+function get_decisions(model::JuMP.Model, s::Integer = 1)
     !haskey(model.ext, :decisions) && return IgnoreDecisions()
-    return model.ext[:decisions]
+    N = length(model.ext[:decisions])
+    1 <= s <= N || error("Stage $s not in range 1 to $N.")
+    return model.ext[:decisions][s]
 end
 
-function all_decisions(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+function all_decisions(model::JuMP.Model, s::Integer = 1)
+    decisions = get_decisions(model, s)::Decisions
     return all_decisions(decisions)
 end
 
-function all_known_decisions(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+function all_known_decisions(model::JuMP.Model, s::Integer = 2)
+    decisions = get_decisions(model, s)::Decisions
     return all_known_decisions(decisions)
 end
 """
     all_decision_variables(model::JuMP.Model)
 
-Returns a list of all decisions currently in the `model`. The decisions are
+Returns a stage-wise list of all decisions currently in the `model`. The decisions are
 ordered by creation time.
 """
 function all_decision_variables(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+    haskey(model.ext, :decisions) || error("No decisions in model.")
+    N = length(model.ext[:decisions])
+    return ntuple(Val{N}()) do stage
+        return all_decision_variables(model, stage)
+    end
+end
+"""
+    all_decision_variables(model::JuMP.Model, stage::Integer)
+
+Returns a list of all decisions currently in the `model` at stage `stage`. The decisions are
+ordered by creation time.
+"""
+function all_decision_variables(model::JuMP.Model, stage::Integer)
+    haskey(model.ext, :decisions) || error("No decisions in model.")
+    decisions = get_decisions(model, stage)::Decisions
     return map(decisions.undecided) do index
         DecisionRef(model, index)
     end
@@ -48,43 +65,82 @@ end
 """
     all_known_decision_variables(model::JuMP.Model)
 
-Returns a list of all known decisions currently in the `model`. The decisions are
+Returns a stage-wise list of all known decisions currently in the `model`. The decisions are
 ordered by creation time.
 """
 function all_known_decision_variables(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+    haskey(model.ext, :decisions) || error("No decisions in model.")
+    N = length(model.ext[:decisions])
+    return ntuple(Val{N}()) do s
+        return all_known_decision_variables(model, s)
+    end
+end
+"""
+    all_known_decision_variables(model::JuMP.Model, stage::Integer)
+
+Returns a stage-wise list of all known decisions currently in the `model` at stage `stage`. The decisions are
+ordered by creation time.
+"""
+function all_known_decision_variables(model::JuMP.Model, stage::Integer)
+    haskey(model.ext, :decisions) || error("No decisions in model.")
+    decisions = get_decisions(model, stage)::Decisions
     return map(decisions.knowns) do index
         KnownRef(model, index)
     end
 end
 """
-    num_decisions(model::JuMP.Model)
+    num_decisions(model::JuMP.Model, stage::Integer = 1)
 
-Return the number of decisions in `model`.
+Return the number of decisions in `model` at stage `stage`. Defaults to the first stage.
 """
-function num_decisions(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+function num_decisions(model::JuMP.Model, stage::Integer = 1)
+    decisions = get_decisions(model, stage)::Decisions
     return num_decisions(decisions)
 end
 """
-    num_decisions(model::JuMP.Model)
+    num_known_decisions(model::JuMP.Model, stage::Integer = 2)
 
-Return the number of known decisions in `model`.
+Return the number of known decisions in `model` at stage `stage`. Defaults to the second stage.
 """
-function num_known_decisions(model::JuMP.Model)
-    decisions = get_decisions(model)::Decisions
+function num_known_decisions(model::JuMP.Model, stage::Integer = 2)
+    stage > 1 || error("No decisions can be known in the first stage.")
+    decisions = get_decisions(model, stage - 1)::Decisions
     return num_known_decisions(decisions)
 end
 
-
 # Getters (refs) #
 # ========================== #
+function stage(dref::DecisionRef)
+    haskey(dref.model.ext, :decisions) || error("No decisions in model.")
+    N = length(dref.model.ext[:decisions])
+    for i in 1:N
+        if index(dref) in dref.model.ext[:decisions][i].undecided
+            return i
+        end
+    end
+    return nothing
+end
+function stage(kref::KnownRef)
+    haskey(kref.model.ext, :decisions) || error("No decisions in model.")
+    N = length(kref.model.ext[:decisions])
+    for i in 1:N
+        if index(kref) in kref.model.ext[:decisions][i].knowns
+            return i
+        end
+    end
+    return nothing
+end
+
 function get_decisions(dref::DecisionRef)
-    return get_decisions(dref.model)
+    s = stage(dref)
+    s === nothing && return IgnoreDecisions()
+    return get_decisions(dref.model, s)
 end
 
 function get_decisions(kref::KnownRef)
-    return get_decisions(kref.model)
+    s = stage(kref)
+    s === nothing && return IgnoreDecisions()
+    return get_decisions(kref.model, s)
 end
 """
     decision(dref::Union{DecisionRef, KnownRef})
@@ -276,7 +332,7 @@ function JuMP.unfix(dref::DecisionRef)
     # Update state
     d.state = NotTaken
     # Prepare modification
-    change = DecisionStateChange(index(dref), NotTaken, -value(dref))
+    change = DecisionStateChange(index(dref), NotTaken, -d.value)
     # Update objective and constraints
     update_decisions!(JuMP.owner_model(dref), change)
     return nothing
@@ -332,7 +388,59 @@ function JuMP.delete(model::JuMP.Model, dref::DecisionRef)
         error("The decision you are trying to delete does not " *
               "belong to the model.")
     end
-    # TODO What to do here?
+    # First delete any SingleDecision constraints
+    for S in [MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}, MOI.ZeroOne, MOI.Integer]
+        ci = CI{SingleDecision,S}(index(dref).value)
+        if MOI.is_valid(backend(model), ci)
+            MOI.delete(backend(model), ci)
+        end
+    end
+    # Remove SingleDecisionSet constraint
+    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+    MOI.delete(backend(model), ci)
+    # Delete the variable corresponding to the decision
+    MOI.delete(backend(model), index(dref))
+    # Remove the decision
+    remove_decision!(get_decisions(dref), index(dref))
+    return nothing
+end
+
+function JuMP.delete(model::JuMP.Model, drefs::Vector{DecisionRef})
+    isempty(drefs) && return nothing
+    if any(model !== owner_model(dref) for dref in drefs)
+        error("A decision you are trying to delete does not " *
+              "belong to the model.")
+    end
+    # First delete any SingleDecision constraints
+    for dref in drefs
+        for S in [MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}, MOI.ZeroOne, MOI.Integer]
+            ci = CI{SingleDecision,S}(index(dref).value)
+            if MOI.is_valid(backend(model), ci)
+                MOI.delete(backend(model), ci)
+            end
+        end
+    end
+    # Delete the variables corresponding to the decision
+    MOI.delete(backend(model), index.(drefs))
+    # Remove any MultipleDecisionSet constraint
+    for ci in MOI.get(backend(model), MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MultipleDecisionSet{Float64}}())
+        f = MOI.get(backend(model), MOI.ConstraintFunction(), ci)::MOI.VectorOfVariables
+        if all(f.variables .== index.(drefs))
+            # This is the constraint
+            MOI.delete(backend(model), ci)
+            break
+        end
+    end
+    # Remove any SingleDecisionSet constraints
+    for dref in drefs
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+        if MOI.is_valid(backend(model), ci)
+            MOI.delete(backend(model), ci)
+        end
+    end
+    # Remove the decisions
+    map(dref -> remove_decision!(get_decisions(dref), index(dref)), drefs)
+    return nothing
 end
 
 function JuMP.delete(model::JuMP.Model, kref::KnownRef)
@@ -340,7 +448,43 @@ function JuMP.delete(model::JuMP.Model, kref::KnownRef)
         error("The known decision you are trying to delete does not " *
               "belong to the model.")
     end
-    # TODO What to do here?
+    # First delete SingleKnownSet constraint
+    ci = CI{MOI.SingleVariable,SingleKnownSet{Float64}}(index(kref).value)
+    MOI.delete(backend(model), ci)
+    # Delete the variable corresponding to the decision
+    MOI.delete(backend(model), index(kref))
+    # Remove the decision
+    remove_known_decision!(get_decisions(kref), index(kref))
+    return nothing
+end
+
+function JuMP.delete(model::JuMP.Model, krefs::Vector{KnownRef})
+    isempty(krefs) && return nothing
+    if any(model !== owner_model(kref) for kref in krefs)
+        error("The known decision you are trying to delete does not " *
+              "belong to the model.")
+    end
+    # Delete the variable corresponding to the decision
+    MOI.delete(backend(model), index.(krefs))
+    # First remove any MultipleKnownSet constraint
+    for ci in MOI.get(backend(model), MOI.ListOfConstraintIndices{MOI.VectorOfVariables, MultipleKnownSet{Float64}}())
+        f = MOI.get(backend(model), MOI.ConstraintFunction(), ci)::MOI.VectorOfVariables
+        if all(f.variables .== index.(drefs))
+            # This is the constraint
+            MOI.delete(backend(model), ci)
+            break
+        end
+    end
+    # Remove any SingleKnownSet constraints
+    for kref in krefs
+        ci = CI{MOI.SingleVariable,SingleKnownSet{Float64}}(index(kref).value)
+        if MOI.is_valid(backend(model), ci)
+            MOI.delete(backend(model), ci)
+        end
+    end
+    # Remove the decisions
+    map(kref -> remove_known_decision!(get_decisions(kref), index(kref)), krefs)
+    return nothing
 end
 
 JuMP.owner_model(dref::DecisionRef) = dref.model
@@ -375,21 +519,21 @@ function JuMP.is_valid(model::Model, kref::KnownRef)
 end
 
 function JuMP.has_lower_bound(dref::DecisionRef)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), index)
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
+    return MOI.is_valid(backend(owner_model(dref)), ci)
 end
 function JuMP.LowerBoundRef(dref::DecisionRef)
     moi_lb =  MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}
-    index = moi_lb(index(dref).value)
+    ci = moi_lb(index(dref).value)
     return ConstraintRef{JuMP.Model, moi_lb, ScalarShape}(owner_model(dref),
-                                                          index,
+                                                          ci,
                                                           ScalarShape())
 end
 function JuMP.set_lower_bound(dref::Decision, lower::Number)
     new_set = MOI.GreaterThan(convert(Float64, lower))
     if has_lower_bound(dref)
-        cindex = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
-        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), cindex, new_set)
+        ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
+        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), ci, new_set)
     else
         MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
     end
@@ -408,21 +552,21 @@ function JuMP.lower_bound(dref::DecisionRef)
 end
 
 function JuMP.has_upper_bound(dref::DecisionRef)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), index)
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
+    return MOI.is_valid(backend(owner_model(dref)), ci)
 end
 function JuMP.UpperBoundRef(dref::DecisionRef)
     moi_ub =  MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}
-    index = moi_ub(index(dref).value)
+    ci = moi_ub(index(dref).value)
     return ConstraintRef{JuMP.Model, moi_ub, ScalarShape}(owner_model(dref),
-                                                          index,
+                                                          ci,
                                                           ScalarShape())
 end
 function JuMP.set_upper_bound(dref::DecisionRef, lower::Number)
     new_set = MOI.LessThan(convert(Float64, lower))
     if has_upper_bound(dref)
-        cindex = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
-        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), cindex, new_set)
+        ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
+        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), ci, new_set)
     else
         MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
     end
@@ -441,8 +585,8 @@ function JuMP.upper_bound(dref::DecisionRef)
 end
 
 function JuMP.is_integer(dref::DecisionRef)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), index)
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dref).value)
+    return MOI.is_valid(backend(owner_model(dref)), ci)
 end
 function JuMP.set_integer(dref::DecisionRef)
     if is_integer(dref)
@@ -459,15 +603,15 @@ function unset_integer(dref::DecisionRef)
 end
 function JuMP.IntegerRef(dref::DecisionRef)
     moi_int =  MOI.ConstraintIndex{SingleDecision, MOI.Integer}
-    index = moi_int(index(dref).value)
+    ci = moi_int(index(dref).value)
     return ConstraintRef{JuMP.Model, moi_int, ScalarShape}(owner_model(dref),
-                                                           index,
+                                                           ci,
                                                            ScalarShape())
 end
 
 function JuMP.is_binary(dref::DecisionRef)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), index)
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dref).value)
+    return MOI.is_valid(backend(owner_model(dref)), ci)
 end
 function JuMP.set_binary(dref::DecisionRef)
     if is_binary(dref)
@@ -484,9 +628,9 @@ function unset_binary(dref::DecisionRef)
 end
 function JuMP.BinaryRef(dref::DecisionRef)
     moi_bin =  MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}
-    index = moi_bin(index(dref).value)
+    ci = moi_bin(index(dref).value)
     return ConstraintRef{JuMP.Model, moi_bin, ScalarShape}(owner_model(dref),
-                                                           index,
+                                                           ci,
                                                            ScalarShape())
 end
 
@@ -548,13 +692,17 @@ Base.broadcastable(kref::KnownRef) = Ref(kref)
 
 # JuMP copy interface #
 # ========================== #
-function JuMP.copy_extension_data(decisions::Decisions, dest::Model, src::Model)
-    new_decisions = Decisions()
-    for dref in all_decision_variables(src)
-        set_decision!(new_decisions, index(dref), decision(dref))
+function JuMP.copy_extension_data(decisions::NTuple{N,Decisions}, dest::Model, src::Model) where N
+    new_decisions = ntuple(Val{N}()) do _
+        Decisions()
     end
-    for kref in all_known_decision_variables(src)
-        set_known_decision!(new_decisions, index(kref), decision(kref))
+    for s in 1:N
+        for dref in all_decision_variables(src, s)
+            set_decision!(new_decisions[s], index(dref), decision(dref))
+        end
+        for kref in all_known_decision_variables(src, s)
+            set_known_decision!(new_decisions[s], index(kref), decision(kref))
+        end
     end
     return new_decisions
 end

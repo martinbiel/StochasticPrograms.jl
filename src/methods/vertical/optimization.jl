@@ -28,3 +28,18 @@ function set_subproblem_optimizer_attribute!(structure::VerticalStructure, attr:
     MOI.set(scenarioproblems(structure), attr, value)
     return nothing
 end
+
+function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::VerticalStructure{2}, optimizer::MOI.AbstractOptimizer)
+    cache = solutioncache(stochasticprogram)
+    # Cache main solution
+    variables = decision_variables_at_stage(stochasticprogram, 1)
+    constraints = decision_constraints_at_stage(stochasticprogram, 1)
+    cache[:solution] = SolutionCache(optimizer, variables, constraints)
+    # Cache first-stage solution
+    cache[:node_solution_1] = SolutionCache(backend(structure.first_stage), variables, constraints)
+    # Cache scenario-dependent solutions (Skip if more than 100 scenarios for performance)
+    if num_scenarios(stochasticprogram) <= 1e3
+        cache_solution!(cache, scenarioproblems(structure), optimizer, 2)
+    end
+    return nothing
+end

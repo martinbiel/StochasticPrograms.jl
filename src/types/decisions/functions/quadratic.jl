@@ -345,6 +345,8 @@ function JuMP.moi_function_type(::Type{BilinearDecisionExpr{T}}) where T
     return QuadraticDecisionFunction{T,LinearPart{T}}
 end
 
+is_decision_type(::Type{<:QuadraticDecisionFunction}) = true
+
 QuadraticDecisionFunction(quad::_DQE) = QuadraticDecisionFunction(convert(DQE, quad))
 QuadraticDecisionFunction(quad::_KQE) = QuadraticDecisionFunction(convert(DQE, quad))
 
@@ -760,6 +762,29 @@ function add_term!(terms::Vector{MOI.ScalarQuadraticTerm{T}},
     else
         # Variable already included, increment the coefficient
         new_coeff = terms[i].coefficient + coefficient
+        if iszero(new_coeff)
+            deleteat!(terms, i)
+        else
+            terms[i] = MOI.ScalarQuadraticTerm(new_coeff, index_1, index_2)
+        end
+    end
+    return nothing
+end
+
+function remove_term!(terms::Vector{MOI.ScalarQuadraticTerm{T}},
+                      term::MOI.ScalarQuadraticTerm{T}) where T
+    index_1 = term.variable_index_1
+    index_2 = term.variable_index_2
+    coefficient = term.coefficient
+    i = something(findfirst(t -> t.variable_index_1 == index_1 &&
+                            t.variable_index_2 == index_2,
+                            terms), 0)
+    if iszero(i) && !iszero(coefficient)
+        # The term was not already included in the terms
+        push!(terms, MOI.ScalarQuadraticTerm(-coefficient, index_1, index_2))
+    else
+        # Term already included, increment the coefficient
+        new_coeff = terms[i].coefficient - coefficient
         if iszero(new_coeff)
             deleteat!(terms, i)
         else

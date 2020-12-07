@@ -21,6 +21,9 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     parameters::ProgressiveHedgingParameters{Float64}
 
     status::MOI.TerminationStatusCode
+    primal_status::MOI.ResultStatusCode
+    dual_status::MOI.ResultStatusCode
+    raw_status::String
     solve_time::Float64
     progressivehedging::Union{AbstractProgressiveHedging, Nothing}
 
@@ -36,6 +39,9 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                    penaltyterm,
                    ProgressiveHedgingParameters{Float64}(; kw...),
                    MOI.OPTIMIZE_NOT_CALLED,
+                   MOI.NO_SOLUTION,
+                   MOI.NO_SOLUTION,
+                   "Progressive-hedging optimizer has not been run.",
                    NaN,
                    nothing)
     end
@@ -112,12 +118,13 @@ function MOI.optimize!(optimizer::Optimizer)
     end
     start_time = time()
     optimizer.status = optimizer.progressivehedging()
+    if optimizer.status == MOI.OPTIMAL
+        optimizer.primal_status = MOI.FEASIBLE_POINT
+        optimizer.dual_status = MOI.FEASIBLE_POINT
+        optimizer.raw_status = "Progressive-hedging procedure converged to optimal solution."
+    end
     optimizer.solve_time = time() - start_time
     return nothing
-end
-
-function termination_status(optimizer::Optimizer)
-    return optimizer.status
 end
 
 function optimizer_name(optimizer::Optimizer)
@@ -279,12 +286,16 @@ function MOI.get(optimizer::Optimizer, ::MOI.TerminationStatus)
     return optimizer.status
 end
 
-function MOI.get(optimizer::Optimizer, attr::MOI.ListOfVariableIndices)
-    if optimizer.progressivehedging === nothing
-        throw(UnloadedStructure{Optimizer}())
-    end
-    list = MOI.get(optimizer.progressivehedging.structure.proxy, attr)
-    return list
+function MOI.get(optimizer::Optimizer, ::MOI.PrimalStatus)
+    return optimizer.primal_status
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.DualStatus)
+    return optimizer.dual_status
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.RawStatusString)
+    return optimizer.raw_status
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.VariableIndex)
@@ -294,6 +305,24 @@ function MOI.get(optimizer::Optimizer, ::MOI.VariablePrimal, index::MOI.Variable
     return decision(optimizer.progressivehedging, index)
 end
 
+function MOI.get(optimizer::Optimizer, ::MOI.ConstraintPrimal, ci::MOI.ConstraintIndex)
+    if optimizer.progressivehedging === nothing
+        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+    end
+    return scalar_subproblem_reduction(optimizer.progressivehedging) do subproblem
+        return MOI.get(subproblem.optimizer, MOI.ConstraintPrimal(), ci)
+    end
+end
+
+function MOI.get(optimizer::Optimizer, ::MOI.ConstraintDual, ci::MOI.ConstraintIndex)
+    if optimizer.progressivehedging === nothing
+        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+    end
+    return scalar_subproblem_reduction(optimizer.progressivehedging) do subproblem
+        return MOI.get(subproblem.optimizer, MOI.ConstraintDual(), ci)
+    end
+end
+
 function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
     if optimizer.progressivehedging === nothing
         throw(StochasticProgram.UnloadedStructure{Optimizer}())
@@ -301,16 +330,113 @@ function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
     return objective_value(optimizer.progressivehedging)
 end
 
+function MOI.get(optimizer::Optimizer, ::MOI.DualObjectiveValue)
+    if optimizer.progressivehedging === nothing
+        throw(StochasticProgram.UnloadedStructure{Optimizer}())
+    end
+    if optimizer.status == MOI.OPTIMAL
+        return objective_value(optimizer.progressivehedging)
+    elseif optimizer.status == MOI.INFEASIBLE
+        sense = MOI.get(optimizer.progressivehedging.structure, MOI.ObjectiveSense())
+        return sense == MOI.MAX_SENSE ? Inf : -Inf
+    elseif optimizer.status == MOI.DUAL_INFEASIBLE
+        sense = MOI.get(optimizer.progressivehedging.structure, MOI.ObjectiveSense())
+        return sense == MOI.MAX_SENSE ? -Inf : Inf
+    else
+        return NaN
+    end
+end
+
 function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
     return optimizer.solve_time
 end
 
 function MOI.get(optimizer::Optimizer, attr::Union{MOI.AbstractOptimizerAttribute, MOI.AbstractModelAttribute})
-    # Catch-all in case the proxy model supports it
+    # Fallback to through structure
     if optimizer.progressivehedging === nothing
         throw(UnloadedStructure{Optimizer}())
     end
-    return MOI.get(optimizer.progressivehedging.structure.proxy, attr)
+    return MOI.get(optimizer.progressivehedging.structure, attr)
+end
+
+function MOI.get(optimizer::Optimizer, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.progressivehedging.structure, attr, ci)
+end
+
+function MOI.set(optimizer::Optimizer, attr::Union{MOI.AbstractOptimizerAttribute, MOI.AbstractModelAttribute}, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, index, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex, value)
+    # Fallback to first-stage optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, ci, value)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentModelAttribute)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.progressivehedging.structure, attr)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.progressivehedging.structure, attr, index)
+end
+
+function MOI.get(optimizer::Optimizer, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.get(optimizer.progressivehedging.structure, attr, ci)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentModelAttribute, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, index, value)
+end
+
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, ci::MOI.ConstraintIndex, value)
+    # Fallback to subproblem optimizer through structure
+    if optimizer.progressivehedging === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return MOI.set(optimizer.progressivehedging.structure, attr, ci, value)
 end
 
 function MOI.is_empty(optimizer::Optimizer)

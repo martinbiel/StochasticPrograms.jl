@@ -63,12 +63,7 @@ function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintSet,
     return bridge.set
 end
 
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintPrimal,
-                 bridge::AffineDecisionConstraintBridge{T}) where T
-    return MOI.get(model, attr, bridge.constraint)
-end
-
-function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintDual,
+function MOI.get(model::MOI.ModelLike, attr::MOI.AbstractConstraintAttribute,
                  bridge::AffineDecisionConstraintBridge{T}) where T
     return MOI.get(model, attr, bridge.constraint)
 end

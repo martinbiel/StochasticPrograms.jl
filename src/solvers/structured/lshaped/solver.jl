@@ -79,8 +79,8 @@ struct LShapedAlgorithm{T <: AbstractFloat,
                               aggregator::AbstractAggregator,
                               consolidator::AbstractConsolidator; kw...)
         # Sanity checks
-        length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
-        n = num_subproblems(structure)
+        length(x₀) != num_decisions(structure, 1) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure, 1))
+        n = num_subproblems(structure, 2)
         n == 0 && error("No subproblems in stochastic program. Cannot run L-shaped procedure.")
         # Float types
         T = promote_type(eltype(x₀), Float32)

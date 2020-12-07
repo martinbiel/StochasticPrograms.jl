@@ -9,7 +9,7 @@
         set_silent(sp)
         set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
         set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
-        if name == "Infeasible"
+        if name == "Infeasible" || name == "Vectorized Infeasible"
             set_optimizer_attribute(sp, FeasibilityCuts(), true)
         end
         @testset "Distributed Sanity Check: $name" begin
@@ -20,7 +20,7 @@
             set_optimizer_attribute(sp_nondist, Execution(), Serial())
             set_optimizer_attribute(sp_nondist, MasterOptimizer(), GLPK.Optimizer)
             set_optimizer_attribute(sp_nondist, SubproblemOptimizer(), GLPK.Optimizer)
-            if name == "Infeasible"
+            if name == "Infeasible" || name == "Vectorized Infeasible"
                 set_optimizer_attribute(sp_nondist, FeasibilityCuts(), true)
             end
             optimize!(sp)
@@ -33,6 +33,9 @@
             @test num_scenarios(sp) == length(scenarios(sp))
             @test num_subproblems(sp) == num_subproblems(sp_nondist)
             @test isapprox(optimal_decision(sp), optimal_decision(sp_nondist))
+            for i in 1:num_scenarios(sp)
+                @test isapprox(optimal_recourse_decision(sp, i), optimal_recourse_decision(sp_nondist, i), rtol = sqrt(tol))
+            end
             @test isapprox(objective_value(sp), objective_value(sp_nondist))
         end
         @testset "Distributed SP Constructs: $name" begin
@@ -61,13 +64,16 @@
             @test num_subproblems(sp_copy) == num_subproblems(sp)
             set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer(presolve = true))
             set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer(presolve = true))
-            if name == "Infeasible"
+            if name == "Infeasible" || name == "Vectorized Infeasible"
                 set_optimizer_attribute(sp_copy, FeasibilityCuts(), true)
             end
             optimize!(sp)
             optimize!(sp_copy)
             @test termination_status(sp_copy) == MOI.OPTIMAL
             @test isapprox(optimal_decision(sp_copy), optimal_decision(sp), rtol = tol)
+            for i in 1:num_scenarios(sp)
+                @test isapprox(optimal_recourse_decision(sp_copy, i), optimal_recourse_decision(sp, i), rtol = sqrt(tol))
+            end
             @test isapprox(objective_value(sp_copy), objective_value(sp), rtol = tol)
             @test isapprox(EWS(sp_copy), EWS(sp), rtol = tol)
             @test isapprox(EVPI(sp_copy), EVPI(sp), rtol = tol)

@@ -1,41 +1,72 @@
 """
     DecisionVariable <: AbstractVariableRef
 
-Holds a reference to the stochastic program and the corresponding MOI.VariableIndex.
+Identifier for a decision in a stochastic program. Holds a reference to the stochastic program, the stage the decision is taken in, and its corresponding MOI.VariableIndex.
 """
 struct DecisionVariable <: JuMP.AbstractVariableRef
     stochasticprogram::StochasticProgram
+    stage::Int
     index::MOI.VariableIndex
 end
 
 # Getters #
 # ========================== #
-function get_decisions(dvar::DecisionVariable)
-    return decisions(structure(owner_model(dvar)))
-end
 """
     decision(dvar::DecisionVariable)
 
-Return the internal `Decision` associated with `dvar`.
+Return the internal `Decision` associated with the first-stage `dvar`.
 """
 function decision(dvar::DecisionVariable)
-    decisions = get_decisions(dvar)::Decisions
-    return decision(decisions, index(dvar))
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `decision(dvar, scenario_index)`.")
+    return decision(structure(owner_model(dvar)), index(dvar), stage(dvar))
+end
+"""
+    decision(dvar::DecisionVariable, scenario_index::Integer)
+
+Return the scenario-dependent internal `Decision` associated with `dvar` at `scenario_index`.
+"""
+function decision(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `decision(dvar)`.")
+    return decision(structure(owner_model(dvar)), index(dvar), stage(dvar), scenario_index)
+end
+"""
+    stage(dvar::DecisionVariable)
+
+Return the stage of `dvar`.
+"""
+function stage(dvar::DecisionVariable)
+    return dvar.stage
 end
 """
     state(dvar::DecisionVariable)
 
-Return the `DecisionState` of `dvar`.
+Return the `DecisionState` of the first-stage `dvar`.
 """
 function state(dvar::DecisionVariable)
     return decision(dvar).state
+end
+"""
+    state(dvar::DecisionVariable, scenario_index::Integer)
+
+Return the scenario-dependent `DecisionState` of `dvar` at `scenario_index`.
+"""
+function state(dvar::DecisionVariable, scenario_index::Integer)
+    return decision(dvar,scenario_index).state
 end
 
 # Setters #
 # ========================== #
 function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, vals::AbstractVector)
+    if isempty(dvars)
+        @warn "No decision variables specified. Nothing to do."
+        return nothing
+    end
     # Check that all given decisions are in model
     map(dvar -> check_belongs_to_model(dvar, stochasticprogram), dvars)
+    # Check that all decisions belong to the same stage
+    all(dvar -> stage(dvar) == stage(dvars[1]), dvars) || error("All decisions should be taken in the same stage.")
+    # Check that decisions are first-stage
+    stage(dvars[1]) == 1 || error("Decisions are scenario-dependent, consider `take_decisions!(sp, dvars, vals, scenario_index)`")
     # Check decision length
     length(dvars) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of decision variables $(length(dvars)).")
     # Update decisions
@@ -50,10 +81,43 @@ function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{Dec
     update_decisions!(stochasticprogram, DecisionsStateChange())
     return nothing
 end
+function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, vals::AbstractVector, scenario_index::Integer)
+    if isempty(dvars)
+        @warn "No decision variables specified. Nothing to do."
+        return nothing
+    end
+    # Check that all given decisions are in model
+    map(dvar -> check_belongs_to_model(dvar, stochasticprogram), dvars)
+    # Check that all decisions belong to the same stage
+    all(dvar -> stage(dvar) == stage(dvars[1]), dvars) || error("All decisions should be taken in the same stage.")
+    # Check that decisions are not first-stage
+    stage(dvars[1]) > 1 || error("Decisions are not scenario-dependent, consider `take_decisions!(sp, dvars, vals)`")
+    # Check decision length
+    length(dvars) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of decision variables $(length(dvars)).")
+    # Update decisions
+    for (dvar, val) in zip(dvars, vals)
+        d = decision(dvar, scenario_index)
+        # Update state
+        d.state = Taken
+        # Update value
+        d.value = val
+    end
+    # Update objective and constraints in model
+    update_decisions!(stochasticprogram, DecisionsStateChange(), stage(dvars[1]), scenario_index)
+    return nothing
+end
 
-function untake_decisions!(model::JuMP.Model, dvars::Vector{DecisionVariable})
+function untake_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable})
+    if isempty(dvars)
+        @warn "No decision variables specified. Nothing to do."
+        return nothing
+    end
     # Check that all given decisions are in model
     map(dvar -> check_belongs_to_model(dvar, model), dvars)
+    # Check that all decisions belong to the same stage
+    all(dvar -> stage(dvar) == stage(dvars[1]), dvars) || error("All decisions should be taken in the same stage.")
+    # Check that decisions are first-stage
+    stage(dvars[1]) == 1 || error("Decisions are scenario-dependent, consider `unttake_decisions!(sp, dvars, scenario_index)`")
     # Update decisions
     need_update = false
     for dvar in dvars
@@ -68,27 +132,30 @@ function untake_decisions!(model::JuMP.Model, dvars::Vector{DecisionVariable})
     need_update && update_decisions!(stochasticprogram, DecisionsStateChange())
     return nothing
 end
-
-function update_decisions!(stochasticprogram::StochasticProgram, change::DecisionModification)
-    update_decisions!(structure(stochasticprogram), change)
-end
-
-# JuMP overloads #
-# ========================== #
-function JuMP.delete(stochasticprogram::StochasticProgram, dvar::DecisionVariable)
-    if stochasticprogram !== owner_model(dvar)
-        error("The decision variable you are trying to delete does not " *
-              "belong to the stochastic program.")
+function untake_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, scenario_index::Integer)
+    if isempty(dvars)
+        @warn "No decision variables specified. Nothing to do."
+        return nothing
     end
-    MOI.delete(structure(stochasticprogram), index(dvar))
-end
-
-function delete(stochasticprogram::StochasticProgram, con_ref::ConstraintRef{<:StochasticProgram})
-    if stochasticprogram !== con_ref.model
-        error("The constraint reference you are trying to delete does not " *
-              "belong to the stochasticprogram.")
+    # Check that all given decisions are in model
+    map(dvar -> check_belongs_to_model(dvar, model), dvars)
+    # Check that all decisions belong to the same stage
+    all(dvar -> stage(dvar) == stage(dvars[1]), dvars) || error("All decisions should be taken in the same stage.")
+    # Check that decisions are first-stage
+    stage(dvars[1]) > 1 || error("Decisions are not scenario-dependent, consider `take_decisions!(sp, dvars, vals)`")
+    # Update decisions
+    need_update = false
+    for dvar in dvars
+        d = decision(dvar, scenario_index)
+        if state(d) == Taken
+            need_update |= true
+            # Update state
+            d.state = NotTaken
+        end
     end
-    MOI.delete(structure(sto), index(con_ref))
+    # Update objective and constraints in model (if needed)
+    need_update && update_decisions!(stochasticprogram, DecisionsStateChange(), stage(dvars[1]), scenario_index)
+    return nothing
 end
 
 # MOI #
@@ -100,8 +167,18 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariabl
         # Check if there is a cached solution
         cache = solutioncache(stochasticprogram)
         if haskey(cache, :solution)
-            # Returned cached solution
-            return MOI.get(cache[:solution], attr, index(dvar))
+            # Returned cached solution if possible
+            try
+                return MOI.get(cache[:solution], attr, index(dvar))
+            catch
+            end
+        end
+        if haskey(cache, :node_solution_1)
+            # Value was possibly only cached in first-stage solution
+            try
+                return MOI.get(cache[:node_solution_1], attr, index(dvar))
+            catch
+            end
         end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
@@ -109,26 +186,37 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariabl
         end
         return MOI.get(optimizer(stochasticprogram), attr, index(dvar))
     end
-    return MOI.get(structure(stochasticprogram), attr, index(dvar))
+    return MOI.get(backend(proxy(stochasticprogram, stage(dvar))), attr, index(dvar))
 end
-function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractConstraintAttribute,
-                 cr::ConstraintRef{<:StochasticProgram})
-    check_belongs_to_model(cr, stochasticprogram)
+function MOI.get(stochasticprogram::StochasticProgram, attr::ScenarioDependentVariableAttribute,
+                 dvar::DecisionVariable)
+    check_belongs_to_model(dvar, stochasticprogram)
     if MOI.is_set_by_optimize(attr)
         # Check if there is a cached solution
         cache = solutioncache(stochasticprogram)
-        if haskey(cache, :solution)
-            # Returned cached solution
-            return MOI.get(cache[:solution], attr, index(cr))
+        key = Symbol(:node_solution_, attr.stage, :_, attr.scenario_index)
+        if haskey(cache, key)
+            # Returned cached solution if possible
+            try
+                return MOI.get(cache[key], attr.attr, index(dvar))
+            catch
+            end
         end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
             throw(OptimizeNotCalled())
         end
-        return MOI.get(optimizer(stochasticprogram), attr, index(cr))
-    else
-        return MOI.get(structure(stochasticprogram), attr, index(cr))
+        try
+            # Try to get scenario-dependent value directly
+            return MOI.get(optimizer(stochasticprogram), attr, index(dvar))
+        catch
+            # Fallback to resolving scenario-dependence in structure if
+            # not supported natively by optimizer
+            MOI.get(structure(stochasticprogram), attr, index(dvar))
+        end
     end
+    # Get value from structure if not set by optimizer
+    return MOI.get(structure(stochasticprogram), attr, index(dvar))
 end
 
 function MOI.set(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariableAttribute,
@@ -137,31 +225,126 @@ function MOI.set(stochasticprogram::StochasticProgram, attr::MOI.AbstractVariabl
     MOI.set(structure(stochasticprogram), attr, index(dvar), value)
     return nothing
 end
-function MOI.set(stochasticprogram::StochasticProgram, attr::MOI.AbstractConstraintAttribute,
-                 cr::ConstraintRef, value)
-    check_belongs_to_model(cr, stochasticprogram)
-    MOI.set(structure(stochasticprogram), attr, index(cr), value)
-end
 
 # JuMP variable interface #
 # ========================== #
-JuMP.name(dvar::DecisionVariable) = MOI.get(owner_model(dvar), MOI.VariableName(), dvar)::String
+"""
+    name(dvar::DecisionVariable, scenario_index::Integer)::String
+
+Get the name of the decision variable `dvar`.
+"""
+function JuMP.name(dvar::DecisionVariable)
+    return MOI.get(owner_model(dvar), MOI.VariableName(), dvar)::String
+end
+"""
+    name(dvar::DecisionVariable, scenario_index::Integer)::String
+
+Get the name of the scenario-dependent decision variable `dvar` in scenario `scenario_index`.
+"""
+function JuMP.name(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `name(dvar)`.")
+    attr = ScenarioDependentVariableAttribute(stage(dvar), scenario_index, MOI.VariableName())
+    return MOI.get(owner_model(dvar), attr, dvar)::String::String
+end
+"""
+    set_name(dvar::DecisionVariable, scenario_index::Integer, name::String)
+
+Set the name of the decision variable `dvar` to `name`.
+"""
 function JuMP.set_name(dvar::DecisionVariable, name::String)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_name(dvar, scenario_index, name)`.")
     return MOI.set(owner_model(dvar), MOI.VariableName(), dvar, name)
 end
+"""
+    set_name(dvar::DecisionVariable, scenario_index::Integer, name::String)
 
-function decision_by_name(stochasticprogram::StochasticProgram, name::String)
-    index = MOI.get(structure(stochasticprogram), MOI.VariableIndex, name)
+Set the name of the scenario-dependent decision variable `dvar` in scenario `scenario_index` to `name`.
+"""
+function JuMP.set_name(dvar::DecisionVariable, scenario_index::Integer, name::String)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_name(dvar, name)`.")
+    attr = ScenarioDependentVariableAttribute(stage(dvar), scenario_index, MOI.VariableName())
+    return MOI.set(owner_model(dvar), attr, dvar, name)
+end
+"""
+    decision_by_name(stochasticprogram::Stochasticprogram,
+                     stage::Integer,
+                     name::String)::Union{AbstractVariableRef, Nothing}
+
+Returns the reference of the variable with name attribute `name` at `stage` of `stochasticprogram` or `Nothing` if
+no variable has this name attribute. Throws an error if several variables have
+`name` as their name attribute at stage `s`.
+"""
+function decision_by_name(stochasticprogram::StochasticProgram{N}, stage::Integer, name::String) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    index = MOI.get(backend(proxy(stochasticprogram, stage)), MOI.VariableIndex, name)
     if index isa Nothing
         return nothing
     else
-        return DecisionVariable(stochasticprogram, index)
+        return DecisionVariable(stochasticprogram, stage, index)
     end
 end
+"""
+    index(dvar::DecisionVariable)::MOI.VariableIndex
 
+Return the index of the decision variable that corresponds to `dvar` in the MOI backend.
+"""
 JuMP.index(dvar::DecisionVariable) = dvar.index
+"""
+    optimizer_index(dvar::DecisionVariable)::MOI.VariableIndex
 
+Return the index of the variable that corresponds to `dvar` in the optimizer model.
+"""
+function JuMP.optimizer_index(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `optimizer_index(dvar, scenario_index)`.")
+    return optimizer_index(structure(owner_model(dvar)), index(dvar))
+end
+"""
+    optimizer_index(dvar::DecisionVariable, scenario_index)::MOI.VariableIndex
+
+Return the index of the variable that corresponds to the scenario-dependent `dvar` in the optimizer model at `scenario_index`.
+"""
+function JuMP.optimizer_index(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `optimizer_index(dvar)`.")
+    return optimizer_index(structure(owner_model(dvar)), index(dvar), scenario_index)
+end
+"""
+    has_duals(stochasticprogram::StochasticProgram; result::Int = 1)
+
+Return `true` if the solver has a primal solution in the first-stage of
+`stochasticprogram` in result index `result` available to query,
+otherwise return `false`.
+"""
+function JuMP.has_values(stochasticprogram::StochasticProgram; result::Int = 1)
+    return primal_status(stochasticprogram; result) != MOI.NO_SOLUTION
+end
+"""
+    has_values(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer; result::Int = 1)
+
+Return `true` if the solver has a primal solution in the node at stage
+`stage` and scenario `scenario_index` in result index `result`
+available to query, otherwise return `false`.
+"""
+function JuMP.has_values(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer; result::Int = 1)
+    return primal_status(stochasticprogram, stage, scenario_index; result) != MOI.NO_SOLUTION
+end
+"""
+    has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
+
+Return `true` if the solver has a primal solution in scenario `scenario_index`
+in result index `result` available to query, otherwise return `false`.
+"""
+function has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
+    return has_values(stochasticprogram, 2, scenario_index; result)
+end
+"""
+    value(dvar::DecisionVariable; result = 1)
+
+Return the value of the first-stage decision variable `dvar`
+associated with result index `result` of the most-recent
+returned by the solver.
+"""
 function JuMP.value(dvar::DecisionVariable; result::Int = 1)::Float64
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `value(dvar, scenario_index)`.")
     d = decision(dvar)
     if d.state == Taken
         # If decision has been fixed the value can be fetched
@@ -170,59 +353,187 @@ function JuMP.value(dvar::DecisionVariable; result::Int = 1)::Float64
     end
     return MOI.get(owner_model(dvar), MOI.VariablePrimal(result), dvar)
 end
+"""
+    value(dvar::DecisionVariable, scenario_index::Integer; result = 1)
 
+Return the scenario-dependent value of the decision variable `dvar`
+associated with result index `result` at `scenario_index` of the
+most-recent returned by the solver.
+"""
+function JuMP.value(dvar::DecisionVariable, scenario_index::Integer; result::Int = 1)::Float64
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_fixed(dvar)`.")
+    d = decision(dvar, scenario_index)
+    if d.state == Taken
+        # If decision has been fixed the value can be fetched
+        # directly
+        return d.value
+    end
+    attr = ScenarioDependentVariableAttribute(stage(dvar), scenario_index, MOI.VariablePrimal(result))
+    return MOI.get(owner_model(dvar), attr, dvar)
+end
+"""
+    value(dvar_expr::Union{GenericAffExpr{T,DecisionVariable}, GenericQuadExpr{T,DecisionVariable}}, stage_to_scenario::Dict{Int,Int}) where T
+
+Evaluate `dvar_expr` where the value of a given `dvar` is found in the scenario returned by the provided `stage_to_scenario` map.
+"""
+function JuMP.value(dvar_expr::Union{GenericAffExpr{T,DecisionVariable}, GenericQuadExpr{T,DecisionVariable}}, stage_to_scenario::Dict{Int,Int}; result::Int = 1)::Float64 where T
+    var_value = (dvar) -> begin
+        if stage(dvar) == 1
+            return value(dvar)
+        end
+        return value(dvar, stage_to_scenario[stage(dvar)])
+    end
+    return value(dvar_expr, var_value)
+end
+"""
+    reduced_cost(dvar::DecisionVariable)::Float64
+
+Return the reduced cost associated with the decision variable `dvar`.
+"""
+function JuMP.reduced_cost(dvar::DecisionVariable)::Float64
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `reduced_cost(dvar, scenario_index)`.")
+    sp = owner_model(dvar)
+    if !has_duals(sp)
+        error("Unable to query reduced cost of variable because stochastic program does" *
+              " not have duals available in the first stage.")
+    end
+    sign = objective_sense(sp) == MOI.MIN_SENSE ? 1.0 : -1.0
+    if is_fixed(dvar)
+        return sign * dual(FixRef(dvar))
+    end
+    rc = 0.0
+    if has_upper_bound(dvar)
+        rc += dual(UpperBoundRef(dvar))
+    end
+    if has_lower_bound(dvar)
+        rc += dual(LowerBoundRef(dvar))
+    end
+    return sign * rc
+end
+"""
+    reduced_cost(dvar::DecisionVariable)::Float64
+
+Return the reduced cost associated with the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.reduced_cost(dvar::DecisionVariable, scenario_index::Integer)::Float64
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `reduced_cost(dvar)`.")
+    sp = owner_model(dvar)
+    if !has_duals(sp, scenario_index)
+        error("Unable to query reduced cost of variable because stochastic program does" *
+              " not have duals available in scenario `scenario_index`.")
+    end
+    sign = objective_sense(sp) == MOI.MIN_SENSE ? 1.0 : -1.0
+    if is_fixed(dvar, scenario_index)
+        return sign * dual(FixRef(dvar), scenario_index)
+    end
+    rc = 0.0
+    if has_upper_bound(dvar, scenario_index)
+        rc += dual(UpperBoundRef(dvar), scenario_index)
+    end
+    if has_lower_bound(dvar, scenario_index)
+        rc += dual(LowerBoundRef(dvar), scenario_index)
+    end
+    return sign * rc
+end
+"""
+    is_fixed(dvar::DecisionVariable)
+
+Return `true` if `dvar` is a fixed first-stage decision variable.
+"""
 function JuMP.is_fixed(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `is_fixed(dvar, scenario_index)`.")
     if state(dvar) == Taken
         return true
     end
     return false
 end
 """
+    is_fixed(dvar::DecisionVariable, scenario_index)
+
+Return `true` if `dvar` is a fixed decision variable in `scenario_index`.
+"""
+function JuMP.is_fixed(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_fixed(dvar)`.")
+    if state(dvar, scenario_index) == Taken
+        return true
+    end
+    return false
+end
+"""
+    fix(dvar::DecisionVariable, val::Number)
+
+Fix the first-stage decision associated with `dvar` to `val`. In contexts
+where `dvar` is a variable, the variable is fixed to the value. In
+contexts where `dvar` is a known parameter value, the value is updated.
+"""
+function JuMP.fix(dvar::DecisionVariable, val::Number)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `fix(dvar, scenario_index, val)`.")
+    fix(structure(owner_model(dvar)), index(dvar), stage(dvar), val)
+    return nothing
+end
+"""
+    fix(dvar::DecisionVariable, scenario_index::Integer, val::Number)
+
+Fix the scenario-dependent decision associated with `dvar` at `scenario_index`
+to `val`. In contexts where `dvar` is a variable, the variable is fixed to the
+value. In contexts where `dvar` is a known parameter value, the value is updated.
+"""
+function JuMP.fix(dvar::DecisionVariable, scenario_index::Integer, val::Number)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `fix(dvar, val)`.")
+    fix(structure(owner_model(dvar)), index(dvar), stage(dvar), scenario_index, val)
+    return nothing
+end
+"""
     unfix(dvar::DecisionVariable)
 
-Unfix the decision associated with `dvar`. If the decision is already in a `NotTaken` state, this does nothing.
-
-See also [`fix`](@ref).
+Unfix the first-stage decision associated with `dvar`. If the decision
+is already in a `NotTaken` state, this does nothing.
 """
 function JuMP.unfix(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `unfix(dvar, scenario_index)`.")
     if state(dvar) == NotTaken
         # Nothing to do, just return
         return nothing
     end
+    unfix(structure(owner_model(dvar)), index(dvar), stage(dvar))
     d = decision(dvar)
     # Update state
     d.state = NotTaken
     # Prepare modification
-    change = DecisionStateChange(index(dvar), NotTaken, -value(dvar))
+    change = DecisionStateChange(index(dvar), NotTaken, -d.value)
     # Update objective and constraints
     update_decisions!(JuMP.owner_model(dvar), change)
     return nothing
 end
 """
-    fix(dvar::DecisionVariable, val::Number)
+    unfix(dvar::DecisionVariable, scenario_index::Integer)
 
-Fix the decision associated with `dvar` to `val`. In contexts where `dvar` is a variable, the variable is fixed to the value. In contexts where `dvar` is a known parameter value, the value is updated.
-
-See also [`unfix`](@ref).
+Unfix the scenario-dependent decision associated with `dvar`
+at `scenario_index`. If the decision is already in a `NotTaken`
+state, this does nothing.
 """
-function JuMP.fix(dvar::DecisionVariable, val::Number)
-    d = decision(dvar)
-    if state(dvar) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index(dvar), Taken, val)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
-    else
-        # Prepare modification
-        change = DecisionStateChange(index(dvar), Taken, val - d.value)
-        # Just update value
-        d.value = val
+function JuMP.unfix(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `unfix(dvar)`.")
+    if state(dvar, scenario_index) == NotTaken
+        # Nothing to do, just return
+        return nothing
     end
-    # Update objective and constraints
-    update_decisions!(JuMP.owner_model(dvar), change)
+    unfix(structure(owner_model(dvar)), index(dvar), stage(dvar), scenario_index)
     return nothing
+end
+
+"""
+    FixRef(dvar::DecisionVariable)
+
+Return a constraint reference to the constraint fixing the value of the decision `dvar`. Errors
+if one does not exist.
+"""
+function JuMP.FixRef(dvar::DecisionVariable)
+    moi_fix =  MOI.ConstraintIndex{SingleDecision, MOI.EqualTo{Float64}}
+    return SPConstraintRef{moi_fix, ScalarShape}(owner_model(dvar),
+                                                 stage(dvar),
+                                                 moi_fix(index(dvar).value),
+                                                 ScalarShape())
 end
 
 JuMP.owner_model(dvar::DecisionVariable) = dvar.stochasticprogram
@@ -236,140 +547,592 @@ function JuMP.check_belongs_to_model(dvar::DecisionVariable, stochasticprogram::
         throw(DecisionNotOwned(dvar))
     end
 end
+"""
+    is_valid(stochasticprogram::StochasticProgram, dvar::DecisionVariable)
 
+Return `true` if `dvar` refers to a valid first-stage decision variable in `stochasticprogram`.
+"""
 function JuMP.is_valid(stochasticprogram::StochasticProgram, dvar::DecisionVariable)
-    return stochasticprogram === owner_model(dvar)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `is_valid(dvar, scenario_index)`.")
+    return stochasticprogram === owner_model(dvar) &&
+        MOI.is_valid(structure(stochasticprogram), index(dvar), stage(dvar))
 end
+"""
+    is_valid(stochasticprogram::StochasticProgram, dvar::DecisionVariable, scenario_index::Integer)
 
-function JuMP.has_lower_bound(dvar::DecisionVariable)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dvar).value)
-    return MOI.is_valid(structure(owner_model(dvar)), index)
+Return `true` if the scenario-dependent `dvar` refers to a valid decision variable in `stochasticprogram` at `scenario_index`.
+"""
+function JuMP.is_valid(stochasticprogram::StochasticProgram, dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_valid(dvar)`.")
+    return stochasticprogram === owner_model(dvar) &&
+        MOI.is_valid(structure(stochasticprogram), index(dvar), stage(dvar), scenario_index)
 end
+"""
+    delete(stochasticprogram::StochasticProgram, dvar::DecisionVariable)
+
+Delete the first-stage decision variable associated with `dvar` from the `stochasticprogram`.
+"""
+function JuMP.delete(stochasticprogram::StochasticProgram, dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `delete(stochasticprogram, dvar, scenario_index)`.")
+    if stochasticprogram !== owner_model(dvar)
+        error("The decision variable you are trying to delete does not " *
+              "belong to the stochastic program.")
+    end
+    proxy_ = proxy(stochasticprogram, stage(dvar))
+    JuMP.delete(proxy_, DecisionRef(proxy_, index(dvar)))
+    MOI.delete(structure(stochasticprogram), index(dvar), stage(dvar))
+    return nothing
+end
+"""
+    delete(stochasticprogram::StochasticProgram, dvar::DecisionVariable, scenario_index::Integer)
+
+Delete the scenario-dependent decision variable associated with `dvar` from the `stochasticprogram` at `scenario_index`.
+"""
+function JuMP.delete(stochasticprogram::StochasticProgram, dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `delete(stochasticprogram, dvar)`.")
+    if stochasticprogram !== owner_model(dvar)
+        error("The decision variable you are trying to delete does not " *
+              "belong to the stochastic program.")
+    end
+    MOI.delete(structure(stochasticprogram), index(dvar), stage(dvar), scenario_index)
+    return nothing
+end
+"""
+    delete(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable})
+
+Delete the decisions associated with `dvars` from the `stochasticprogram`.
+"""
+function JuMP.delete(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable})
+    all(stage.(dvars) .== stage(dvars[1])) || error("$dvars are not all from the same stage")
+    stage(dvars[1]) > 1 && error("Some of $dvars are scenario dependent, consider `delete(stochasticprogram, dvars, scenario_index)`.")
+    if any(stochasticprogram !== owner_model(dvar) for dvar in dvars)
+        error("A decision variable you are trying to delete does not " *
+              "belong to the stochastic program.")
+    end
+    proxy_ = proxy(stochasticprogram, stage(dvars[1]))
+    JuMP.delete(proxy_, DecisionRef.(proxy_, index.(dvars)))
+    MOI.delete(structure(stochasticprogram), index.(dvars), stage(dvars[1]))
+    return nothing
+end
+"""
+    delete(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, scenario_index::Integer)
+
+Delete the scenario-dependent decisions associated with `dvars` from the `stochasticprogram` at `scenario_index`.
+"""
+function JuMP.delete(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, scenario_index::Integer)
+    all(stage.(dvars) .== stage(dvars[1])) || error("$dvars are not all from the same stage")
+    stage(dvars[1]) == 1 && error("$dvars are not scenario dependent, consider `delete(stochasticprogram, dvars)`.")
+    if any(stochasticprogram !== owner_model(dvar) for dvar in dvars)
+        error("A decision variable you are trying to delete does not " *
+              "belong to the stochastic program.")
+    end
+    MOI.delete(structure(stochasticprogram), index.(dvars), stage(dvars[1]), scenario_index)
+    return nothing
+end
+"""
+    has_lower_bound(dvar::DecisionVariable)
+
+Return `true` if the first-stage decision variable `dvar` has a lower bound.
+"""
+function JuMP.has_lower_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `has_lower_bound(dvar, scenario_index)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar))
+end
+"""
+    has_lower_bound(dvar::DecisionVariable, scenario_index::Integer)
+
+Return `true` if the scenario-dependent decision variable `dvar` has a lower bound at `scenario_index`.
+"""
+function JuMP.has_lower_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `has_lower_bound(dvar)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar), scenario_index)
+end
+"""
+    LowerBoundRef(dvar::DecisionVariable)
+
+Return a constraint reference to the lower bound constraint of the decision variable `dvar`.
+Errors if one does not exist.
+"""
 function JuMP.LowerBoundRef(dvar::DecisionVariable)
     moi_lb =  MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}
-    index = moi_lb(index(dvar).value)
-    sp = owner_model(dvar)
-    SP = typeof(sp)
-    return ConstraintRef{SP, moi_lb, ScalarShape}(sp,
-                                                  index,
-                                                  ScalarShape())
+    return SPConstraintRef{moi_lb, ScalarShape}(owner_model(dvar),
+                                                stage(dvar),
+                                                moi_lb(index(dvar).value),
+                                                ScalarShape())
 end
+"""
+
+    set_lower_bound(dvar::DecisionVariable)
+
+Set the lower bound of the first-stage decision variable `dvar` to `lower`. If one does not exist, create a new lower bound constraint.
+"""
 function JuMP.set_lower_bound(dvar::DecisionVariable, lower::Number)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_lower_bound(dvar, scenario_index, lower)`.")
     new_set = MOI.GreaterThan(convert(Float64, lower))
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
     if has_lower_bound(dvar)
+        # Update existing bound
         cindex = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dvar).value)
         MOI.set(structure(owner_model(dvar)), MOI.ConstraintSet(), cindex, new_set)
+        # Update proxy
+        MOI.set(backend(proxy_), MOI.ConstraintSet(), cindex, new_set)
     else
+        # Add new lower bound constraint
         MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), new_set)
+        # Update proxy
+        MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), new_set)
     end
     return nothing
 end
+"""
+    set_lower_bound(dvar::DecisionVariable, scenario_index::Integer, lower::Number)
+
+Set the lower bound of the scenario-dependent decision variable `dvar` at `scenario_index` to `lower`. If one does not exist, create a new lower bound constraint.
+"""
+function JuMP.set_lower_bound(dvar::DecisionVariable, scenario_index::Integer, lower::Number)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_lower_bound(dvar, lower)`.")
+    new_set = MOI.GreaterThan(convert(Float64, lower))
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
+    if has_lower_bound(dvar, scenario_index)
+        # Update existing bound
+        cindex = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dvar).value)
+        attr = ScenarioDependentConstraintAttribute(stage(dvar), scenario_index, MOI.ConstraintSet())
+        MOI.set(structure(owner_model(dvar)), attr, cindex, new_set)
+        # Update proxy
+        MOI.set(backend(proxy_), MOI.ConstraintSet(), cindex, new_set)
+    else
+        # Add new lower bound constraint
+        MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), new_set, stage(dvar), scenario_index)
+        # Update proxy if the scenario-dependent decision does not have a lower bound yet
+        if !has_lower_bound(DecisionRef(proxy_, index(dvar)))
+            MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), new_set)
+        end
+    end
+    return nothing
+end
+"""
+    delete_lower_bound(dvar::DecisionVariable)
+
+Delete the lower bound constraint of the first-stage decision variable `dvar`.
+"""
 function JuMP.delete_lower_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `delete_lower_bound(dvar, scenario_index)`.")
     JuMP.delete(owner_model(dvar), LowerBoundRef(dvar))
 end
+"""
+    delete_lower_bound(dvar::DecisionVariable, scenario_index::Integer)
+
+Delete the lower bound constraint of the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.delete_lower_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `delete_lower_bound(dvar)`.")
+    JuMP.delete(owner_model(dvar), LowerBoundRef(dvar), scenario_index)
+end
+"""
+    lower_bound(dvar::DecisionVariable)
+
+Return the lower bound of the first-stage decision variable `dvar`. Error if one does not exist.
+"""
 function JuMP.lower_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `lower_bound(dvar, scenario_index)`.")
     if !has_lower_bound(dvar)
         error("Decision variable $(dvar) does not have a lower bound.")
     end
-    cset = MOI.get(structure(owner_model(dvar)), MOI.ConstraintSet(),
+    cset = MOI.get(owner_model(dvar), MOI.ConstraintSet(),
                    LowerBoundRef(dvar))::MOI.GreaterThan{Float64}
     return cset.lower
 end
+"""
+    lower_bound(dvar::DecisionVariable, scenario_index::Integer)
 
-function JuMP.has_upper_bound(dvar::DecisionVariable)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dvar).value)
-    return MOI.is_valid(structure(owner_model(dvar)), index)
+Return the lower bound of the scenario-dependent decision variable `dvar` at `scenario_index`. Error if one does not exist.
+"""
+function JuMP.lower_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `lower_bound(dvar)`.")
+    if !has_lower_bound(dvar, scenario_index)
+        error("Decision variable $(dvar) at $scenario_index does not have a lower bound.")
+    end
+    attr = ScenarioDependentConstraintAttribute(stage(dvar), scenario_index, MOI.ConstraintSet())
+    cset = MOI.get(owner_model(dvar), attr,
+                   LowerBoundRef(dvar))::MOI.GreaterThan{Float64}
+    return cset.lower
 end
+"""
+    has_upper_bound(dvar::DecisionVariable)
+
+Return `true` if the first-stage decision variable `dvar` has a upper bound.
+"""
+function JuMP.has_upper_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `upper_bound(dvar, scenario_index)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar))
+end
+"""
+    has_upper_bound(dvar::DecisionVariable, scenario_index::Integer)
+
+Return `true` if the scenario-dependent decision variable `dvar` has a upper bound at `scenario_index`.
+"""
+function JuMP.has_upper_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `upper_bound(dvar)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar), scenario_index)
+end
+"""
+    LowerBoundRef(dvar::DecisionVariable)
+
+Return a constraint reference to the upper bound constraint of the decision variable `dvar`.
+Errors if one does not exist.
+"""
 function JuMP.UpperBoundRef(dvar::DecisionVariable)
     moi_ub =  MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}
-    index = moi_ub(index(dvar).value)
-    sp = owner_model(dvar)
-    SP = typeof(sp)
-    return ConstraintRef{SP, moi_ub, ScalarShape}(sp,
-                                                  index,
-                                                  ScalarShape())
+    return SPConstraintRef{moi_ub, ScalarShape}(owner_model(dvar),
+                                                stage(dvar),
+                                                moi_ub(index(dvar).value),
+                                                ScalarShape())
 end
-function JuMP.set_upper_bound(dvar::DecisionVariable, lower::Number)
-    new_set = MOI.LessThan(convert(Float64, lower))
+"""
+    set_upper_bound(dvar::DecisionVariable, upper::Number)
+
+Set the upper bound of the first-stage decision variable `dvar` to `upper`. If one does not exist, create a new upper bound constraint.
+"""
+function JuMP.set_upper_bound(dvar::DecisionVariable, upper::Number)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_upper_bound(dvar, scenario_index, upper)`.")
+    new_set = MOI.LessThan(convert(Float64, upper))
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
     if has_upper_bound(dvar)
+        # Update existing bound
         cindex = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dvar).value)
         MOI.set(structure(owner_model(dvar)), MOI.ConstraintSet(), cindex, new_set)
+        # Update proxy
+        MOI.set(backend(proxy_), MOI.ConstraintSet(), cindex, new_set)
     else
+        # Add new upper bound constraint
         MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), new_set)
+        # Update proxy
+        MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), new_set)
     end
     return nothing
 end
+"""
+    set_upper_bound(dvar::DecisionVariable, scenario_index::Integer, upper::Number)
+
+Set the upper bound of the scenario-dependent decision variable `dvar` at `scenario_index` to `upper`. If one does not exist, create a new upper bound constraint.
+"""
+function JuMP.set_upper_bound(dvar::DecisionVariable, scenario_index::Integer, upper::Number)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_upper_bound(dvar, upper)`.")
+    new_set = MOI.LessThan(convert(Float64, upper))
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
+    if has_upper_bound(dvar, scenario_index)
+        # Update existing bound
+        cindex = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dvar).value)
+        attr = ScenarioDependentConstraintAttribute(stage(dvar), scenario_index, MOI.ConstraintSet())
+        MOI.set(structure(owner_model(dvar)), attr, cindex, new_set)
+        # Update proxy
+        MOI.set(backend(proxy_), MOI.ConstraintSet(), cindex, new_set)
+    else
+        # Add new upper bound constraint
+        MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), new_set, stage(dvar), scenario_index)
+        # Update proxy if the scenario-dependent decision does not have a upper bound yet
+        if !has_upper_bound(DecisionRef(proxy_, index(dvar)))
+            MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), new_set)
+        end
+    end
+    return nothing
+end
+"""
+    delete_upper_bound(dvar::DecisionVariable)
+
+Delete the upper bound constraint of the first-stage decision variable `dvar`.
+"""
 function JuMP.delete_upper_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `delete_upper_bound(dvar, scenario_index)`.")
     JuMP.delete(owner_model(dvar), UpperBoundRef(dvar))
 end
+"""
+    delete_upper_bound(dvar::DecisionVariable, scenario_index::Integer)
+
+Delete the upper bound constraint of the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.delete_upper_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `delete_upper_bound(dvar)`.")
+    JuMP.delete(owner_model(dvar), UpperBoundRef(dvar), scenario_index)
+end
+"""
+    upper_bound(dvar::DecisionVariable)
+
+Return the upper bound of the first-stage decision variable `dvar`. Error if one does not exist.
+"""
 function JuMP.upper_bound(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `upper_bound(dvar, scenario_index)`.")
     if !has_upper_bound(dvar)
         error("Decision $(dvar) does not have a upper bound.")
     end
-    cset = MOI.get(structure(owner_model(dvar)), MOI.ConstraintSet(),
+    cset = MOI.get(owner_model(dvar), MOI.ConstraintSet(),
                    UpperBoundRef(dvar))::MOI.LessThan{Float64}
     return cset.upper
 end
+"""
+    upper_bound(dvar::DecisionVariable, scenario_index::Integer)
 
-function JuMP.is_integer(dvar::DecisionVariable)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dvar).value)
-    return MOI.is_valid(structure(owner_model(dvar)), index)
+Return the upper bound of the scenario-dependent decision variable `dvar` at `scenario_index`. Error if one does not exist.
+"""
+function JuMP.upper_bound(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `upper_bound(dvar)`.")
+    if !has_upper_bound(dvar, scenario_index)
+        error("Decision $(dvar) at `scenario_index` does not have a upper bound.")
+    end
+    attr = ScenarioDependentConstraintAttribute(stage(dvar), scenario_index, MOI.ConstraintSet())
+    cset = MOI.get(owner_model(dvar), attr,
+                   UpperBoundRef(dvar))::MOI.LessThan{Float64}
+    return cset.upper
 end
+"""
+    is_integer(dvar::DecisionVariable)
+
+Return `true` if the first-stage decision variable `dvar` is constrained to be integer.
+"""
+function JuMP.is_integer(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `is_integer(dvar, scenario_index)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar))
+end
+"""
+    is_integer(dvar::DecisionVariable, scenario_index::Integer)
+
+Return `true` if the scenario-dependent decision variable `dvar` is constrained to be integer at `scenario_index`.
+"""
+function JuMP.is_integer(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_integer(dvar)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar), scenario_index)
+end
+"""
+    set_integer(dvar::DecisionVariable)
+
+Add an integrality constraint on the first-stage decision variable `dvar`.
+"""
 function JuMP.set_integer(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_integer(dvar, scenario_index)`.")
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
     if is_integer(dvar)
         return nothing
     elseif is_binary(dvar)
         error("Cannot set the decision $(dvar) to integer as it is already binary.")
     else
+        # Add new integer constraint
         MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), MOI.Integer())
+        # Update proxy
+        MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), MOI.Integer())
     end
+    return nothing
 end
-function unset_integer(dvar::DecisionVariable)
+"""
+    set_integer(dvar::DecisionVariable, scenario_index::Integer)
+
+Add an integrality constraint on the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.set_integer(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_integer(dvar)`.")
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
+    if is_integer(dvar, scenario_index)
+        return nothing
+    elseif is_binary(dvar, scenario_index)
+        error("Cannot set the decision $(dvar) at `scenario_index` to integer as it is already binary.")
+    else
+        # Add new integer constraint
+        MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), MOI.Integer(), stage(dvar), scenario_index)
+        # Update proxy if the scenario-dependent decision does not have an integer bound yet
+        if !is_integer(DecisionRef(proxy_, index(dvar)))
+            MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), MOI.Integer())
+        end
+    end
+    return nothing
+end
+"""
+    unset_integer(dvar::DecisionVariable)
+
+Delete the integrality constraint of the first-stage decision variable `dvar`.
+"""
+function JuMP.unset_integer(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `unset_integer(dvar, scenario_index)`.")
     JuMP.delete(owner_model(dvar), IntegerRef(dvar))
     return nothing
 end
+"""
+    unset_integer(dvar::DecisionVariable, scenario_index::Integer)
+
+Delete the integrality constraint of the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.unset_integer(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `unset_integer(dvar)`.")
+    JuMP.delete(owner_model(dvar), IntegerRef(dvar), scenario_index)
+    return nothing
+end
+"""
+    IntegerRef(dvar::DecisionVariable)
+
+Return a constraint reference to the integrality constraint of the decision variable `dvar`.
+Errors if one does not exist.
+"""
 function JuMP.IntegerRef(dvar::DecisionVariable)
     moi_int =  MOI.ConstraintIndex{SingleDecision, MOI.Integer}
-    index = moi_int(index(dvar).value)
-    sp = owner_model(dvar)
-    SP = typeof(sp)
-    return ConstraintRef{SP, moi_int, ScalarShape}(sp,
-                                                   index,
-                                                   ScalarShape())
+    return SPConstraintRef{moi_int, ScalarShape}(owner_model(dvar),
+                                                 stage(dvar),
+                                                 moi_int(index(dvar).value),
+                                                 ScalarShape())
 end
+"""
+    is_binary(dvar::DecisionVariable)
 
+Return `true` if the first-stage decision variable `dvar` is constrained to be binary.
+"""
 function JuMP.is_binary(dvar::DecisionVariable)
-    index = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dvar).value)
-    return MOI.is_valid(structure(owner_model(dvar)), index)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `is_binary(dvar, scenario_index)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar))
 end
+"""
+    is_binary(dvar::DecisionVariable, scenario_index::Integer)
+
+Return `true` if the scenario-dependent decision variable `dvar` is constrained to be binary at `scenario_index`.
+"""
+function JuMP.is_binary(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_binary(dvar)`.")
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dvar).value)
+    return MOI.is_valid(structure(owner_model(dvar)), ci, stage(dvar), scenario_index)
+end
+"""
+    set_binary(dvar::DecisionVariable)
+
+Constrain the first-stage decision variable `dvar` to the set ``\\{0,1\\}``.
+"""
 function JuMP.set_binary(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_binary(dvar, scenario_index)`.")
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
     if is_binary(dvar)
         return nothing
     elseif is_integer(dvar)
         error("Cannot set the decision $(dvar) to binary as it is already integer.")
     else
+        # Add new binary constraint
         MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), MOI.ZeroOne())
+        # Update proxy
+        MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), MOI.ZeroOne())
+    end
+    return nothing
+end
+"""
+    set_binary(dvar::DecisionVariable, scenario_index::Integer)
+
+Constrain the scenario-dependent decision variable `dvar` to the set ``\\{0,1\\}`` at `scenario_index`.
+"""
+function JuMP.set_binary(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_binary(dvar)`.")
+    # Get proxy
+    proxy_ = proxy(owner_model(dvar), stage(dvar))
+    # Check if bound exists already
+    if is_binary(dvar, scenario_index)
+        return nothing
+    elseif is_integer(dvar, scenario_index)
+        error("Cannot set the decision $(dvar) at `scenario_index` to binary as it is already integer.")
+    else
+        # Add new binary constraint
+        MOI.add_constraint(structure(owner_model(dvar)), SingleDecision(index(dvar)), MOI.ZeroOne(), stage(dvar), scenario_index)
+        # Update proxy if the scenario-dependent decision does not have a binary bound yet
+        if !is_binary(DecisionRef(proxy_, index(dvar)))
+            MOI.add_constraint(backend(proxy_), SingleDecision(index(dvar)), MOI.ZeroOne())
+        end
     end
 end
-function unset_binary(dvar::DecisionVariable)
+"""
+    unset_binary(dvar::DecisionVariable)
+
+Delete the binary constraint of the first-stage decision variable `dvar`.
+"""
+function JuMP.unset_binary(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `unset_binary(dvar, scenario_index)`.")
     JuMP.delete(owner_model(dvar), BinaryRef(dvar))
     return nothing
 end
+"""
+    unset_binary(dvar::DecisionVariable, scenario_index::Integer)
+
+Delete the binary constraint of the scenario-dependent decision variable `dvar` at `scenario_index`.
+"""
+function JuMP.unset_binary(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `unset_binary(dvar)`.")
+    JuMP.delete(owner_model(dvar), BinaryRef(dvar), scenario_index)
+    return nothing
+end
+"""
+    BinaryRef(dvar::DecisionVariable)
+
+Return a constraint reference to the binary constraint of the decision variable `dvar`.
+Errors if one does not exist.
+"""
 function JuMP.BinaryRef(dvar::DecisionVariable)
     moi_bin =  MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}
-    index = moi_bin(index(dvar).value)
-    sp = owner_model(dvar)
-    SP = typeof(sp)
-    return ConstraintRef{SP, moi_bin, ScalarShape}(sp,
-                                                   index,
-                                                   ScalarShape())
+    return SPConstraintRef{moi_bin, ScalarShape}(owner_model(dvar),
+                                                 stage(dvar),
+                                                 moi_bin(index(dvar).value),
+                                                 ScalarShape())
 end
+"""
+    start_value(dvar::DecisionVariable)
 
+Return the start value of the first-stage decision variable `dvar`.
+"""
 function JuMP.start_value(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `start_value(dvar, scenario_index)`.")
     return MOI.get(owner_model(dvar), MOI.VariablePrimalStart(), dvar)
 end
+"""
+    start_value(dvar::DecisionVariable, scenario_index::Integer)
+
+Return the start value of the scenario-dependent decision variable `dvar`
+at `scenario_index`.
+"""
+function JuMP.start_value(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `start_value(dvar)`.")
+    attr = ScenarioDependentVariableAttribute(stage(dvar), scenario_index, MOI.VariablePrimalStart())
+    return MOI.get(owner_model(dvar), attr, dvar)
+end
+"""
+    set_start_value(dvar::DecisionVariable)
+
+Set the start value of the first-stage decision variable `dvar` to `value`.
+"""
 function JuMP.set_start_value(dvar::DecisionVariable, value::Number)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `set_start_value(dvar, scenario_index, value)`.")
+    MOI.set(backend(proxy(owner_model(dvar), stage(dvar))), MOI.VariablePrimalStart(), index(dvar), Float64(value))
     MOI.set(owner_model(dvar), MOI.VariablePrimalStart(), dvar, Float64(value))
+end
+"""
+    set_start_value(dvar::DecisionVariable, scenario_index::Integer, value::Number)
+
+Set the start value of the scenario-dependent decision variable `dvar`
+at `scenario_index` to `value`.
+"""
+function JuMP.set_start_value(dvar::DecisionVariable, scenario_index::Integer, value::Number)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `set_start_value(dvar, value)`.")
+    attr = ScenarioDependentVariableAttribute(stage(dvar), scenario_index, MOI.VariablePrimalStart())
+    MOI.set(owner_model(dvar), attr, dvar, Float64(value))
 end
 
 function Base.hash(dvar::DecisionVariable, h::UInt)
@@ -382,5 +1145,31 @@ function Base.isequal(dvar::DecisionVariable, other::DecisionVariable)
 end
 
 Base.iszero(::DecisionVariable) = false
-Base.copy(dvar::DecisionVariable) = DecisionVariable(dvar.stochasticprogram, dvar.index)
+Base.copy(dvar::DecisionVariable) = DecisionVariable(dvar.stochasticprogram, stage(dvar), dvar.index)
 Base.broadcastable(dvar::DecisionVariable) = Ref(dvar)
+
+function DecisionRef(dvar::DecisionVariable)
+    stage(dvar) > 1 && error("$dvar is scenario dependent, consider `DecisionRef(dvar, scenario_index)`.")
+    sp = owner_model(dvar)
+    return DecisionRef(proxy(sp, stage(dvar)), structure(sp), index(dvar))
+end
+function DecisionRef(dvar::DecisionVariable, scenario_index::Integer)
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `DecisionRef(dvar)`.")
+    sp = owner_model(dvar)
+    return DecisionRef(proxy(sp, stage(dvar)), structure(sp), index(dvar), scenario_index)
+end
+
+function KnownRef(dvar::DecisionVariable, at_stage::Integer, scenario_index::Integer)
+    at_stage > stage(dvar) || error("$dvar can only be known after stage $(stage(dvar)).")
+    sp = owner_model(dvar)
+    return KnownRef(proxy(sp, at_stage), structure(sp), index(dvar), at_stage, scenario_index)
+end
+
+is_decision_type(::Type{DecisionVariable}) = true
+
+function JuMP.moi_function_type(::Type{DecisionVariable})
+    return SingleDecision
+end
+function JuMP.moi_function_type(::Type{<:Vector{<:DecisionVariable}})
+    return VectorOfDecisions
+end

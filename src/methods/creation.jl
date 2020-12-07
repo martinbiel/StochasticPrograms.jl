@@ -433,7 +433,7 @@ end
 See also: [`@second_stage`](@ref)
 """
 macro first_stage(arg)
-    @capture(arg, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
+    @capture(arg, sp_Symbol = def_) || error("Invalid syntax. Expected @first_stage sp = begin ... end")
     return esc(:(@stage 1 $arg))
 end
 """
@@ -475,7 +475,11 @@ end
 See also: [`@first_stage`](@ref)
 """
 macro second_stage(arg)
-    return esc(:(@stage 2 $arg))
+    @capture(arg, sp_Symbol = def_) || error("Invalid syntax. Expected @second_stage sp = begin ... end")
+    return esc(@q begin
+        @stage 2 $arg
+        generate!($sp)
+    end)
 end
 """
     @parameters(def)
@@ -517,14 +521,20 @@ See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 macro decision(def...) @warn "@decision should be used inside a @stage block." end
 macro _decision(args...)
     args = [args...]
+    known = false
+    recourse = false
     # Check context of decision definition
-    known = if args[1] isa Symbol && args[1] == :known
+    if args[1] isa Symbol && args[1] == :known
         known = true
+    elseif args[1] isa Symbol && args[1] == :recourse
+        recourse = true
     else
-        args[1] == :unknown || error("Incorrect usage of @_decision.")
-        known = false
+        args[1] == :decision || error("Incorrect usage of @_decision.")
     end
     # Remove context from args
+    deleteat!(args, 1)
+    # Cache stage and remove from args
+    stage = args[1]
     deleteat!(args, 1)
     # Move any set definitions
     set = NoSpecifiedConstraint()
@@ -541,9 +551,9 @@ macro _decision(args...)
     end
     # Return expression based on context
     if known
-        return esc(:(@variable $((args)...) set = StochasticPrograms.KnownSet()))
+        return esc(:(@variable $((args)...) set = StochasticPrograms.KnownSet($stage)))
     else
-        return esc(:(@variable $((args)...) set = StochasticPrograms.DecisionSet(constraint = $set)))
+        return esc(:(@variable $((args)...) set = StochasticPrograms.DecisionSet($stage, constraint = $set, is_recourse = $recourse)))
     end
 end
 
@@ -687,7 +697,10 @@ Solver is default solver
 See also: [`@parameters`](@ref), [`@decision`](@ref), [`@uncertain`](@ref)
 """
 macro stage(stage, args)
-    @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected stage, multistage = begin JuMPdef end")
+    @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected @stage stage sp = begin ... end")
+    # Flags for error checking
+    seen_decision = :(false)
+    seen_recourse = :(false)
     # Decision definitions might require parameter calculations,
     # so we first need to extract and save any such lines
     vardefs = Expr(:block)
@@ -701,10 +714,10 @@ macro stage(stage, args)
             @capture(x, @uncertain args__)
             # Skip any line related to the JuMP model, stochastics, or unhandled @parameter lines
             return Expr(:block)
-        elseif @capture(x, @decision args__)
+        elseif @capture(x, @decision args__) || @capture(x, @recourse args__)
             # Handle @decision
             return @q begin
-                StochasticPrograms.@_decision known $((args)...)
+                StochasticPrograms.@_decision known $stage $((args)...)
             end
         else
             # Anything else could be required for decision variable construction, and is therefore saved
@@ -714,8 +727,17 @@ macro stage(stage, args)
     # Next, handle @decision annotations in main definition
     def = postwalk(def) do x
         if @capture(x, @decision args__)
+            # Bookkeep for error checking
+            seen_decision = :(true)
             return @q begin
-                StochasticPrograms.@_decision unknown $((args)...)
+                StochasticPrograms.@_decision decision $stage $((args)...)
+            end
+        end
+        if @capture(x, @recourse args__)
+            # Bookkeep for error checking
+            seen_recourse = :(true)
+            return @q begin
+                StochasticPrograms.@_decision recourse $stage $((args)...)
             end
         end
         return x
@@ -739,7 +761,7 @@ macro stage(stage, args)
             for param in args
                 push!(code.args, :($param = stage.$param))
             end
-            # Extracted paremeters might be required for decision variable construction
+            # Extracted parameters might be required for decision variable construction
             pushfirst!(decisiondefs.args, code)
             return code
          elseif @capture(x, @uncertain var_Symbol::t_Symbol)
@@ -850,9 +872,15 @@ macro stage(stage, args)
     # Create definition code
     code = @q begin
         isa($(esc(sp)), StochasticProgram) || error("Given object is not a stochastic program.")
-        $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
-            $(esc(decisiondefs))
-	        return $(esc(:model))
+        n = num_stages($(esc(sp)))
+        $stage > n && error("Cannot specify stage $($stage) for stochastic program with $n stages.")
+        $stage == n && $seen_decision && error("@decision declarations cannot be used in the final stage. Consider @recourse instead.")
+        if $stage < n
+            $seen_recourse && error("@recourse declarations can only be used in the final stage.")
+            $(esc(sp)).generator[Symbol(:stage_,$stage,:_decisions)] = ($(esc(:model))::JuMP.Model, $(esc(:stage))) -> begin
+                $(esc(decisiondefs))
+	            return $(esc(:model))
+            end
         end
         # Stage model generation code
         $generatordefs

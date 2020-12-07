@@ -19,6 +19,10 @@ end
 
 @everywhere import StochasticPrograms: probability, expected
 
+include("../decisions/decisions.jl")
+TestDecisionVariable.run_dtests()
+TestDecisionConstraint.run_dtests()
+TestDecisionObjective.run_dtests()
 include("../problems/problem_load.jl")
 include("dfunctional_tests.jl")
 include("dsolver_tests.jl")

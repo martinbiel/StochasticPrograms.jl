@@ -33,11 +33,13 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
         # initial decision
         MOI.optimize!(optimizer)
         status = MOI.get(optimizer, MOI.TerminationStatus())
-        if !(status ∈ StochasticPrograms.AcceptableTermination)
-            error("Initial wait-and-see problem could not be solved in subproblem $id, returned status $status.")
-        end
-        x₀ = map(decisions.undecided) do vi
-            T(MOI.get(optimizer, MOI.VariablePrimal(), vi))
+        x₀ = if status in StochasticPrograms.AcceptableTermination
+            x₀ = map(decisions.undecided) do vi
+                T(MOI.get(optimizer, MOI.VariablePrimal(), vi))
+            end
+        else
+            # Fallback in case crash was unsuccessful
+            x₀ = rand(T, length(decisions.undecided))
         end
         A = typeof(x₀)
         ξ = map(x₀) do val
@@ -96,7 +98,7 @@ function add_projection_targets!(subproblem::SubProblem)
     model = subproblem.optimizer
     for i in eachindex(ξ)
         name = add_subscript(:ξ, i)
-        var_index, _ = MOI.add_constrained_variable(model, StochasticPrograms.SingleKnownSet(ξ[i]))
+        var_index, _ = MOI.add_constrained_variable(model, StochasticPrograms.SingleKnownSet(2, ξ[i]))
         set_known_decision!(subproblem.decisions, var_index, ξ[i])
         MOI.set(model, MOI.VariableName(), var_index, name)
         subproblem.projection_targets[i] = var_index

@@ -76,6 +76,24 @@ function evaluate_decision(stochasticprogram::TwoStageStochasticProgram,
     end
 end
 """
+    recourse_decision(stochasticprogram::TwoStageStochasticProgram, decision::AbstractVector, scenario::AbstractScenario)
+
+Determine the optimal recourse decision after taking the first-stage `decision` if `scenario` is the actual outcome in `stochasticprogram`. The supplied `decision` must match the defined decision variables in `stochasticprogram`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
+"""
+function recourse_decision(stochasticprogram::TwoStageStochasticProgram,
+                           decision::AbstractVector,
+                           scenario::AbstractScenario)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    check_provided_optimizer(stochasticprogram.optimizer)
+    # Sanity checks on given decision vector
+    length(decision) == num_decisions(stochasticprogram) || error("Incorrect length of given decision vector, has ", length(decision), " should be ", num_decisions(stochasticprogram))
+    all(.!(isnan.(decision))) || error("Given decision vector has NaN elements")
+    # Generate and solve outcome model
+    outcome = outcome_model(stochasticprogram, decision, scenario; optimizer = subproblem_optimizer(stochasticprogram))
+    optimize!(outcome)
+    return JuMP.value.(all_decision_variables(outcome)[end])
+end
+"""
     evaluate_decision(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
 
 Return a statistical estimate of the objective of the two-stage `stochasticmodel` at `decision` in the form of a confidence interval at the current confidence level, over the scenario distribution induced by `sampler`.
@@ -114,7 +132,7 @@ function evaluate_decision(stochasticmodel::StochasticModel{2}, decision::Abstra
     return CI
 end
 """
-    lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
+    lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
 
 Generate a confidence interval around a lower bound on the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
@@ -122,7 +140,7 @@ The attribute [`NumSamples`](@ref) is the size of the sampled models used to gen
 
 If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
+function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticmodel.optimizer)
     # Get the instance optimizer
@@ -157,7 +175,7 @@ function lower_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampl
     return ConfidenceInterval(L, U, 1-α)
 end
 """
-    upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
+    upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
 
 Generate a confidence interval around an upper bound of the true optimum of the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`, by generating and evaluating a candidate decision.
 
@@ -165,7 +183,7 @@ The attribute [`NumSamples`](@ref) is the size of the sampled model used to gene
 
 If a sample-based optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function upper_bound(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
+function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticmodel.optimizer)
     # Get the instance optimizer

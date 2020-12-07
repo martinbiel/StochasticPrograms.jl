@@ -1,5 +1,6 @@
 struct SPResult
     x̄::Vector{Float64}
+    ȳ::Dict{Int, Vector{Float64}}
     VRP::Float64
     EWS::Float64
     EVPI::Float64

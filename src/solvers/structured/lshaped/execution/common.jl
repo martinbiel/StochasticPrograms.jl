@@ -104,6 +104,9 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     take_step!(lshaped)
     # Early optimality check if using level sets
     if lshaped.regularization isa LevelSet && check_optimality(lshaped)
+        # Resolve subproblems with optimal vector
+        lshaped.x .= decision(lshaped)
+        resolve_subproblems!(lshaped)
         # Optimal, final log
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL

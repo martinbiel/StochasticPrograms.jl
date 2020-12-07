@@ -22,12 +22,12 @@ function JuMP.set_objective_coefficient(model::Model, decision_or_known::Union{D
         else
             set_objective_function(model, add_to_expression!(coeff * decision_or_known, current_obj))
         end
-    elseif obj_fct_type == DecisionAffExpr{Float64} && decision_or_known isa DecisionRef
+    elseif obj_fct_type <: Union{DecisionAffExpr, DecisionQuadExpr} && decision_or_known isa DecisionRef
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
             DecisionCoefficientChange(index(decision_or_known), coeff))
-    elseif obj_fct_type == DecisionAffExpr{Float64} && decision_or_known isa KnownRef
+    elseif obj_fct_type <: Union{DecisionAffExpr, DecisionQuadExpr} && decision_or_known isa KnownRef
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),

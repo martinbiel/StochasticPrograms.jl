@@ -12,6 +12,8 @@ update_iterate!(ph::AbstractProgressiveHedging) = update_iterate!(ph, ph.executi
 update_subproblems!(ph::AbstractProgressiveHedging) = update_subproblems!(ph, ph.execution)
 update_dual_gap!(ph::AbstractProgressiveHedging) = update_dual_gap!(ph, ph.execution)
 calculate_objective_value(ph::AbstractProgressiveHedging) = calculate_objective_value(ph, ph.execution)
+scalar_subproblem_reduction(value::Function, ph::AbstractProgressiveHedging) = scalar_subproblem_reduction(value, ph.execution)
+vector_subproblem_reduction(value::Function, ph::AbstractProgressiveHedging, n::Integer) = scalar_subproblem_reduction(value, ph.execution, n)
 # ------------------------------------------------------------
 include("common.jl")
 include("serial.jl")

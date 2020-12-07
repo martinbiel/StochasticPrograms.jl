@@ -12,20 +12,18 @@ end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
                                                    model::MOI.ModelLike,
-                                                   set::SingleDecisionSet{T,NoSpecifiedConstraint}) where T
-    variable = MOI.add_variable(model)
-    return DecisionBridge(set.decision, variable)
-end
-
-function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
-                                                   model::MOI.ModelLike,
-                                                   set::SingleDecisionSet{T,S}) where {T, S}
-    variable, constraint = MOI.add_constrained_variable(model, set.constraint)
+                                                   set::SingleDecisionSet{T}) where T
+    variable = if set.constraint isa NoSpecifiedConstraint
+        variable = MOI.add_variable(model)
+    else
+        variable, constraint = MOI.add_constrained_variable(model, set.constraint)
+        variable
+    end
     return DecisionBridge(set.decision, variable)
 end
 
 function MOIB.Variable.supports_constrained_variable(
-    ::Type{DecisionBridge{T}}, ::Type{SingleDecisionSet{T,S}}) where {T, S}
+    ::Type{DecisionBridge{T}}, ::Type{SingleDecisionSet{T}}) where T
     return true
 end
 
@@ -44,14 +42,14 @@ function MOI.get(bridge::DecisionBridge, ::MOI.ListOfVariableIndices)
 end
 
 # References
-function MOI.delete(::MOI.ModelLike, bridge::DecisionBridge)
-    MOI.delete(bridge.variable)
+function MOI.delete(model::MOI.ModelLike, bridge::DecisionBridge)
+    MOI.delete(model, bridge.variable)
 end
 
 # Attributes, Bridge acting as a constraint
 function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet,
                  bridge::DecisionBridge)
-    return SingleDecisionSet(bridge.decision)
+    return SingleDecisionSet(1, bridge.decision)
 end
 
 function MOI.get(model::MOI.ModelLike, ::MOI.ConstraintPrimal,
@@ -179,20 +177,18 @@ end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
                                                    model::MOI.ModelLike,
-                                                   set::MultipleDecisionSet{T,NoSpecifiedConstraint}) where T
-    variables = MOI.add_variables(model, length(set.decisions))
-    return DecisionsBridge(set.decisions, variables)
-end
-
-function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
-                                                   model::MOI.ModelLike,
-                                                   set::MultipleDecisionSet{T,S}) where {T, S}
-    variables, constraints = MOI.add_constrained_variables(model, set.constraint)
+                                                   set::MultipleDecisionSet{T}) where T
+    variables = if set.constraint isa NoSpecifiedConstraint
+        variables = MOI.add_variables(model, length(set.decisions))
+    else
+        variables, constraints = MOI.add_constrained_variables(model, set.constraint)
+        variables
+    end
     return DecisionsBridge(set.decisions, variables)
 end
 
 function MOIB.Variable.supports_constrained_variable(
-    ::Type{DecisionsBridge{T}}, ::Type{MultipleDecisionSet{T,S}}) where {T, S}
+    ::Type{DecisionsBridge{T}}, ::Type{MultipleDecisionSet{T}}) where T
     return true
 end
 

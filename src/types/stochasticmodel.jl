@@ -72,6 +72,9 @@ See also: [`@stage`](@ref), [`@parameters`](@ref), [`@decision`](@ref), [`@uncer
 """
 macro stochastic_model(def)
     stage = 0
+    seen_uncertain = false
+    seen_decision = false
+    seen_recourse = false
     scenariodef = Expr(:block)
     paramdefs = Vector{Expr}()
     decisiondefs = Vector{Vector{Symbol}}()
@@ -82,7 +85,10 @@ macro stochastic_model(def)
             else
                 stage == 0 && (n == 1 || error("A first stage must be defined."))
                 stage == n - 1 || error("Define the stages in coherent order.")
+                stage == 1 && seen_uncertain && error("@uncertain declarations cannot be used in the first stage.")
+                seen_recourse && error("@recourse declarations can only be used in the final stage.")
                 stage += 1
+                seen_decision = false
                 push!(paramdefs, :(StageParameters()))
                 push!(decisiondefs, Vector{Symbol}())
                 if n > 1
@@ -123,8 +129,15 @@ macro stochastic_model(def)
                @capture(x, @decision model_ var_Symbol[range__] <= ub_ more__) || @capture(x, @decision model_ var_Symbol[range__] >= ln_ more__) ||
                @capture(x, @decision model_ var_Symbol in set_ more__) || @capture(x, @decision model_ var_Symbol[range__] in set_ more__) ||
                @capture(x, @decision model_ lb_ <= var_Symbol <= ub_ more__) || @capture(x, @decision model_ lb_ <= var_Symbol[range__] <= ub_ more__)
+                seen_decision = true
                 push!(decisiondefs[stage], var)
             end
+        end
+        if @capture(x, @recourse arg__)
+            seen_recourse = true
+        end
+        if @capture(x, @uncertain arg__)
+            seen_uncertain = true
         end
         scenariodef = if @capture(x, @uncertain var_Symbol::t_Symbol = def_)
             esc(@q begin
@@ -136,6 +149,7 @@ macro stochastic_model(def)
         return x
     end
     stage >= 2 || error("Define at least two stages.")
+    seen_decision && error("@decision declarations cannot be used in the final stage. Consider @recourse instead.")
     code = @q begin
         $scenariodef
         StochasticModel($(esc.(paramdefs)...)) do $(esc(:sp))

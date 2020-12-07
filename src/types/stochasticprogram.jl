@@ -1,6 +1,8 @@
 struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStructure{N}}
     stages::S
+    decisions::NTuple{N, Decisions}
     structure::ST
+    proxy::NTuple{N,JuMP.Model}
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
     solutioncache::Dict{Symbol, SolutionCache}
@@ -13,11 +15,19 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         S = typeof(stages)
+        decisions = ntuple(Val(N)) do i
+            Decisions()
+        end
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
-        structure = StochasticStructure(scenario_types, default_structure(instantiation, optimizer.optimizer))
+        structure = StochasticStructure(decisions, scenario_types, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)
+        proxy = ntuple(Val{N}()) do _
+            Model()
+        end
         return new{N, S, ST}(stages,
+                             decisions,
                              structure,
+                             proxy,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
                              Dict{Symbol, SolutionCache}(),
@@ -31,11 +41,19 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         S = typeof(stages)
+        decisions = ntuple(Val(N)) do i
+            Decisions()
+        end
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
-        structure = StochasticStructure(scenarios, default_structure(instantiation, optimizer.optimizer))
+        structure = StochasticStructure(decisions, scenarios, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)
+        proxy = ntuple(Val{N}()) do _
+            Model()
+        end
         return new{N, S, ST}(stages,
+                             decisions,
                              structure,
+                             proxy,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
                              Dict{Symbol, SolutionCache}(),
@@ -152,18 +170,18 @@ function Base.show(io::IO, stochasticprogram::StochasticProgram{N}) where N
             end
         elseif s == 2 && N == 2
             stype = typename(scenario_type(stochasticprogram))
-            return " * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
+            return " * $(ndecisions) recourse variables\n * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
         else
             stype = typename(scenario_type(stochasticprogram, s))
             if distributed(stochasticprogram, s)
                 if s == N
-                    return " * Distributed stage $s:\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
+                    return " * Distributed stage $s:\n   * $(ndecisions) recourse variables\n * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
                 else
                     return " * Distributed stage $s:\n   * $(ndecisions) decision variable$(plural(ndecisions))\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
                 end
             else
                 if s == N
-                    return " * Stage $s:\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
+                    return " * Stage $s:\n   * $(ndecisions) recourse variables\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
                 else
                     return " * Stage $s:\n   * $(ndecisions) decision variable$(plural(ndecisions))\n   * $(nscenarios) scenario$(plural(nscenarios)) of type $stype"
                 end
@@ -214,8 +232,18 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::Union{MOI.Terminati
     # Check if there is a cached solution
     cache = solutioncache(stochasticprogram)
     if haskey(cache, :solution)
-        # Returned cached solution
-        return MOI.get(cache[:solution], attr)
+        # Returned cached solution if possible
+        try
+            return MOI.get(cache[:solution], attr)
+        catch
+        end
+    end
+    if haskey(cache, :node_solution_1)
+        # Value was possibly only cached in first-stage solution
+        try
+            return MOI.get(cache[:node_solution_1], attr)
+        catch
+        end
     end
     return MOI.get(optimizer(stochasticprogram), attr)
 end
@@ -224,8 +252,18 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractModelAt
         # Check if there is a cached solution
         cache = solutioncache(stochasticprogram)
         if haskey(cache, :solution)
-            # Returned cached solution
-            return MOI.get(cache[:solution], attr)
+            # Returned cached solution if possible
+            try
+                return MOI.get(cache[:solution], attr)
+            catch
+            end
+        end
+        if haskey(cache, :node_solution_1)
+            # Value was possibly only cached in first-stage solution
+            try
+                return MOI.get(cache[:node_solution_1], attr)
+            catch
+            end
         end
         check_provided_optimizer(stochasticprogram.optimizer)
         if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
@@ -233,7 +271,57 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractModelAt
         end
         return MOI.get(optimizer(stochasticprogram), attr)
     else
-        return MOI.get(structure(stochasticprogram), attr)
+        if is_structure_independent(attr)
+            # Get attribute from first stage of proxy if structure independent
+            return MOI.get(proxy(stochasticprogram, 1), attr)
+        else
+            # Handle in structure otherwise
+            return MOI.get(structure(stochasticprogram), attr)
+        end
+    end
+end
+function MOI.get(stochasticprogram::StochasticProgram, attr::ScenarioDependentModelAttribute)
+    if MOI.is_set_by_optimize(attr)
+        # Check if there is a cached solution
+        cache = solutioncache(stochasticprogram)
+        key = Symbol(:node_solution_, attr.stage, :_, attr.scenario_index)
+        if haskey(cache, key)
+            try
+                return MOI.get(cache[key], attr.attr)
+            catch
+            end
+        end
+        check_provided_optimizer(stochasticprogram.optimizer)
+        # Return statuses without checks
+        if typeof(attr.attr) <: Union{MOI.TerminationStatus, MOI.PrimalStatus, MOI.DualStatus}
+            try
+                # Try to get scenario-dependent value directly
+                return MOI.get(optimizer(stochasticprogram), attr)
+            catch
+                # Fallback to resolving scenario-dependence in structure if
+                # not supported natively by optimizer
+                return MOI.get(structure(stochasticprogram), attr)
+            end
+        end
+        if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
+            throw(OptimizeNotCalled())
+        end
+        try
+            # Try to get scenario-dependent value directly
+            return MOI.get(optimizer(stochasticprogram), attr)
+        catch
+            # Fallback to resolving scenario-dependence in structure if
+            # not supported natively by optimizer
+            MOI.get(structure(stochasticprogram), attr)
+        end
+    else
+        if is_structure_independent(attr)
+            # Get attribute from first stage of proxy if structure independent
+            return MOI.get(proxy(stochasticprogram, 1), attr)
+        else
+            # Handle in structure otherwise
+            return MOI.get(structure(stochasticprogram), attr)
+        end
     end
 end
 function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
@@ -245,6 +333,16 @@ function MOI.set(sp::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, va
     return nothing
 end
 function MOI.set(sp::StochasticProgram, attr::MOI.AbstractModelAttribute, value)
+    if is_structure_independent(attr)
+        MOI.set(proxy(sp, attr.stage), attr, value)
+    end
+    MOI.set(structure(sp), attr, value)
+    return nothing
+end
+function MOI.set(sp::StochasticProgram, attr::ScenarioDependentModelAttribute, value)
+    if is_structure_independent(attr)
+        MOI.set(proxy(sp, attr.stage), attr, value)
+    end
     MOI.set(structure(sp), attr, value)
     return nothing
 end
@@ -262,3 +360,5 @@ function JuMP.check_belongs_to_model(con_ref::ConstraintRef{<:StochasticProgram}
         throw(ConstraintNotOwned(con_ref))
     end
 end
+
+Base.broadcastable(sp::StochasticProgram) = Ref(sp)

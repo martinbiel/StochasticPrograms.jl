@@ -45,7 +45,7 @@ HorizontalStructure
 
 ```@autodocs
 Modules = [StochasticPrograms]
-Pages   = ["decision_variable.jl", "variable_interface.jl"]
+Pages   = ["decision_variable.jl", "constraints.jl", "objective.jl", "variable_interface.jl"]
 ```
 
 ## Scenarios

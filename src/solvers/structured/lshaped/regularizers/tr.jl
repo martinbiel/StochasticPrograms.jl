@@ -68,7 +68,7 @@ function initialize_regularization!(lshaped::AbstractLShaped, tr::TrustRegion{T}
     trust_region = Decision(tr.parameters.Δ, T)
     tr.data.Δ, _ =
         MOI.add_constrained_variable(lshaped.master,
-                                     SingleKnownSet(trust_region))
+                                     SingleKnownSet(1, trust_region))
     set_known_decision!(tr.decisions, tr.data.Δ, trust_region)
     MOI.set(lshaped.master, MOI.VariableName(), tr.data.Δ, name)
     x = VectorOfDecisions(tr.decisions.undecided)

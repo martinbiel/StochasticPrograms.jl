@@ -20,6 +20,7 @@ function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario;
                stage_parameters(stochasticprogram, 2),
                scenario,
                Decisions(),
+               Decisions(),
                optimizer)
 end
 function _WS(stage_one_generator::Function,
@@ -27,14 +28,16 @@ function _WS(stage_one_generator::Function,
              stage_one_params::Any,
              stage_two_params::Any,
              scenario::AbstractScenario,
-             decisions::Decisions,
+             stage_one_decisions::Decisions,
+             stage_two_decisions::Decisions,
              optimizer_constructor)
     ws_model = optimizer_constructor == nothing ? Model() : Model(optimizer_constructor)
     # Prepare decisions
-    ws_model.ext[:decisions] = decisions
+    ws_model.ext[:decisions] = (stage_one_decisions, stage_two_decisions)
     add_decision_bridges!(ws_model)
     # Generate first stage and cache objective
     stage_one_generator(ws_model, stage_one_params)
+    # Cache objective
     ws_obj = copy(objective_function(ws_model))
     ws_sense = objective_sense(ws_model)
     ws_sense = ws_sense == MOI.FEASIBILITY_SENSE ? MOI.MIN_SENSE : ws_sense
@@ -65,7 +68,7 @@ function wait_and_see_decision(stochasticprogram::StochasticProgram{2}, scenario
     ws_model = WS(stochasticprogram, scenario, optimizer = subproblem_optimizer(stochasticprogram))
     optimize!(ws_model)
     # Return WS decision
-    return JuMP.value.(all_decision_variables(ws_model))
+    return JuMP.value.(all_decision_variables(ws_model, 1))
 end
 """
     EWS(stochasticprogram::StochasticProgram)
@@ -92,6 +95,7 @@ function EWS(stochasticprogram::StochasticProgram, structure::AbstractStochastic
                  stage_parameters(stochasticprogram, 1),
                  stage_parameters(stochasticprogram, 2),
                  scenario,
+                 Decisions(),
                  Decisions(),
                  subproblem_optimizer(stochasticprogram))
         optimize!(ws)
@@ -320,7 +324,7 @@ function expected_value_decision(stochasticprogram::StochasticProgram{2})
     evp = EVP(stochasticprogram, optimizer = master_optimizer(stochasticprogram))
     optimize!(evp)
     # Return EVP decision
-    return JuMP.value.(all_decision_variables(evp))
+    return JuMP.value.(all_decision_variables(evp, 1))
 end
 """
     EV(stochasticprogram::TwoStageStochasticProgram)

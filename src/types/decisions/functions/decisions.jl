@@ -50,6 +50,8 @@ function JuMP.jump_function(model::Model, decision::SingleDecision)
     return DecisionRef(model, decision)
 end
 
+is_decision_type(::Type{SingleDecision}) = true
+
 SingleKnown(kref::KnownRef) = SingleKnown(index(kref))
 function JuMP.moi_function(kref::KnownRef)
     return SingleKnown(kref)
@@ -75,6 +77,8 @@ function JuMP.jump_function(model::Model, decisions::VectorOfDecisions)
         DecisionRef(model, decision)
     end
 end
+
+is_decision_type(::Type{VectorOfDecisions}) = true
 
 VectorOfKnowns(kvars::Vector{KnownRef}) = VectorOfKnowns(index.(kvars))
 function JuMP.moi_function(knowns::Vector{<:KnownRef})

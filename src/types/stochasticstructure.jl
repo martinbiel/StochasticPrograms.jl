@@ -62,18 +62,12 @@ struct DistributedHorizontal <: StochasticInstantiation end
     StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::StochasticInstantiation) where M
 
 Constructs a stochastic structure over the `M` provided scenario types according to the specified `instantiation`. Should be overrided for every defined stochastic structure.
-"""
-function StochasticStructure(scenario_types::ScenarioTypes{M}, instantiation::StochasticInstantiation) where M
-    throw(MethodError(StochasticStructure, scenario_types, instantiation))
-end
-"""
+
     StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::StochasticInstantiation) where M
 
 Constructs a stochastic structure over the `M` provided scenario sets according to the specified `instantiation`. Should be overrided for every defined stochastic structure.
 """
-function StochasticStructure(scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::StochasticInstantiation) where M
-    throw(MethodError(StochasticStructure, scenario_types, instantiation))
-end
+function StochasticStructure end
 """
     default_structure(instantiation::StochasticInstantiation, optimizer)
 
@@ -150,25 +144,29 @@ message(err::UnloadableStructure) = err.message
 function structure_name(structure::AbstractStochasticStructure)
     return "Unknown"
 end
+function num_decisions(structure::AbstractStochasticStructure{N}, stage::Integer = 1) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    return length(structure.decisions[stage].undecided)
+end
 function scenario_type(structure::AbstractStochasticStructure, s::Integer = 2)
     return _scenario_type(scenarios(structure, s))
 end
 function _scenario_type(::Vector{S}) where S <: AbstractScenario
     return S
 end
-function num_scenarios(structure::AbstractStochasticStructure, s::Integer = 2)
-    return length(scenarios(structure, s))
+function num_scenarios(structure::AbstractStochasticStructure, stage::Integer = 2)
+    return length(scenarios(structure, stage))
 end
-function probability(structure::AbstractStochasticStructure, i::Integer, s::Integer = 2)
-    return probability(scenario(structure, i, s))
+function probability(structure::AbstractStochasticStructure, stage::Integer, scenario_index::Integer)
+    return probability(scenario(structure, stage, scenario_index))
 end
-function stage_probability(structure::AbstractStochasticStructure, s::Integer = 2)
-    return probability(scenarios(structure, s))
+function stage_probability(structure::AbstractStochasticStructure, stage::Integer = 2)
+    return probability(scenarios(structure, stage))
 end
-function expected(structure::AbstractStochasticStructure, s::Integer = 2)
-    return expected(scenarios(structure, s))
+function expected(structure::AbstractStochasticStructure, stage::Integer = 2)
+    return expected(scenarios(structure, stage))
 end
-function distributed(structure::AbstractStochasticStructure, s)
+function distributed(structure::AbstractStochasticStructure, stage::Integer)
     return false
 end
 # ========================== #

@@ -139,17 +139,17 @@ function stochastic_model(smps::SMPSModel{2})
             if any(isfinite.(lb))
                 if any(isfinite.(ub))
                     # Double bounds
-                    @variable(model, lb[i] <= y[i in 1:n] <= ub[i])
+                    @recourse(model, lb[i] <= y[i in 1:n] <= ub[i])
                 else
                     # Lower bounds
-                    @variable(model, y[i in 1:n] >= lb[i])
+                    @recourse(model, y[i in 1:n] >= lb[i])
                 end
             elseif any(isfinite.(ub))
                 # Upper bounds
-                @variable(model, y[i in 1:n] <= ub[i])
+                @recourse(model, y[i in 1:n] <= ub[i])
             else
                 # Free
-                @variable(model, y[i in 1:n])
+                @recourse(model, y[i in 1:n])
             end
             # Define objective and constraints
             @objective(model, Min, dot((q + Δq), y))

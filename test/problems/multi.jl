@@ -18,7 +18,7 @@ sm = @stochastic_model begin
         @uncertain d
         @variable(model, x³ <= 2)
         @variable(model, w³)
-        @variable(model, y³)
+        @recourse(model, y³)
         @objective(model, Min, x³ + 3*w³)
         @constraint(model, y² + x³ + w³ - y³ == d)
     end
