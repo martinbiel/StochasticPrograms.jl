@@ -15,7 +15,7 @@ end
 """
     HybridAggregation
 
-Functor object for using hybrid aggregation in an L-shaped algorithm. Create by supplying a [`HybridAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using hybrid aggregation in an L-shaped algorithm. Create by supplying a [`HybridAggregate`](@ref) object through `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 ...
 # Parameters
@@ -87,7 +87,7 @@ end
 """
     HybridAggregate(initial::AbstractAggregator, final::AbstractAggregator, τ::AbstractFloat)
 
-Factory object for [`HybridAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?HybridAggregation for parameter descriptions.
+Factory object for [`HybridAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute. See ?HybridAggregation for parameter descriptions.
 
 """
 mutable struct HybridAggregate <: AbstractAggregator

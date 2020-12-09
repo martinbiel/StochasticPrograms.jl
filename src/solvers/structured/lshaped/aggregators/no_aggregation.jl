@@ -38,7 +38,7 @@ end
 """
     DontAggregate
 
-Factory object for [`NoAggregation`](@ref). Passed by default to `aggregate` in the `LShapedSolver` factory function.
+Factory object for [`NoAggregation`](@ref). Passed by default to `aggregate` in `LShaped.Optimizer`.
 
 """
 struct DontAggregate <: AbstractAggregator end

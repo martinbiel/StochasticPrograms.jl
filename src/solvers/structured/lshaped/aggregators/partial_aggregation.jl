@@ -1,7 +1,7 @@
 """
     PartialAggregation
 
-Functor object for using partial aggregation in an L-shaped algorithm. Create by supplying a [`PartialAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using partial aggregation in an L-shaped algorithm. Create by supplying a [`PartialAggregate`](@ref) object through `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 ...
 # Parameters
@@ -110,7 +110,7 @@ end
 """
     PartialAggregate
 
-Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.  See ?PartialAggregation for parameter descriptions.
+Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.  See ?PartialAggregation for parameter descriptions.
 
 """
 mutable struct PartialAggregate <: AbstractAggregator
@@ -158,7 +158,7 @@ end
 """
     Aggregate
 
-Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.
+Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 """
 struct Aggregate <: AbstractAggregator end

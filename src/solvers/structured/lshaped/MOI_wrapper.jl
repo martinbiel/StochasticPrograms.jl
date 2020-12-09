@@ -8,7 +8,7 @@ Return an L-shaped optimizer.
 - `subproblem_optimizer::AbstractOptimizer`: Optionally specify a different solver for the subproblems.
 - `feasibility_cuts::Bool = false`: Specify if feasibility cuts should be used
 - `regularize::AbstractRegularizer = DontRegularize()`: Specify regularization procedure (DontRegularize, RegularizedDecomposition/RD/WithRegularizedDecomposition, TrustRegion/TR/WithTrustRegion, LevelSet/LV/WithLevelSets).
-- `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate)
+- `aggregate::AbstractAggregator = DontAggregate()`: Specify aggregation procedure (DontAggregate, Aggregate, PartialAggregate, DynamicAggregate, ClusterAggregate, GranulatedAggregate, HybridAggregate)
 - `consolidate::AbstractConsolidator = DontConsolidate()`: Specify consolidation procedure (DontConsolidate, Consolidate)
 - `execution::Execution = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
 - <keyword arguments>: Algorithm specific parameters, See `?LShaped` for list of possible arguments and default values.

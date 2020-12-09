@@ -1,7 +1,7 @@
 """
     ClusterAggregation
 
-Functor object for using cluster aggregation in an L-shaped algorithm. Create by supplying a [`ClusterAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using cluster aggregation in an L-shaped algorithm. Create by supplying a [`ClusterAggregate`](@ref) object through `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 The following cluster rules are available
 - [`StaticCluster`](@ref)
@@ -130,7 +130,7 @@ end
 """
     ClusterAggregate(rule::AbstractClusterRule; lock_after::Function = (τ,n)->false)
 
-Factory object for [`ClusterAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?ClusterAggregation for parameter descriptions.
+Factory object for [`ClusterAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute. See ?ClusterAggregation for parameter descriptions.
 
 """
 mutable struct ClusterAggregate <: AbstractAggregator

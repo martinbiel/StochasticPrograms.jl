@@ -1,7 +1,7 @@
 """
     GranulatedAggregation
 
-Functor object for using partial aggregation in an L-shaped algorithm. Create by supplying a [`GranulatedAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using partial aggregation in an L-shaped algorithm. Create by supplying a [`GranulatedAggregate`](@ref) object through `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 ...
 # Parameters
@@ -107,7 +107,7 @@ end
 """
     GranulatedAggregate
 
-Factory object for [`GranulatedAggregation`](@ref). Pass to `aggregate` in the `LShapedSolver` factory function.  See ?GranulatedAggregation for parameter descriptions.
+Factory object for [`GranulatedAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.  See ?GranulatedAggregation for parameter descriptions.
 
 """
 mutable struct GranulatedAggregate <: AbstractAggregator

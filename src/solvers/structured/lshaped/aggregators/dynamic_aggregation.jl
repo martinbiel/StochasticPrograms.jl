@@ -1,7 +1,7 @@
 """
     DynamicAggregation
 
-Functor object for using dynamic aggregation in an L-shaped algorithm. Create by supplying a [`DynamicAggregate`](@ref) object through `aggregate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using dynamic aggregation in an L-shaped algorithm. Create by supplying a [`DynamicAggregate`](@ref) object through `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
 
 The following selection rules are available
 - [`SelectUniform`](@ref)
@@ -108,7 +108,7 @@ end
 """
     DynamicAggregate(num_aggregates::Integer, rule::AbstractSelectionRule; lock_after::Function = (τ,n)->false)
 
-Factory object for [`DynamicAggregation`](@ref). Pass to `aggregate ` in the `LShapedSolver` factory function. See ?DynamicAggregation for parameter descriptions.
+Factory object for [`DynamicAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute. See ?DynamicAggregation for parameter descriptions.
 
 """
 mutable struct DynamicAggregate <: AbstractAggregator

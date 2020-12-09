@@ -50,7 +50,7 @@ LShaped.set_aggregation_attributes
 ```
 ```@autodocs
 Modules = [LShaped]
-Pages   = ["no_aggregation.jl", "partial_aggregation.jl", "dynamic_aggregation.jl", "cluster_aggregation.jl", "hybrid_aggregation.jl"]
+Pages   = ["no_aggregation.jl", "partial_aggregation.jl", "dynamic_aggregation.jl", "cluster_aggregation.jl", "granulated_aggregation.jl", "hybrid_aggregation.jl"]
 ```
 
 ### Selection rules
