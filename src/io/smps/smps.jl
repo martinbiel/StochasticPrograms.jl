@@ -1,4 +1,4 @@
-module SMPS
+@reexport module SMPS
 
 # Standard library
 using LinearAlgebra
@@ -68,6 +68,10 @@ const GAMMA = :GAMMA
 const BETA = :BETA
 const LOGNORM = :LOGNORM
 const DISTRIBUTIONS = [DISCRETE, UNIFORM, NORMAL, GAMMA, BETA, LOGNORM]
+
+export
+    SMPSScenario,
+    SMPSSampler
 
 include("tim.jl")
 include("cor.jl")

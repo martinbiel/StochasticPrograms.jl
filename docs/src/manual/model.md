@@ -234,3 +234,154 @@ end
 print(sp)
 ```
 It is of course also possible to do this on programs instantiated from a `StochasticModel`.
+
+## SMPS
+
+StochasticPrograms also support reading models specified in the SMPS format. Specifically, SMPS definitions with uncertain data of types INDEP or BLOCKS are supported. We show how the simple example can be specified in SMPS. An SMPS definition consist of the following files:
+
+- problem.smps
+- problem.tim
+- problem.cor
+- problem.sto
+
+Here, `problem.smps` is just an empty file that shares the name with the others to simplify IO commands. The `problem.tim` file specifies the stage structure of the stochastic program. An example for the simple problem is given below.
+```
+TIME          SIMPLE
+PERIODS
+    X1        BOUND                    STAGE1
+    Y1        LINK1                    STAGE2
+ENDATA
+```
+Row and column delimeters are given for each stage. The `problem.cor` file specifies the optimization structure of the problem in MPS format. An example for the simple problem as follows.
+```
+NAME          SIMPLE
+ROWS
+ N  OBJ
+ L  BOUND
+ L  LINK1
+ L  LINK2
+ L  Y1UP
+ L  Y2UP
+COLUMNS
+    X1        OBJ       100.0          BOUND     1.0
+    X2        OBJ       150.0          BOUND     1.0
+    X1        LINK1     -60.0
+    X2        LINK2     -80.0
+    Y1        OBJ       26.0           Y1UP      1.0
+    Y2        OBJ       30.0           Y2UP      1.0
+    Y1        LINK1     6.0            LINK2     8.0
+    Y2        LINK1     10.0           LINK2     5.0
+RHS
+    RHS       BOUND     120.0
+    RHS       LINK1     0.0
+    RHS       LINK2     0.0
+    RHS       Y1UP      400.0
+    RHS       Y2UP      200.0
+BOUNDS
+ LO X1LIM     X1        40.0
+ LO X2LIM     X2        20.0
+ LO Y1LIM     Y1        0.0
+ LO Y2LIM     Y2        0.0
+ENDATA
+```
+Finally, the `problem.sto` file specifies the uncertain data. We use the BLOCKS format to specify the simple scenarios.
+```
+STOCH         SIMPLE
+BLOCKS        DISCRETE
+ BL BLOCK1    STAGE2    0.4
+    Y1        OBJ       -24.0
+    Y2        OBJ       -28.0
+    RHS       Y1UP      500.0
+    RHS       Y2UP      100.0
+ BL BLOCK1    STAGE2    0.6
+    Y1        OBJ       -28.0
+    Y2        OBJ       -32.0
+    RHS       Y1UP      300.0
+    RHS       Y2UP      300.0
+ENDATA
+```
+We specify the two scenarios, giving the value in each corresponding coordinate in the `problem.cor` file. Now, we can read this model into Julia in several ways, assuming all files are in the same folder. First, consider
+```julia
+model = read("problem.smps", StochasticModel)
+```
+```julia
+Two-Stage Stochastic Model
+
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)
+```
+This returns a `StochasticModel` object that can be used as usual, assuming it is instantiated with the scenarios of the special `SMPSScenario` type. To that end, we can read a specialized sampler object for the specified SMPS model:
+```julia
+sampler = read("problem.smps", SMPSSampler)
+sampler()
+```
+```julia
+SMPSScenario with probability 1.0 and underlying data:
+
+Δq = [0.0, 0.0, -54.0, -62.0]
+ΔT = 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries
+ΔW = 0×2 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries
+Δh = Float64[]
+ΔC = 4×4 SparseArrays.SparseMatrixCSC{Float64,Int64} with 0 stored entries
+Δd₁ = [0.0, 0.0, 0.0, 0.0]
+Δd₂ = [0.0, 0.0, -100.0, 100.0]
+```
+We can now instantiate a specific instance of the read model:
+```julia
+sp = instantiate(model, sampler, 2)
+```
+```julia
+Stochastic program with:
+ * 2 decision variables
+ * 2 scenarios of type SMPSScenario
+Structure: Deterministic equivalent
+Solver name: No optimizer attached.
+```
+The same result, up to sampling, can be achieved directly through
+```julia
+sp = read("problem.smps", StochasticProgram, num_scenarios = 2)
+```
+```julia
+Stochastic program with:
+ * 2 decision variables
+ * 2 scenarios of type SMPSScenario
+Structure: Deterministic equivalent
+Solver name: No optimizer attached.
+```
+This `read` variant takes the same keyword arguments as `instantiate`. Because the specified scenario structure in BLOCKS or INDEP format has finite support, it is possible to read the stochastic program corresponding to the full support by not specifying `num_scenarios`:
+```julia
+sp = read("problem.smps", StochasticProgram)
+```
+```julia
+Stochastic program with:
+ * 2 decision variables
+ * 2 scenarios of type SMPSScenario
+Structure: Deterministic equivalent
+Solver name: No optimizer attached.
+```
+In this case, the full support correspond exactly to the simple model we have considered before:
+```julia
+print(sp)
+```
+```julia
+Deterministic equivalent problem
+Min 100 x[1] + 150 x[2] - 16.8 y₂[1] - 19.2 y₂[2] - 9.600000000000001 y₁[1] - 11.200000000000001 y₁[2]
+Subject to
+ y₁[1] ≥ 0.0
+ y₁[2] ≥ 0.0
+ y₂[1] ≥ 0.0
+ y₂[2] ≥ 0.0
+ [x[1], x[2]] ∈ Decisions
+ x[1] ≥ 40.0
+ x[2] ≥ 20.0
+ [x[1] + x[2] - 120] ∈ MathOptInterface.Nonpositives(1)
+ [-60 x[1] + 6 y₁[1] + 10 y₁[2], -80 x[2] + 8 y₁[1] + 5 y₁[2], y₁[1] - 500, y₁[2] - 100] ∈ MathOptInterface.Nonpositives(4)
+ [-60 x[1] + 6 y₂[1] + 10 y₂[2], -80 x[2] + 8 y₂[1] + 5 y₂[2], y₂[1] - 300, y₂[2] - 300] ∈ MathOptInterface.Nonpositives(4)
+Solver name: No optimizer attached.
+```
+A warning is issued if the full support contains more than `1e5` scenarios.

@@ -22,6 +22,13 @@ Modules = [StochasticPrograms]
 Pages   = ["stochasticprogram.jl"]
 ```
 
+## IO
+
+```@autodocs
+Modules = [SMPS]
+Pages   = ["reader.jl"]
+```
+
 ## Structures
 
 ```@autodocs
@@ -52,6 +59,11 @@ Pages   = ["scenario.jl"]
 AbstractSampler
 Sampler
 sample
+```
+
+```@autodocs
+Modules = [SMPS]
+Pages   = ["scenario.jl", "sampler.jl"]
 ```
 
 ```@meta

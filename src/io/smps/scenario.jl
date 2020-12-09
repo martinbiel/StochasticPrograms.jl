@@ -1,3 +1,10 @@
+"""
+    SMPSScenario
+
+Conveniece type that adheres to the [`AbstractScenario`](@ref) abstraction. Obtained when reading scenarios specified in SMPS format.
+
+See also: [`SMPSSampler`](@ref)
+"""
 struct SMPSScenario{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractScenario
     probability::Probability
     Δq::Vector{T}
@@ -33,4 +40,16 @@ function StochasticPrograms.expected(scenarios::Vector{<:SMPSScenario{T}}) where
                      probability(ξ₁) * ξ₁.Δd₂ + probability(ξ₂) * ξ₂.Δd₂)
     end
     return StochasticPrograms.ExpectedScenario(expected)
+end
+
+function StochasticPrograms.scenariotext(io::IO, scenario::SMPSScenario)
+    print(io, " and underlying data:\n\n")
+    println(io, "Δq = $(scenario.Δq)")
+    println(io, "ΔT = $(scenario.ΔT)")
+    println(io, "ΔW = $(scenario.ΔW)")
+    println(io, "Δh = $(scenario.Δh)")
+    println(io, "ΔC = $(scenario.ΔC)")
+    println(io, "Δd₁ = $(scenario.Δd₁)")
+    print(io, "Δd₂ = $(scenario.Δd₂)")
+    return io
 end

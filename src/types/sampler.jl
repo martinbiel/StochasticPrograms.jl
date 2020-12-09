@@ -35,7 +35,7 @@ end
 
 General purpose sampler object that samples Scenario.
 
-See also: [`Scenario`](@ref), [`@sampler`](@ref)
+See also: [`Scenario`](@ref), [`@scenario`](@ref), [`@sampler`](@ref)
 """
 struct Sampler <: AbstractSampler{Scenario}
     sampler::Function

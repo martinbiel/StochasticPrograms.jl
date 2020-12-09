@@ -22,7 +22,13 @@ Base.eltype(::Type{<:MultiDiscreteNonParametricSampler}) = Float64
 function Distributions._rand!(rng::AbstractRNG, s::MultiDiscreteNonParametricSampler, x::AbstractVector)
     @inbounds x .= s.support[rand(rng, s.aliastable)]
 end
+"""
+    SMPSSampler
 
+Sampler object for SMPS scenarios. Obtained by reading from a model defined in SMPS format.
+
+See also: [`SMPSScenario`](@ref)
+"""
 struct SMPSSampler{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractSampler{SMPSScenario{T,M}}
     template::LPData{T,M}
     technology::UnitRange{Int}
