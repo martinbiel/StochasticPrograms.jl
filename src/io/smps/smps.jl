@@ -8,6 +8,7 @@ using Distributed
 
 # External libraries
 using StochasticPrograms
+using Compat
 using Distributions
 using Distributions: AliasTable
 using OrderedCollections
