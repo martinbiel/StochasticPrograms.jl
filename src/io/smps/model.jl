@@ -33,7 +33,7 @@ function parse_stage(raw::RawSMPS, stage::Integer, N::Integer, constructor)
         next_col = tim.col_delims[stage + 1]
         colrange = collect(keys(cor.vars))[cor.vars[col]:cor.vars[next_col]-1]
         # Extract first-stage model
-        model = constructor(cor; colrange, rowrange, include_constant = true)
+        model = constructor(cor; colrange = colrange, rowrange = rowrange, include_constant = true)
         # Return stage
         return SMPSStage(model)
     else
@@ -57,7 +57,7 @@ function parse_stage(raw::RawSMPS, stage::Integer, N::Integer, constructor)
             colrange = collect(keys(cor.vars))[cor.vars[prev_col]:end]
         end
         # Extract second-stage model
-        model = constructor(cor; colrange, rowrange)
+        model = constructor(cor; colrange = colrange, rowrange = rowrange)
         # Compute technology and recourse ranges
         delim      = findfirst(x -> x == col, colrange)
         technology = 1:delim-1

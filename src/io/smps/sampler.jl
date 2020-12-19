@@ -165,7 +165,7 @@ function full_support(sampler::SMPSSampler{T}) where T <: AbstractFloat
             samples = merge(samples, outcome)
             π *= ρ
         end
-        return create_scenario(sampler, samples; π)
+        return create_scenario(sampler, samples; π = π)
     end
 end
 
