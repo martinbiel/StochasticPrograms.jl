@@ -45,9 +45,9 @@ function Base.read(io::IO,
     sm = stochastic_model(smps)
     sampler = SMPSSampler(smps.raw.sto, smps.stages[2])
     if num_scenarios != nothing
-        return instantiate(sm, sampler, num_scenarios; instantiation, optimizer, defer, direct_model, kw...)
+        return instantiate(sm, sampler, num_scenarios; instantiation = instantiation, optimizer = optimizer, defer = defer, direct_model = direct_model, kw...)
     else
-        return instantiate(sm, full_support(sampler); instantiation, optimizer, defer, direct_model, kw...)
+        return instantiate(sm, full_support(sampler); instantiation = instantiation, optimizer = optimizer, defer = defer, direct_model = direct_model, kw...)
     end
 end
 Base.read(filename::AbstractString, ::Type{StochasticProgram}; kw...) = open(io -> read(io, StochasticProgram; kw...), filename)

@@ -119,10 +119,10 @@ function parse_cor(::Type{T}, filename::AbstractString) where T <: AbstractFloat
                   rhs,
                   ranges,
                   bounds;
-                  objgiven,
-                  objname,
-                  rhsname,
-                  name)
+                  objgiven = objgiven,
+                  objname = objname,
+                  rhsname = rhsname,
+                  name = name)
 end
 parse_cor(filename::AbstractString) = parse_cor(Float64, filename)
 
