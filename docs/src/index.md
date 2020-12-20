@@ -48,7 +48,7 @@ If you use the cut aggregation funcionality for L-shaped, please cite the follow
 ## Manual Outline
 
 ```@contents
-Pages = ["manual/quickstart.md", "manual/data.md", "manual/model.md", "manual/distributed.md", "manual/structuredsolvers.md", "manual/examples.md"]
+Pages = ["manual/quickstart.md", "manual/data.md", "manual/model.md", "manual/decisions.md", "manual/distributed.md", "manual/structuredsolvers.md", "manual/examples.md"]
 ```
 
 ## Library Outline

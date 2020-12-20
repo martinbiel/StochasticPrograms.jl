@@ -7,11 +7,12 @@ include("spconstructs.jl")
 include("deterministic_equivalent/generation.jl")
 include("deterministic_equivalent/evaluation.jl")
 include("deterministic_equivalent/optimization.jl")
+include("deterministic_equivalent/spconstructs.jl")
 
 include("vertical/generation.jl")
 include("vertical/evaluation.jl")
 include("vertical/optimization.jl")
-#include("vertical/spconstructs.jl")
+include("vertical/spconstructs.jl")
 
 include("horizontal/generation.jl")
 include("horizontal/evaluation.jl")

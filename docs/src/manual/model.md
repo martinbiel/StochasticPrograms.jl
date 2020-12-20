@@ -12,8 +12,8 @@ simple_model = @stochastic_model begin
     @stage 2 begin
         @known x₁ x₂
         @uncertain q₁ q₂ d₁ d₂
-        @variable(model, 0 <= y₁ <= d₁)
-        @variable(model, 0 <= y₂ <= d₂)
+        @recourse(model, 0 <= y₁ <= d₁)
+        @recourse(model, 0 <= y₂ <= d₂)
         @objective(model, Max, q₁*y₁ + q₂*y₂)
         @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
         @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
@@ -200,16 +200,16 @@ sp = StochasticProgram([ξ₁, ξ₂], Deterministic())
 Note that we must provide the instantiation type explicitly as well. A slightly diferrent modeling syntax is now used to define the stage models of `sp`:
 ```@example instant
 @first_stage sp = begin
-    @variable(model, x₁ >= 40)
-    @variable(model, x₂ >= 20)
+    @decision(model, x₁ >= 40)
+    @decision(model, x₂ >= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
     @constraint(model, x₁ + x₂ <= 120)
 end
 @second_stage sp = begin
     @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-    @variable(model, 0 <= y₁ <= d₁)
-    @variable(model, 0 <= y₂ <= d₂)
+    @recourse(model, 0 <= y₁ <= d₁)
+    @recourse(model, 0 <= y₂ <= d₂)
     @objective(model, Min, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
@@ -224,8 +224,8 @@ As a side note, it is possible to run stage definition macros on programs with e
 @stage 2 sp = begin
     @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-    @variable(model, 2 <= y₁ <= d₁)
-    @variable(model, 2 <= y₂ <= d₂)
+    @recourse(model, 2 <= y₁ <= d₁)
+    @recourse(model, 2 <= y₂ <= d₂)
     @objective(model, Min, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
@@ -340,6 +340,7 @@ sp = instantiate(model, sampler, 2)
 ```julia
 Stochastic program with:
  * 2 decision variables
+ * 2 recourse variables
  * 2 scenarios of type SMPSScenario
 Structure: Deterministic equivalent
 Solver name: No optimizer attached.
@@ -351,6 +352,7 @@ sp = read("problem.smps", StochasticProgram, num_scenarios = 2)
 ```julia
 Stochastic program with:
  * 2 decision variables
+ * 2 recourse variables
  * 2 scenarios of type SMPSScenario
 Structure: Deterministic equivalent
 Solver name: No optimizer attached.
@@ -362,6 +364,7 @@ sp = read("problem.smps", StochasticProgram)
 ```julia
 Stochastic program with:
  * 2 decision variables
+ * 2 recourse variables
  * 2 scenarios of type SMPSScenario
 Structure: Deterministic equivalent
 Solver name: No optimizer attached.

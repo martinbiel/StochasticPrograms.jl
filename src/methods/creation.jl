@@ -508,7 +508,7 @@ macro parameters(def) @warn "@parameters should be used inside a @stage block." 
 """
     @decision(model, expr, args..., kw_args...)
 
-Add a decision variable to `model` described by the expression `expr`. If used inside a [`@stage`](@ref) block, the created variable can be used in subsequent stage blocks. See `@variable` for syntax details.
+Add a decision variable to `model` described by the expression `expr`. If used inside a [`@stage`](@ref) block, the created variable can be used in subsequent stage blocks. [`@recourse`](@ref) should be used to mark decisions in the final stage. See `@variable` for syntax details.
 
 ## Examples
 
@@ -516,9 +516,23 @@ Add a decision variable to `model` described by the expression `expr`. If used i
 @decision(model, x >= 40)
 ```
 
-See also [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
+See also [`@recourse`](@ref), [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
 """
 macro decision(def...) @warn "@decision should be used inside a @stage block." end
+"""
+    @recourse(model, expr, args..., kw_args...)
+
+Add a recourse decision variable to `model` described by the expression `expr`. Replaces [`@decision`](@ref) in the [`@stage`](@ref) block of the final stage, and can only be used there. See `@variable` for syntax details.
+
+## Examples
+
+```julia
+@recourse(model, 0 <= y <= 1)
+```
+
+See also [`@decision`](@ref), [`@parameters`](@ref), [`@uncertain`](@ref), [`@stage`](@ref)
+"""
+macro recourse(def...) @warn "@recourse should be used inside the @stage block of the final stage." end
 macro _decision(args...)
     args = [args...]
     known = false

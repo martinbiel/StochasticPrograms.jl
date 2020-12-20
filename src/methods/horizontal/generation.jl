@@ -24,7 +24,7 @@ function generate!(stochasticprogram::TwoStageStochasticProgram, structure::Hori
                          generator(stochasticprogram, :stage_2),
                          stage_parameters(stochasticprogram, 1),
                          stage_parameters(stochasticprogram, 2),
-                         structure.decisions[stage],
+                         structure.decisions[stage-1],
                          subproblem_optimizer(stochasticprogram))
     # Generate constraint map
     seen_constraints = CI[]
@@ -67,8 +67,8 @@ function generate_horizontal!(scenarioproblems::ScenarioProblems,
                                              stage_one_params,
                                              stage_two_params,
                                              scenario(scenarioproblems,i),
-                                             Decisions(),
                                              decisions,
+                                             Decisions(),
                                              optimizer))
     end
     return nothing

@@ -44,9 +44,9 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
     N = num_scenarios(structure)
     Q = Vector{Float64}(undef, N)
     obj_sense = objective_sense(structure.model)
-    for (i, sub_objective) in enumerate(structure.sub_objectives[1])
-        (sense, func) = sub_objectives
-        Qᵢ = MOIU.eval_variables(sub_objective) do idx
+    for (i, sub_objective) in enumerate(structure.sub_objectives[2])
+        (sub_sense, sub_obj) = sub_objective
+        Qᵢ = MOIU.eval_variables(sub_obj) do idx
             return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
         end
         if obj_sense == sub_sense
@@ -55,8 +55,8 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
             Q[i] = -Qᵢ
         end
     end
-    probabilities = map(1:num_scenarios(structure)) do i
-        probability(structure, i)
+    probabilities = map(1:num_scenarios(structure, 2)) do i
+        probability(structure, 2, i)
     end
     weights = Distributions.StatsBase.ProbabilityWeights(probabilities)
     σ = std(Q, weights, corrected = true)

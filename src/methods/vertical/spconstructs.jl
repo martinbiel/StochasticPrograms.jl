@@ -20,6 +20,7 @@ function EWS(stochasticprogram::StochasticProgram,
                                  two_params,
                                  scenario,
                                  Decisions(),
+                                 Decisions(),
                                  opt)
                         return ws
                     end
@@ -51,6 +52,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram,
                                  one_params,
                                  two_params,
                                  scenario,
+                                 Decisions(),
                                  Decisions(),
                                  opt)
                         return ws

@@ -201,7 +201,7 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     # Optimize
     optimize!(sampled_model)
     x̂ = optimal_decision(sampled_model)
-    return upper_bound(stochasticmodel, x̂, sampler; kw...)
+    return upper_confidence_interval(stochasticmodel, x̂, sampler; kw...)
 end
 """
     upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
@@ -271,10 +271,10 @@ function confidence_interval(stochasticmodel::StochasticModel{2}, sampler::Abstr
     α = (1 - confidence)/2
     MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Lower bound
-    lower_CI = lower_bound(stochasticmodel, sampler; kw...)
+    lower_CI = lower_confidence_interval(stochasticmodel, sampler; kw...)
     L = lower(lower_CI)
     # Upper bound
-    upper_CI = upper_bound(stochasticmodel, sampler; kw...)
+    upper_CI = upper_confidence_interval(stochasticmodel, sampler; kw...)
     U = upper(upper_CI)
     # Restore confidence level
     MOI.set(stochasticmodel, Confidence(), confidence)
@@ -304,10 +304,10 @@ function gap(stochasticmodel::StochasticModel{2}, decision::AbstractVector, samp
     α = (1-confidence)/2
     MOI.set(stochasticmodel, Confidence(), 1 - α)
     # Lower bound
-    lower_CI = lower_bound(stochasticmodel, sampler; kw...)
+    lower_CI = lower_confidence_interval(stochasticmodel, sampler; kw...)
     L = lower(lower_CI)
     # Upper bound
-    upper_CI = upper_bound(stochasticmodel, decision, sampler; kw...)
+    upper_CI = upper_confidence_interval(stochasticmodel, decision, sampler; kw...)
     U = upper(upper_CI)
     # Restore confidence level
     MOI.set(stochasticmodel, Confidence(), confidence)

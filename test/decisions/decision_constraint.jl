@@ -4,7 +4,9 @@ using StochasticPrograms
 using Test
 
 function test_SingleDecision_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @decision(model, z[1:2])
@@ -12,9 +14,10 @@ function test_SingleDecision_constraints(Structure)
         @constraint(model, con12[i in 1:2], z[i] in MOI.LessThan(float(i)))
     end
     @second_stage sp = begin
+        @uncertain a
         @recourse(model, y)
         @recourse(model, w[1:2])
-        @constraint(model, con21, y in MOI.LessThan(10.0))
+        @constraint(model, con21, y in MOI.LessThan(a))
         @constraint(model, con22[i in 1:2], w[i] in MOI.LessThan(float(i)))
     end
     # First-stage
@@ -33,24 +36,33 @@ function test_SingleDecision_constraints(Structure)
     @test c.func == z[1]
     @test c.set == MOI.LessThan(1.0)
     # Scenario-dependent
-    y = DecisionRef(sp[2,:y], 1)
-    w = DecisionRef.(sp[2,:w], 1)
+    y1 = DecisionRef(sp[2,:y], 1)
+    y2 = DecisionRef(sp[2,:y], 2)
+    w1 = DecisionRef.(sp[2,:w], 1)
+    w2 = DecisionRef.(sp[2,:w], 2)
     con21 = sp[2,:con21]
     @test "con21" == @inferred JuMP.name(con21, 1)
     @test index(con21) == JuMP.constraint_by_name(owner_model(con21), 2, "con21").index
-    c = JuMP.constraint_object(con21, 1)
-    @test c.func == y
-    @test c.set == MOI.LessThan(10.0)
+    c1 = JuMP.constraint_object(con21, 1)
+    c2 = JuMP.constraint_object(con21, 2)
+    @test c1.func == y1
+    @test c2.func == y2
+    @test c1.set == MOI.LessThan(1.0)
+    @test c2.set == MOI.LessThan(2.0)
     con22 = sp[2,:con22]
     @test "con22[1]" == @inferred JuMP.name(con22[1], 1)
     @test index(con22[1]) == JuMP.constraint_by_name(owner_model(con22[1]), 2, "con22[1]").index
-    c = JuMP.constraint_object(con22[1], 1)
-    @test c.func == w[1]
+    c1 = JuMP.constraint_object(con22[1], 1)
+    c2 = JuMP.constraint_object(con22[1], 2)
+    @test c1.func == w1[1]
+    @test c2.func == w2[1]
     @test c.set == MOI.LessThan(1.0)
 end
 
 function test_VectorOfDecisions_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x[1:2])
         @constraint(model, con11, x in MOI.Zeros(2))
@@ -72,19 +84,21 @@ function test_VectorOfDecisions_constraints(Structure)
     @test c.func == [x[2],x[1]]
     @test c.set == MOI.Zeros(2)
     # Scenario-dependent
-    y = DecisionRef.(sp[2,:y], 1)
+    y = DecisionRef.(sp[2,:y], 2)
     sp_cref = sp[2,:con21]
-    c = JuMP.constraint_object(sp_cref, 1)
+    c = JuMP.constraint_object(sp_cref, 2)
     @test c.func == y
     @test c.set == MOI.Zeros(2)
     sp_cref = sp[2,:con22]
-    c = JuMP.constraint_object(sp_cref, 1)
+    c = JuMP.constraint_object(sp_cref, 2)
     @test c.func == [y[2],y[1]]
     @test c.set == MOI.Zeros(2)
 end
 
 function test_DecisionAffExpr_scalar_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con11, 2x <= 10)
@@ -94,9 +108,10 @@ function test_DecisionAffExpr_scalar_constraints(Structure)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con21, 2x + 2y <= 10)
-        @constraint(model, con22, 3x + 3y + 1 >= 10)
+        @constraint(model, con21, 2x + a*y <= 10)
+        @constraint(model, con22, a*x + 3y + 1 >= 10)
         @constraint(model, con23, 1 == -y - x)
         @constraint(model, con24, 2 == 1)
     end
@@ -114,29 +129,42 @@ function test_DecisionAffExpr_scalar_constraints(Structure)
     @test_throws ErrorException JuMP.constraint_object(sp[1,:con14])
     # Scenario-dependent
     x = KnownRef(sp[1,:x], 2, 1)
-    y = DecisionRef(sp[2,:y], 1)
-    c = JuMP.constraint_object(sp[2,:con21], 1)
-    @test JuMP.isequal_canonical(c.func, 2x + 2y)
-    @test c.set == MOI.LessThan(10.0)
-    c = JuMP.constraint_object(sp[2,:con22], 1)
-    @test JuMP.isequal_canonical(c.func, 3x + 3y)
-    @test c.set == MOI.GreaterThan(9.0)
-    c = JuMP.constraint_object(sp[2,:con23], 1)
-    @test JuMP.isequal_canonical(c.func, 1.0x + 1.0y)
-    @test c.set == MOI.EqualTo(-1.0)
+    y1 = DecisionRef(sp[2,:y], 1)
+    y2 = DecisionRef(sp[2,:y], 2)
+    c1 = JuMP.constraint_object(sp[2,:con21], 1)
+    c2 = JuMP.constraint_object(sp[2,:con21], 2)
+    @test JuMP.isequal_canonical(c1.func, 2x + y1)
+    @test JuMP.isequal_canonical(c2.func, 2x + 2y2)
+    @test c1.set == MOI.LessThan(10.0)
+    @test c2.set == MOI.LessThan(10.0)
+    c1 = JuMP.constraint_object(sp[2,:con22], 1)
+    c2 = JuMP.constraint_object(sp[2,:con22], 2)
+    @test JuMP.isequal_canonical(c1.func, x + 3y1)
+    @test JuMP.isequal_canonical(c2.func, 2x + 3y2)
+    @test c1.set == MOI.GreaterThan(9.0)
+    @test c2.set == MOI.GreaterThan(9.0)
+    c1 = JuMP.constraint_object(sp[2,:con23], 1)
+    c2 = JuMP.constraint_object(sp[2,:con23], 2)
+    @test JuMP.isequal_canonical(c1.func, 1.0x + 1.0y1)
+    @test JuMP.isequal_canonical(c2.func, 1.0x + 1.0y2)
+    @test c1.set == MOI.EqualTo(-1.0)
+    @test c2.set == MOI.EqualTo(-1.0)
     @test_throws ErrorException JuMP.constraint_object(sp[2,:con24], 1)
 end
 
 function test_DecisionAffExpr_vectorized_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con1, [x, 2x] .== [1-x, 3])
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con2, [x + y, 2x + 2y] .== [1-x-y, 3])
+        @constraint(model, con2, [a*x + y, 2x + a*y] .== [1-x-y, 3])
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -147,24 +175,33 @@ function test_DecisionAffExpr_vectorized_constraints(Structure)
     @test c[2].set == MOI.EqualTo(3.0)
     # Scenario-dependent
     x = KnownRef(sp[1,:x], 2, 1)
-    y = DecisionRef(sp[2,:y], 1)
-    c = JuMP.constraint_object.(sp[2,:con2], 1)
-    @test JuMP.isequal_canonical(c[1].func, 2.0x + 2.0y)
-    @test c[1].set == MOI.EqualTo(1.0)
-    @test JuMP.isequal_canonical(c[2].func, 2.0x + 2.0y)
-    @test c[2].set == MOI.EqualTo(3.0)
+    y1 = DecisionRef(sp[2,:y], 1)
+    y2 = DecisionRef(sp[2,:y], 2)
+    c1 = JuMP.constraint_object.(sp[2,:con2], 1)
+    c2 = JuMP.constraint_object.(sp[2,:con2], 2)
+    @test JuMP.isequal_canonical(c1[1].func, 2.0x + 2.0y1)
+    @test JuMP.isequal_canonical(c2[1].func, 3.0x + 2.0y2)
+    @test c1[1].set == MOI.EqualTo(1.0)
+    @test c2[1].set == MOI.EqualTo(1.0)
+    @test JuMP.isequal_canonical(c1[2].func, 2.0x + y1)
+    @test JuMP.isequal_canonical(c2[2].func, 2.0x + 2.0y2)
+    @test c1[2].set == MOI.EqualTo(3.0)
+    @test c2[2].set == MOI.EqualTo(3.0)
 end
 
 function test_delete_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con1, 2x <= 1)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con2, 2x + 2y <= 1)
+        @constraint(model, con2, a*x + 2y <= 1)
     end
     # First-stage
     sp_cref = sp[1,:con1]
@@ -177,9 +214,13 @@ function test_delete_constraints(Structure)
     sp_cref = sp[2,:con2]
     @test_throws ErrorException JuMP.is_valid(sp, sp_cref)
     @test JuMP.is_valid(sp, sp_cref, 1)
+    @test JuMP.is_valid(sp, sp_cref, 2)
     @test_throws ErrorException JuMP.delete(sp, sp_cref)
     JuMP.delete(sp, sp_cref, 1)
     @test !JuMP.is_valid(sp, sp_cref, 1)
+    @test JuMP.is_valid(sp, sp_cref, 2)
+    JuMP.delete(sp, sp_cref, 2)
+    @test !JuMP.is_valid(sp, sp_cref, 2)
     @first_stage sp = begin
         @decision(model, x[1:9])
         @constraint(model, con11, sum(x[1:2:9]) <= 3)
@@ -203,22 +244,30 @@ function test_delete_constraints(Structure)
     cons = all_constraints(sp, 2, DecisionAffExpr{Float64}, MOI.LessThan{Float64})
     @test_throws ErrorException all(JuMP.is_valid.(sp, cons))
     @test all(JuMP.is_valid.(sp, cons, 1))
+    @test all(JuMP.is_valid.(sp, cons, 2))
     @test_throws ErrorException JuMP.delete(sp, cons[[1, 3]])
     JuMP.delete(sp, cons[[1, 3]], 1)
     @test all((!JuMP.is_valid).(sp, cons[[1, 3]], 1))
     @test JuMP.is_valid(sp, cons[2], 1)
+    @test all(JuMP.is_valid.(sp, cons, 2))
+    JuMP.delete(sp, cons[[1, 3]], 2)
+    @test all((!JuMP.is_valid).(sp, cons[[1, 3]], 2))
+    @test JuMP.is_valid(sp, cons[2], 2)
 end
 
 function test_DecisionQuadrExpr_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con1, x^2 + x <= 1)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con2, y^2 + y*x - 1.0 == 0.0)
+        @constraint(model, con2, y^2 + a*y*x - 1.0 == 0.0)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -229,10 +278,14 @@ function test_DecisionQuadrExpr_constraints(Structure)
     # Scenario-dependent
     sp_cref = sp[2,:con2]
     x = KnownRef(sp[1,:x], 2, 1)
-    y = DecisionRef(sp[2,:y], 1)
-    c = JuMP.constraint_object(sp_cref, 1)
-    @test JuMP.isequal_canonical(c.func, y^2 + x*y)
-    @test c.set == MOI.EqualTo(1.0)
+    y1 = DecisionRef(sp[2,:y], 1)
+    y2 = DecisionRef(sp[2,:y], 2)
+    c1 = JuMP.constraint_object(sp_cref, 1)
+    c2 = JuMP.constraint_object(sp_cref, 2)
+    @test JuMP.isequal_canonical(c1.func, y1^2 + x*y1)
+    @test JuMP.isequal_canonical(c2.func, y2^2 + 2*x*y2)
+    @test c1.set == MOI.EqualTo(1.0)
+    @test c2.set == MOI.EqualTo(1.0)
     # sp_cref = sp[2,:con3]
     # c = JuMP.constraint_object(cref)
     # @test JuMP.isequal_canonical(c.func[1], -1 + 3x^2 - 4x*y + 2x)
@@ -241,14 +294,17 @@ function test_DecisionQuadrExpr_constraints(Structure)
 end
 
 function test_all_decision_constraints(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x >= 0)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y >= 0)
-        @constraint(model, x + y >= 0)
+        @constraint(model, x + a*y >= 0)
     end
     # First-stage
     x = sp[1,:x]
@@ -269,13 +325,18 @@ function test_all_decision_constraints(Structure)
     aff_constraints = all_constraints(sp, 2, DecisionAffExpr{Float64},
                                       MOI.GreaterThan{Float64})
     x = KnownRef(x, 2, 1)
-    y = DecisionRef(y, 1)
-    c = constraint_object(aff_constraints[1], 1)
-    @test JuMP.isequal_canonical(c.func, x + y)
+    y1 = DecisionRef(y, 1)
+    y2 = DecisionRef(y, 2)
+    c1 = constraint_object(aff_constraints[1], 1)
+    c2 = constraint_object(aff_constraints[1], 2)
+    @test JuMP.isequal_canonical(c1.func, x + y1)
+    @test JuMP.isequal_canonical(c2.func, x + 2y2)
 end
 
 function test_list_of_constraint_types(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x >= 0, Bin)
         @constraint(model, 2x <= 1)
@@ -284,8 +345,9 @@ function test_list_of_constraint_types(Structure)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y >= 0, Bin)
-        @constraint(model, 2x + 2y <= 1)
+        @constraint(model, 2x + 2y <= a)
         @constraint(model, [x + y, x] in SecondOrderCone())
         @constraint(model, x^2+y^2 - x*y <= 1)
     end
@@ -316,7 +378,9 @@ function test_list_of_constraint_types(Structure)
 end
 
 function test_change_decision_coefficient(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con1, 2 * x == -1)
@@ -324,9 +388,10 @@ function test_change_decision_coefficient(Structure)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con2, 2x + 2y == 0)
-        @constraint(model, quadcon2, y^2 + x == 0)
+        @constraint(model, con2, 2x + a*y == 0)
+        @constraint(model, quadcon2, y^2 + a*x == 0)
     end
     # First-stage
     x = sp[1,:x]
@@ -348,34 +413,48 @@ function test_change_decision_coefficient(Structure)
     y = sp[2,:y]
     sp_cref = sp[2,:con2]
     @test_throws ErrorException JuMP.normalized_coefficient(sp_cref, y) == 2.0
-    @test JuMP.normalized_coefficient(sp_cref, y, 1) == 2.0
-    @test_throws ErrorException JuMP.set_normalized_coefficient(sp_cref, y, 1.0)
-    JuMP.set_normalized_coefficient(sp_cref, y, 1, 1.0)
     @test JuMP.normalized_coefficient(sp_cref, y, 1) == 1.0
+    @test JuMP.normalized_coefficient(sp_cref, y, 2) == 2.0
+    @test_throws ErrorException JuMP.set_normalized_coefficient(sp_cref, y, 1.0)
+    JuMP.set_normalized_coefficient(sp_cref, y, 1, 2.0)
+    JuMP.set_normalized_coefficient(sp_cref, y, 2, 1.0)
+    @test JuMP.normalized_coefficient(sp_cref, y, 1) == 2.0
+    @test JuMP.normalized_coefficient(sp_cref, y, 2) == 1.0
     JuMP.set_normalized_coefficient(sp_cref, y, 1, 3)
+    JuMP.set_normalized_coefficient(sp_cref, y, 2, 3)
     @test JuMP.normalized_coefficient(sp_cref, y, 1) == 3.0
+    @test JuMP.normalized_coefficient(sp_cref, y, 2) == 3.0
     quad_con = sp[2,:quadcon2]
     @test_throws ErrorException JuMP.normalized_coefficient(quad_con, y) == 0.0
     @test JuMP.normalized_coefficient(quad_con, y, 1) == 0.0
+    @test JuMP.normalized_coefficient(quad_con, y, 2) == 0.0
     @test_throws ErrorException JuMP.set_normalized_coefficient(quad_con, y, 2)
     JuMP.set_normalized_coefficient(quad_con, y, 1, 2)
+    JuMP.set_normalized_coefficient(quad_con, y, 2, 2)
     @test JuMP.normalized_coefficient(quad_con, y, 1) == 2.0
+    @test JuMP.normalized_coefficient(quad_con, y, 2) == 2.0
     x = KnownRef(x, 2, 1)
-    y = DecisionRef(y, 1)
+    y1 = DecisionRef(y, 1)
+    y2 = DecisionRef(y, 2)
     @test JuMP.isequal_canonical(
-        JuMP.constraint_object(quad_con, 1).func, y^2 + 2y + x)
+        JuMP.constraint_object(quad_con, 1).func, y1^2 + 2y1 + x)
+    @test JuMP.isequal_canonical(
+        JuMP.constraint_object(quad_con, 2).func, y2^2 + 2y2 + 2x)
 end
 
 function test_change_decision_rhs(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1. probability = 0.5
+    ξ₂ = @scenario a = 2. probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
         @constraint(model, con1, 2 * x <= 1)
     end
     @second_stage sp = begin
         @known x
+        @uncertain a
         @recourse(model, y)
-        @constraint(model, con2, 2x + y <= 0)
+        @constraint(model, con2, 2x + y <= a)
     end
     # First-stage
     sp_cref = sp[1,:con1]
@@ -387,12 +466,17 @@ function test_change_decision_rhs(Structure)
     # Scenario-dependent
     sp_cref = sp[2,:con2]
     @test_throws ErrorException JuMP.normalized_rhs(sp_cref)
-    @test JuMP.normalized_rhs(sp_cref, 1) == 0.0
+    @test JuMP.normalized_rhs(sp_cref, 1) == 1.0
+    @test JuMP.normalized_rhs(sp_cref, 2) == 2.0
     @test_throws ErrorException JuMP.set_normalized_rhs(sp_cref, 2.0)
     JuMP.set_normalized_rhs(sp_cref, 1, 2.0)
+    JuMP.set_normalized_rhs(sp_cref, 2, 1.0)
     @test JuMP.normalized_rhs(sp_cref, 1) == 2.0
+    @test JuMP.normalized_rhs(sp_cref, 2) == 1.0
     JuMP.set_normalized_rhs(sp_cref, 1, 3)
+    JuMP.set_normalized_rhs(sp_cref, 2, 3)
     @test JuMP.normalized_rhs(sp_cref, 1) == 3.0
+    @test JuMP.normalized_rhs(sp_cref, 2) == 3.0
 end
 
 function runtests()

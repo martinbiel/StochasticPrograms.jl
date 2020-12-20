@@ -30,8 +30,8 @@ farmer_model = @stochastic_model begin
             SellPrice = Dict(:wheat=>170, :corn=>150, :beets=>36, :extra_beets=>10)
         end
         @uncertain ξ[c in Crops]
-        @variable(model, y[p in setdiff(Crops, [:beets])] >= 0)
-        @variable(model, w[s in Crops ∪ [:extra_beets]] >= 0)
+        @recourse(model, y[p in setdiff(Crops, [:beets])] >= 0)
+        @recourse(model, w[s in Crops ∪ [:extra_beets]] >= 0)
         @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
                    - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
         @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
@@ -60,11 +60,24 @@ We can now optimize the model:
 ```@example farmer
 optimize!(farmer)
 x = optimal_decision(farmer)
-println("Wheat: $(x[1])")
-println("Corn: $(x[2])")
-println("Beets: $(x[3])")
+x = farmer[1,:x]
+println("Wheat: $(value(x[:wheat]))")
+println("Corn: $(value(x[:corn]))")
+println("Beets: $(value(x[:beets]))")
 println("Profit: $(objective_value(farmer))")
 ```
+We can also check results for a specific scenario:
+```@example farmer
+y = farmer[2,:y]
+w = farmer[2,:w]
+println("Purchased wheat: $(value(y[:wheat], 1))")
+println("Purchased corn: $(value(y[:corn], 1))")
+println("Sold wheat: $(value(w[:wheat], 1))")
+println("Sold corn: $(value(w[:corn], 1))")
+println("Sold beets: $(value(w[:extra_beets], 1))")
+println("Profit: $(objective_value(farmer, 1))")
+```
+
 Finally, we calculate the stochastic performance of the model:
 ```@example farmer
 println("EVPI: $(EVPI(farmer))")

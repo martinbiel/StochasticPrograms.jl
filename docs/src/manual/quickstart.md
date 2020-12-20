@@ -81,8 +81,8 @@ simple_model = @stochastic_model begin
     end
     @stage 2 begin
         @uncertain q₁ q₂ d₁ d₂
-        @variable(model, 0 <= y₁ <= d₁)
-        @variable(model, 0 <= y₂ <= d₂)
+        @recourse(model, 0 <= y₁ <= d₁)
+        @recourse(model, 0 <= y₂ <= d₂)
         @objective(model, Max, q₁*y₁ + q₂*y₂)
         @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
         @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
@@ -290,7 +290,7 @@ evaluate_decision(sp, x)
 Internally, this fixes all occurances of the first-stage variables in the deterministic equivalent and solves the resulting problem. An equivalent approach is to fix the decisions manually:
 ```@example simple
 another_sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
-fix.(all_decision_variables(another_sp), x)
+fix.(all_decision_variables(another_sp, 1), x)
 optimize!(another_sp)
 objective_value(another_sp)
 ```

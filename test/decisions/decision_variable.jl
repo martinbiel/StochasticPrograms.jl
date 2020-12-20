@@ -4,7 +4,9 @@ using StochasticPrograms
 using Test
 
 function test_decision_no_bound(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
     end
@@ -24,25 +26,33 @@ function test_decision_no_bound(Structure)
     @test StochasticPrograms.stage(y) == 2
     @test_throws ErrorException JuMP.has_lower_bound(y)
     @test !JuMP.has_lower_bound(y, 1)
+    @test !JuMP.has_lower_bound(y, 2)
     @test_throws ErrorException JuMP.has_upper_bound(y)
     @test !JuMP.has_upper_bound(y, 1)
+    @test !JuMP.has_upper_bound(y, 2)
     @test_throws ErrorException JuMP.is_fixed(y)
     @test !JuMP.is_fixed(y, 1)
+    @test !JuMP.is_fixed(y, 2)
     @test_throws ErrorException JuMP.is_integer(y)
     @test !JuMP.is_integer(y, 1)
+    @test !JuMP.is_integer(y, 2)
     @test_throws ErrorException JuMP.is_binary(y)
     @test !JuMP.is_binary(y, 1)
+    @test !JuMP.is_binary(y, 2)
     @test "y" == @inferred JuMP.name(y)
     @test y == decision_by_name(owner_model(y), 2, "y")
 end
 
 function test_decision_lower_bound(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x >= 0, Bin)
     end
     @second_stage sp = begin
-        @recourse(model, y >= 0, Bin)
+        @uncertain a
+        @recourse(model, y >= a, Bin)
     end
     # First-stage
     x = sp[1,:x]
@@ -57,23 +67,33 @@ function test_decision_lower_bound(Structure)
     # Scenario-dependent
     y = sp[2,:y]
     @test JuMP.has_lower_bound(y, 1)
-    @test 0.0 == @inferred JuMP.lower_bound(y, 1)
+    @test JuMP.has_lower_bound(y, 2)
+    @test 1.0 == @inferred JuMP.lower_bound(y, 1)
+    @test 2.0 == @inferred JuMP.lower_bound(y, 2)
     @test !JuMP.has_upper_bound(y, 1)
+    @test !JuMP.has_upper_bound(y, 2)
     @test !JuMP.is_fixed(y, 1)
+    @test !JuMP.is_fixed(y, 2)
     @test JuMP.is_binary(y, 1)
+    @test JuMP.is_binary(y, 2)
     @test !JuMP.is_integer(y, 1)
-    @test isequal(sp[2,:y], y)
+    @test !JuMP.is_integer(y, 2)
     JuMP.delete_lower_bound(y, 1)
     @test !JuMP.has_lower_bound(y, 1)
+    JuMP.delete_lower_bound(y, 2)
+    @test !JuMP.has_lower_bound(y, 2)
 end
 
 function test_decision_upper_bound(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x <= 1.0, Int)
     end
     @second_stage sp = begin
-        @recourse(model, y <= 1.0, Int)
+        @uncertain a
+        @recourse(model, y <= a, Int)
     end
     # First-stage
     x = sp[1,:x]
@@ -88,22 +108,33 @@ function test_decision_upper_bound(Structure)
     # Scenario-dependent
     y = sp[2,:y]
     @test !JuMP.has_lower_bound(y, 1)
+    @test !JuMP.has_lower_bound(y, 2)
     @test JuMP.has_upper_bound(y, 1)
+    @test JuMP.has_upper_bound(y, 2)
     @test 1.0 == @inferred JuMP.upper_bound(y, 1)
+    @test 2.0 == @inferred JuMP.upper_bound(y, 2)
     @test !JuMP.is_fixed(y, 1)
+    @test !JuMP.is_fixed(y, 2)
     @test !JuMP.is_binary(y, 1)
+    @test !JuMP.is_binary(y, 2)
     @test JuMP.is_integer(y, 1)
+    @test JuMP.is_integer(y, 2)
     JuMP.delete_upper_bound(y, 1)
     @test !JuMP.has_upper_bound(y, 1)
+    JuMP.delete_upper_bound(y, 2)
+    @test !JuMP.has_upper_bound(y, 2)
 end
 
 function test_decision_fix(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x == 1)
     end
     @second_stage sp = begin
-        @recourse(model, y == 1)
+        @uncertain a
+        @recourse(model, y == a)
     end
     # First-stage
     x = sp[1,:x]
@@ -121,25 +152,41 @@ function test_decision_fix(Structure)
     # Scenario-dependent
     y = sp[2,:y]
     @test !JuMP.has_lower_bound(y, 1)
+    @test !JuMP.has_lower_bound(y, 2)
     @test !JuMP.has_upper_bound(y, 1)
+    @test !JuMP.has_upper_bound(y, 2)
     @test JuMP.is_fixed(y, 1)
+    @test JuMP.is_fixed(y, 2)
     @test 1.0 == @inferred JuMP.value(y, 1)
+    @test 2.0 == @inferred JuMP.value(y, 2)
     JuMP.unfix(y, 1)
     @test !JuMP.is_fixed(y, 1)
+    @test JuMP.is_fixed(y, 2)
+    JuMP.unfix(y, 2)
+    @test !JuMP.is_fixed(y, 2)
     JuMP.fix(y, 1, 2.0)
     @test !JuMP.has_lower_bound(y, 1)
     @test !JuMP.has_upper_bound(y, 1)
     @test JuMP.is_fixed(y, 1)
+    @test !JuMP.is_fixed(y, 2)
     @test 2.0 == @inferred JuMP.value(y, 1)
+    JuMP.fix(y, 2, 1.0)
+    @test !JuMP.has_lower_bound(y, 2)
+    @test !JuMP.has_upper_bound(y, 2)
+    @test JuMP.is_fixed(y, 2)
+    @test 1.0 == @inferred JuMP.value(y, 2)
 end
 
 function test_decision_custom_index_sets(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x[0:1, 10:20, 1:1] >= 2)
     end
     @second_stage sp = begin
-        @recourse(model, y[0:1, 10:20, 1:1] >= 2)
+        @uncertain a
+        @recourse(model, y[0:1, 10:20, 1:1] >= a)
     end
     # First-stage
     x = sp[1,:x]
@@ -157,20 +204,26 @@ function test_decision_custom_index_sets(Structure)
     # Scenario-dependent
     y = sp[2,:y]
     @test JuMP.has_lower_bound(y[0, 15, 1], 1)
-    @test 2 == @inferred JuMP.lower_bound(y[0, 15, 1], 1)
+    @test JuMP.has_lower_bound(y[0, 15, 1], 2)
+    @test 1 == @inferred JuMP.lower_bound(y[0, 15, 1], 1)
+    @test 2 == @inferred JuMP.lower_bound(y[0, 15, 1], 2)
     @test !JuMP.has_upper_bound(y[0, 15, 1], 1)
+    @test !JuMP.has_upper_bound(y[0, 15, 1], 2)
     @second_stage sp = begin
         @recourse(model, y[i in -10:10, s in [:a,:b]] <= 5.5, Int)
     end
     y = sp[2,:y]
     @test 5.5 == @inferred JuMP.upper_bound(y[-4, :a], 1)
+    @test 5.5 == @inferred JuMP.upper_bound(y[-4, :a], 2)
     @test "y[-10,a]" == @inferred JuMP.name(y[-10,:a])
     @test nothing === decision_by_name(sp, 1, "y[-10,a]")
     @test y[-10,:a] == decision_by_name(sp, 2, "y[-10,a]")
 end
 
 function test_variable_is_valid_delete(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
     end
@@ -187,9 +240,13 @@ function test_variable_is_valid_delete(Structure)
     y = sp[2,:y]
     @test_throws ErrorException JuMP.is_valid(sp, y)
     @test JuMP.is_valid(sp, y, 1)
+    @test JuMP.is_valid(sp, y, 2)
     @test_throws ErrorException JuMP.delete(sp, y)
     JuMP.delete(sp, y, 1)
     @test !JuMP.is_valid(sp, y, 1)
+    @test JuMP.is_valid(sp, y, 2)
+    JuMP.delete(sp, y, 2)
+    @test !JuMP.is_valid(sp, y, 2)
     @test_throws Exception JuMP.delete(sp, y, 1)
     @first_stage sp = begin
         @decision(model, x[1:3] >= 1)
@@ -209,18 +266,25 @@ function test_variable_is_valid_delete(Structure)
     y = sp[2,:y]
     @test_throws ErrorException is_valid.(sp, y)
     @test all(is_valid.(sp, y, 1))
+    @test all(is_valid.(sp, y, 2))
     @test_throws ErrorException delete.(sp, y)
     delete(sp, y, 1)
     @test all((!is_valid).(sp, y, 1))
+    @test all(is_valid.(sp, y, 2))
+    delete(sp, y, 2)
+    @test all((!is_valid).(sp, y, 2))
 end
 
 function test_variable_bounds_set_get(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, 0 <= x <= 2)
     end
     @second_stage sp = begin
-        @recourse(model, 0 <= y <= 2)
+        @uncertain a
+        @recourse(model, 0 <= y <= a)
     end
     # First-stage
     x = sp[1,:x]
@@ -234,18 +298,26 @@ function test_variable_bounds_set_get(Structure)
     y = sp[2,:y]
     @test_throws ErrorException JuMP.lower_bound(y)
     @test 0 == @inferred JuMP.lower_bound(y, 1)
+    @test 0 == @inferred JuMP.lower_bound(y, 2)
     @test_throws ErrorException JuMP.upper_bound(y)
-    @test 2 == @inferred JuMP.upper_bound(y, 1)
+    @test 1 == @inferred JuMP.upper_bound(y, 1)
+    @test 2 == @inferred JuMP.upper_bound(y, 2)
     @test_throws ErrorException JuMP.set_lower_bound(y, 1.)
     set_lower_bound(y, 1, 1.)
     @test 1. == @inferred JuMP.lower_bound(y, 1)
+    set_lower_bound(y, 2, 1.)
+    @test 1. == @inferred JuMP.lower_bound(y, 2)
     @test_throws ErrorException JuMP.set_upper_bound(y, 3.)
     set_upper_bound(y, 1, 3.)
     @test 3. == @inferred JuMP.upper_bound(y, 1)
+    set_upper_bound(y, 2, 3.)
+    @test 3. == @inferred JuMP.upper_bound(y, 2)
 end
 
 function test_variable_starts_set_get(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x[1:3])
     end
@@ -262,14 +334,19 @@ function test_variable_starts_set_get(Structure)
     y = sp[2,:y]
     @test_throws ErrorException JuMP.set_start_value.(y, x0)
     JuMP.set_start_value.(y, 1, x0)
+    JuMP.set_start_value.(y, 2, x0)
     @test_throws ErrorException JuMP.start_value.(y)
     @test JuMP.start_value.(y, 1) == x0
+    @test JuMP.start_value.(y, 2) == x0
     @test_throws ErrorException JuMP.start_value.([y[1],y[2],y[3]])
     @test JuMP.start_value.([y[1],y[2],y[3]], 1) == x0
+    @test JuMP.start_value.([y[1],y[2],y[3]], 2) == x0
 end
 
 function test_variable_integrality_set_get(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x[1:3])
     end
@@ -294,24 +371,38 @@ function test_variable_integrality_set_get(Structure)
     @test_throws ErrorException JuMP.set_integer(y[2])
     JuMP.set_integer(y[2], 1)
     JuMP.set_integer(y[2], 1)
+    JuMP.set_integer(y[3], 2)
+    JuMP.set_integer(y[3], 2)
     @test_throws ErrorException JuMP.is_integer(y[2])
     @test JuMP.is_integer(y[2], 1)
+    @test !JuMP.is_integer(y[2], 2)
+    @test JuMP.is_integer(y[3], 2)
+    @test !JuMP.is_integer(y[3], 1)
     @test_throws ErrorException JuMP.unset_integer(y[2])
     JuMP.unset_integer(y[2], 1)
+    JuMP.unset_integer(y[3], 2)
     @test !JuMP.is_integer(y[2], 1)
     @test_throws ErrorException JuMP.set_binary(y[2])
     JuMP.set_binary(y[1], 1)
     JuMP.set_binary(y[1], 1)
+    JuMP.set_binary(y[1], 2)
+    JuMP.set_binary(y[1], 2)
     @test_throws ErrorException JuMP.is_binary(y[1])
     @test JuMP.is_binary(y[1], 1)
+    @test JuMP.is_binary(y[1], 2)
     @test_throws Exception JuMP.set_integer(y[1], 1)
+    @test_throws Exception JuMP.set_integer(y[1], 2)
     @test_throws ErrorException JuMP.unset_binary(y[1])
     JuMP.unset_binary(y[1], 1)
     @test !JuMP.is_binary(y[1], 1)
+    JuMP.unset_binary(y[1], 2)
+    @test !JuMP.is_binary(y[1], 2)
 end
 
 function test_variables_constrained_on_creation(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x[1:2] in SecondOrderCone())
     end
@@ -368,7 +459,9 @@ function test_variables_constrained_on_creation(Structure)
 end
 
 function test_all_decision_variables(Structure)
-    sp = StochasticProgram([Scenario()], Structure...)
+    ξ₁ = @scenario a = 1 probability = 0.5
+    ξ₂ = @scenario a = 2 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x₁)
         @decision(model, x₂)

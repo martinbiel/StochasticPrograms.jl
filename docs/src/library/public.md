@@ -88,6 +88,7 @@ end
 @first_stage
 @second_stage
 @decision
+@recourse
 @known
 @parameters
 @uncertain

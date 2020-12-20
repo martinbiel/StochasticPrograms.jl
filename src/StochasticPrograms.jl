@@ -209,6 +209,7 @@ export
     @expectation,
     @sample,
     @decision,
+    @recourse,
     @known,
     @parameters,
     @uncertain,

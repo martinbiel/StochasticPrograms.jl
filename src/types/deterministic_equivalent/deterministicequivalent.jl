@@ -275,7 +275,7 @@ function MOI.delete(structure::DeterministicEquivalent{N}, indices::Vector{MOI.V
     mapped_indices = map(indices) do index
         structure.variable_map[(index, scenario_index)]
     end
-    JuMP.delete(structure.model, DecisionRef.(structure.model, indices))
+    JuMP.delete(structure.model, DecisionRef.(structure.model, mapped_indices))
     return nothing
 end
 function MOI.delete(structure::DeterministicEquivalent, ci::MOI.ConstraintIndex{F,S}, stage::Integer) where {F, S}
@@ -530,14 +530,14 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
         m = Model()
         F = typeof(obj)
         MOI.set(backend(m), MOI.ObjectiveFunction{F}(), obj)
-        dref = DecisionRef(m, index)
+        mapped_index = structure.variable_map[(index, scenario_index)]
+        dref = DecisionRef(m, mapped_index)
         set_objective_coefficient(m, dref, coeff)
         obj = objective_function(m)
         structure.sub_objectives[stage][scenario_index] = (sense, moi_function(obj))
         # Set coefficient of mapped second-stage variable
-        mapped_index = structure.variable_map[(index, scenario_index)]
         dref = DecisionRef(structure.model, mapped_index)
-        set_objective_coefficient(structure.model, dref, coeff)
+        set_objective_coefficient(structure.model, dref, probability(structure, stage, scenario_index) * coeff)
     end
     return nothing
 end
