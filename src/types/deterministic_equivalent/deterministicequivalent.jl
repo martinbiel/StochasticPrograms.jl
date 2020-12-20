@@ -579,7 +579,7 @@ function JuMP.normalized_coefficient(structure::DeterministicEquivalent{N},
     mapped_ci = structure.constraint_map[(ci, scenario_index)]
     f = MOI.get(structure, MOI.ConstraintFunction(), mapped_ci)::F
     mapped_index = structure.variable_map[(index, scenario_index)]
-    dref = DecisionRef(structure.model, index)
+    dref = DecisionRef(structure.model, mapped_index)
     return JuMP._affine_coefficient(jump_function(structure.model, f), dref)
 end
 

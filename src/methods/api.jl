@@ -289,7 +289,7 @@ Return the status of the most recent primal solution of the solver of
 the scenario `scenario_index`.
 """
 function JuMP.primal_status(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
-    return primal_status(stochasticprogram, 2, scenario_index; result)
+    return primal_status(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     dual_status(stochasticprogram::StochasticProgram; result::Int = 1)
@@ -317,7 +317,7 @@ Return the status of the most recent dual solution of the solver of
 scenario `scenario_index`.
 """
 function JuMP.dual_status(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
-    return dual_status(stochasticprogram, 2, scenario_index; result)
+    return dual_status(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     solve_time(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)

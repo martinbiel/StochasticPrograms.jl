@@ -118,7 +118,7 @@ struct DecisionSparseAxisArray{V <: Union{DecisionRef, KnownRef}, A <: SparseAxi
 end
 
 function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, set::DecisionSet)
-    return DecisionDenseAxisArray{DecisionRef}(set.stage, variables, set.constraint; set.is_recourse)
+    return DecisionDenseAxisArray{DecisionRef}(set.stage, variables, set.constraint; is_recourse = set.is_recourse)
 end
 
 function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, set::KnownSet)
@@ -126,7 +126,7 @@ function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.
 end
 
 function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, set::DecisionSet)
-    return DecisionSparseAxisArray{DecisionRef}(set.stage, variables, set.constraint; set.is_recourse)
+    return DecisionSparseAxisArray{DecisionRef}(set.stage, variables, set.constraint; is_recourse = set.is_recourse)
 end
 
 function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, set::KnownSet)

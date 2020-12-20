@@ -204,7 +204,7 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     return upper_bound(stochasticmodel, x̂, sampler; kw...)
 end
 """
-    upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
+    upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler; kw...)
 
 Generate a confidence interval around an upper bound of the expected value of `decision` in the two-stage `stochasticmodel` at the current confidence level, over the scenario distribution induced by `sampler`.
 
@@ -212,7 +212,7 @@ The attribute [`NumUpperTrials`](@ref) is the number of sampled models and the a
 
 The supplied `decision` must match the defined decision variables in `stochasticmodel`. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown.
 """
-function upper_bound(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler, kw...)
+function upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision::AbstractVector, sampler::AbstractSampler, kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticmodel.optimizer)
     # Get the instance optimizer

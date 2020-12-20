@@ -97,7 +97,7 @@ Return the objective value of scenario `scenario_index` associated with result i
 of the most-recent solution after a call to `optimize!(stochasticprogram)`.
 """
 function JuMP.objective_value(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)::Float64
-    return objective_value(stochasticprogram, 2, scenario_index; result)
+    return objective_value(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     dual_objective_value(stochasticprogram::StochasticProgram; result::Int = 1)
@@ -163,7 +163,7 @@ Return the objective value of the dual problem of scenario `scenario_index` asso
 of the most-recent solution after a call to `optimize!(stochasticprogram)`.
 """
 function JuMP.dual_objective_value(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)::Float64
-    return dual_objective_value(stochasticprogram, 2, scenario_index; result)
+    return dual_objective_value(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     objective_sense(stochasticprogram::StochasticProgram)::MathOptInterface.OptimizationSense

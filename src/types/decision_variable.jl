@@ -334,7 +334,7 @@ Return `true` if the solver has a primal solution in scenario `scenario_index`
 in result index `result` available to query, otherwise return `false`.
 """
 function has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
-    return has_values(stochasticprogram, 2, scenario_index; result)
+    return has_values(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     value(dvar::DecisionVariable; result = 1)
@@ -379,9 +379,9 @@ Evaluate `dvar_expr` where the value of a given `dvar` is found in the scenario 
 function JuMP.value(dvar_expr::Union{GenericAffExpr{T,DecisionVariable}, GenericQuadExpr{T,DecisionVariable}}, stage_to_scenario::Dict{Int,Int}; result::Int = 1)::Float64 where T
     var_value = (dvar) -> begin
         if stage(dvar) == 1
-            return value(dvar)
+            return value(dvar; result = result)
         end
-        return value(dvar, stage_to_scenario[stage(dvar)])
+        return value(dvar, stage_to_scenario[stage(dvar)]; result = result)
     end
     return value(dvar_expr, var_value)
 end
