@@ -597,7 +597,7 @@ Return `true` if the solver has a dual solution in the node at stage
 available to query, otherwise return `false`.
 """
 function JuMP.has_duals(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer; result::Int = 1)
-    return dual_status(stochasticprogram, stage, scenario_index; result) != MOI.NO_SOLUTION
+    return dual_status(stochasticprogram, stage, scenario_index; result = result) != MOI.NO_SOLUTION
 end
 """
     has_duals(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
@@ -606,7 +606,7 @@ Return `true` if the solver has a dual solution in scenario `scenario_index`
 in result index `result` available to query, otherwise return `false`.
 """
 function JuMP.has_duals(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
-    return has_duals(stochasticprogram, 2, scenario_index; result)
+    return has_duals(stochasticprogram, 2, scenario_index; result = result)
 end
 """
     dual(sp_cref::SPConstraintRef; result::Int = 1)
@@ -617,7 +617,7 @@ returned by the solver.
 """
 function JuMP.dual(sp_cref::SPConstraintRef; result::Int = 1)
     stage(sp_cref) > 1 && error("$sp_cref is scenario dependent, consider `dual(sp_cref, scenario_index)`.")
-    return reshape_vector(_constraint_dual(sp_cref, result), dual_shape(sp_cref.shape))
+    return reshape_vector(_constraint_dual(sp_cref, result = result), dual_shape(sp_cref.shape))
 end
 function _constraint_dual(sp_cref::SPConstraintRef{<:JuMP._MOICON{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}},
                           result::Int)::Float64
@@ -636,7 +636,7 @@ most-recent solution returned by the solver.
 """
 function JuMP.dual(sp_cref::SPConstraintRef, scenario_index::Integer; result::Int = 1)
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `dual(sp_cref)`.")
-    return reshape_vector(_constraint_dual(sp_cref, scenario_index, result), dual_shape(sp_cref.shape))
+    return reshape_vector(_constraint_dual(sp_cref, scenario_index, result = result), dual_shape(sp_cref.shape))
 end
 function _constraint_dual(sp_cref::SPConstraintRef{<:JuMP._MOICON{<:MOI.AbstractScalarFunction, <:MOI.AbstractScalarSet}},
                           scenario_index::Integer,

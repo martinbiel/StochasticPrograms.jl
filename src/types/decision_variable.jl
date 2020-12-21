@@ -325,7 +325,7 @@ Return `true` if the solver has a primal solution in the node at stage
 available to query, otherwise return `false`.
 """
 function JuMP.has_values(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer; result::Int = 1)
-    return primal_status(stochasticprogram, stage, scenario_index; result) != MOI.NO_SOLUTION
+    return primal_status(stochasticprogram, stage, scenario_index; result = result) != MOI.NO_SOLUTION
 end
 """
     has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
