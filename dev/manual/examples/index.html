@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">StochasticPrograms.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../quickstart/">Quick start</a></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Farmer-problem"><span>Farmer problem</span></a></li><li><a class="tocitem" href="#Continuous-scenario-distribution"><span>Continuous scenario distribution</span></a></li></ul></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Farmer-problem"><a class="docs-heading-anchor" href="#Farmer-problem">Farmer problem</a><a id="Farmer-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Farmer-problem" title="Permalink"></a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><pre><code class="language-julia">using StochasticPrograms
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Examples · StochasticPrograms.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">StochasticPrograms.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../quickstart/">Quick start</a></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li><a class="tocitem" href="../decisions/">Multi-stage decisions</a></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li class="is-active"><a class="tocitem" href>Examples</a><ul class="internal"><li><a class="tocitem" href="#Farmer-problem"><span>Farmer problem</span></a></li><li><a class="tocitem" href="#Continuous-scenario-distribution"><span>Continuous scenario distribution</span></a></li></ul></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Examples</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Examples</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/examples.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h1><h2 id="Farmer-problem"><a class="docs-heading-anchor" href="#Farmer-problem">Farmer problem</a><a id="Farmer-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Farmer-problem" title="Permalink"></a></h2><p>The following defines the well-known &quot;Farmer problem&quot;, first outlined in <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>, in StochasticPrograms. The problem revolves around a farmer who needs to decide how to partition his land to sow three different crops. The uncertainty comes from not knowing what the future yield of each crop will be. Recourse decisions involve purchasing/selling crops at the market.</p><pre><code class="language-julia">using StochasticPrograms
 using GLPK</code></pre><p>An example implementation of the farmer problem is given by:</p><pre><code class="language-julia">Crops = [:wheat, :corn, :beets]
 farmer_model = @stochastic_model begin
     @stage 1 begin
@@ -20,8 +20,8 @@ farmer_model = @stochastic_model begin
             SellPrice = Dict(:wheat=&gt;170, :corn=&gt;150, :beets=&gt;36, :extra_beets=&gt;10)
         end
         @uncertain ξ[c in Crops]
-        @variable(model, y[p in setdiff(Crops, [:beets])] &gt;= 0)
-        @variable(model, w[s in Crops ∪ [:extra_beets]] &gt;= 0)
+        @recourse(model, y[p in setdiff(Crops, [:beets])] &gt;= 0)
+        @recourse(model, w[s in Crops ∪ [:extra_beets]] &gt;= 0)
         @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
                    - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
         @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
@@ -50,15 +50,36 @@ And data, a 3-element Array{Float64,1}:
   2.4
  16.0</pre><p>We can now instantiate the farmer problem using the defined stochastic model and the three yield scenarios:</p><pre><code class="language-julia">farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], optimizer = GLPK.Optimizer)</code></pre><pre class="documenter-example-output">Stochastic program with:
  * 3 decision variables
- * 0 recourse variables
+ * 6 recourse variables
  * 3 scenarios of type Scenario
 Structure: Deterministic equivalent
 Solver name: GLPK</pre><p>Printing:</p><pre><code class="language-julia">print(farmer)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
-Min 150 x[wheat] + 230 x[corn] + 260 x[beets] + 79.33333333333333 y₃[wheat] + 70 y₃[corn] - 56.666666666666664 w₃[wheat] - 50 w₃[corn] - 12 w₃[beets] - 3.333333333333333 w₃[extra_beets] + 79.33333333333333 y₂[wheat] + 70 y₂[corn] - 56.666666666666664 w₂[wheat] - 50 w₂[corn] - 12 w₂[beets] - 3.333333333333333 w₂[extra_beets] + 79.33333333333333 y₁[wheat] + 70 y₁[corn] - 56.666666666666664 w₁[wheat] - 50 w₁[corn] - 12 w₁[beets] - 3.333333333333333 w₁[extra_beets]
+Min 150 x[wheat] + 230 x[corn] + 260 x[beets] + 79.33333333333333 y₁[wheat] + 70 y₁[corn] - 56.666666666666664 w₁[wheat] - 50 w₁[corn] - 12 w₁[beets] - 3.333333333333333 w₁[extra_beets] + 79.33333333333333 y₂[wheat] + 70 y₂[corn] - 56.666666666666664 w₂[wheat] - 50 w₂[corn] - 12 w₂[beets] - 3.333333333333333 w₂[extra_beets] + 79.33333333333333 y₃[wheat] + 70 y₃[corn] - 56.666666666666664 w₃[wheat] - 50 w₃[corn] - 12 w₃[beets] - 3.333333333333333 w₃[extra_beets]
 Subject to
- beets_quota : w₁[beets] ≤ 6000.0
- beets_quota : w₂[beets] ≤ 6000.0
- beets_quota : w₃[beets] ≤ 6000.0
+ x[wheat] ∈ Decisions
+ x[corn] ∈ Decisions
+ x[beets] ∈ Decisions
+ y₁[wheat] ∈ RecourseDecisions
+ y₁[corn] ∈ RecourseDecisions
+ w₁[wheat] ∈ RecourseDecisions
+ w₁[corn] ∈ RecourseDecisions
+ w₁[beets] ∈ RecourseDecisions
+ w₁[extra_beets] ∈ RecourseDecisions
+ y₂[wheat] ∈ RecourseDecisions
+ y₂[corn] ∈ RecourseDecisions
+ w₂[wheat] ∈ RecourseDecisions
+ w₂[corn] ∈ RecourseDecisions
+ w₂[beets] ∈ RecourseDecisions
+ w₂[extra_beets] ∈ RecourseDecisions
+ y₃[wheat] ∈ RecourseDecisions
+ y₃[corn] ∈ RecourseDecisions
+ w₃[wheat] ∈ RecourseDecisions
+ w₃[corn] ∈ RecourseDecisions
+ w₃[beets] ∈ RecourseDecisions
+ w₃[extra_beets] ∈ RecourseDecisions
+ x[wheat] ≥ 0.0
+ x[corn] ≥ 0.0
+ x[beets] ≥ 0.0
  y₁[wheat] ≥ 0.0
  y₁[corn] ≥ 0.0
  w₁[wheat] ≥ 0.0
@@ -77,13 +98,10 @@ Subject to
  w₃[corn] ≥ 0.0
  w₃[beets] ≥ 0.0
  w₃[extra_beets] ≥ 0.0
- x[wheat] ∈ Decisions
- x[corn] ∈ Decisions
- x[beets] ∈ Decisions
- x[wheat] ≥ 0.0
- x[corn] ≥ 0.0
- x[beets] ≥ 0.0
  x[wheat] + x[corn] + x[beets] ≤ 500.0
+ beets_quota : w₁[beets] ≤ 6000.0
+ beets_quota : w₂[beets] ≤ 6000.0
+ beets_quota : w₃[beets] ≤ 6000.0
  minimum_requirement[wheat] : 3 x[wheat] + y₁[wheat] - w₁[wheat] ≥ 200.0
  minimum_requirement[corn] : 3.6 x[corn] + y₁[corn] - w₁[corn] ≥ 240.0
  minimum_requirement_beets : 24 x[beets] - w₁[beets] - w₁[extra_beets] ≥ 0.0
@@ -95,15 +113,28 @@ Subject to
  minimum_requirement_beets : 16 x[beets] - w₃[beets] - w₃[extra_beets] ≥ 0.0
 Solver name: GLPK</pre><p>We can now optimize the model:</p><pre><code class="language-julia">optimize!(farmer)
 x = optimal_decision(farmer)
-println(&quot;Wheat: $(x[1])&quot;)
-println(&quot;Corn: $(x[2])&quot;)
-println(&quot;Beets: $(x[3])&quot;)
+x = farmer[1,:x]
+println(&quot;Wheat: $(value(x[:wheat]))&quot;)
+println(&quot;Corn: $(value(x[:corn]))&quot;)
+println(&quot;Beets: $(value(x[:beets]))&quot;)
 println(&quot;Profit: $(objective_value(farmer))&quot;)</code></pre><pre class="documenter-example-output">Wheat: 170.00000000000006
 Corn: 80.00000000000001
 Beets: 250.0
-Profit: -108390.0</pre><p>Finally, we calculate the stochastic performance of the model:</p><pre><code class="language-julia">println(&quot;EVPI: $(EVPI(farmer))&quot;)
-println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre class="documenter-example-output">EVPI: 7015.5555555555475
-VSS: 1150.0</pre><h2 id="Continuous-scenario-distribution"><a class="docs-heading-anchor" href="#Continuous-scenario-distribution">Continuous scenario distribution</a><a id="Continuous-scenario-distribution-1"></a><a class="docs-heading-anchor-permalink" href="#Continuous-scenario-distribution" title="Permalink"></a></h2><p>As an example, consider the following generalized stochastic program:</p><p class="math-container">\[\begin{aligned}
+Profit: -108390.00000000001</pre><p>We can also check results for a specific scenario:</p><pre><code class="language-julia">y = farmer[2,:y]
+w = farmer[2,:w]
+println(&quot;Purchased wheat: $(value(y[:wheat], 1))&quot;)
+println(&quot;Purchased corn: $(value(y[:corn], 1))&quot;)
+println(&quot;Sold wheat: $(value(w[:wheat], 1))&quot;)
+println(&quot;Sold corn: $(value(w[:corn], 1))&quot;)
+println(&quot;Sold beets: $(value(w[:extra_beets], 1))&quot;)
+println(&quot;Profit: $(objective_value(farmer, 1))&quot;)</code></pre><pre class="documenter-example-output">Purchased wheat: 0.0
+Purchased corn: 0.0
+Sold wheat: 310.00000000000017
+Sold corn: 48.000000000000036
+Sold beets: 0.0
+Profit: 108900.00000000001</pre><p>Finally, we calculate the stochastic performance of the model:</p><pre><code class="language-julia">println(&quot;EVPI: $(EVPI(farmer))&quot;)
+println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre class="documenter-example-output">EVPI: 7015.555555555533
+VSS: 1150.0000000000146</pre><h2 id="Continuous-scenario-distribution"><a class="docs-heading-anchor" href="#Continuous-scenario-distribution">Continuous scenario distribution</a><a id="Continuous-scenario-distribution-1"></a><a class="docs-heading-anchor-permalink" href="#Continuous-scenario-distribution" title="Permalink"></a></h2><p>As an example, consider the following generalized stochastic program:</p><p class="math-container">\[\begin{aligned}
  \operatorname*{minimize}_{x \in \mathbb{R}} &amp; \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
 \end{aligned}\]</p><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><pre><code class="language-julia">using StochasticPrograms
 using Distributions
@@ -161,4 +192,4 @@ println(&quot;Optimal decision: $(optimal_decision(sp))&quot;)
 println(&quot;Optimal value: $(objective_value(sp))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.0397762891884894]
 Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Array{S,1}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;Expected value decision: $(expected_value_decision(sp)&quot;)
 println(&quot;VSS: $(VSS(sp))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
-VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Sunday 20 December 2020 20:35">Sunday 20 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 21 December 2020 14:44">Monday 21 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
