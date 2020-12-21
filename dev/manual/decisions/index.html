@@ -90,7 +90,7 @@ println(objective_function(sp, 2, 1))
 println(objective_function(sp))</code></pre><pre class="documenter-example-output">2 y₁
 x + y₁ - 0.5 y₂
 y₁
-x + 0.5 y₁ - 0.5 y₂</pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-julia">set_optimizer(sp, GLPK.Optimizer)
+x + 0.5 y₁ - 0.5 y₂</pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-">set_optimizer(sp, GLPK.Optimizer)
 
 optimize!(sp)
 
@@ -113,21 +113,7 @@ println(value(y, 2))
 println(reduced_cost(y, 2))
 println(dual(con, 2))
 println(objective_value(sp, 2))
-println(optimal_recourse_decision(sp, 2))</code></pre><pre class="documenter-example-output">OPTIMAL
-2.0
-[2.0]
-2.0
-0.75
-1.0
-0.5
-0.0
-2.0
-[1.0]
-1.0
-0.0
--0.25
-2.0
-[1.0]</pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-julia">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
+println(optimal_recourse_decision(sp, 2))</code></pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-julia">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
 Min x + 0.5 y₁ - 0.5 y₂
 Subject to
  x ∈ Decisions(value = 3.0)
@@ -180,7 +166,7 @@ Subject to
  y ≥ 0.5
  con : 2 y - x ≤ 0.0
 
-Solver name: No optimizer attached.</pre><p>We resolve the problem to verify:</p><pre><code class="language-julia">optimize!(sp)
+Solver name: No optimizer attached.</pre><p>We resolve the problem to verify:</p><pre><code class="language-">optimize!(sp)
 
 println(termination_status(sp))
 println(objective_value(sp))
@@ -203,21 +189,7 @@ println(objective_value(sp, 2))
 println(optimal_recourse_decision(sp, 2))
 
 # Evaluating x = 3 should give the same answer:
-println(evaluate_decision(sp, [3.]))</code></pre><pre class="documenter-example-output">OPTIMAL
-2.75
-[3.0]
-3.0
-1.0
-0.5
-0.0
-3.0
-[1.0]
-1.5
-0.0
--0.25
-2.75
-[1.5]
-2.75</pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-julia">fix(y, 1, 2.)
+println(evaluate_decision(sp, [3.]))</code></pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-julia">fix(y, 1, 2.)
 optimize!(sp)
 
 println(termination_status(sp))
@@ -238,13 +210,13 @@ println(optimal_recourse_decision(sp, 2))
 
 # Evaluating x = 3 should give the same answer:
 println(evaluate_decision(sp, [3.]))</code></pre><pre class="documenter-example-output">OPTIMAL
-2.5
-[2.0]
+3.25
+[3.0]
 3.0
 2.0
-2.0
+3.0
 [2.0]
-1.0
-2.5
-[1.0]
-3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 21 December 2020 14:44">Monday 21 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+1.5
+3.25
+[1.5]
+3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Monday 21 December 2020 15:32">Monday 21 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
