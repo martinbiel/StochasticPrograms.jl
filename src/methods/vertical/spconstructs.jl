@@ -5,14 +5,14 @@ function EWS(stochasticprogram::StochasticProgram,
         for (i,w) in enumerate(workers())
             @async partial_ews[i] = remotecall_fetch(
                 w,
-                scenarioproblems(stochasticprogram)[w-1],
+                scenarioproblems(structure, 2)[w-1],
                 stochasticprogram.generator[:stage_1],
                 stochasticprogram.generator[:stage_2],
                 stage_parameters(stochasticprogram, 1),
                 stage_parameters(stochasticprogram, 2),
-                sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
+                subproblem_optimizer(stochasticprogram)) do sp, gen_one, gen_two, one_params, two_params, opt
                     scenarioproblems = fetch(sp)
-                    num_scenarios(scenarioproblems) == 0 && return zero(T)
+                    num_scenarios(scenarioproblems) == 0 && return 0.0
                     subproblems = map(scenarios(scenarioproblems)) do scenario
                         ws = _WS(gen_one,
                                  gen_two,
@@ -24,7 +24,7 @@ function EWS(stochasticprogram::StochasticProgram,
                                  opt)
                         return ws
                     end
-                    return outcome_mean(subproblems, probability.(subproblems))
+                    return outcome_mean(subproblems, probability.(scenarios(scenarioproblems)))
                 end
         end
     end
@@ -38,12 +38,12 @@ function statistical_EWS(stochasticprogram::StochasticProgram,
         for (i,w) in enumerate(workers())
             @async partial_ews[i] = remotecall_fetch(
                 w,
-                scenarioproblems(stochasticprogram)[w-1],
+                scenarioproblems(structure, 2)[w-1],
                 stochasticprogram.generator[:stage_1],
                 stochasticprogram.generator[:stage_2],
                 stage_parameters(stochasticprogram, 1),
                 stage_parameters(stochasticprogram, 2),
-                sub_optimizer(stochasticprogram)) do (sp,gen_one,gen_two,one_params,two_params,opt)
+                subproblem_optimizer(stochasticprogram)) do sp, gen_one, gen_two, one_params, two_params, opt
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
                     ws_models = map(scenarios(scenarioproblems)) do scenario

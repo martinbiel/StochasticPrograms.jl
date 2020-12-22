@@ -140,6 +140,7 @@ function statistical_EWS(stochasticprogram::StochasticProgram, structure::Abstra
                  stage_parameters(stochasticprogram, 2),
                  scenario,
                  Decisions(),
+                 Decisions(),
                  subproblem_optimizer(stochasticprogram))
     end
     return welford(ws_models, probability.(scenarios(stochasticprogram)))
