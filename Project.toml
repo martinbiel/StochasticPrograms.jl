@@ -1,7 +1,7 @@
 name = "StochasticPrograms"
 uuid = "8b8459f2-c380-502b-8633-9aed2d6c2b35"
 authors = ["Martin Biel <martinbiel93@gmail.com>"]
-version = "0.4.1"
+version = "0.5.0"
 
 [deps]
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
