@@ -51,9 +51,9 @@ println(typeof(x))
 The return type is [`DecisionVariable`](@ref) a specialized `AbstractVariableRef`. For first-stage variables, the syntax is unchanged from JuMP:
 ```@example decision
 println(name(x))
-println(has_lower_bound(x))
-println(has_upper_bound(x))
-println(lower_bound(x))
+println("x has lower bound: $(has_lower_bound(x))")
+println("x has upper bound: $(has_upper_bound(x))")
+println("lower_bound(x) = $(lower_bound(x))")
 ```
 If we instead query for the recourse decision ``y``:
 ```@example decision
@@ -71,14 +71,14 @@ ERROR: y is scenario dependent, consider `lower_bound(dvar, scenario_index)`.
 As indicated by the error, ``y`` is scenario-dependent so a `scenario_index` must be provided as well:
 ```@example decision
 println(name(y, 1))
-println(has_lower_bound(y, 1))
-println(has_upper_bound(y, 1))
-println(lower_bound(y, 1))
+println("y has lower bound in scenario 1: $(has_lower_bound(y, 1))")
+println("y has upper bound in scenario 1: $(has_upper_bound(y, 1))")
+println("lower_bound(y, 1) = lower_bound(y, 1)")
 
 println(name(y, 2))
-println(has_lower_bound(y, 2))
-println(has_upper_bound(y, 2))
-println(lower_bound(y, 2))
+println("y has lower bound in scenario 2: $(has_lower_bound(y, 2))")
+println("y has upper bound in scenario 2: $(has_upper_bound(y, 2))")
+println("lower_bound(y, 2) = lower_bound(y, 2)")
 ```
 The lower bound of ``y`` is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a [`Vertical`](@ref) or [`Horizontal`](@ref) structure. Auxilliary variables created with the standard `@variable` are not available through this API. To access them, either annotate them with [`@decision`](@ref) (or [`@recourse`](@ref) in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:
 ```@example decision
@@ -92,14 +92,15 @@ println(typeof(w))
 Constraints that include variables annotated with either [`@decision`](@ref) or [`@recourse`](@ref) can also be accessed in the extended API. Stage-wise list of all such constraints can be obtained:
 ```@example decision
 println(list_of_constraint_types(sp, 1))
-
+```
+```@example decision
 println(list_of_constraint_types(sp, 2))
 ```
 and type-sorted constraints can be obtained through a stage-dependent variant of [`all_constraints`](@ref):
 ```@example decision
 all_constraints(sp, 2, DecisionAffExpr{Float64}, MOI.LessThan{Float64});
 ```
-The constraint can also be accessed through
+The scenario-dependent constraint in stage 2 can also be accessed through
 ```@example decision
 con = sp[2,:con];
 println(con)
@@ -107,31 +108,29 @@ println(con)
 This returns an [`SPConstraintRef`](@ref), similar in function to [`DecisionVariable`](@ref). The constraint originates from stage-two, so most attributes are scenario-dependent:
 ```@example decision
 println(name(con, 1))
-println(normalized_rhs(con, 1))
-println(normalized_coefficient(con, y, 1))
+println("RHS of con in scenario 1 = $(normalized_rhs(con, 1))")
+println("Coefficient of y in scenario 1 = $(normalized_coefficient(con, y, 1))")
 
 println(name(con, 2))
-println(normalized_rhs(con, 2))
-println(normalized_coefficient(con, y, 2))
+println("RHS of con in scenario 2 = $(normalized_rhs(con, 2))")
+println("Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))")
 ```
 
 ## Decision objectives
 
 The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:
 ```@example decision
-println(objective_function(sp, 1))
-println(objective_function(sp, 2, 1))
-println(objective_function(sp, 2, 2))
-println(objective_function(sp))
+println("Objective in stage 1: $(objective_function(sp, 1))")
+println("Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))")
+println("Objective in stage 2, scenario 2: $(objective_function(sp, 2, 2))")
+println("Full objective: $(objective_function(sp))")
 ```
 and can be modified accordingly:
 ```@example decision
 set_objective_coefficient(sp, y, 2, 1, 2.);
-println(objective_function(sp, 2, 1))
-println(objective_function(sp))
+println("Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))")
+println("Full objective: $(objective_function(sp))")
 set_objective_coefficient(sp, y, 2, 1, 1.);
-println(objective_function(sp, 2, 1))
-println(objective_function(sp))
 ```
 The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with [`Vertical`](@ref) or [`Horizontal`](@ref) instead.
 
@@ -143,26 +142,29 @@ set_optimizer(sp, GLPK.Optimizer)
 
 optimize!(sp)
 
-println(termination_status(sp))
-println(objective_value(sp))
-println(optimal_decision(sp))
+# Main result
+println("Termination status: $(termination_status(sp))")
+println("Objective value: $(objective_value(sp))")
+println("Optimal decision: $(optimal_decision(sp))")
 
 # First stage
-println(value(x))
-println(reduced_cost(x))
+println("value(x) = $(value(x))")
+println("reduced_cost(x) = $(reduced_cost(x))")
 
+# Scenario 1
 # Second stage
-println(value(y, 1))
-println(reduced_cost(y, 1))
-println(dual(con, 1))
-println(objective_value(sp, 1))
-println(optimal_recourse_decision(sp, 1))
+println("value(y, 1) = $(value(y, 1))")
+println("reduced_cost(y, 1) = $(reduced_cost(y, 1))")
+println("dual(con, 1) = $(dual(con, 1))")
+println("Objective value in scenario 1: $(objective_value(sp, 1))")
+println("Optimal recourse in scenario 1: $(optimal_recourse_decision(sp, 1))")
 
-println(value(y, 2))
-println(reduced_cost(y, 2))
-println(dual(con, 2))
-println(objective_value(sp, 2))
-println(optimal_recourse_decision(sp, 2))
+# Scenario 2
+println("value(y, 2) = $(value(y, 2))")
+println("reduced_cost(y, 2) = $(reduced_cost(y, 2))")
+println("dual(con, 2) = $(dual(con, 2))")
+println("Objective value in scenario 2: $(objective_value(sp, 2))")
+println("Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))")
 ```
 
 As mentioned in the [Quick start](@ref), decision evaluation can be performed manually through the decision API. Consider:
@@ -198,50 +200,59 @@ We resolve the problem to verify:
 ```@example decision
 optimize!(sp)
 
-println(termination_status(sp))
-println(objective_value(sp))
-println(optimal_decision(sp))
+# Main result
+println("Termination status: $(termination_status(sp))")
+println("Objective value: $(objective_value(sp))")
+println("Optimal decision: $(optimal_decision(sp))")
 
 # First stage
-println(value(x))
+println("value(x) = $(value(x))")
 
+# Scenario 1
 # Second stage
-println(value(y, 1))
-println(reduced_cost(y, 1))
-println(dual(con, 1))
-println(objective_value(sp, 1))
-println(optimal_recourse_decision(sp, 1))
+println("value(y, 1) = $(value(y, 1))")
+println("reduced_cost(y, 1) = $(reduced_cost(y, 1))")
+println("dual(con, 1) = $(dual(con, 1))")
+println("Objective value in scenario 1: $(objective_value(sp, 1))")
+println("Optimal recourse in scenario 1: $(optimal_recourse_decision(sp, 1))")
 
-println(value(y, 2))
-println(reduced_cost(y, 2))
-println(dual(con, 2))
-println(objective_value(sp, 2))
-println(optimal_recourse_decision(sp, 2))
+# Scenario 2
+println("value(y, 2) = $(value(y, 2))")
+println("reduced_cost(y, 2) = $(reduced_cost(y, 2))")
+println("dual(con, 2) = $(dual(con, 2))")
+println("Objective value in scenario 2: $(objective_value(sp, 2))")
+println("Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))")
 
 # Evaluating x = 3 should give the same answer:
-println(evaluate_decision(sp, [3.]))
+println("Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))")
 ```
 We can also fix the value of ``y`` in a specific scenario:
 ```@example decision
 fix(y, 1, 2.)
 optimize!(sp)
 
-println(termination_status(sp))
-println(objective_value(sp))
-println(optimal_decision(sp))
+# Main result
+println("Termination status: $(termination_status(sp))")
+println("Objective value: $(objective_value(sp))")
+println("Optimal decision: $(optimal_decision(sp))")
 
 # First stage
-println(value(x))
+println("value(x) = $(value(x))")
 
+# Scenario 1
 # Second stage
-println(value(y, 1))
-println(objective_value(sp, 1))
-println(optimal_recourse_decision(sp, 1))
+println("value(y, 1) = $(value(y, 1))")
+println("Objective value in scenario 1: $(objective_value(sp, 1))")
+println("Optimal recourse in scenario 1: $(optimal_recourse_decision(sp, 1))")
 
-println(value(y, 2))
-println(objective_value(sp, 2))
-println(optimal_recourse_decision(sp, 2))
+# Scenario 2
+println("value(y, 2) = $(value(y, 2))")
+println("Objective value in scenario 2: $(objective_value(sp, 2))")
+println("Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))")
 
 # Evaluating x = 3 should give the same answer:
 println(evaluate_decision(sp, [3.]))
+
+# Evaluating x = 3 should give the same answer:
+println("Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))")
 ```
