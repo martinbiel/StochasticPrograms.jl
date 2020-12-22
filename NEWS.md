@@ -1,6 +1,86 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.5.0 (December 22, 2020)
+-----------------------------
+
+- The `@scenario` macro is now used to create `Scenario` objects that match a certain `@uncertain` declaration. For example, if the following declaration is used in a stage definition:
+```julia
+@uncertain q₁ q₂ d₁ d₂
+```
+then a matching scenario can be created through
+```
+ξ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4
+```
+Container syntax is also supported:
+```julia
+@uncertain ξ[i in 1:4]
+@uncertain ξ[i in 1:5, i != 3]
+@uncertain ξ[i in 1:5, j in 1:5]
+@uncertain ξ[i in 1:5, k in [:a,:b,:c]]
+```
+together with:
+```julia
+ξ = @scenario ξ[i in 1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4
+ξ = @scenario ξ[i in 1:5, i != 3] i * rand() probability = rand()
+ξ = @scenario ξ[i in 1:5, j in 1:5] = rand(5,5) probability = rand()
+ξ = @scenario ξ[i in 1:5, k in [:a,:b,:c]] = rand(5,5) probability = rand()
+```
+See the documentation for further examples.
+- The old @scenario functionality is replaced by @define_scenario. Syntax is otherwise unchanged.
+- The decision handling has been refactored. StochasticPrograms now provide an extended version of JuMPs API for decision variables/constraints/objectives with stage and scenario dependence. Some short examples are given below.
+```julia
+ξ₁ = @scenario a = 1 probability = 0.5
+ξ₂ = @scenario a = 2 probability = 0.5
+sp = StochasticProgram([ξ₁,ξ₂], Deterministic())
+
+@first_stage sp = begin
+    @decision(model, x >= 2)
+    @objective(model, Min, x)
+end
+@second_stage sp = begin
+    @known x
+    @uncertain a
+    @recourse(model, y >= 0)
+    @objective(model, Max, y)
+    @constraint(model, con, a*y <= x)
+end
+generate!(sp)
+
+x = sp[1,:x] # Returns a DecisionVariable object that adheres to JuMPs API
+lower_bound(x) # 2
+y = sp[2,:y] # Returns a DecisionVariable object that adheres to JuMPs API
+lower_bound(y) # Errors, y is scenario dependent
+lower_bound(y, 1) # 0 (lower bound of y in scenario 1)
+con = sp[2,:con] # The constraint `con` is found in the second stage
+normalized_coefficient(con, x, 1) # -1, coeff of x in scenario 1
+normalized_coefficient(con, x, 2) # -1, coeff of x in scenario 2
+normalized_coefficient(con, y, 1) # 1, coeff of y in scenario 1
+normalized_coefficient(con, y, 2) # 2, coeff of y in scenario 2
+
+objective_function(sp, 1) # First-stage objective
+objective_function(sp, 2, 1) # Second-stage objective in scenario 1
+objective_function(sp, 2, 1) # Second-stage objective in scenario 2
+objective_function(sp) # Full objective
+
+set_optimizer(sp, GLPK.Optimizer)
+value(x) # 2, optimal value of x
+value(y) # Errors, y is scenario-dependent
+value(y, 1) # 2, optimal value of y in scenario 1
+value(y, 1) # 1, optimal value of y in scenario 2
+dual(con) # Errors, con is scenario-dependent
+dual(con, 1) # -0.5, dual value of con in scenario 1
+dual(con, 2) # -0.25, dual value of con in scenario 1
+```
+- The new `@recourse` annotation should be used to annotate decisions in the final stage.
+- Only variables created with `@decision` and `@recourse` are accessible with the new API. Likewise, only constraints that include `@decision` and/or `@recourse` variables are accessible. Regular JuMP variables and constraints are accessed by first querying the relevant JuMP subproblem and the use standars getters.
+- An SMPS reader has been implemented and added to the framework. It currently supports the INDEP and BLOCKS formats for specifying scenarios. See the documentation for an example.
+- The new function `optimal_recourse_decision(sp, scenario_index)` can be used to obtain the optimal recourse decision in scenario `scenario_index` after optimizing `sp`.
+- The new function `recourse_decision(sp, x, scenario)` can be used to obtain the optimal recourse decision in scenario `scenario` if `x` is the first-stage decision.
+- A granulated aggregation procedure has been added to the L-shaped suite
+- The function `lower_bound` becomes `lower_confidence_interval` and the function `upper_bound` becomes `upper_confidence_interval` to avoid name clashes with JuMP
+- Various bugfixes
+
 Version 0.4.0 (July 14, 2020)
 -----------------------------
 

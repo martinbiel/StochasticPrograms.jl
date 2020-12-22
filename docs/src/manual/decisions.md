@@ -109,10 +109,12 @@ This returns an [`SPConstraintRef`](@ref), similar in function to [`DecisionVari
 ```@example decision
 println(name(con, 1))
 println("RHS of con in scenario 1 = $(normalized_rhs(con, 1))")
+println("Coefficient of x in scenario 1 = $(normalized_coefficient(con, x, 1))")
 println("Coefficient of y in scenario 1 = $(normalized_coefficient(con, y, 1))")
 
 println(name(con, 2))
 println("RHS of con in scenario 2 = $(normalized_rhs(con, 2))")
+println("Coefficient of x in scenario 2 = $(normalized_coefficient(con, x, 2))")
 println("Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))")
 ```
 
