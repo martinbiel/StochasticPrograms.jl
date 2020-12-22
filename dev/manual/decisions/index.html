@@ -64,15 +64,19 @@ VariableRef</pre><h2 id="Decision-constraints"><a class="docs-heading-anchor" hr
  con : w - x ≤ 0.0</pre><p>The scenario-dependent constraint in stage 2 can also be accessed through</p><pre><code class="language-julia">con = sp[2,:con];
 println(con)</code></pre><pre class="documenter-example-output">con : w - x ≤ 0.0</pre><p>This returns an <a href="../../library/public/#StochasticPrograms.SPConstraintRef"><code>SPConstraintRef</code></a>, similar in function to <a href="../../library/public/#StochasticPrograms.DecisionVariable"><code>DecisionVariable</code></a>. The constraint originates from stage-two, so most attributes are scenario-dependent:</p><pre><code class="language-julia">println(name(con, 1))
 println(&quot;RHS of con in scenario 1 = $(normalized_rhs(con, 1))&quot;)
+println(&quot;Coefficient of x in scenario 1 = $(normalized_coefficient(con, x, 1))&quot;)
 println(&quot;Coefficient of y in scenario 1 = $(normalized_coefficient(con, y, 1))&quot;)
 
 println(name(con, 2))
 println(&quot;RHS of con in scenario 2 = $(normalized_rhs(con, 2))&quot;)
+println(&quot;Coefficient of x in scenario 2 = $(normalized_coefficient(con, x, 2))&quot;)
 println(&quot;Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))&quot;)</code></pre><pre class="documenter-example-output">con
 RHS of con in scenario 1 = 0.0
+Coefficient of x in scenario 1 = -1.0
 Coefficient of y in scenario 1 = 1.0
 con
 RHS of con in scenario 2 = 0.0
+Coefficient of x in scenario 2 = -1.0
 Coefficient of y in scenario 2 = 2.0</pre><h2 id="Decision-objectives"><a class="docs-heading-anchor" href="#Decision-objectives">Decision objectives</a><a id="Decision-objectives-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-objectives" title="Permalink"></a></h2><p>The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:</p><pre><code class="language-julia">println(&quot;Objective in stage 1: $(objective_function(sp, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 2: $(objective_function(sp, 2, 2))&quot;)
@@ -253,4 +257,4 @@ value(y, 2) = 1.0
 Objective value in scenario 2: 2.5
 Optimal recourse in scenario 2: [1.0]
 3.25
-Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 22 December 2020 11:14">Tuesday 22 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 22 December 2020 14:00">Tuesday 22 December 2020</span>. Using Julia version 1.5.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
