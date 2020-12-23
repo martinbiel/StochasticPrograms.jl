@@ -197,13 +197,7 @@ function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
     if optimizer.subproblem_optimizer === nothing
         return MOI.get(optimizer, MasterOptimizer())
     end
-    return () -> begin
-        opt = optimizer.subproblem_optimizer()
-        for (attr, value) in optimizer.sub_params
-            MOI.set(opt, attr, value)
-        end
-        return opt
-    end
+    return MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
 end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)

@@ -20,6 +20,14 @@ function load_model!(optimizer::Optimizer,
                      sampler::AbstractSampler,
                      x₀::AbstractVector)
     instance_optimizer = MOI.get(optimizer, InstanceOptimizer())
+    # Default log settings
+    try
+        MOI.set(instance_optimizer, MOI.RawParameter("log"), optimizer.parameters.log)
+        MOI.set(instance_optimizer, MOI.RawParameter("keep"), optimizer.parameters.keep)
+        MOI.set(instance_optimizer, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
+        MOI.set(instance_optimizer, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
+    catch
+    end
     # Create new SAA algorithm
     optimizer.algorithm = SampleAverageApproximation(model,
                                                      sampler,
@@ -156,20 +164,7 @@ function MOI.get(optimizer::Optimizer, ::InstanceOptimizer)
     if optimizer.instance_optimizer === nothing
         error("Instance optimizer not set. Consider setting `InstanceOptimizer` attribute.")
     end
-    return () -> begin
-        instance_opt = optimizer.instance_optimizer()
-        for (attr, value) in optimizer.optimizer_params
-            MOI.set(instance_opt, attr, value)
-        end
-        try
-            MOI.set(instance_opt, MOI.RawParameter("log"), optimizer.parameters.log)
-            MOI.set(instance_opt, MOI.RawParameter("keep"), optimizer.parameters.keep)
-            MOI.set(instance_opt, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
-            MOI.set(instance_opt, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
-        catch
-        end
-        return instance_opt
-    end
+    return MOI.OptimizerWithAttributes(optimizer.instance_optimizer, collect(optimizer.optimizer_params))
 end
 
 function MOI.set(optimizer::Optimizer, ::InstanceOptimizer, optimizer_constructor)
