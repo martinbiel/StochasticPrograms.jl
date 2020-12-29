@@ -1,7 +1,7 @@
 StochasticPrograms release notes
 ==================
 
-Version 0.5.0 (December 22, 2020)
+Version 0.5.0 (December 29, 2020)
 -----------------------------
 
 - The `@scenario` macro is now used to create `Scenario` objects that match a certain `@uncertain` declaration. For example, if the following declaration is used in a stage definition:
