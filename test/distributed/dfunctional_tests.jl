@@ -65,8 +65,8 @@
             @test num_scenarios(sp_copy) == num_scenarios(sp)
             generate!(sp_copy)
             @test num_subproblems(sp_copy) == num_subproblems(sp)
-            set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer(presolve = true))
-            set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer(presolve = true))
+            set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer())
+            set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer())
             if name == "Infeasible" || name == "Vectorized Infeasible"
                 set_optimizer_attribute(sp_copy, FeasibilityCuts(), true)
             end
