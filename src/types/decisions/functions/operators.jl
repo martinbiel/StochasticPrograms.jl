@@ -341,7 +341,7 @@ function MOIU.operate_output_index!(
     op::Union{typeof(+), typeof(-)}, ::Type{T},
     output_index::Integer,
     f::VectorAffineDecisionFunction{T}, α::T) where T
-    MOIU.operate_output_index!(op, T, output_index, f.variable_part)
+    MOIU.operate_output_index!(op, T, output_index, f.variable_part, α)
     return f
 end
 function MOIU.operate!(op::Union{typeof(+), typeof(-)}, ::Type{T},
