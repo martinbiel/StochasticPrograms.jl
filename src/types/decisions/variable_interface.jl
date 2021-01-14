@@ -597,7 +597,7 @@ function JuMP.set_integer(dref::DecisionRef)
         MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.Integer())
     end
 end
-function unset_integer(dref::DecisionRef)
+function JuMP.unset_integer(dref::DecisionRef)
     JuMP.delete(owner_model(dref), IntegerRef(dref))
     return nothing
 end
@@ -622,7 +622,7 @@ function JuMP.set_binary(dref::DecisionRef)
         MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.ZeroOne())
     end
 end
-function unset_binary(dref::DecisionRef)
+function JuMP.unset_binary(dref::DecisionRef)
     JuMP.delete(owner_model(dref), BinaryRef(dref))
     return nothing
 end
