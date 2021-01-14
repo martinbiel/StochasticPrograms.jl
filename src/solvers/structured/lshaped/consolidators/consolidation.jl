@@ -29,7 +29,7 @@ end
 # No consolidation
 # ------------------------------------------------------------
 """
-    NoRegularization
+    NoConsolidation
 
 Empty functor object for running the L-shaped algorithm without consolidation.
 
@@ -52,7 +52,7 @@ end
 """
     Consolidation
 
-Functor object for using consolidation in an L-shaped algorithm. Create by supplying a [`Consolidate`](@ref) object through `consolidate ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using consolidation in an L-shaped algorithm. Create by supplying a [`Consolidate`](@ref) object through `consolidate` in `LShaped.Optimizer` or by setting the [`Consolidator`](@ref) attribute.
 
 ...
 # Algorithm parameters
@@ -185,7 +185,7 @@ end
 """
     DontConsolidate
 
-Factory object for [`NoConsolidation`](@ref). Passed by default to `consolidate` in the `LShapedSolver` factory function.
+Factory object for [`NoConsolidation`](@ref). Passed by default to `consolidate` in `LShaped.Optimizer`.
 
 """
 struct DontConsolidate <: AbstractConsolidator end
@@ -197,7 +197,7 @@ end
 """
     Consolidate
 
-Factory object for [`Consolidation`](@ref). Pass to `consolidate` in the `LShapedSolver` factory function. See ?Consolidation for parameter descriptions.
+Factory object for [`Consolidation`](@ref). Pass to `consolidate` in `LShaped.Optimizer` or set the [`Consolidator`](@ref) attribute. See ?Consolidation for parameter descriptions.
 
 """
 mutable struct Consolidate <: AbstractConsolidator

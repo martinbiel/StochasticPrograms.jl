@@ -19,7 +19,8 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     subproblem_optimizer
     master_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     sub_params::Dict{MOI.AbstractOptimizerAttribute, Any}
-    feasibility_cuts::Bool
+    feasibility_strategy::AbstractFeasibilityStrategy
+    integer_strategy::AbstractIntegerStrategy
     execution::AbstractExecution
     regularizer::AbstractRegularizer
     aggregator::AbstractAggregator
@@ -36,7 +37,8 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
 
     function Optimizer(; master_optimizer = nothing,
                        execution::AbstractExecution = nworkers() == 1 ? Serial() : Synchronous(),
-                       feasibility_cuts::Bool = false,
+                       feasibility_strategy::AbstractFeasibilityStrategy = IgnoreFeasibility(),
+                       integer_strategy::AbstractIntegerStrategy = IgnoreIntegers(),
                        regularize::AbstractRegularizer = DontRegularize(),
                        aggregate::AbstractAggregator = DontAggregate(),
                        consolidate::AbstractConsolidator = DontConsolidate(),
@@ -45,7 +47,8 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
                    subproblem_optimizer,
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
-                   feasibility_cuts,
+                   feasibility_strategy,
+                   integer_strategy,
                    execution,
                    regularize,
                    aggregate,
@@ -113,7 +116,8 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
     # Create new L-shaped algorithm
     optimizer.lshaped = LShapedAlgorithm(structure,
                                          xâ‚€,
-                                         optimizer.feasibility_cuts,
+                                         optimizer.feasibility_strategy,
+                                         optimizer.integer_strategy,
                                          optimizer.execution,
                                          optimizer.regularizer,
                                          optimizer.aggregator,
@@ -292,12 +296,21 @@ function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, v
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::FeasibilityCuts)
-    return optimizer.feasibility_cuts
+function MOI.get(optimizer::Optimizer, ::FeasibilityStrategy)
+    return optimizer.feasibility_strategy
 end
 
-function MOI.set(optimizer::Optimizer, ::FeasibilityCuts, use_feasibility_cuts)
-    optimizer.feasibility_cuts = use_feasibility_cuts
+function MOI.set(optimizer::Optimizer, ::FeasibilityStrategy, strategy::AbstractFeasibilityStrategy)
+    optimizer.feasibility_strategy = strategy
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::IntegerStrategy)
+    return optimizer.integer_strategy
+end
+
+function MOI.set(optimizer::Optimizer, ::IntegerStrategy, strategy::AbstractIntegerStrategy)
+    optimizer.integer_strategy = strategy
     return nothing
 end
 

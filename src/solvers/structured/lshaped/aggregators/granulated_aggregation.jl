@@ -107,7 +107,7 @@ end
 """
     GranulatedAggregate
 
-Factory object for [`GranulatedAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.  See ?GranulatedAggregation for parameter descriptions.
+Factory object for [`GranulatedAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or set the [`Aggregator`](@ref) attribute.  See ?GranulatedAggregation for parameter descriptions.
 
 """
 mutable struct GranulatedAggregate <: AbstractAggregator

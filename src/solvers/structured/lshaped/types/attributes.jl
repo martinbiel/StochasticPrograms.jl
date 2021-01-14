@@ -7,11 +7,23 @@ Abstract supertype for attribute objects specific to the L-shaped algorithm.
 """
 abstract type AbstractLShapedAttribute <: AbstractStructuredOptimizerAttribute end
 """
-    FeasibilityCuts
+    FeasibilityStrategy
 
-An optimizer attribute for specifying if feasibility cuts should be used in the L-shaped algorithm. Options are `true` of `false`.
+An optimizer attribute for specifying a strategy for dealing with second-stage feasibility the L-shaped algorithm. Options are:
+
+- [`IgnoreFeasibility`](@ref) (default)
+- [`UseFeasibilityCuts`](@ref)
 """
-struct FeasibilityCuts <: AbstractLShapedAttribute end
+struct FeasibilityStrategy <: AbstractLShapedAttribute end
+"""
+    IntegerStrategy
+
+An optimizer attribute for specifying a strategy for dealing with integers the L-shaped algorithm. Options are:
+
+- [`IgnoreIntegers`](@ref) (default)
+- [`UseWeakCuts`](@ref)
+"""
+struct IntegerStrategy <: AbstractLShapedAttribute end
 """
     Regularizer
 
@@ -41,10 +53,16 @@ struct Aggregator <: AbstractLShapedAttribute end
 
 An optimizer attribute for specifying a consolidation procedure to be used in the L-shaped algorithm. Options are:
 
-- [`NoConsolidation`](@ref)
+- [`NoConsolidation`](@ref) (default)
 - [`Consolidation`](@ref)
 """
 struct Consolidator <: AbstractLShapedAttribute end
+"""
+    IntegerParameter
+
+Abstract supertype for integer-specific attributes.
+"""
+abstract type IntegerParameter <: AbstractLShapedAttribute end
 """
     RegularizationParameter
 

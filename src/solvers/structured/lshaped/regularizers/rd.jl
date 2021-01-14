@@ -19,7 +19,7 @@ end
 """
     RegularizedDecomposition
 
-Functor object for using regularized decomposition regularization in an L-shaped algorithm. Create by supplying an [`RD`](@ref) object through `regularize ` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
+Functor object for using regularized decomposition regularization in an L-shaped algorithm. Create by supplying an [`RD`](@ref) object through `regularize` in `LShaped.Optimizer` or by setting the [`Regularizer`](@ref) attribute.
 
 ...
 # Parameters
@@ -166,7 +166,7 @@ end
 """
     RD
 
-Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize ` in the `LShapedSolver` factory function. Equivalent factory calls: `RD`, `WithRD`, `RegularizedDecomposition`, `WithRegularizedDecomposition`. See ?RegularizedDecomposition for parameter descriptions.
+Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize` in `LShaped.Optimizer` or set the [`Regularizer`](@ref) attribute. Equivalent factory calls: `RD`, `WithRD`, `RegularizedDecomposition`, `WithRegularizedDecomposition`. See ?RegularizedDecomposition for parameter descriptions.
 
 """
 mutable struct RD <: AbstractRegularizer

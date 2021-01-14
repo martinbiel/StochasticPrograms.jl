@@ -4,20 +4,34 @@
 Functor object for using serial execution in a lshaped algorithm. Create by supplying a [`Serial`](@ref) object through `execution` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 """
-struct SerialExecution{H <: AbstractFeasibilityHandler,
-                       T <: AbstractFloat,
-                       A <: AbstractVector} <: AbstractLShapedExecution
-    subproblems::Vector{SubProblem{H,T}}
+struct SerialExecution{T <: AbstractFloat,
+                       A <: AbstractVector,
+                       F <: AbstractFeasibilityAlgorithm,
+                       I <: AbstractIntegerAlgorithm} <: AbstractLShapedExecution
+    subproblems::Vector{SubProblem{T,F,I}}
     decisions::Decisions
     subobjectives::A
     model_objectives::A
 
     function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
-                             ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
-                                                                     T <: AbstractFloat,
-                                                                     A <: AbstractVector}
-        H = HandlerType(F)
-        return new{H,T,A}(Vector{SubProblem{H,T}}(), structure.decisions[2], A(), A())
+                             feasibility_strategy::AbstractFeasibilityStrategy,
+                             integer_strategy::AbstractIntegerStrategy,
+                             ::Type{T},
+                             ::Type{A}) where {T <: AbstractFloat,
+                                               A <: AbstractVector}
+        F = worker_type(feasibility_strategy)
+        I = worker_type(integer_strategy)
+        execution = new{T,A,F,I}(Vector{SubProblem{T,F,I}}(), structure.decisions[2], A(), A())
+        # Load subproblems
+        for i in 1:num_subproblems(structure, 2)
+            push!(execution.subproblems, SubProblem(
+                subproblem(structure, 2, i),
+                i,
+                T(probability(scenario(structure, 2, i))),
+                feasibility_strategy,
+                integer_strategy))
+        end
+        return execution
     end
 end
 
@@ -25,17 +39,17 @@ function num_thetas(lshaped::AbstractLShaped, ::SerialExecution)
     return num_thetas(num_subproblems(lshaped), lshaped.aggregation)
 end
 
-function initialize_subproblems!(execution::SerialExecution{H,T},
-                                 scenarioproblems::ScenarioProblems) where {H <: AbstractFeasibilityHandler,
-                                                                            T <: AbstractFloat}
+function initialize_subproblems!(execution::SerialExecution{T},
+                                 scenarioproblems::ScenarioProblems,
+                                 feasibility_strategy::AbstractFeasibilityStrategy,
+                                 integer_strategy::AbstractIntegerStrategy) where T <: AbstractFloat
     for i in 1:num_subproblems(scenarioproblems)
         push!(execution.subproblems, SubProblem(
             subproblem(scenarioproblems, i),
             i,
             T(probability(scenario(scenarioproblems, i))),
-            all_known_decisions(execution.decisions),
-            H))
-    end
+            feasibility_strategy,
+            integer_strategy))
     return nothing
 end
 
@@ -52,7 +66,7 @@ function restore_subproblems!(lshaped::AbstractLShaped, execution::SerialExecuti
     return nothing
 end
 
-function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
+function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution{T}) where T <: AbstractFloat
     # Update subproblems
     update_known_decisions!(execution.decisions, lshaped.x)
     # Assume no cuts are added
@@ -71,10 +85,16 @@ end
 # API
 # ------------------------------------------------------------
 function (execution::Serial)(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
-                             ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
-                                                                     T <: AbstractFloat,
-                                                                     A <: AbstractVector}
-    return SerialExecution(structure, F, T, A)
+                             feasibility_strategy::AbstractFeasibilityStrategy,
+                             integer_strategy::AbstractIntegerStrategy,
+                             ::Type{T},
+                             ::Type{A}) where {T <: AbstractFloat,
+                                               A <: AbstractVector}
+    return SerialExecution(structure,
+                           feasibility_strategy,
+                           integer_strategy,
+                           T,
+                           A)
 end
 
 function str(::Serial)

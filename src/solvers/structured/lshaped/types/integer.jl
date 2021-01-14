@@ -1,0 +1,2 @@
+abstract type AbstractIntegerAlgorithm end
+abstract type AbstractIntegerStrategy end

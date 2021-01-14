@@ -1,15 +1,18 @@
-SubWorker{H,T} = RemoteChannel{Channel{Vector{SubProblem{H,T}}}}
+SubWorker{T,F,I} = RemoteChannel{Channel{Vector{SubProblem{T,F,I}}}}
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
 Work = RemoteChannel{Channel{Int}}
 
-function load_subproblems!(subworkers::Vector{SubWorker{H,T}},
+function load_subproblems!(subworkers::Vector{SubWorker{T,F,I}},
                            scenarioproblems::DistributedScenarioProblems,
-                           decisions::Vector{DecisionChannel}) where {H <: AbstractFeasibilityHandler,
-                                                                      T <: AbstractFloat}
+                           decisions::Vector{DecisionChannel},
+                           feasibility_strategy::AbstractFeasibilityStrategy,
+                           integer_strategy::AbstractIntegerStrategy) where {T <: AbstractFloat,
+                                                                             F <: AbstractFeasibilityAlgorithm,
+                                                                             I <: AbstractIntegerAlgorithm}
     # Create subproblems on worker processes
     @sync begin
         for w in workers()
-            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{H,T}}}(1), w)
+            subworkers[w-1] = RemoteChannel(() -> Channel{Vector{SubProblem{T,F,I}}}(1), w)
             prev = map(2:(w-1)) do p
                 scenarioproblems.scenario_distribution[p-1]
             end
@@ -18,25 +21,29 @@ function load_subproblems!(subworkers::Vector{SubWorker{H,T}},
                                     w,
                                     subworkers[w-1],
                                     scenarioproblems[w-1],
-                                    decisions[w-1],
+                                    feasibility_strategy,
+                                    integer_strategy,
                                     start_id)
         end
     end
 end
 
-function initialize_subworker!(subworker::SubWorker{H,T},
+function initialize_subworker!(subworker::SubWorker{T,F,I},
                                scenarioproblems::ScenarioProblemChannel,
-                               decisions::DecisionChannel,
-                               start_id::Integer) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
+                               feasibility_strategy::AbstractFeasibilityStrategy,
+                               integer_strategy::AbstractIntegerStrategy,
+                               start_id::Integer) where {T <: AbstractFloat,
+                                                         F <: AbstractFeasibilityAlgorithm,
+                                                         I <: AbstractIntegerAlgorithm}
     sp = fetch(scenarioproblems)
-    subproblems = Vector{SubProblem{H,T}}(undef, num_subproblems(sp))
+    subproblems = Vector{SubProblem{T,F,I}}(undef, num_subproblems(sp))
     for i in 1:num_subproblems(sp)
         subproblems[i] = SubProblem(
             subproblem(sp, i),
             start_id + i,
             T(probability(scenario(sp, i))),
-            all_known_decisions(fetch(decisions)),
-            H)
+            feasibility_strategy,
+            integer_strategy)
     end
     put!(subworker, subproblems)
     return nothing
@@ -55,15 +62,17 @@ function restore_subproblems!(subworkers::Vector{<:SubWorker})
     return nothing
 end
 
-function resolve_subproblems!(subworker::SubWorker{H,T},
+function resolve_subproblems!(subworker::SubWorker{T,F,I},
                               decisions::DecisionChannel,
                               x::AbstractVector,
                               cutqueue::CutQueue{T},
                               aggregator::AbstractAggregator,
                               t::Integer,
-                              metadata::MetaData) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
+                              metadata::MetaData) where {T <: AbstractFloat,
+                                                         F <: AbstractFeasibilityAlgorithm,
+                                                         I <: AbstractIntegerAlgorithm}
     # Fetch all subproblems stored in worker
-    subproblems::Vector{SubProblem{H,T}} = fetch(subworker)
+    subproblems::Vector{SubProblem{T,F,I}} = fetch(subworker)
     if isempty(subproblems)
         # Workers has nothing do to, return.
         return nothing
@@ -82,17 +91,18 @@ function resolve_subproblems!(subworker::SubWorker{H,T},
     return nothing
 end
 
-function work_on_subproblems!(subworker::SubWorker{H,T},
+function work_on_subproblems!(subworker::SubWorker{T,F,I},
                               decisions::DecisionChannel,
                               work::Work,
                               finalize::Work,
                               cutqueue::CutQueue{T},
                               iterates::RemoteIterates{A},
                               metadata::MetaData,
-                              aggregator::AbstractAggregator) where {H <: AbstractFeasibilityHandler,
-                                                                     T <: AbstractFloat,
-                                                                     A <: AbstractVector}
-    subproblems::Vector{SubProblem{H,T}} = fetch(subworker)
+                              aggregator::AbstractAggregator) where {T <: AbstractFloat,
+                                                                     A <: AbstractVector,
+                                                                     F <: AbstractFeasibilityAlgorithm,
+                                                                     I <: AbstractIntegerAlgorithm}
+    subproblems::Vector{SubProblem{T,F,I}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.
        return nothing

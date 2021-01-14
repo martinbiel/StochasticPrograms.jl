@@ -10,8 +10,6 @@ tolerance(lshaped::AbstractLShaped) = lshaped.parameters.τ
 function initialize!(lshaped::AbstractLShaped)
     # Initialize progress meter
     lshaped.progress.thresh = lshaped.parameters.τ
-    # Initialize subproblems
-    initialize_subproblems!(lshaped, scenarioproblems(lshaped.structure, 2))
     # Prepare the master optimization problem
     prepare_master!(lshaped)
     # Initialize regularization policy

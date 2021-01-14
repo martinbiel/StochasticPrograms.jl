@@ -101,6 +101,7 @@ export
 
 # Include files
 include("types/types.jl")
+include("integer/integer.jl")
 include("consolidators/consolidation.jl")
 include("aggregators/aggregation.jl")
 include("regularizers/regularization.jl")

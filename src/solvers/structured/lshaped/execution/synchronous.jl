@@ -4,10 +4,11 @@
 Functor object for using synchronous execution in an L-shaped algorithm (assuming multiple Julia cores are available). Create by supplying a [`Synchronous`](@ref) object through `execution` in the `LShapedSolver` factory function and then pass to a `StochasticPrograms.jl` model.
 
 """
-struct SynchronousExecution{H <: AbstractFeasibilityHandler,
-                            T <: AbstractFloat,
-                            A <: AbstractVector} <: AbstractLShapedExecution
-    subworkers::Vector{SubWorker{H,T}}
+struct SynchronousExecution{T <: AbstractFloat,
+                            A <: AbstractVector,
+                            F <: AbstractFeasibilityAlgorithm,
+                            I <: AbstractIntegerAlgorithm} <: AbstractLShapedExecution
+    subworkers::Vector{SubWorker{T,F,I}}
     decisions::Vector{DecisionChannel}
     subobjectives::A
     model_objectives::A
@@ -15,23 +16,28 @@ struct SynchronousExecution{H <: AbstractFeasibilityHandler,
     cutqueue::CutQueue{T}
 
     function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
-                                  ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
-                                                                          T <: AbstractFloat,
-                                                                          A <: AbstractVector}
-        H = HandlerType(F)
-        return new{H,T,A}(Vector{SubWorker{H,T}}(undef, nworkers()),
-                          scenarioproblems(structure).decisions,
-                          A(),
-                          A(),
-                          Vector{MetaData}(undef, nworkers()),
-                          RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))))
+                                  feasibility_strategy::AbstractFeasibilityStrategy,
+                                  integer_strategy::AbstractIntegerStrategy,
+                                  ::Type{T},
+                                  ::Type{A}) where {T <: AbstractFloat,
+                                                    A <: AbstractVector}
+        F = worker_type(feasibility_strategy)
+        I = worker_type(integer_strategy)
+        execution =  new{T,A,F,I}(Vector{SubWorker{H,T}}(undef, nworkers()),
+                                  scenarioproblems(structure).decisions,
+                                  A(),
+                                  A(),
+                                  Vector{MetaData}(undef, nworkers()),
+                                  RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))),
+                                  Vector{Future}(undef, nworkers()))
+        # Start loading subproblems
+        load_subproblems!(execution.subworkers,
+                          scenarioproblems,
+                          execution.decisions,
+                          feasibility_strategy,
+                          integer_strategy)
+        return execution
     end
-end
-
-function initialize_subproblems!(execution::SynchronousExecution,
-                                 scenarioproblems::DistributedScenarioProblems)
-    load_subproblems!(execution.subworkers, scenarioproblems, execution.decisions)
-    return nothing
 end
 
 function finish_initilization!(lshaped::AbstractLShaped, execution::SynchronousExecution)
@@ -48,7 +54,7 @@ function restore_subproblems!(::AbstractLShaped, execution::SynchronousExecution
     return nothing
 end
 
-function resolve_subproblems!(lshaped::AbstractLShaped, execution::SynchronousExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
+function resolve_subproblems!(lshaped::AbstractLShaped, execution::SynchronousExecution{T}) where T <: AbstractFloat
     # Update metadata
     for w in workers()
         put!(execution.metadata[w-1], timestamp(lshaped), :gap, gap(lshaped))
@@ -81,10 +87,16 @@ end
 # API
 # ------------------------------------------------------------
 function (execution::Synchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
-                                  ::Type{F}, ::Type{T}, ::Type{A}) where {F <: AbstractFeasibility,
-                                                                          T <: AbstractFloat,
-                                                                          A <: AbstractVector}
-    return SynchronousExecution(structure, F, T, A)
+                                  feasibility_strategy::AbstractFeasibilityStrategy,
+                                  integer_strategy::AbstractIntegerStrategy,
+                                  ::Type{T},
+                                  ::Type{A}) where {T <: AbstractFloat,
+                                                    A <: AbstractVector}
+    return SynchronousExecution(structure,
+                                feasibility_strategy,
+                                integer_strategy,
+                                T,
+                                A)
 end
 
 function str(::Synchronous)

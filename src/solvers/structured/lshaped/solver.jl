@@ -37,7 +37,8 @@ struct LShapedAlgorithm{T <: AbstractFloat,
                         ST <: VerticalStructure,
                         M <: MOI.AbstractOptimizer,
                         E <: AbstractLShapedExecution,
-                        F <: AbstractFeasibility,
+                        F <: AbstractFeasibilityAlgorithm,
+                        I <: AbstractIntegerAlgorithm,
                         R <: AbstractRegularization,
                         Agg <: AbstractAggregation,
                         C <: AbstractConsolidation} <: AbstractLShaped
@@ -58,6 +59,9 @@ struct LShapedAlgorithm{T <: AbstractFloat,
     # Feasibility
     feasibility::F
 
+    # Integers
+    integer::I
+
     # Regularization
     regularization::R
 
@@ -73,7 +77,8 @@ struct LShapedAlgorithm{T <: AbstractFloat,
 
     function LShapedAlgorithm(structure::VerticalStructure,
                               x₀::AbstractVector,
-                              feasibility_cuts::Bool,
+                              feasibility_strategy::AbstractFeasibilityStrategy,
+                              integer_strategy::AbstractIntegerStrategy,
                               _execution::AbstractExecution,
                               regularizer::AbstractRegularizer,
                               aggregator::AbstractAggregator,
@@ -90,10 +95,13 @@ struct LShapedAlgorithm{T <: AbstractFloat,
         ST = typeof(structure)
         M = typeof(backend(structure.first_stage))
         # Feasibility
-        feasibility = feasibility_cuts ? HandleFeasibility(T) : IgnoreFeasibility()
-        F = typeof(feasibility)
+        feasibility_algorithm = master(feasibility_strategy, T)
+        F = typeof(feasibility_algorithm)
+        # Integers
+        integer_algorithm = master(integer_strategy, T)
+        I = typeof(integer_algorithm)
         # Execution policy
-        execution = _execution(structure, F, T, A)
+        execution = _execution(structure, feasibility_strategy, integer_strategy, T, A)
         E = typeof(execution)
         # Regularization policy
         regularization = regularizer(structure.decisions[1], x₀_)
@@ -107,24 +115,25 @@ struct LShapedAlgorithm{T <: AbstractFloat,
         # Algorithm parameters
         params = LShapedParameters{T}(; kw...)
 
-        lshaped = new{T,A,ST,M,E,F,R,Agg,C}(structure,
-                                            n,
-                                            LShapedData{T}(),
-                                            params,
-                                            backend(structure.first_stage),
-                                            structure.decisions[1],
-                                            x₀_,
-                                            A(),
-                                            execution,
-                                            feasibility,
-                                            regularization,
-                                            Vector{MOI.VariableIndex}(),
-                                            Vector{CutConstraint}(),
-                                            Vector{SparseOptimalityCut{T}}(),
-                                            aggregation,
-                                            consolidation,
-                                            A(),
-                                            ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))L-Shaped Gap "))
+        lshaped = new{T,A,ST,M,E,F,I,R,Agg,C}(structure,
+                                              n,
+                                              LShapedData{T}(),
+                                              params,
+                                              backend(structure.first_stage),
+                                              structure.decisions[1],
+                                              x₀_,
+                                              A(),
+                                              execution,
+                                              feasibility_algorithm,
+                                              integer_algorithm,
+                                              regularization,
+                                              Vector{MOI.VariableIndex}(),
+                                              Vector{CutConstraint}(),
+                                              Vector{SparseOptimalityCut{T}}(),
+                                              aggregation,
+                                              consolidation,
+                                              A(),
+                                              ProgressThresh(T(1.0), 0.0, "$(indentstr(params.indent))L-Shaped Gap "))
         # Initialize solver
         initialize!(lshaped)
         return lshaped

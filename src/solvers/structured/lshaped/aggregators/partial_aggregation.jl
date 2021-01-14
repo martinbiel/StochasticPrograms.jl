@@ -110,7 +110,7 @@ end
 """
     PartialAggregate
 
-Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.  See ?PartialAggregation for parameter descriptions.
+Factory object for [`PartialAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or set the [`Aggregator`](@ref) attribute.  See ?PartialAggregation for parameter descriptions.
 
 """
 mutable struct PartialAggregate <: AbstractAggregator
@@ -158,7 +158,7 @@ end
 """
     Aggregate
 
-Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by setting the [`Aggregator`](@ref) attribute.
+Factory object for [`FullAggregation`](@ref). Pass to `aggregate` in `LShaped.Optimizer` or by set the [`Aggregator`](@ref) attribute.
 
 """
 struct Aggregate <: AbstractAggregator end
