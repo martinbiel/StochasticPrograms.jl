@@ -1,0 +1,13 @@
+STOCH         SIMPLE
+SCENARIOS
+ SC Scen1     'ROOT'    0.4	           STAGE2
+    Y1        OBJ       -24.0
+    Y2        OBJ       -28.0
+    RHS       Y1UP      500.0
+    RHS       Y2UP      100.0
+ SC Scen2     'ROOT'    0.6	           STAGE2
+    Y1        OBJ       -28.0
+    Y2        OBJ       -32.0
+    RHS       Y1UP      300.0
+    RHS       Y2UP      300.0
+ENDATA

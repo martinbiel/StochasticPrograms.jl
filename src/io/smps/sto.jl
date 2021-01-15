@@ -183,6 +183,44 @@ function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractStrin
                 else
                     error("Distribution $dist is not supported.")
                 end
+            elseif mode == SCENARIOS
+                if words[1] == "SC"
+                    length(words) == 5 || error("Malformed+ sto file at line $words.")
+                    words[3] == "'ROOT'" || error("SCEN format currently only supported for two-stage models.")
+                    stage_name = Symbol(words[5])
+                    haskey(tim.stages, stage_name) || error("Stage name $stage_name not specified in .tim file.")
+                    stage = tim.stages[stage_name]
+                    prob = parse(Float64, words[4])
+                    # Check if random vector exists already
+                    idx = get(ranvec_indices[stage - 1], block, 0)
+                    ran_vec = if idx > 0
+                        ran_vec = random_vecs[stage - 1][idx]
+                        # Sanity check
+                        ran_vec isa BlockDiscrete || error("Random vector at $block has more than one specified distribution.")
+                        ran_vec
+                    else
+                        # Create new DISCRETE random vector
+                        ran_vec = BlockDiscrete(T, inclusion)
+                        push!(random_vecs[stage - 1], ran_vec)
+                        # Bookkeep
+                        block += 1
+                        ranvec_indices[stage - 1][block] = length(random_vecs[stage - 1])
+                        ran_vec
+                    end
+                    # Update probability
+                    push!(ran_vec.support, Dict{RowCol,T}())
+                    push!(ran_vec.probabilities, prob)
+                    continue
+                else
+                    length(words) == 3 || error("Malformed sto file at line $words.")
+                    col = Col(words[1])
+                    col = col == cor.rhsname ? RHS : col
+                    row = Row(words[2])
+                    val = parse(Float64, words[3])
+                    idx = ranvec_indices[stage - 1][block]
+                    ran_vec = random_vecs[stage - 1][idx]
+                    ran_vec.support[end][(row, col)] = val
+                end
             else
                 throw(ArgumentError("$(mode) is not a valid sto file mode."))
             end
