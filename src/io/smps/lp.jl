@@ -21,6 +21,8 @@ struct LPData{T <: AbstractFloat, M <: AbstractMatrix}
     d₂::Vector{T}
     lb::Vector{T}
     ub::Vector{T}
+    is_binary::Vector{Bool}
+    is_integer::Vector{Bool}
     indexmap::IndexMap
 
     function LPData(::Type{T}, ::Type{<:Matrix}, n::Int, m₁::Int, m₂::Int) where T <: AbstractFloat
@@ -34,6 +36,8 @@ struct LPData{T <: AbstractFloat, M <: AbstractMatrix}
             fill(convert(T, Inf), m₂),
             fill(convert(T, -Inf), n),
             fill(convert(T, Inf), n),
+            fill(false, n),
+            fill(false, n),
             IndexMap(n, m₁, m₂))
     end
 
@@ -48,6 +52,8 @@ struct LPData{T <: AbstractFloat, M <: AbstractMatrix}
             fill(convert(T, Inf), m₂),
             fill(convert(T, -Inf), n),
             fill(convert(T, Inf), n),
+            fill(false, n),
+            fill(false, n),
             IndexMap(n, m₁, m₂))
     end
 
@@ -55,26 +61,28 @@ struct LPData{T <: AbstractFloat, M <: AbstractMatrix}
                     A::AbstractMatrix, b::AbstractVector,
                     d₁::AbstractVector, C::AbstractMatrix, d₂::AbstractVector,
                     lb::AbstractVector, ub::AbstractVector,
+                    is_binary::AbstractVector, is_integer::AbstractVector,
                     map::IndexMap) where T <: AbstractFloat
         A_ = convert(Matrix{T}, A)
         C_ = convert(Matrix{T}, C)
         # Sanity check
-        _lpcheck(c₁, c₂, A, b, d₁, C, d₂, lb, ub)
+        _lpcheck(c₁, c₂, A, b, d₁, C, d₂, lb, ub, is_binary, is_integer)
         # Return data
-        return new{T, Matrix{T}}(c₁, c₂, A_, b, d₁, C_, d₂, lb, ub, map)
+        return new{T, Matrix{T}}(c₁, c₂, A_, b, d₁, C_, d₂, lb, ub, is_binary, is_integer, map)
     end
 
     function LPData(::Type{T}, c₁::AbstractVector, c₂::Real,
                     A::AbstractSparseMatrix, b::AbstractVector,
                     d₁::AbstractVector, C::AbstractSparseMatrix, d₂::AbstractVector,
                     lb::AbstractVector, ub::AbstractVector,
+                    is_binary::AbstractVector, is_integer::AbstractVector,
                     map::IndexMap) where T <: AbstractFloat
         A_ = convert(SparseMatrixCSC{T}, A)
         C_ = convert(SparseMatrixCSC{T}, C)
         # Sanity check
-        _lpcheck(c₁, c₂, A, b, d₁, C, d₂, lb, ub)
+        _lpcheck(c₁, c₂, A, b, d₁, C, d₂, lb, ub, is_binary, is_integer)
         # Return data
-        return new{T, SparseMatrixCSC{T,Int}}(c₁, c₂, A_, b, d₁, C_, d₂, lb, ub, map)
+        return new{T, SparseMatrixCSC{T,Int}}(c₁, c₂, A_, b, d₁, C_, d₂, lb, ub, is_binary, is_integer, map)
     end
 end
 
@@ -95,7 +103,8 @@ SparseLPData() =
 function _lpcheck(c₁::AbstractVector, c₂::Real,
                   A::AbstractMatrix, b::AbstractVector,
                   d₁::AbstractVector, C::AbstractMatrix, d₂::AbstractVector,
-                  lb::AbstractVector, ub::AbstractVector)
+                  lb::AbstractVector, ub::AbstractVector,
+                  is_binary::AbstractVector, is_integer::AbstractVector)
     n₁ = length(c₁)
     m₁, n₂ = size(A)
     m₂, n₃ = size(C)
@@ -110,6 +119,8 @@ function _lpcheck(c₁::AbstractVector, c₂::Real,
         throw(DomainError(d ,"LPData: `d₁` and `d₂` must have $(m₂) elements, has $(length(d₁)) and $(length(d₂))"))
     elseif n₁ ≠ length(lb) || n₁ ≠ length(ub)
         throw(DomainError((lb, ub) ,"LPData: Both `lb` and `ub` must have $(n₁) elements, , has $(length(lb)) and $(length(ub))"))
+    elseif n₁ ≠ length(is_binary) || n₁ ≠ length(is_integer)
+        throw(DomainError((lb, ub) ,"LPData: Both `is_binary` and `is_integer` must have $(n₁) elements, , has $(length(is_binary)) and $(length(is_integer))"))
     end
 end
 
@@ -117,8 +128,9 @@ function LPData(c₁::AbstractVector, c₂::Real,
                 A::AbstractMatrix, b::AbstractVector,
                 d₁::AbstractVector, C::AbstractMatrix, d₂::AbstractVector,
                 lb::AbstractVector, ub::AbstractVector,
+                is_binary::AbstractVector, is_integer::AbstractVector,
                 map::IndexMap)
-    return LPData(Float64, c₁, c₂, A, b, d₁, C, d₂, lb, ub, map)
+    return LPData(Float64, c₁, c₂, A, b, d₁, C, d₂, lb, ub, is_binary, is_integer, map)
 end
 
 function LPData(cor::RawCor{T};
@@ -141,6 +153,8 @@ function LPData(cor::RawCor{T};
     d₂ = fill(convert(T, Inf), m₂)
     lb = zeros(T, n)
     ub = fill(convert(T, Inf), n)
+    is_binary = fill(false, n)
+    is_integer = fill(false, n)
     # Aux counters
     ncols = 0
     neqrows = 0
@@ -206,9 +220,9 @@ function LPData(cor::RawCor{T};
         c₂ = -get(cor.rhs, cor.objname, zero(T))
     end
     # Fill bounds
-    fill_bounds!(cor, lb, ub, colrange, map)
+    fill_bounds!(cor, lb, ub, is_binary, is_integer, colrange, map)
     # Return the problem
-    return LPData(T, c₁, c₂, A, b, d₁, C, d₂, lb, ub, map)
+    return LPData(T, c₁, c₂, A, b, d₁, C, d₂, lb, ub, is_binary, is_integer, map)
 end
 
 function SparseLPData(cor::RawCor{T};
@@ -229,6 +243,8 @@ function SparseLPData(cor::RawCor{T};
     d₂ = fill(convert(T, Inf), m₂)
     lb = zeros(T, n)
     ub = fill(convert(T, Inf), n)
+    is_binary = fill(false, n)
+    is_integer = fill(false, n)
     # Prepare matrices
     Aᵢ = Vector{Int}()
     Aⱼ = Vector{Int}()
@@ -310,12 +326,12 @@ function SparseLPData(cor::RawCor{T};
         c₂ = -get(cor.rhs, cor.objname, zero(T))
     end
     # Fill bounds
-    fill_bounds!(cor, lb, ub, colrange, map)
+    fill_bounds!(cor, lb, ub, is_binary, is_integer, colrange, map)
     # Return the problem
-    return LPData(T, c₁, c₂, A, b, d₁, C, d₂, lb, ub, map)
+    return LPData(T, c₁, c₂, A, b, d₁, C, d₂, lb, ub, is_binary, is_integer, map)
 end
 
-function fill_bounds!(cor, lb, ub, colrange, map)
+function fill_bounds!(cor::RawCor{T}, lb, ub, is_binary, is_integer, colrange, map) where T <: AbstractFloat
     ncols = 0
     for (col, val) in cor.bounds
         col in colrange || (ncols += 1; continue)
@@ -332,6 +348,22 @@ function fill_bounds!(cor, lb, ub, colrange, map)
                 lb[j] = ub[j] = bndval
                 map[(FIXED,col)] = (0,j,LEQ)
                 map[(FIXED,col)] = (0,j,GEQ)
+            elseif bndtype == BINARY
+                is_binary[j] = true
+                lb[j] = convert(T, -Inf)
+                map[(BINARY,col)] = (0,j,BINARY)
+            elseif bndtype == INTEGER
+                is_integer[j] = true
+                lb[j] = convert(T, -Inf)
+                map[(INTEGER,col)] = (0,j,INTEGER)
+            elseif bndtype == INTEGER_LOWER
+                is_integer[j] = true
+                lb[j] = bndval
+                map[(INTEGER,col)] = (0,j,INTEGER_LOWER)
+            elseif bndtype == INTEGER_UPPER
+                is_integer[j] = true
+                ub[j] = bndval
+                map[(INTEGER,col)] = (0,j,INTEGER_UPPER)
             else
                 lb[j] = convert(T, -Inf)
                 map[(FREE,col)] = (0,j,FREE)

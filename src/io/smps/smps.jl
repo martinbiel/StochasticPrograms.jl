@@ -34,6 +34,10 @@ const GEQ = :GEQ
 const RANGE = :RANGE
 const LOWER = :LOWER
 const UPPER = :UPPER
+const BINARY = :BINARY
+const INTEGER = :INTEGER
+const INTEGER_LOWER = :INTEGER_LOWER
+const INTEGER_UPPER = :INTEGER_UPPER
 const FREE = :FREE
 const FIXED = :FIXED
 

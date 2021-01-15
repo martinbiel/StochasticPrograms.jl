@@ -100,10 +100,14 @@ function parse_cor(::Type{T}, filename::AbstractString) where T <: AbstractFloat
             elseif mode == BOUNDS
                 var = Symbol(words[3])
                 bnd = words[1] == "LO" ? LOWER :
-                    words[1] == "UP" ? UPPER :
-                    words[1] == "FR" ? FREE  : FIXED
+                      words[1] == "UP" ? UPPER :
+                      words[1] == "BV" ? BINARY :
+                      words[1] == "I"  ? INTEGER :
+                      words[1] == "LI" ? INTEGER_LOWER :
+                      words[1] == "UI" ? INTEGER_UPPER :
+                      words[1] == "FR" ? FREE  : FIXED
                 push!(get!(bounds, var, Pair{Symbol,T}[]),
-                      Pair(bnd, convert(T, parse(Float64, bnd == FREE ? "0" : words[4]))))
+                      Pair(bnd, convert(T, parse(Float64, bnd in [FREE, BINARY, INTEGER] ? "0" : words[4]))))
             else
                 throw(ArgumentError("$(mode) is not a valid cor file mode."))
             end

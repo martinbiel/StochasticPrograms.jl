@@ -272,7 +272,7 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Ma
         end
     end
     # Return template
-    return LPData(T, Δc, zero(T), ΔA, Δb, Δd₁, ΔC, Δd₂, model.lb, model.ub, model.indexmap)
+    return LPData(T, Δc, zero(T), ΔA, Δb, Δd₁, ΔC, Δd₂, model.lb, model.ub, model.is_binary, model.is_integer, model.indexmap)
 end
 
 function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, SparseMatrixCSC{T,Int}}, stage::Integer) where {N, T}
@@ -369,5 +369,5 @@ function uncertainty_template(sto::RawStoch{N}, cor::RawCor, model::LPData{T, Sp
     ΔA  = sparse(ΔAᵢ, ΔAⱼ, ΔAᵥ, m₁, n)
     ΔC  = sparse(ΔCᵢ, ΔCⱼ, ΔCᵥ, m₂, n)
     # Return template
-    return LPData(T, Δc, zero(T), ΔA, Δb, Δd₁, ΔC, Δd₂, model.lb, model.ub, model.indexmap)
+    return LPData(T, Δc, zero(T), ΔA, Δb, Δd₁, ΔC, Δd₂, model.lb, model.ub, model.is_binary, model.is_integer, model.indexmap)
 end

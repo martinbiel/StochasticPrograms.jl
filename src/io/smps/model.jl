@@ -86,8 +86,10 @@ function stochastic_model(smps::SMPSModel{2})
             C, d = canonical(data.model.C,
                              data.model.d₁,
                              data.model.d₂)
-            lb = data.model.lb
-            ub = data.model.ub
+            lb   = data.model.lb
+            ub   = data.model.ub
+            bin  = data.model.is_binary
+            int  = data.model.is_integer
             # Define all first-stage variables as decisions
             if any(isfinite.(lb))
                 if any(isfinite.(ub))
@@ -103,6 +105,14 @@ function stochastic_model(smps::SMPSModel{2})
             else
                 # Free
                 @decision(model, x[i in 1:n])
+            end
+            # Add any binary or integer restrictions
+            for i in 1:n
+                if bin[i]
+                    @constraint(model, x[i] in MOI.ZeroOne())
+                elseif int[i]
+                    @constraint(model, x[i] in MOI.Integer())
+                end
             end
             # Define objective and constraints
             if any(abs.(c₁) .> sqrt(eps())) || abs(c₂) > sqrt(eps())
@@ -133,8 +143,10 @@ function stochastic_model(smps::SMPSModel{2})
                              data.model.d₂ + Δd₂)
             T̃    = C̃[:, data.technology]
             W̃    = C̃[:, data.recourse]
-            lb = data.model.lb[data.recourse]
-            ub = data.model.ub[data.recourse]
+            lb   = data.model.lb[data.recourse]
+            ub   = data.model.ub[data.recourse]
+            bin  = data.model.is_binary[data.recourse]
+            int  = data.model.is_integer[data.recourse]
             # Define all recourse variables
             if any(isfinite.(lb))
                 if any(isfinite.(ub))
@@ -150,6 +162,14 @@ function stochastic_model(smps::SMPSModel{2})
             else
                 # Free
                 @recourse(model, y[i in 1:n])
+            end
+            # Add any binary or integer restrictions
+            for i in 1:n
+                if bin[i]
+                    @constraint(model, y[i] in MOI.ZeroOne())
+                elseif int[i]
+                    @constraint(model, y[i] in MOI.Integer())
+                end
             end
             # Define objective and constraints
             @objective(model, Min, dot((q + Δq), y))
