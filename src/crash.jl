@@ -86,7 +86,7 @@ function (::FeasiblePoint)(stochasticprogram::StochasticProgram)
     @objective(m, MOI.FEASIBILITY_SENSE, 0)
     optimize!(m)
     # Return feasible point
-    return JuMP.value.(all_decision_variables(m))
+    return JuMP.value.(all_decision_variables(m, 1))
 end
 
 function (crash::FeasiblePoint)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
