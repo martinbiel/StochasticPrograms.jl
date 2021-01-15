@@ -6,7 +6,12 @@ Empty functor object for running an L-shaped algorithm without dealing with inte
 """
 struct NoIntegerAlgorithm <: AbstractIntegerAlgorithm end
 
+function check_optimality(::AbstractLShaped, ::NoIntegerAlgorithm)
+    return true
+end
+
 function solve_subproblem(subproblem::SubProblem,
+                          metadata,
                           ::NoFeasibilityAlgorithm,
                           ::NoIntegerAlgorithm,
                           x::AbstractVector)
@@ -14,6 +19,7 @@ function solve_subproblem(subproblem::SubProblem,
 end
 
 function solve_subproblem(subproblem::SubProblem,
+                          metadata,
                           feasibility_algorithm::FeasibilityCutsWorker,
                           ::NoIntegerAlgorithm,
                           x::AbstractVector)
@@ -28,12 +34,15 @@ function solve_subproblem(subproblem::SubProblem,
     if !(status ∈ AcceptableTermination)
         error("Subproblem $(subproblem.id) was not solved properly during feasibility check, returned status code: $status")
     end
-    obj_sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
-    w = MOI.get(model, MOI.ObjectiveValue())
-    w *= obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0
+    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    w = correction * MOI.get(model, MOI.ObjectiveValue())
+    # Ensure correction is available in master
+    set_metadata!(metadata, subproblem.id, :correction, correction)
+    # Check feasibility
     if w > sqrt(eps())
         # Subproblem is infeasible, create feasibility cut
-        return FeasibilityCut(subproblem, x)
+        return FeasibilityCut(subproblem, metadata, x)
     end
     # Restore subproblem and solve as usual
     restore_subproblem!(subproblem)

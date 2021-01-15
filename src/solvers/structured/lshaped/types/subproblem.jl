@@ -1,6 +1,7 @@
 struct SubProblem{T <: AbstractFloat, F <: AbstractFeasibilityAlgorithm, I <: AbstractIntegerAlgorithm}
     id::Int
     probability::T
+    model::JuMP.Model
     optimizer::MOI.AbstractOptimizer
     feasibility_algorithm::F
     integer_algorithm::I
@@ -27,6 +28,7 @@ struct SubProblem{T <: AbstractFloat, F <: AbstractFeasibilityAlgorithm, I <: Ab
                                         T)
         return new{T,F,I}(id,
                           π,
+                          model,
                           optimizer,
                           feasibility_algorithm,
                           integer_algorithm,
@@ -96,8 +98,9 @@ function restore_subproblem!(subproblem::SubProblem)
     restore!(subproblem.optimizer, subproblem.feasibility_algorithm)
 end
 
-function (subproblem::SubProblem)(x::AbstractVector)
+function (subproblem::SubProblem)(x::AbstractVector, metadata)
     return solve_subproblem(subproblem,
+                            metadata,
                             subproblem.feasibility_algorithm,
                             subproblem.integer_algorithm,
                             x)
@@ -174,30 +177,6 @@ function FeasibilityCut(subproblem::SubProblem{T}, x::AbstractVector) where T <:
     G = sparsevec(cols, vals, length(x))
     g = correction * MOI.get(subproblem.optimizer, MOI.ObjectiveValue()) + G⋅x
     return FeasibilityCut(G, g, subproblem.id)
-end
-
-function WeakOptimalityCut(subproblem::SubProblem{T}, x::AbstractVector, L::T) where T <: AbstractFloat
-    π = subproblem.probability
-    cols = collect(1:length(x))
-    vals = zeros(T, length(x))
-    S = 0
-    for (i,val) in enumerate(x)
-        if isapprox(val, 0., rtol = 1e-6)
-            vals[i] = -1.
-        else
-            # Assume x == 1
-            S += 1
-            vals[i] = 1.
-        end
-    end
-    # Get sense
-    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
-    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
-    # Get sense-corrected optimal value
-    Q = correction * π * MOI.get(subproblem.optimizer, MOI.ObjectiveValue())
-    G = (Q - L) * sparsevec(cols, vals, length(x))
-    q = -(Q - L)*(S - 1) + L
-    return OptimalityCut(G, q, subproblem.id)
 end
 
 Infeasible(subprob::SubProblem) = Infeasible(subprob.id)

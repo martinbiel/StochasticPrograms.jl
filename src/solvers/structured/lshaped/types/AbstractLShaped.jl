@@ -258,10 +258,12 @@ function indentstr(n::Integer)
     return repeat(" ", n)
 end
 
-function check_optimality(lshaped::AbstractLShaped)
+function check_optimality(lshaped::AbstractLShaped, added::Bool)
     @unpack τ = lshaped.parameters
     @unpack θ = lshaped.data
-    return θ > -Inf && gap(lshaped) <= τ
+    cut_condition = !added && norm(decision(lshaped) - lshaped.x) <= sqrt(eps())
+    gap_condition = θ > -Inf && gap(lshaped) <= τ
+    return (cut_condition || gap_condition) && check_optimality(lshaped, lshaped.integer)
 end
 # ======================================================================== #
 
@@ -338,8 +340,12 @@ function add_cut!(lshaped::AbstractLShaped, cut::AggregatedOptimalityCut, θs::A
     end
     return true
 end
-add_cut!(lshaped::AbstractLShaped, cut::AnyOptimalityCut, θs::AbstractVector, subobjectives::AbstractVector, x::AbstractVector; check = true) = add_cut!(lshaped, cut, θs, subobjectives, cut(x); check = check)
-add_cut!(lshaped::AbstractLShaped, cut::AnyOptimalityCut, θs::AbstractVector, subobjectives::AbstractVector; check = true) = add_cut!(lshaped, cut, θs, subobjectives, current_decision(lshaped); check = check)
+function add_cut!(lshaped::AbstractLShaped, cut::AnyOptimalityCut, θs::AbstractVector, subobjectives::AbstractVector, x::AbstractVector; check = true)
+    return add_cut!(lshaped, cut, θs, subobjectives, cut(x); check = check)
+end
+function add_cut!(lshaped::AbstractLShaped, cut::AnyOptimalityCut, θs::AbstractVector, subobjectives::AbstractVector; check = true)
+    return add_cut!(lshaped, cut, θs, subobjectives, current_decision(lshaped); check = check)
+end
 
 function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, ::AbstractVector, subobjectives::AbstractVector, Q::AbstractFloat; check = true)
     # Ensure that there is no false convergence
@@ -354,14 +360,31 @@ function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, ::A
     end
     return true
 end
-add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, θs::AbstractVector, subobjectives::AbstractVector; check = true) = add_cut!(lshaped, cut, θs, subobjectives, Inf)
+function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, θs::AbstractVector, subobjectives::AbstractVector; check = true)
+    correction = if has_metadata(lshaped.execution.metadata, cut.id, :correction)
+        correction = get_metadata(lshaped.execution.metadata, cut.id, :correction)
+    else
+        correction = 1.
+    end
+    return add_cut!(lshaped, cut, θs, subobjectives, correction * Inf)
+end
 
 function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{Infeasible}, ::AbstractVector, subobjectives::AbstractVector; check = true)
-    subobjectives[cut.id] = Inf
+    correction = if has_metadata(lshaped.execution.metadata, cut.id, :correction)
+        correction = get_metadata(lshaped.execution.metadata, cut.id, :correction)
+    else
+        correction = 1.
+    end
+    subobjectives[cut.id] = correction * Inf
     return true
 end
 
 function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{Unbounded}, ::AbstractVector, subobjectives::AbstractVector; check = true)
-    subobjectives[cut.id] = -Inf
+    correction = if has_metadata(lshaped.execution.metadata, cut.id, :correction)
+        correction = get_metadata(lshaped.execution.metadata, cut.id, :correction)
+    else
+        correction = 1.
+    end
+    subobjectives[cut.id] = correction * -Inf
     return true
 end

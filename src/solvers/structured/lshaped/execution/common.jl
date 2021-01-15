@@ -102,8 +102,8 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     lshaped.data.Q = Q
     # Update incumbent (if applicable)
     take_step!(lshaped)
-    # Early optimality check if using level sets
-    if lshaped.regularization isa LevelSet && check_optimality(lshaped)
+    # Early gap optimality check if using level sets
+    if lshaped.regularization isa LevelSet && check_optimality(lshaped, false)
         # Resolve subproblems with optimal vector
         lshaped.x .= decision(lshaped)
         resolve_subproblems!(lshaped)
@@ -121,10 +121,12 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     # Update master solution
     update_solution!(lshaped)
     lshaped.data.θ = calculate_estimate(lshaped)
+    # Handle integrality
+    handle_integrality!(lshaped, lshaped.integer)
     # Log progress
     log!(lshaped)
     # Check optimality
-    if check_optimality(lshaped) || (!added && norm(decision(lshaped) - lshaped.x) <= sqrt(eps()))
+    if check_optimality(lshaped, added)
         # Optimal, final log
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL

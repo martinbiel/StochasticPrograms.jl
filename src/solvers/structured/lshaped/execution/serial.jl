@@ -12,6 +12,7 @@ struct SerialExecution{T <: AbstractFloat,
     decisions::Decisions
     subobjectives::A
     model_objectives::A
+    metadata::MetaData
 
     function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
                              feasibility_strategy::AbstractFeasibilityStrategy,
@@ -21,7 +22,7 @@ struct SerialExecution{T <: AbstractFloat,
                                                A <: AbstractVector}
         F = worker_type(feasibility_strategy)
         I = worker_type(integer_strategy)
-        execution = new{T,A,F,I}(Vector{SubProblem{T,F,I}}(), structure.decisions[2], A(), A())
+        execution = new{T,A,F,I}(Vector{SubProblem{T,F,I}}(), structure.decisions[2], A(), A(), MetaData())
         # Load subproblems
         for i in 1:num_subproblems(structure, 2)
             push!(execution.subproblems, SubProblem(
@@ -74,7 +75,7 @@ function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecuti
     # Update and solve subproblems
     for subproblem in execution.subproblems
         update_subproblem!(subproblem)
-        cut::SparseHyperPlane{T} = subproblem(lshaped.x)
+        cut::SparseHyperPlane{T} = subproblem(lshaped.x, execution.metadata)
         added |= aggregate_cut!(lshaped, lshaped.aggregation, cut)
     end
     added |= flush!(lshaped, lshaped.aggregation)

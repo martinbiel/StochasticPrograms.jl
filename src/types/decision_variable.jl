@@ -1138,3 +1138,17 @@ end
 function JuMP.moi_function_type(::Type{<:Vector{<:DecisionVariable}})
     return VectorOfDecisions
 end
+
+"""
+    relax_integrality(stochasticprogram::StochasticProgram)
+
+Modifies `stochasticprogram` to "relax" all binary and integrality constraints on decisions and auxilliary variables.
+
+Returns a function that can be called without any arguments to restore the
+original stochasticprogram. The behavior of this function is undefined if additional
+changes are made to the affected decisions and variables in the meantime.
+"""
+function JuMP.relax_integrality(stochasticprogram::StochasticProgram)
+    unrelax = relax_integrality(structure(stochasticprogram))
+    return unrelax
+end

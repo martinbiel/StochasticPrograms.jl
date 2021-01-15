@@ -32,8 +32,23 @@ end
 
 RemoteIterates{A} = RemoteChannel{IterateChannel{A}}
 
+const MetaData = Dict{Tuple{Int,Symbol},Any}
+
+has_metadata(data::MetaData, type::Symbol) = haskey(data, (0, type))
+has_metadata(data::MetaData, idx::Integer, type::Symbol) = haskey(data, (idx, type))
+get_metadata(data::MetaData, type::Symbol) = data[(0, type)]
+get_metadata(data::MetaData, idx::Integer, type::Symbol) = data[(idx, type)]
+function set_metadata!(data::MetaData, type::Symbol, value)
+    data[(0, type)] = value
+    return nothing
+end
+function set_metadata!(data::MetaData, idx::Integer, type::Symbol, value)
+    data[(idx, type)] = value
+    return nothing
+end
+
 mutable struct MetaChannel <: AbstractChannel{Any}
-    metadata::Dict{Tuple{Int,Symbol},Any}
+    metadata::MetaData
     cond_take::Condition
     MetaChannel() = new(Dict{Tuple{Int,Symbol},Any}(), Condition())
 end
@@ -64,4 +79,17 @@ function wait(channel::MetaChannel, t, key)
     end
 end
 
-MetaData = RemoteChannel{MetaChannel}
+MetaDataChannel = RemoteChannel{MetaChannel}
+
+has_metadata(data::MetaDataChannel, type::Symbol) = isready(data, 0, type)
+has_metadata(data::MetaDataChannel, idx::Integer, type::Symbol) = isready(data, idx, type)
+get_metadata(data::MetaDataChannel, type::Symbol) = fetch(data, 0, type)
+get_metadata(data::MetaDataChannel, idx::Integer, type::Symbol) = fetch(data, idx, type)
+function set_metadata!(data::MetaDataChannel, type::Symbol, value)
+    put!(data, 0, type, value)
+    return nothing
+end
+function set_metadata!(data::MetaDataChannel, idx::Integer, type::Symbol, value)
+    put!(data, idx, type, value)
+    return nothing
+end

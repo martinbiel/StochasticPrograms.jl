@@ -600,6 +600,11 @@ function JuMP.jump_function(structure::DeterministicEquivalent{N},
     return JuMP.jump_function(structure.model, f)
 end
 
+function JuMP.relax_integrality(structure::DeterministicEquivalent)
+    unrelax = relax_decision_integrality(structure.model)
+    return unrelax
+end
+
 # Getters #
 # ========================== #
 function structure_name(structure::DeterministicEquivalent)

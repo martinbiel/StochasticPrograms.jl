@@ -22,7 +22,8 @@ struct AsynchronousExecution{T <: AbstractFloat,
     decisions::Vector{DecisionChannel}
     work::Vector{Work}
     finalize::Vector{Work}
-    metadata::Vector{MetaData}
+    metadata::MetaDataChannel
+    remote_metadata::Vector{MetaDataChannel}
     iterates::RemoteIterates{A}
     cutqueue::CutQueue{T}
     active_workers::Vector{Future}
@@ -48,6 +49,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
                                  scenarioproblems(structure).decisions,
                                  Vector{Work}(undef, nworkers()),
                                  Vector{Work}(undef, nworkers()),
+                                 RemoteChannel(() -> MetaChannel()),
                                  Vector{MetaData}(undef, nworkers()),
                                  RemoteChannel(() -> IterateChannel(Dict{Int,A}())),
                                  RemoteChannel(() -> Channel{QCut{T}}(max_active * nworkers() * num_scenarios(structure))),
@@ -82,9 +84,9 @@ function finish_initilization!(lshaped::AbstractLShaped, execution::Asynchronous
     for w in workers()
         execution.work[w-1] = RemoteChannel(() -> Channel{Int}(execution.max_active+1), w)
         execution.finalize[w-1] = RemoteChannel(() -> Channel{Int}(1), w)
-        execution.metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
+        execution.remote_metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
         put!(execution.work[w-1], 1)
-        put!(execution.metadata[w-1], 1, :gap, Inf)
+        put!(execution.remote_metadata[w-1], 1, :gap, Inf)
     end
     return nothing
 end
@@ -100,7 +102,7 @@ function start_workers!(lshaped::AbstractLShaped, execution::AsynchronousExecuti
                                                    execution.finalize[w-1],
                                                    execution.cutqueue,
                                                    execution.iterates,
-                                                   execution.metadata[w-1],
+                                                   execution.remote_metadata[w-1],
                                                    worker_aggregator)
     end
     return nothing
@@ -261,7 +263,7 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{T})
                 for w in workers()
                     if !isready(execution.active_workers[w-1])
                         put!(execution.work[w-1], t+1)
-                        put!(execution.metadata[w-1], t+1, :gap, gap(lshaped))
+                        put!(execution.remote_metadata[w-1], t+1, :gap, gap(lshaped))
                     end
                 end
                 execution.data.timestamp = t + 1
@@ -321,7 +323,7 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{T})
             for w in workers()
                 if !isready(execution.active_workers[w-1])
                     put!(execution.work[w-1], t+1)
-                    put!(execution.metadata[w-1], t+1, :gap, gap(lshaped))
+                    put!(execution.remote_metadata[w-1], t+1, :gap, gap(lshaped))
                 end
             end
             # New active iteration

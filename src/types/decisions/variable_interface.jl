@@ -478,6 +478,84 @@ Base.iszero(::DecisionRef) = false
 Base.copy(dref::DecisionRef) = DecisionRef(dref.model, dref.index)
 Base.broadcastable(dref::DecisionRef) = Ref(dref)
 
+function JuMP._info_from_variable(dref::DecisionRef)
+    has_lb = has_lower_bound(dref)
+    lb = has_lb ? lower_bound(dref) : -Inf
+    has_ub = has_upper_bound(dref)
+    ub = has_ub ? upper_bound(dref) : Inf
+    has_fix = is_fixed(dref)
+    fixed_value = has_fix ? value(dref) : NaN
+    start_or_nothing = start_value(dref)
+    has_start = !(start_or_nothing isa Nothing)
+    start = has_start ? start_or_nothing : NaN
+    has_start = start !== Nothing
+    binary = is_binary(dref)
+    integer = is_integer(dref)
+    return VariableInfo(has_lb, lb, has_ub, ub, has_fix, fixed_value,
+                        has_start, start, binary, integer)
+end
+
+function relax_decision_integrality(model::JuMP.Model)
+    N = length(model.ext[:decisions])
+    all_known = mapreduce(vcat, 1:N-1) do s
+        index.(all_known_decision_variables(model, s))
+    end
+    all_decisions = index.(all_decision_variables(model, N))
+    # Collect variable info
+    info_pre_relaxation = Vector{Tuple{AbstractVariableRef, VariableInfo}}()
+    for var in all_variables(model)
+        vi = index(var)
+        if vi in all_known
+            # Known decision, skip
+            continue
+        end
+        if vi in all_decisions
+            # Decision variable
+            dref = DecisionRef(model, vi)
+            push!(info_pre_relaxation, (dref, JuMP._info_from_variable(dref)))
+        else
+            # Auxilliary variable
+            push!(info_pre_relaxation, (var, JuMP._info_from_variable(var)))
+        end
+    end
+    for (v, info) in info_pre_relaxation
+        if info.integer
+            unset_integer(v)
+        elseif info.binary
+            unset_binary(v)
+            if !info.has_fix
+                set_lower_bound(v, max(0.0, info.lower_bound))
+                set_upper_bound(v, min(1.0, info.upper_bound))
+            elseif info.fixed_value < 0 || info.fixed_value > 1
+                error("The model has no valid relaxation: binary variable " *
+                      "fixed out of bounds.")
+            end
+        end
+    end
+    function unrelax()
+        for (v, info) in info_pre_relaxation
+            if info.integer
+                set_integer(v)
+            elseif info.binary
+                set_binary(v)
+                if !info.has_fix
+                    if info.has_lb
+                        set_lower_bound(v, info.lower_bound)
+                    else
+                        delete_lower_bound(v)
+                    end
+                    if info.has_ub
+                        set_upper_bound(v, info.upper_bound)
+                    else
+                        delete_upper_bound(v)
+                    end
+                end
+            end
+        end
+        return
+    end
+    return unrelax
+end
 # JuMP copy interface #
 # ========================== #
 function JuMP.copy_extension_data(decisions::NTuple{N,Decisions}, dest::Model, src::Model) where N

@@ -23,6 +23,6 @@ struct RawIntegerParameter <: IntegerParameter
     name::Any
 end
 
-#include("common.jl")
+include("common.jl")
 include("ignore_integers.jl")
-include("weak_cuts.jl")
+include("combinatorial_cuts.jl")

@@ -12,7 +12,8 @@ struct SynchronousExecution{T <: AbstractFloat,
     decisions::Vector{DecisionChannel}
     subobjectives::A
     model_objectives::A
-    metadata::Vector{MetaData}
+    metadata::MetaDataChannel
+    remote_metadata::Vector{MetaDataChannel}
     cutqueue::CutQueue{T}
 
     function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
@@ -27,7 +28,8 @@ struct SynchronousExecution{T <: AbstractFloat,
                                   scenarioproblems(structure).decisions,
                                   A(),
                                   A(),
-                                  Vector{MetaData}(undef, nworkers()),
+                                  RemoteChannel(() -> MetaChannel()),
+                                  Vector{MetaDataChannel}(undef, nworkers()),
                                   RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))),
                                   Vector{Future}(undef, nworkers()))
         # Start loading subproblems
@@ -44,7 +46,7 @@ function finish_initilization!(lshaped::AbstractLShaped, execution::SynchronousE
     append!(execution.subobjectives, fill(1e10, num_thetas(lshaped)))
     append!(execution.model_objectives, fill(-1e10, num_thetas(lshaped)))
     for w in workers()
-        execution.metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
+        execution.remote_metadata[w-1] = RemoteChannel(() -> MetaChannel(), w)
     end
     return lshaped
 end
