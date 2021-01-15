@@ -529,7 +529,7 @@ function JuMP.LowerBoundRef(dref::DecisionRef)
                                                           ci,
                                                           ScalarShape())
 end
-function JuMP.set_lower_bound(dref::Decision, lower::Number)
+function JuMP.set_lower_bound(dref::DecisionRef, lower::Number)
     new_set = MOI.GreaterThan(convert(Float64, lower))
     if has_lower_bound(dref)
         ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
