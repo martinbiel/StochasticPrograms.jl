@@ -94,7 +94,7 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Det
         if cache[key].modattr[MOI.TerminationStatus()] == MOI.OPTIMAL
             Q = 0.0
             try
-                Qᵢ = MOIU.eval_variables(structure.sub_objectives[1][i][2]) do idx
+                Qᵢ = MOIU.eval_variables(structure.sub_objectives[2][i][2]) do idx
                     return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
                 end
                 cache[key].modattr[MOI.ObjectiveValue()] = Qᵢ
