@@ -135,6 +135,7 @@ export
     decision_names,
     all_decision_variables,
     all_known_decision_variables,
+    all_auxiliary_variables,
     decision_by_name,
     recourse_length,
     first_stage,

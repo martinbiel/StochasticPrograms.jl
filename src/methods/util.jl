@@ -141,6 +141,69 @@ function extract_set(expr)
     return set, new_expr, found
 end
 
+function canonical(C::AbstractMatrix{T}, d₁::AbstractVector{T}, d₂::AbstractVector{T}; direction = :leq) where T <: AbstractFloat
+    i₁      = isfinite.(d₁)
+    i₂      = isfinite.(d₂)
+    m₁, m₂  = sum(i₁), sum(i₂)
+    m       = m₁ + m₂
+    m == 0 && return zero(C), zero(d₁)
+    C̃       = zeros(T, m, size(C, 2))
+    d̃       = zeros(T, m)
+    C̃[1:m₁,:]        = -C[i₁, :]
+    d̃[1:m₁]          = -d₁[i₁]
+    C̃[(m₁+1):end,:]  = C[i₂,:]
+    d̃[(m₁+1):end]    = d₂[i₂]
+    if direction == :leq
+        return C̃, d̃
+    elseif direction == :geq
+        return -C̃, -d̃
+    else
+        error("unknown direction.")
+    end
+end
+
+function canonical(C::AbstractSparseMatrix{T}, d₁::AbstractVector{T}, d₂::AbstractVector{T}; direction = :leq) where T <: AbstractFloat
+    # Convert to canonical form
+    i₁     = isfinite.(d₁)
+    i₂     = isfinite.(d₂)
+    m₁, m₂ = sum(i₁), sum(i₂)
+    m      = m₁ + m₂
+    m == 0 && return zero(C), zero(d₁)
+    C̃ᵢ     = Vector{Int}()
+    C̃ⱼ     = Vector{Int}()
+    C̃ᵥ     = Vector{T}()
+    d̃      = zeros(T, m)
+    d̃[1:m₁] = -d₁[i₁]
+    d̃[(m₁+1):end]    = d₂[i₂]
+    rows   = rowvals(C)
+    vals   = nonzeros(C)
+    for col in 1:size(C, 2)
+        for j in nzrange(C, col)
+            row = rows[j]
+            if i₁[row]
+                idx = count(i -> i, i₁[1:row])
+                push!(C̃ᵢ, idx)
+                push!(C̃ⱼ, col)
+                push!(C̃ᵥ, -vals[j])
+            end
+            if i₂[row]
+                idx = count(i -> i, i₂[1:row])
+                push!(C̃ᵢ, m₁ + idx)
+                push!(C̃ⱼ, col)
+                push!(C̃ᵥ, vals[j])
+            end
+        end
+    end
+    C̃ = sparse(C̃ᵢ, C̃ⱼ, C̃ᵥ, m, size(C, 2))
+    if direction == :leq
+        return C̃, d̃
+    elseif direction == :geq
+        return -C̃, -d̃
+    else
+        error("unknown direction.")
+    end
+end
+
 function decision_variables_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     return all_decisions(get_decisions(proxy(stochasticprogram, s), s))

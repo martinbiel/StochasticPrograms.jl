@@ -11,7 +11,7 @@ end
 """
     CombinatorialCutsMaster
 
-Master functor object for using weak optimality cuts in an integer L-shaped algorithm. Requires all first-stage decisions to be binary. Create by supplying a [`UseCombinatorialCuts`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
+Master functor object for using weak optimality cuts in an integer L-shaped algorithm. Requires all first-stage decisions to be binary. Create by supplying a [`CombinatorialCuts`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
 
 """
 struct CombinatorialCutsMaster{T <: AbstractFloat} <: AbstractIntegerAlgorithm
@@ -21,6 +21,14 @@ struct CombinatorialCutsMaster{T <: AbstractFloat} <: AbstractIntegerAlgorithm
         T_ = promote_type(T, Float32)
         return new{T_}(CombinatorialCutsParameters{T}(; kw...))
     end
+end
+
+function initialize_integer_algorithm!(master::CombinatorialCutsMaster, first_stage::JuMP.Model)
+    # Sanity check
+    if !all(is_binary, all_decision_variables(first_stage, 1))
+        error("Combinatorial cuts require all first-stage decisions to be binary.")
+    end
+    return nothing
 end
 
 function handle_integrality!(lshaped::AbstractLShaped, master::CombinatorialCutsMaster)
@@ -71,19 +79,36 @@ end
 """
     CombinatorialCutsWorker
 
-Worker functor object for using weak optimality cuts in an integer L-shaped algorithm. Create by supplying a [`UseCombinatorialCuts`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
+Worker functor object for using weak optimality cuts in an integer L-shaped algorithm. Create by supplying a [`CombinatorialCuts`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
 
 """
 struct CombinatorialCutsWorker{T <: AbstractFloat} <: AbstractIntegerAlgorithm
     data::CombinatorialCutsData{T}
     parameters::CombinatorialCutsParameters{T}
+    integer_variables::Vector{MOI.VariableIndex}
 
     function CombinatorialCutsWorker(::Type{T}; kw...) where T <: AbstractFloat
         T_ = promote_type(T, Float32)
-        worker = new{T_}(CombinatorialCutsData{T_}(), CombinatorialCutsParameters{T}(; kw...))
+        worker = new{T_}(CombinatorialCutsData{T_}(),
+                         CombinatorialCutsParameters{T}(; kw...),
+                         Vector{MOI.VariableIndex}())
         worker.data.L = worker.parameters.lower_bound
         return worker
     end
+end
+
+function initialize_integer_algorithm!(worker::CombinatorialCutsWorker, subproblem::SubProblem)
+    # Gather integer variables
+    append!(worker.integer_variables, gather_integer_variables(subproblem))
+    # Sanity check
+    if isempty(worker.integer_variables)
+        @warn "No integer variables in subproblem $(subproblem.id). Integer strategy is superfluous."
+    end
+    return nothing
+end
+
+function integer_variables(worker::CombinatorialCutsWorker)
+    return worker.integer_variables
 end
 
 function update_lower_bound!(worker::CombinatorialCutsWorker, L::AbstractFloat)
@@ -119,11 +144,11 @@ function solve_subproblem(subproblem::SubProblem,
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
     if status ∈ AcceptableTermination
-        # Check if integer restrictions are satisfied
+        # Integer restrictions are satisfied if optimal
         set_metadata!(metadata,
                       subproblem.id,
                       :integral_solution,
-                      check_integrality_restrictions(subproblem))
+                      true)
         return CombinatorialOptimalityCut(subproblem, x, worker.data.L)
     elseif status == MOI.INFEASIBLE
         return Infeasible(subproblem)
@@ -201,23 +226,23 @@ end
 # API
 # ------------------------------------------------------------
 """
-    UseCombinatorialCuts
+    CombinatorialCuts
 
 Factory object for [`CombinatorialCuts`](@ref). Pass to `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
 
 """
-struct UseCombinatorialCuts <: AbstractIntegerStrategy
+struct CombinatorialCuts <: AbstractIntegerStrategy
     parameters::CombinatorialCutsParameters{Float64}
 end
-UseCombinatorialCuts(; kw...) = UseCombinatorialCuts(CombinatorialCutsParameters(; kw...))
+CombinatorialCuts(; kw...) = CombinatorialCuts(CombinatorialCutsParameters(; kw...))
 
-function master(wc::UseCombinatorialCuts, ::Type{T}) where T <: AbstractFloat
+function master(wc::CombinatorialCuts, ::Type{T}) where T <: AbstractFloat
     return CombinatorialCutsMaster(T; type2dict(wc.parameters)...)
 end
 
-function worker(wc::UseCombinatorialCuts, ::Type{T}) where T <: AbstractFloat
+function worker(wc::CombinatorialCuts, ::Type{T}) where T <: AbstractFloat
     return CombinatorialCutsWorker(T; type2dict(wc.parameters)...)
 end
-function worker_type(::UseCombinatorialCuts)
+function worker_type(::CombinatorialCuts)
     return CombinatorialCutsWorker{Float64}
 end

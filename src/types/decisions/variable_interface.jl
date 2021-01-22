@@ -80,6 +80,25 @@ function all_known_decision_variables(model::JuMP.Model, stage::Integer)
     end
 end
 """
+    all_auxiliary_variables(model::JuMP.Model)
+
+Returns a list of all auxiliary variables currently in the decision `model` through `@variable`. The variables are ordered by creation time.
+"""
+function all_auxiliary_variables(model::JuMP.Model)
+    haskey(model.ext, :decisions) || error("No decisions in model. Use `all_variables` as usual.")
+    N = length(model.ext[:decisions])
+    all_known = mapreduce(vcat, all_known_decision_variables(model)) do krefs
+        index.(krefs)
+    end
+    all_decisions = map(all_decision_variables(model, N)) do drefs
+        index.(drefs)
+    end
+    return filter(all_variables(model)) do var
+        vi = index(var)
+        return !(vi in all_known || vi in all_decisions)
+    end
+end
+"""
     num_decisions(model::JuMP.Model, stage::Integer = 1)
 
 Return the number of decisions in `model` at stage `stage`. Defaults to the first stage.
@@ -101,6 +120,10 @@ end
 
 # Getters (refs) #
 # ========================== #
+function stage(model::JuMP.Model)
+    haskey(model.ext, :decisions) || error("No decisions in model.")
+    N = length(model.ext[:decisions])
+end
 function stage(dref::DecisionRef)
     haskey(dref.model.ext, :stage_map) || error("No decisions in model.")
     return dref.model.ext[:stage_map][index(dref)]
@@ -514,7 +537,7 @@ function relax_decision_integrality(model::JuMP.Model)
             dref = DecisionRef(model, vi)
             push!(info_pre_relaxation, (dref, JuMP._info_from_variable(dref)))
         else
-            # Auxilliary variable
+            # Auxiliary variable
             push!(info_pre_relaxation, (var, JuMP._info_from_variable(var)))
         end
     end

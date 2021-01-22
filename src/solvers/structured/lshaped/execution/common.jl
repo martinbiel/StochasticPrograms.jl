@@ -89,7 +89,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     # Resolve all subproblems at the current optimal solution
     Q, added = resolve_subproblems!(lshaped)
     if Q == Inf && !handle_feasibility(lshaped.feasibility)
-        @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with feasibility_strategy = UseFeasibilityCuts to use feasibility cuts."
+        @warn "Stochastic program is not second-stage feasible at the current decision. Rerun procedure with feasibility_strategy = FeasibilityCuts to use feasibility cuts."
         # Early termination log
         log!(lshaped; status = MOI.INFEASIBLE)
         return MOI.INFEASIBLE

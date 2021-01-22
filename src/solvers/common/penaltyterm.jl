@@ -35,7 +35,7 @@ function initialize_penaltyterm!(penalty::Quadratic,
     if !quad_support
         throw(MOI.UnsupportedAttribute(MOI.ConstraintFunction(), "Using a quadratic penalty term requires an optimizer that supports quadratic constraints"))
     end
-    # Add ℓ₂-norm auxilliary variable
+    # Add ℓ₂-norm auxiliary variable
     penalty.t = MOI.add_variable(model)
     t = MOI.SingleVariable(penalty.t)
     # Prepare variable vectors
@@ -168,7 +168,7 @@ Functor object for using an approximately quadratic penalty term, through linear
 mutable struct Linearized <: AbstractPenaltyterm
     num_breakpoints::Int
     spacing::Float64
-    auxilliary_variables::Vector{MOI.VariableIndex}
+    auxiliary_variables::Vector{MOI.VariableIndex}
     constraints::Vector{LinearizationConstraint}
 
     function Linearized(num_breakpoints::Integer, spacing::Float64)
@@ -191,13 +191,13 @@ function initialize_penaltyterm!(penalty::Linearized,
     T = typeof(α)
     n = length(x)
     m = penalty.num_breakpoints
-    resize!(penalty.auxilliary_variables, n)
+    resize!(penalty.auxiliary_variables, n)
     resize!(penalty.constraints, n * m)
     F = MOI.get(model, MOI.ObjectiveFunctionType())
-    # Add auxilliary cost variables
+    # Add auxiliary cost variables
     for i in eachindex(x)
-        penalty.auxilliary_variables[i] = MOI.add_variable(model)
-        var = penalty.auxilliary_variables[i]
+        penalty.auxiliary_variables[i] = MOI.add_variable(model)
+        var = penalty.auxiliary_variables[i]
         MOI.add_constraint(model, MOI.SingleVariable(var), MOI.GreaterThan(0.0))
         name = add_subscript("‖x - ξ‖₂²", i)
         MOI.set(model, MOI.VariableName(), var, name)
@@ -210,7 +210,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     end .- (penalty.spacing - 1)
     k = 1
     for i in eachindex(x)
-        tᵢ = MOI.SingleVariable(penalty.auxilliary_variables[i])
+        tᵢ = MOI.SingleVariable(penalty.auxiliary_variables[i])
         xᵢ = SingleDecision(x[i])
         ξᵢ = SingleDecision(ξ[i])
         for (j,r) in enumerate(breakpoints)
@@ -236,7 +236,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     for i in eachindex(x)
         MOI.modify(model,
                    MOI.ObjectiveFunction{F}(),
-                   MOI.ScalarCoefficientChange(penalty.auxilliary_variables[i],
+                   MOI.ScalarCoefficientChange(penalty.auxiliary_variables[i],
                                                correction * α))
     end
     return nothing
@@ -254,7 +254,7 @@ function update_penaltyterm!(penalty::Linearized,
     for i in eachindex(x)
         MOI.modify(model,
                    MOI.ObjectiveFunction{F}(),
-                   MOI.ScalarCoefficientChange(penalty.auxilliary_variables[i], correction * α))
+                   MOI.ScalarCoefficientChange(penalty.auxiliary_variables[i], correction * α))
     end
     # Update projection targets
     for vi in ξ
@@ -276,10 +276,10 @@ function remove_penalty!(penalty::Linearized,
         end
     end
     # Delete aux variables
-    for (i,var) in enumerate(penalty.auxilliary_variables)
+    for (i,var) in enumerate(penalty.auxiliary_variables)
         if !iszero(var.value)
             MOI.delete(model, var)
-            penalty.auxilliary_variables[i] = MOI.VariableIndex(0)
+            penalty.auxiliary_variables[i] = MOI.VariableIndex(0)
         end
     end
     return nothing
@@ -287,7 +287,7 @@ end
 
 function remove_penalty_variables!(penalty::Linearized,
                                    list::Vector{MOI.VariableIndex})
-    filter!(vi -> !(vi in penalty.auxilliary_variables), list)
+    filter!(vi -> !(vi in penalty.auxiliary_variables), list)
     return nothing
 end
 
@@ -317,7 +317,7 @@ function initialize_penaltyterm!(penalty::InfNorm,
                                  ξ::Vector{MOI.VariableIndex})
     T = typeof(α)
     n = length(x) + 1
-    # Add ∞-norm auxilliary variable
+    # Add ∞-norm auxiliary variable
     penalty.t = MOI.add_variable(model)
     MOI.set(model, MOI.VariableName(), penalty.t, "||x - ξ||_∞")
     x = VectorOfDecisions(x)
@@ -405,7 +405,7 @@ function initialize_penaltyterm!(penalty::ManhattanNorm,
                                  ξ::Vector{MOI.VariableIndex})
     T = typeof(α)
     n = length(x) + 1
-    # Add ∞-norm auxilliary variable
+    # Add ∞-norm auxiliary variable
     penalty.t = MOI.add_variable(model)
     MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₁")
     x = VectorOfDecisions(x)

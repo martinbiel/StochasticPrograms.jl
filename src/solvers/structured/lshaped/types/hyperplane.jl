@@ -21,8 +21,8 @@ end
 OptimalityCut(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, OptimalityCut)
 FeasibilityCut(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, FeasibilityCut)
 LinearConstraint(δQ::AbstractVector, q::AbstractFloat, id::Int) = HyperPlane(δQ, q, id, LinearConstraint)
-Infeasible(id::Int) = HyperPlane(sparsevec(Float64[]), 1e10, id, Infeasible)
-Unbounded(id::Int) = HyperPlane(sparsevec(Float64[]), 1e10, id, Unbounded)
+Infeasible(Q::AbstractFloat, id::Int) = HyperPlane(sparsevec(Float64[]), Q, id, Infeasible)
+Unbounded(Q::AbstractFloat, id::Int) = HyperPlane(sparsevec(Float64[]), Q, id, Unbounded)
 
 struct AggregatedOptimalityCut{T <: AbstractFloat, A <: AbstractVector} <: AbstractHyperPlane
     δQ::A
@@ -62,10 +62,10 @@ function (cut::AggregatedOptimalityCut)(x::AbstractVector)
     return cut.q-cut.δQ⋅x
 end
 function (hyperplane::HyperPlane{Infeasible})(x::AbstractVector)
-    return Inf
+    return hyperplane.q
 end
 function (hyperplane::HyperPlane{Unbounded})(x::AbstractVector)
-    return -Inf
+    return hyperplane.q
 end
 
 infeasible(hyperplane::AbstractHyperPlane) = false

@@ -186,7 +186,7 @@ function parse_sto(::Type{T}, tim::RawTime, cor::RawCor, filename::AbstractStrin
             elseif mode == SCENARIOS
                 if words[1] == "SC"
                     length(words) == 5 || error("Malformed+ sto file at line $words.")
-                    words[3] == "'ROOT'" || error("SCEN format currently only supported for two-stage models.")
+                    words[3] == "ROOT" || error("SCEN format currently only supported for two-stage models.")
                     stage_name = Symbol(words[5])
                     haskey(tim.stages, stage_name) || error("Stage name $stage_name not specified in .tim file.")
                     stage = tim.stages[stage_name]

@@ -15,7 +15,7 @@ restore!(::MOI.ModelLike, ::NoFeasibilityAlgorithm) = nothing
 """
     FeasibilityCutsMaster
 
-Master functor object for using feasibility cuts in an L-shaped algorithm. Create by supplying a [`UseFeasibilityCuts`](@ref) object through `feasibility_strategy` in `LShaped.Optimizer` or set the [`FeasibilityStrategy`](@ref) attribute.
+Master functor object for using feasibility cuts in an L-shaped algorithm. Create by supplying a [`FeasibilityCuts`](@ref) object through `feasibility_strategy` in `LShaped.Optimizer` or set the [`FeasibilityStrategy`](@ref) attribute.
 """
 struct FeasibilityCutsMaster{T <: AbstractFloat} <: AbstractFeasibilityAlgorithm
     cuts::Vector{SparseFeasibilityCut{T}}
@@ -33,7 +33,7 @@ restore!(::MOI.ModelLike, ::FeasibilityCutsMaster) = nothing
 """
     FeasibilityCutsWorker
 
-Worker functor object for using feasibility cuts in an L-shaped algorithm. Create by supplying a [`UseFeasibilityCuts`](@ref) object through `feasibility_strategy` in `LShaped.Optimizer` or set the [`FeasibilityStrategy`](@ref) attribute.
+Worker functor object for using feasibility cuts in an L-shaped algorithm. Create by supplying a [`FeasibilityCuts`](@ref) object through `feasibility_strategy` in `LShaped.Optimizer` or set the [`FeasibilityStrategy`](@ref) attribute.
 """
 mutable struct FeasibilityCutsWorker <: AbstractFeasibilityAlgorithm
     objective::MOI.AbstractScalarFunction
@@ -50,7 +50,7 @@ function prepare!(model::MOI.ModelLike, worker::FeasibilityCutsWorker)
     i = 1
     # Create auxiliary feasibility variables
     for (F, S) in MOI.get(model, MOI.ListOfConstraints())
-        i = add_auxilliary_variables!(model, worker, F, S, i)
+        i = add_auxiliary_variables!(model, worker, F, S, i)
     end
     return nothing
 end
@@ -58,20 +58,20 @@ function prepared(worker::FeasibilityCutsWorker)
     return length(worker.feasibility_variables) > 0
 end
 
-function add_auxilliary_variables!(model::MOI.ModelLike,
-                                   worker::FeasibilityCutsWorker,
-                                   F::Type{<:MOI.AbstractFunction},
-                                   S::Type{<:MOI.AbstractSet},
-                                   idx::Integer)
+function add_auxiliary_variables!(model::MOI.ModelLike,
+                                  worker::FeasibilityCutsWorker,
+                                  F::Type{<:MOI.AbstractFunction},
+                                  S::Type{<:MOI.AbstractSet},
+                                  idx::Integer)
     # Nothing to do for most most constraints
     return idx
 end
 
-function add_auxilliary_variables!(model::MOI.ModelLike,
-                                   worker::FeasibilityCutsWorker,
-                                   F::Type{<:AffineDecisionFunction},
-                                   S::Type{<:MOI.AbstractScalarSet},
-                                   idx::Integer)
+function add_auxiliary_variables!(model::MOI.ModelLike,
+                                  worker::FeasibilityCutsWorker,
+                                  F::Type{<:AffineDecisionFunction},
+                                  S::Type{<:MOI.AbstractScalarSet},
+                                  idx::Integer)
     G = MOI.ScalarAffineFunction{Float64}
     obj_sense = MOI.get(model, MOI.ObjectiveSense())
     for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
@@ -107,11 +107,11 @@ function add_auxilliary_variables!(model::MOI.ModelLike,
     return idx + 1
 end
 
-function add_auxilliary_variables!(model::MOI.ModelLike,
-                                   worker::FeasibilityCutsWorker,
-                                   F::Type{<:VectorAffineDecisionFunction},
-                                   S::Type{<:MOI.AbstractVectorSet},
-                                   idx::Integer)
+function add_auxiliary_variables!(model::MOI.ModelLike,
+                                  worker::FeasibilityCutsWorker,
+                                  F::Type{<:VectorAffineDecisionFunction},
+                                  S::Type{<:MOI.AbstractVectorSet},
+                                  idx::Integer)
     G = MOI.ScalarAffineFunction{Float64}
     obj_sense = MOI.get(model, MOI.ObjectiveSense())
     for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
@@ -185,18 +185,18 @@ function worker_type(::IgnoreFeasibility)
     return NoFeasibilityAlgorithm
 end
 
-struct UseFeasibilityCuts <: AbstractFeasibilityStrategy end
+struct FeasibilityCuts <: AbstractFeasibilityStrategy end
 
-function master(::UseFeasibilityCuts, ::Type{T}) where T <: AbstractFloat
+function master(::FeasibilityCuts, ::Type{T}) where T <: AbstractFloat
     return FeasibilityCutsMaster(T)
 end
 
-function worker(::UseFeasibilityCuts, model::MOI.ModelLike)
+function worker(::FeasibilityCuts, model::MOI.ModelLike)
     # Cache objective
     func_type = MOI.get(model, MOI.ObjectiveFunctionType())
     obj = MOI.get(model, MOI.ObjectiveFunction{func_type}())
     return FeasibilityCutsWorker(obj, Vector{MOI.VariableIndex}())
 end
-function worker_type(::UseFeasibilityCuts)
+function worker_type(::FeasibilityCuts)
     return FeasibilityCutsWorker
 end

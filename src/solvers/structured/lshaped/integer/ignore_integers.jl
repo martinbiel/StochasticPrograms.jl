@@ -6,6 +6,33 @@ Empty functor object for running an L-shaped algorithm without dealing with inte
 """
 struct NoIntegerAlgorithm <: AbstractIntegerAlgorithm end
 
+function initialize_integer_algorithm!(::NoIntegerAlgorithm, first_stage::JuMP.Model)
+    # Sanity check
+    if any(is_binary, all_decision_variables(first_stage, 1)) ||
+       any(is_integer, all_decision_variables(first_stage, 1))
+        @warn "First-stage has binary/integer decisions and no `IntegerStrategy` has been set. Procedure will fail if second-stage has binary/integer variables. Otherwise, the master_optimizer must be integer-capable."
+    end
+    return nothing
+end
+
+function initialize_integer_algorithm!(::NoIntegerAlgorithm, subproblem::SubProblem)
+    if any(is_binary, all_decision_variables(subproblem.model, StochasticPrograms.stage(subproblem.model))) ||
+       any(is_integer, all_decision_variables(subproblem.model, StochasticPrograms.stage(subproblem.model))) ||
+       any(is_binary, all_auxiliary_variables(subproblem.model)) ||
+       any(is_integer, all_auxiliary_variables(subproblem.model))
+        error("Second-stage has binary/integer decisions. Rerun procedure with an `IntegerStrategy`.")
+    end
+    return nothing
+end
+
+function handle_integrality!(::AbstractLShaped, ::NoIntegerAlgorithm)
+    return nothing
+end
+
+function integer_variables(::NoIntegerAlgorithm)
+    return MOI.VariableIndex[]
+end
+
 function check_optimality(::AbstractLShaped, ::NoIntegerAlgorithm)
     return true
 end

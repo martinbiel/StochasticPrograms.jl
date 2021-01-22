@@ -80,7 +80,7 @@ println("y has lower bound in scenario 2: $(has_lower_bound(y, 2))")
 println("y has upper bound in scenario 2: $(has_upper_bound(y, 2))")
 println("lower_bound(y, 2) = lower_bound(y, 2)")
 ```
-The lower bound of ``y`` is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a [`Vertical`](@ref) or [`Horizontal`](@ref) structure. Auxilliary variables created with the standard `@variable` are not available through this API. To access them, either annotate them with [`@decision`](@ref) (or [`@recourse`](@ref) in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:
+The lower bound of ``y`` is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a [`Vertical`](@ref) or [`Horizontal`](@ref) structure. Auxiliary variables created with the standard `@variable` are not available through this API. To access them, either annotate them with [`@decision`](@ref) (or [`@recourse`](@ref) in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:
 ```@example decision
 w = DEP(sp)[:w]
 println(w)

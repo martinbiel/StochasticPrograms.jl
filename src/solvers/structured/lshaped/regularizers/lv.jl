@@ -94,13 +94,13 @@ end
 function filter_variables!(lv::LevelSet, list::Vector{MOI.VariableIndex})
     # Filter projection targets
     filter!(vi -> !(vi in lv.projection_targets), list)
-    # Filter any auxilliary penaltyterm variables
+    # Filter any auxiliary penaltyterm variables
     remove_penalty_variables!(lv.penaltyterm, list)
     return nothing
 end
 
 function filter_constraints!(lv::LevelSet, list::Vector{<:CI})
-    # Filter any auxilliary penaltyterm constraints
+    # Filter any auxiliary penaltyterm constraints
     remove_penalty_constraints!(lv.penaltyterm, list)
     # Filter level-set constraint
     i = something(findfirst(isequal(lv.data.constraint), list), 0)

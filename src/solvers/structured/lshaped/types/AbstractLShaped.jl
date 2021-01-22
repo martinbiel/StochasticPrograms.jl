@@ -12,6 +12,8 @@ function initialize!(lshaped::AbstractLShaped)
     lshaped.progress.thresh = lshaped.parameters.τ
     # Prepare the master optimization problem
     prepare_master!(lshaped)
+    # Initialize integer algorithm
+    initialize_integer_algorithm!(lshaped)
     # Initialize regularization policy
     initialize_regularization!(lshaped)
     # Finish initialization
@@ -370,21 +372,11 @@ function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut}, θs
 end
 
 function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{Infeasible}, ::AbstractVector, subobjectives::AbstractVector; check = true)
-    correction = if has_metadata(lshaped.execution.metadata, cut.id, :correction)
-        correction = get_metadata(lshaped.execution.metadata, cut.id, :correction)
-    else
-        correction = 1.
-    end
-    subobjectives[cut.id] = correction * Inf
+    subobjectives[cut.id] = cut.q
     return true
 end
 
 function add_cut!(lshaped::AbstractLShaped, cut::HyperPlane{Unbounded}, ::AbstractVector, subobjectives::AbstractVector; check = true)
-    correction = if has_metadata(lshaped.execution.metadata, cut.id, :correction)
-        correction = get_metadata(lshaped.execution.metadata, cut.id, :correction)
-    else
-        correction = 1.
-    end
-    subobjectives[cut.id] = correction * -Inf
+    subobjectives[cut.id] = cut.q
     return true
 end

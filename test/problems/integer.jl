@@ -1,4 +1,4 @@
-simple = @stochastic_model begin
+integer = @stochastic_model begin
     @stage 1 begin
         @decision(model, x₁, Bin)
         @decision(model, x₂, Bin)
@@ -12,6 +12,7 @@ simple = @stochastic_model begin
         @recourse(model, y₄, Bin)
         @objective(model, Max, 3*y₁ + 7*y₂ + 9*y₃ + 6*y₄)
         @constraint(model, 2*y₁ + 4*y₂ + 5*y₃ + 3*y₄ <= h - T₁*x₁ - T₂*x₂)
+        #@constraint(model, 2*y₁ + 4*y₂ + 5*y₃ + 3*y₄ >= 10*x₁)
     end
 end
 

@@ -1,7 +1,7 @@
 # Integer API #
 # ------------------------------------------------------------
-# initialize_regularization!(lshaped::AbstractLShaped) = initialize_regularization!(lshaped, lshaped.regularization)
-# restore_regularized_master!(lshaped::AbstractLShaped) = restore_regularized_master!(lshaped, lshaped.regularization)
+initialize_integer_algorithm!(lshaped::AbstractLShaped) = initialize_integer_algorithm!(lshaped.integer, lshaped.structure.first_stage)
+initialize_integer_algorithm!(subproblem::SubProblem) = initialize_integer_algorithm!(subproblem.integer_algorithm, subproblem)
 # filter_variables!(lshaped::AbstractLShaped, list) = filter_variables!(lshaped.regularization, list)
 # filter_constraints!(lshaped::AbstractLShaped, list) = filter_constraints!(lshaped.regularization, list)
 # log_regularization!(lshaped::AbstractLShaped) = log_regularization!(lshaped, lshaped.regularization)
@@ -26,3 +26,4 @@ end
 include("common.jl")
 include("ignore_integers.jl")
 include("combinatorial_cuts.jl")
+include("convexification.jl")

@@ -109,6 +109,9 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
     if optimizer.subproblem_optimizer === nothing
         StochasticPrograms.set_subproblem_optimizer!(structure, optimizer.master_optimizer)
     end
+    if optimizer.integer_strategy isa Convexification && optimizer.integer_strategy.parameters.optimizer === nothing
+        optimizer.integer_strategy.parameters.optimizer = MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
+    end
     # Restore structure if optimization has been run before
     restore_structure!(optimizer)
     # Ensure that execution policy is compatible
@@ -409,7 +412,7 @@ function MOI.get(optimizer::Optimizer, attr::MOI.ListOfVariableIndices)
     list = MOI.get(optimizer.lshaped.structure, attr)
     # Remove the master variables
     filter!(vi -> !(vi in optimizer.lshaped.master_variables), list)
-    # Remove any auxilliary variables from regularization
+    # Remove any auxiliary variables from regularization
     filter_variables!(optimizer.lshaped.regularization, list)
     return list
 end

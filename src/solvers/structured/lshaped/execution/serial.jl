@@ -51,6 +51,7 @@ function initialize_subproblems!(execution::SerialExecution{T},
             T(probability(scenario(scenarioproblems, i))),
             feasibility_strategy,
             integer_strategy))
+    end
     return nothing
 end
 

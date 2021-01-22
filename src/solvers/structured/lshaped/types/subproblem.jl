@@ -26,14 +26,17 @@ struct SubProblem{T <: AbstractFloat, F <: AbstractFeasibilityAlgorithm, I <: Ab
         constraints, terms =
             collect_linking_constraints(model,
                                         T)
-        return new{T,F,I}(id,
-                          π,
-                          model,
-                          optimizer,
-                          feasibility_algorithm,
-                          integer_algorithm,
-                          constraints,
-                          terms)
+        subproblem =  new{T,F,I}(id,
+                                 π,
+                                 model,
+                                 optimizer,
+                                 feasibility_algorithm,
+                                 integer_algorithm,
+                                 constraints,
+                                 terms)
+        # Initialize integer algorithm
+        initialize_integer_algorithm!(subproblem)
+        return subproblem
     end
 end
 
@@ -45,11 +48,12 @@ function collect_linking_constraints(model::JuMP.Model,
     masterterms = Vector{Vector{Tuple{Int, Int, T}}}()
     master_indices = index.(all_known_decision_variables(model, 1))
     # Parse single rows
-    F = DecisionAffExpr{Float64}
+    F = AffineDecisionFunction{T}
     for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
-        for cref in all_constraints(model, F, S)
+        for ci in MOI.get(backend(model), MOI.ListOfConstraintIndices{F,S}())
             coeffs = Vector{Tuple{Int, Int, T}}()
-            aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::DecisionAffExpr
+            f = MOI.get(backend(model), MOI.ConstraintFunction(), ci)::AffineDecisionFunction{T}
+            aff = JuMP.jump_function(model, f)::DecisionAffExpr{T}
             for (coef, kvar) in linear_terms(aff.decisions)
                 # Map known decisions to master decision,
                 # assuming sorted order
@@ -60,16 +64,17 @@ function collect_linking_constraints(model::JuMP.Model,
             end
             if !isempty(coeffs)
                 push!(masterterms, coeffs)
-                push!(linking_constraints, cref.index)
+                push!(linking_constraints, ci)
             end
         end
     end
     # Parse vector rows
-    F = Vector{DecisionAffExpr{Float64}}
+    F = VectorAffineDecisionFunction{T}
     for S in [MOI.Zeros, MOI.Nonpositives, MOI.Nonnegatives]
-        for cref in all_constraints(model, F, S)
+        for ci in MOI.get(backend(model), MOI.ListOfConstraintIndices{F,S}())
             coeffs = Vector{Tuple{Int, Int, T}}()
-            affs = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::Vector{DecisionAffExpr{T}}
+            f = MOI.get(backend(model), MOI.ConstraintFunction(), ci)::VectorAffineDecisionFunction{T}
+            affs = JuMP.jump_function(model, f)::Vector{DecisionAffExpr{T}}
             for (row, aff) in enumerate(affs)
                 for (coef, kvar) in linear_terms(aff.decisions)
                     # Map known decisions to master decision,
@@ -82,7 +87,7 @@ function collect_linking_constraints(model::JuMP.Model,
             end
             if !isempty(coeffs)
                 push!(masterterms, coeffs)
-                push!(linking_constraints, cref.index)
+                push!(linking_constraints, ci)
             end
         end
     end
@@ -95,7 +100,9 @@ function update_subproblem!(subproblem::SubProblem)
 end
 
 function restore_subproblem!(subproblem::SubProblem)
+    restore!(subproblem.optimizer, subproblem.integer_algorithm)
     restore!(subproblem.optimizer, subproblem.feasibility_algorithm)
+    return nothing
 end
 
 function (subproblem::SubProblem)(x::AbstractVector, metadata)
@@ -179,5 +186,16 @@ function FeasibilityCut(subproblem::SubProblem{T}, x::AbstractVector) where T <:
     return FeasibilityCut(G, g, subproblem.id)
 end
 
-Infeasible(subprob::SubProblem) = Infeasible(subprob.id)
-Unbounded(subprob::SubProblem) = Unbounded(subprob.id)
+function Infeasible(subproblem::SubProblem)
+    # Get sense
+    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    return Infeasible(correction * Inf, subproblem.id)
+end
+
+function Unbounded(subproblem::SubProblem)
+    # Get sense
+    sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
+    correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
+    return Unbounded(correction * -Inf, subproblem.id)
+end
