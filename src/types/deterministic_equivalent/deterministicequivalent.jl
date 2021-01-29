@@ -55,6 +55,10 @@ function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentMode
         return typeof(structure.sub_objectives[attr.stage][attr.scenario_index][2])
     elseif attr.attr isa MOI.ObjectiveSense
         return structure.sub_objectives[attr.stage][attr.scenario_index][1]
+    elseif attr.attr isa MOI.ObjectiveValue || attr.attr isa MOI.DualObjectiveValue
+        return MOIU.eval_variables(structure.sub_objectives[attr.stage][attr.scenario_index][2]) do idx
+            return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
+        end
     else
         # Most attributes are shared with the deterministic equivalent
         return MOI.get(backend(structure.model), attr.attr)

@@ -196,7 +196,7 @@ optimize!(sp)
 
 See also: [`VRP`](@ref)
 """
-function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), kw...)
+function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::AbstractCrash = Crash.None(), cache::Bool = false, kw...)
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Ensure stochastic program has been initialized at this point
@@ -207,8 +207,10 @@ function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::Abs
     x₀ = crash(stochasticprogram)
     # Switch on structure and solver type
     optimize!(structure(stochasticprogram), optimizer(stochasticprogram), x₀; kw...)
-    # Cache solution
-    cache_solution!(stochasticprogram, structure(stochasticprogram), optimizer(stochasticprogram))
+    # Cache solution (if requested)
+    if cache
+        cache_solution!(stochasticprogram, structure(stochasticprogram), optimizer(stochasticprogram))
+    end
     return nothing
 end
 """

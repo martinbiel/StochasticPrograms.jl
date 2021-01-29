@@ -130,8 +130,28 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
 
     fill_solution!(mockoptimizer, master_optimizer, subproblem_optimizer, x, y, c)
 
-    StochasticPrograms.cache_solution!(sp, sp.structure, mockoptimizer)
+    @test JuMP.has_values(sp)
+    @test MOI.OPTIMAL == @inferred JuMP.termination_status(sp)
+    @test "solver specific string" == JuMP.raw_status(sp)
+    @test MOI.FEASIBLE_POINT == @inferred JuMP.primal_status(sp)
 
+    @test  2.0 == @inferred JuMP.value(x)
+    @test  2.0 == @inferred JuMP.value(y, 1)
+    @test  4.0 == @inferred JuMP.value(x + y, Dict(2 => 1))
+    @test  2.0 == @inferred JuMP.value(c, 1)
+    @test  4.0 == @inferred JuMP.objective_value(sp)
+    @test  4.0 == @inferred JuMP.dual_objective_value(sp)
+
+    @test JuMP.has_duals(sp)
+    @test MOI.FEASIBLE_POINT == @inferred JuMP.dual_status(sp)
+    @test  2.0 == @inferred JuMP.reduced_cost(x)
+    @test  0.0 == @inferred JuMP.reduced_cost(y, 1)
+    @test -1.0 == @inferred JuMP.dual(c, 1)
+    @test  2.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(x))
+    @test  0.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(y), 1)
+
+    # Test caching
+    StochasticPrograms.cache_solution!(sp, sp.structure, mockoptimizer)
     @test haskey(sp.solutioncache, :solution)
     @test haskey(sp.solutioncache, :node_solution_1)
     @test haskey(sp.solutioncache, :node_solution_2_1)
