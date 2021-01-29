@@ -80,32 +80,62 @@ end
 function scenario(structure::AbstractBlockStructure, stage::Integer, scenario_index::Integer)
     scenario(scenarioproblems(structure, stage), scenario_index)
 end
+function scenario(structure::AbstractBlockStructure{2}, scenario_index::Integer)
+    scenario(scenarioproblems(structure, 2), scenario_index)
+end
 function scenarios(structure::AbstractBlockStructure, stage::Integer)
     scenarios(scenarioproblems(structure, stage))
+end
+function scenarios(structure::AbstractBlockStructure{2})
+    scenarios(scenarioproblems(structure, 2))
 end
 function expected(structure::AbstractBlockStructure, stage::Integer)
     return expected(scenarioproblems(structure, stage))
 end
+function expected(structure::AbstractBlockStructure{2})
+    return expected(scenarioproblems(structure, 2))
+end
 function scenario_type(structure::AbstractBlockStructure, stage::Integer)
     return scenario_type(scenarioproblems(structure, stage))
+end
+function scenario_type(structure::AbstractBlockStructure{2})
+    return scenario_type(scenarioproblems(structure, 2))
 end
 function probability(structure::AbstractBlockStructure, stage::Integer, scenario_index::Integer)
     return probability(scenarioproblems(structure, stage), scenario_index)
 end
+function probability(structure::AbstractBlockStructure{2}, scenario_index::Integer)
+    return probability(scenarioproblems(structure, 2), scenario_index)
+end
 function stage_probability(structure::AbstractBlockStructure, stage::Integer)
     return probability(scenarioproblems(structure, stage))
+end
+function stage_probability(structure::AbstractBlockStructure{2})
+    return probability(scenarioproblems(structure, 2))
 end
 function subproblem(structure::AbstractBlockStructure, stage::Integer, scenario_index::Integer)
     return subproblem(scenarioproblems(structure, stage), scenario_index)
 end
+function subproblem(structure::AbstractBlockStructure{2}, scenario_index::Integer)
+    return subproblem(scenarioproblems(structure, 2), scenario_index)
+end
 function subproblems(structure::AbstractBlockStructure, stage::Integer)
     return subproblems(scenarioproblems(structure, stage))
+end
+function subproblems(structure::AbstractBlockStructure{2})
+    return subproblems(scenarioproblems(structure, 2))
 end
 function num_subproblems(structure::AbstractBlockStructure, stage::Integer)
     return num_subproblems(scenarioproblems(structure, stage))
 end
+function num_subproblems(structure::AbstractBlockStructure{2})
+    return num_subproblems(scenarioproblems(structure, 2))
+end
 function num_scenarios(structure::AbstractBlockStructure, stage::Integer)
     return num_scenarios(scenarioproblems(structure, stage))
+end
+function num_scenarios(structure::AbstractBlockStructure{2})
+    return num_scenarios(scenarioproblems(structure, 2))
 end
 deferred(structure::AbstractBlockStructure{N}) where N = deferred(structure, Val(N))
 deferred(structure::AbstractBlockStructure, ::Val{1}) = deferred_first_stage(structure)
