@@ -13,7 +13,7 @@
             set_optimizer_attribute(sp, FeasibilityCuts(), true)
         end
         @testset "Distributed SP Constructs: $name" begin
-            optimize!(sp)
+            optimize!(sp, cache = true)
             @test termination_status(sp) == MOI.OPTIMAL
             @test isapprox(optimal_decision(sp), res.x̄, rtol = tol)
             for i in 1:num_scenarios(sp)

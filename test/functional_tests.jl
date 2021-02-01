@@ -4,7 +4,7 @@
     for (model, _scenarios, res, name) in problems
         sp = instantiate(model, _scenarios, optimizer = GLPK.Optimizer)
         @testset "SP Constructs: $name" begin
-            optimize!(sp)
+            optimize!(sp, cache = true)
             @test termination_status(sp) == MOI.OPTIMAL
             @test isapprox(optimal_decision(sp), res.x̄, rtol = tol)
             for i in 1:num_scenarios(sp)
