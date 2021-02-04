@@ -170,11 +170,11 @@ function add_worker_scenario!(structure::AbstractBlockStructure, stage::Integer,
     add_scenario!(scenario(structure, stage), scenario, w)
     return nothing
 end
-function add_scenario!(scenariogenerator::Function, stage::Integer, structure::AbstractBlockStructure)
+function add_scenario!(scenariogenerator::Function, structure::AbstractBlockStructure, stage::Integer)
     add_scenario!(scenariogenerator, scenarioproblems(structure, stage))
     return nothing
 end
-function add_worker_scenario!(scenariogenerator::Function, stage::Integer, structure::AbstractBlockStructure, w::Integer)
+function add_worker_scenario!(scenariogenerator::Function, structure::AbstractBlockStructure, stage::Integer, w::Integer)
     add_scenario!(scenariogenerator, scenarioproblems(structure, stage), w)
     return nothing
 end
@@ -186,11 +186,11 @@ function add_worker_scenarios!(structure::AbstractBlockStructure, stage::Integer
     add_scenarios!(scenarioproblems(structure, stage), scenarios, w)
     return nothing
 end
-function add_scenarios!(scenariogenerator::Function, stage::Integer, structure::AbstractBlockStructure, n::Integer)
+function add_scenarios!(scenariogenerator::Function, structure::AbstractBlockStructure, stage::Integer, n::Integer)
     add_scenarios!(scenariogenerator, scenarioproblems(structure, stage), n)
     return nothing
 end
-function add_worker_scenarios!(scenariogenerator::Function, stage::Integer, structure::AbstractBlockStructure, n::Integer, w::Integer)
+function add_worker_scenarios!(scenariogenerator::Function, structure::AbstractBlockStructure, stage::Integer, n::Integer, w::Integer)
     add_scenarios!(scenariogenerator, scenarioproblems(structure, stage), n, w)
     return nothing
 end
