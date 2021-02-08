@@ -25,18 +25,17 @@ end
 # ======================================================================== #
 function prepare_master_objective!(quasigradient::AbstractQuasiGradient)
     # Check sense first
-    master = quasigradient.structure.first_stage
-    sense = MOI.get(backend(master), MOI.ObjectiveSense())
+    sense = MOI.get(quasigradient.master, MOI.ObjectiveSense())
     if sense == MOI.FEASIBILITY_SENSE
         quasigradient.data.no_objective = true
         # Use min-sense during quasi-gradient procedure
-        MOI.set(backend(master), MOI.ObjectiveSense(), MOI.MIN_SENSE)
+        MOI.set(quasigradient.master, MOI.ObjectiveSense(), MOI.MIN_SENSE)
         F = AffineDecisionFunction{Float64}
-        MOI.set(backend(master), MOI.ObjectiveFunction{F}(), zero(F))
+        MOI.set(quasigradient.master, MOI.ObjectiveFunction{F}(), zero(F))
     else
         # Cache the objective function
-        obj = objective_function(master)
-        x = all_decision_variables(master, 1)
+        obj = objective_function(quasigradient.structure.first_stage)
+        x = all_decision_variables(quasigradient.structure.first_stage, 1)
         quasigradient.data.master_objective = moi_function(obj)
         quasigradient.c .= JuMP._affine_coefficient.(obj, x)
     end
@@ -48,12 +47,12 @@ function restore_master!(quasigradient::AbstractQuasiGradient)
     restore_proximal_master!(quasigradient)
     if quasigradient.data.no_objective
         # Re-set FEASIBILITY_SENSE
-        MOI.set(quasigradient.structure.first_stage.moi_backend, MOI.ObjectiveSense(), MOI.FEASIBILITY_SENSE)
+        MOI.set(quasigradient.master, MOI.ObjectiveSense(), MOI.FEASIBILITY_SENSE)
     else
         # Re-add original objective
         @unpack master_objective = quasigradient.data
         F = typeof(master_objective)
-        MOI.set(quasigradient.structure.first_stage.moi_backend, MOI.ObjectiveFunction{F}(), master_objective)
+        MOI.set(quasigradient.master, MOI.ObjectiveFunction{F}(), master_objective)
     end
     return nothing
 end
@@ -84,7 +83,7 @@ end
 
 function current_objective_value(quasigradient::AbstractQuasiGradient)
     # Get sense
-    sense = MOI.get(quasigradient.structure.first_stage, MOI.ObjectiveSense())
+    sense = MOI.get(quasigradient.master, MOI.ObjectiveSense())
     correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     # Return sense-corrected value
     return evaluate_first_stage(quasigradient, current_decision(quasigradient)) +

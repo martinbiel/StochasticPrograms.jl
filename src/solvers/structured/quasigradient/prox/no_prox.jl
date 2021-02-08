@@ -8,7 +8,7 @@ function restore_proximal_master!(::AbstractQuasiGradient, ::NoProximal)
     return nothing
 end
 
-function prox!(::NoProximal, x::AbstractVector, ∇f::AbstractVector, γ::AbstractFloat)
+function prox!(::AbstractQuasiGradient, ::NoProximal, x::AbstractVector, ∇f::AbstractVector, γ::AbstractFloat)
     x .= x - γ*∇f
     return nothing
 end

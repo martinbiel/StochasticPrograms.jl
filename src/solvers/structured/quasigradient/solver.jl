@@ -32,6 +32,7 @@ Functor object for the L-shaped algorithm.
 struct QuasiGradientAlgorithm{T <: AbstractFloat,
                               A <: AbstractVector,
                               ST <: VerticalStructure,
+                              M <: MOI.AbstractOptimizer,
                               E <: AbstractQuasiGradientExecution,
                               P <: AbstractProximal,
                               S <: AbstractStep} <: AbstractQuasiGradient
@@ -40,7 +41,8 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
     data::QuasiGradientData{T}
     parameters::QuasiGradientParameters{T}
 
-    # Iterate
+    # Master
+    master::M
     decisions::Decisions
     x::A
     c::A
@@ -73,6 +75,7 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
         A = typeof(x₀_)
         # Structure
         ST = typeof(structure)
+        M = typeof(backend(structure.first_stage))
         # Prox
         prox = _prox(structure, x₀_, T)
         P = typeof(prox)
@@ -85,19 +88,20 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
         # Algorithm parameters
         params = QuasiGradientParameters{T}(; kw...)
 
-        quasigradient = new{T,A,ST,E,P,S}(structure,
-                                          n,
-                                          QuasiGradientData{T}(),
-                                          params,
-                                          structure.decisions[1],
-                                          x₀_,
-                                          zero(x₀_),
-                                          zero(x₀_),
-                                          A(),
-                                          execution,
-                                          prox,
-                                          stepsize,
-                                          Progress(params.maximum_iterations, "$(indentstr(params.indent))Quasi-gradient Progress "))
+        quasigradient = new{T,A,ST,M,E,P,S}(structure,
+                                            n,
+                                            QuasiGradientData{T}(),
+                                            params,
+                                            backend(structure.first_stage),
+                                            structure.decisions[1],
+                                            x₀_,
+                                            zero(x₀_),
+                                            zero(x₀_),
+                                            A(),
+                                            execution,
+                                            prox,
+                                            stepsize,
+                                            Progress(params.maximum_iterations, "$(indentstr(params.indent))Quasi-gradient Progress "))
         # Initialize solver
         initialize!(quasigradient)
         return quasigradient

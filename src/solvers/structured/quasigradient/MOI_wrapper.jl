@@ -106,7 +106,7 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
                                                      type2dict(optimizer.parameters)...)
     # Set any given prox/sub optimizer attributes
     for (attr, value) in optimizer.master_params
-        MOI.set(optimizer.quasigradient.structure.first_stage.moi_backend, attr, value)
+        MOI.set(optimizer.quasigradient.master, attr, value)
     end
     for (attr, value) in optimizer.sub_params
         MOI.set(scenarioproblems(optimizer.quasigradient.structure), attr, value)

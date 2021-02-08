@@ -16,7 +16,7 @@ using StochasticPrograms: UnspecifiedInstantiation, VerticalStructure, AbstractS
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubproblemOptimizer
 using StochasticPrograms: SingleDecisionSet, update_decision_constraint!
-using StochasticPrograms: set_known_decision!, update_known_decisions!, SingleKnownSet, KnownModification, KnownValuesChange
+using StochasticPrograms: get_decisions, set_known_decision!, update_known_decisions!, SingleKnownSet, KnownModification, KnownValuesChange
 using StochasticPrograms: add_subscript
 using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!, remove_penalty_variables!, remove_penalty_constraints!
 using ProgressMeter
