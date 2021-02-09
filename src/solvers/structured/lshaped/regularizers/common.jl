@@ -21,8 +21,9 @@ function add_projection_targets!(regularization::AbstractRegularization, model::
     ξ = regularization.ξ
     for i in eachindex(ξ)
         name = add_subscript(:ξ, i)
-        var_index, _ = MOI.add_constrained_variable(model, SingleKnownSet(1, ξ[i]))
-        set_known_decision!(regularization.decisions, var_index, ξ[i])
+        set = SingleDecisionSet(1, ξ[i], NoSpecifiedConstraint(), false)
+        var_index, _ = MOI.add_constrained_variable(model, set)
+        set_decision!(regularization.decisions, var_index, ξ[i])
         MOI.set(model, MOI.VariableName(), var_index, name)
         regularization.projection_targets[i] = var_index
     end

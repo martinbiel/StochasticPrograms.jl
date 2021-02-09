@@ -213,21 +213,15 @@ end
 function JuMP.fix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer, val::Number)
     d = decision(structure, index, stage)
     if state(d) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val)
         # Update state
         d.state = Taken
         # Update value
         d.value = val
     else
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val - d.value)
         # Just update value
         d.value = val
     end
-    for scenario_index in 1:num_scenarios(structure)
-        fix(scenarioproblems(structure), index, scenario_index, val)
-    end
+    update_decision_state!(scenarioproblems(structure), index, Taken)
     return nothing
 end
 function JuMP.fix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer, val::Number) where N
@@ -238,9 +232,14 @@ function JuMP.fix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, s
     return nothing
 end
 function JuMP.unfix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer)
-    for scenario_index in 1:num_scenarios(structure)
-        unfix(scenarioproblems(structure), index, scenario_index)
+    d = decision(structure, index, stage)
+    if state(d) == NotTaken
+        # Nothing to do, just return
+        return nothing
     end
+    # Update state
+    d.state = NotTaken
+    update_decision_state!(scenarioproblems(structure), index, NotTaken)
     return nothing
 end
 function JuMP.unfix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
@@ -263,17 +262,12 @@ function JuMP.objective_function(structure::HorizontalStructure, proxy::JuMP.Mod
     return objective_function(proxy, FunType)
 end
 
-function JuMP.optimizer_index(structure::HorizontalStructure, index::VI)
-    return index
-end
-function JuMP.optimizer_index(structure::HorizontalStructure, index::VI, scenario_index::Integer)
-    return index
-end
-function JuMP.optimizer_index(structure::HorizontalStructure, ci::CI)
-    return ci
-end
-function JuMP.optimizer_index(structure::HorizontalStructure, ci::CI{F,S}, scenario_index::Integer) where {F,S}
-    return CI{F,S}(structure.constraint_map[(ci, scenario_index)].value)
+function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}, scenario_index::Integer) where {F,S}
+    if haskey(structure.constraint_map, (ci, scenario_index))
+        ci = CI{F,S}(structure.constraint_map[(ci, scenario_index)].value)
+        return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
+    end
+    return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
 end
 
 function JuMP.set_objective_coefficient(structure::HorizontalStructure{2}, index::VI, var_stage::Integer, stage::Integer, coeff::Real)
@@ -370,14 +364,6 @@ function DecisionRef(proxy::JuMP.Model, structure::HorizontalStructure, index::V
     return DecisionRef(proxy, index)
 end
 
-function KnownRef(proxy::JuMP.Model, structure::HorizontalStructure, index::VI, at_stage::Integer, scenario_index::Integer)
-    at_stage > 1 || error("There are no scenarios in the first at_stage.")
-    n = num_scenarios(structure, at_stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    # Although technically known, decision acts as DecisionRef in horizontal structure
-    return DecisionRef(proxy, index)
-end
-
 function JuMP.jump_function(structure::HorizontalStructure{N},
                             proxy::JuMP.Model,
                             stage::Integer,
@@ -399,10 +385,10 @@ end
 
 # Setters #
 # ========================== #
-function update_decisions!(structure::HorizontalStructure{2}, change::DecisionModification)
+function update_known_decisions!(structure::HorizontalStructure{2})
     # Modification should be applied in every subproblem
     for scenario_index in 1:num_scenarios(structure)
-        update_decisions!(scenarioproblems(structure), change, scenario_index)
+        update_known_decisions!(scenarioproblems(structure), scenario_index)
     end
     return nothing
 end

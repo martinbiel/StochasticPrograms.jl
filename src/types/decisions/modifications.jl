@@ -1,3 +1,6 @@
+struct DecisionIndex <: MOI.AbstractConstraintAttribute end
+MOI.is_set_by_optimize(::DecisionIndex) = true
+
 struct DecisionCoefficientChange{T} <: MOI.AbstractFunctionModification
     decision::MOI.VariableIndex
     new_coefficient::T
@@ -8,32 +11,12 @@ struct DecisionMultirowChange{T} <: MOI.AbstractFunctionModification
     new_coefficients::Vector{Tuple{Int64, T}}
 end
 
-struct KnownCoefficientChange{T} <: MOI.AbstractFunctionModification
-    known::MOI.VariableIndex
-    new_coefficient::T
-end
-
-struct KnownMultirowChange{T} <: MOI.AbstractFunctionModification
-    known::MOI.VariableIndex
-    new_coefficients::Vector{Tuple{Int64, T}}
-end
-
-struct DecisionStateChange{T} <: MOI.AbstractFunctionModification
-    decision::MOI.VariableIndex
+struct DecisionStateChange <: MOI.AbstractFunctionModification
+    index::Int
     new_state::DecisionState
-    value_difference::T
-end
-
-struct DecisionsStateChange <: MOI.AbstractFunctionModification end
-
-struct KnownValueChange{T} <: MOI.AbstractFunctionModification
-    known::MOI.VariableIndex
-    value_difference::T
 end
 
 struct KnownValuesChange <: MOI.AbstractFunctionModification end
 
-const DecisionModification = Union{DecisionCoefficientChange, DecisionStateChange, DecisionsStateChange}
-const VectorDecisionModification = Union{DecisionMultirowChange, DecisionStateChange, DecisionsStateChange}
-const KnownModification = Union{KnownCoefficientChange, KnownValueChange, KnownValuesChange}
-const VectorKnownModification = Union{KnownMultirowChange, KnownValueChange, KnownValuesChange}
+const DecisionModification = Union{DecisionCoefficientChange, DecisionStateChange, KnownValuesChange}
+const VectorDecisionModification = Union{DecisionMultirowChange, DecisionStateChange, KnownValuesChange}

@@ -336,70 +336,33 @@ end
 # JuMP #
 # ========================== #
 function JuMP.fix(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer, val::Number) where N
-    d = decision(structure, index, stage)
-    if state(d) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
-    else
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val - d.value)
-        # Just update value
-        d.value = val
-    end
-    # Update objective and constraints
-    update_decisions!(structure, change)
+    dref = DecisionRef(structure.model, index)
+    fix(dref, val)
     return nothing
 end
 function JuMP.fix(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer, val::Number) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    # Get decision
-    d = decision(structure, index, stage, scenario_index)
-    if state(d) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
-    else
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val - d.value)
-        # Just update value
-        d.value = val
-    end
-    # Update objective and constraints
-    update_decisions!(structure, change, stage, scenario_index)
+    # Fix mapped decision
+    mapped_index = structure.variable_map[(index, scenario_index)]
+    dref = DecisionRef(structure.model, mapped_index)
+    fix(dref, val)
     return nothing
 end
 function JuMP.unfix(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer) where N
-    # Get decision
-    d = decision(structure, index, stage)
-    # Update state
-    d.state = NotTaken
-    # Prepare modification
-    change = DecisionStateChange(index, NotTaken, -d.value)
-    # Update objective and constraints
-    update_decisions!(structure, change)
+    dref = DecisionRef(structure.model, index)
+    unfix(dref)
     return nothing
 end
 function JuMP.unfix(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    # Get decision
-    d = decision(structure, index, stage, scenario_index)
-    # Update state
-    d.state = NotTaken
-    # Prepare modification
-    change = DecisionStateChange(index, NotTaken, -d.value)
-    # Update objective and constraints
-    update_decisions!(structure, change, stage, scenario_index)
+    # Unfix mapped decision
+    mapped_index = structure.variable_map[(index, scenario_index)]
+    dref = DecisionRef(structure.model, mapped_index)
+    unfix(dref)
     return nothing
 end
 
@@ -461,23 +424,23 @@ function JuMP.objective_function(structure::DeterministicEquivalent{N},
     return jump_function(structure.model, func)
 end
 
-function JuMP.optimizer_index(structure::DeterministicEquivalent, index::VI)
-    return index
+function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, index::VI)
+    return decision_index(backend(structure.model), index)
 end
-function JuMP.optimizer_index(structure::DeterministicEquivalent, index::VI, scenario_index::Integer)
+function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, index::VI, scenario_index::Integer)
     mapped_index = structure.variable_map[(index, scenario_index)]
-    return mapped_index
+    return decision_index(backend(structure.model), mapped_index)
 end
-function JuMP.optimizer_index(structure::DeterministicEquivalent, ci::CI)
-    return ci
+function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, ci::CI)
+    return decision_index(backend(structure.model), ci)
 end
-function JuMP.optimizer_index(structure::DeterministicEquivalent, ci::CI, scenario_index::Integer)
+function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, ci::CI, scenario_index::Integer)
     mapped_ci = structure.constraint_map[(ci, scenario_index)]
-    return mapped_ci
+    return decision_index(backend(structure.model), mapped_ci)
 end
-function JuMP.optimizer_index(structure::DeterministicEquivalent, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
+function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
     mapped_ci = CI{F,S}(structure.variable_map[(MOI.VariableIndex(ci.value), scenario_index)].value)
-    return mapped_ci
+    return decision_index(backend(structure.model), mapped_ci)
 end
 
 function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, index::VI, var_stage::Integer, stage::Integer, coeff::Real) where N
@@ -621,13 +584,11 @@ function DecisionRef(proxy::JuMP.Model, structure::DeterministicEquivalent, inde
     mapped_index = structure.variable_map[(index, scenario_index)]
     return DecisionRef(structure.model, mapped_index)
 end
-
-function KnownRef(proxy::JuMP.Model, structure::DeterministicEquivalent{N}, index::VI, stage::Integer, scenario_index::Integer) where N
+function DecisionRef(proxy::JuMP.Model, structure::DeterministicEquivalent{N}, index::VI, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    # Although technically known, decision acts as DecisionRef in deterministic equivalent
     return DecisionRef(structure.model, index)
 end
 
@@ -682,18 +643,15 @@ end
 
 # Setters
 # ========================== #
-function update_decisions!(structure::DeterministicEquivalent, change::DecisionModification)
-    update_decisions!(structure.model, change)
+function update_known_decisions!(structure::DeterministicEquivalent)
+    update_known_decisions!(structure.model)
     return nothing
 end
-function update_decisions!(structure::DeterministicEquivalent, change::DecisionModification, stage::Integer, scenario_index::Integer)
+function update_known_decisions!(structure::DeterministicEquivalent, stage::Integer, scenario_index::Integer)
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    mapped_change = MOIU.map_indices(change) do index
-        return structure.variable_map[(index, scenario_index)]
-    end
-    update_decisions!(structure.model, mapped_change)
+    update_known_decisions!(structure.model)
     return nothing
 end
 

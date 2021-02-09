@@ -33,7 +33,7 @@ function initialize_subproblems!(execution::SerialExecution{H,T},
             subproblem(scenarioproblems, i),
             i,
             T(probability(scenario(scenarioproblems, i))),
-            execution.decisions.knowns,
+            all_known_decisions(execution.decisions),
             H))
     end
     return nothing
@@ -55,12 +55,11 @@ end
 function resolve_subproblems!(lshaped::AbstractLShaped, execution::SerialExecution{H,T}) where {H <: AbstractFeasibilityHandler, T <: AbstractFloat}
     # Update subproblems
     update_known_decisions!(execution.decisions, lshaped.x)
-    change = KnownValuesChange()
     # Assume no cuts are added
     added = false
     # Update and solve subproblems
     for subproblem in execution.subproblems
-        update_subproblem!(subproblem, change)
+        update_subproblem!(subproblem)
         cut::SparseHyperPlane{T} = subproblem(lshaped.x)
         added |= aggregate_cut!(lshaped, lshaped.aggregation, cut)
     end

@@ -23,6 +23,15 @@ function VerticalOptimizer()
     return opt, master, sub
 end
 
+function HorizontalOptimizer()
+    sub = MOIU.MockOptimizer(
+        MOIU.Model{Float64}(), eval_objective_value = false, eval_variable_constraint_dual = false
+    )
+    opt = ProgressiveHedging.Optimizer()
+    MOI.set(opt, SubproblemOptimizer(), () -> sub)
+    return opt, sub, sub
+end
+
 function fill_solution!(::MOI.AbstractOptimizer, master_optimizer, subproblem_optimizer, x, y, c)
     MOI.set(master_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(master_optimizer, MOI.RawStatusString(), "solver specific string")
@@ -31,15 +40,15 @@ function fill_solution!(::MOI.AbstractOptimizer, master_optimizer, subproblem_op
     MOI.set(master_optimizer, MOI.ResultCount(), 1)
     MOI.set(master_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(master_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(master_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
+    MOI.set(master_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(x), 2.0)
     MOI.set(subproblem_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(subproblem_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(subproblem_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(y,1), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(c,1), -1.0)
-    MOI.set(master_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(x)), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(y), 1), 0.0)
+    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(x), 2.0)
+    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(y,1), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(c,1), -1.0)
+    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x)), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(y), 1), 0.0)
     return nothing
 end
 
@@ -51,15 +60,15 @@ function fill_solution!(optimizer::LShaped.Optimizer, master_optimizer, subprobl
     MOI.set(master_optimizer, MOI.ResultCount(), 1)
     MOI.set(master_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(master_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(master_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
+    MOI.set(master_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(x), 2.0)
     MOI.set(subproblem_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(subproblem_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(subproblem_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(y,1), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(c,1), -1.0)
-    MOI.set(master_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(x)), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(y), 1), 0.0)
+    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(x), 2.0)
+    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(y,1), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(c,1), -1.0)
+    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x)), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(y), 1), 0.0)
     # L-shaped specific
     optimizer.lshaped.data.Q = 4.0
     optimizer.lshaped.x[1] = 2
@@ -79,15 +88,14 @@ function fill_solution!(optimizer::ProgressiveHedging.Optimizer, master_optimize
     MOI.set(master_optimizer, MOI.ResultCount(), 1)
     MOI.set(master_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(master_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(master_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
     MOI.set(subproblem_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(subproblem_optimizer, MOI.PrimalStatus(), MOI.FEASIBLE_POINT)
     MOI.set(subproblem_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(x), 2.0)
-    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), StochasticPrograms.mock_index(y,1), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(c,1), -1.0)
-    MOI.set(master_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(x)), 2.0)
-    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), StochasticPrograms.mock_index(JuMP.LowerBoundRef(y), 1), 0.0)
+    MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(y,1), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(c,1), -1.0)
+    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 1), 2.0)
+    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 2), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(y), 1), 0.0)
     # Progressive-hedging specific
     optimizer.progressivehedging.data.Q = 4.0
     optimizer.progressivehedging.ξ[1] = 2
@@ -96,15 +104,6 @@ function fill_solution!(optimizer::ProgressiveHedging.Optimizer, master_optimize
     optimizer.dual_status = MOI.FEASIBLE_POINT
     optimizer.raw_status = "solver specific string"
     return nothing
-end
-
-function HorizontalOptimizer()
-    sub = MOIU.MockOptimizer(
-        MOIU.Model{Float64}(), eval_objective_value = false, eval_variable_constraint_dual = false
-    )
-    opt = ProgressiveHedging.Optimizer()
-    MOI.set(opt, SubproblemOptimizer(), () -> sub)
-    return opt, sub, sub
 end
 
 function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optimizer)

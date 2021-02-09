@@ -39,7 +39,7 @@ function transfer_model!(dest::StochasticProgram, src::StochasticProgram)
     return dest
 end
 
-function copy_decision_objective!(src::JuMP.Model, dest::JuMP.Model, vars::Vector{<:Union{DecisionRef, KnownRef}})
+function copy_decision_objective!(src::JuMP.Model, dest::JuMP.Model, vars::Vector{DecisionRef})
     src_obj = objective_function(src)
     src_obj_sense = objective_sense(src)
     dest_obj_sense = objective_sense(dest)
@@ -143,7 +143,7 @@ end
 
 function decision_variables_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    return get_decisions(proxy(stochasticprogram, s), s).undecided
+    return all_decisions(get_decisions(proxy(stochasticprogram, s), s))
 end
 
 function decision_constraints_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
@@ -173,27 +173,25 @@ function attach_mocks!(structure::HorizontalStructure)
     return nothing
 end
 
-function mock_index(dvar::DecisionVariable)
-    return MOIU.xor_index(optimizer_index(dvar))
+function decision_index(model::MOI.ModelLike, index::MOI.VariableIndex)
+    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index.value)
+    if MOI.is_valid(model, ci)
+        return MOI.get(model, DecisionIndex(), ci)
+    end
+    # Locate multiple decision set
+    F = MOI.VectorOfVariables
+    S = MultipleDecisionSet{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+        f = MOI.get(model, MOI.ConstraintFunction(), ci)
+        i = something(findfirst(vi -> vi == index, f.variables), 0)
+        if i != 0
+            return MOI.get(model, DecisionIndex(), ci)
+        end
+    end
 end
-function mock_index(dvar::DecisionVariable, scenario_index::Integer)
-    return MOIU.xor_index(optimizer_index(dvar, scenario_index))
-end
-function mock_index(sp_cref::SPConstraintRef{CI{AffineDecisionFunction{Float64},S}}) where S
-    idx = optimizer_index(sp_cref)
-    return MOIU.xor_index(CI{MOI.ScalarAffineFunction{Float64},S}(idx.value))
-end
-function mock_index(sp_cref::SPConstraintRef{CI{AffineDecisionFunction{Float64},S}}, scenario_index::Integer) where S
-    idx = optimizer_index(sp_cref, scenario_index)
-    return MOIU.xor_index(CI{MOI.ScalarAffineFunction{Float64},S}(idx.value))
-end
-function mock_index(sp_cref::SPConstraintRef{CI{SingleDecision,S}}) where S
-    idx = optimizer_index(sp_cref)
-    return MOIU.xor_index(CI{MOI.SingleVariable,S}(idx.value))
-end
-function mock_index(sp_cref::SPConstraintRef{CI{SingleDecision,S}}, scenario_index::Integer) where S
-    idx = optimizer_index(sp_cref, scenario_index)
-    return MOIU.xor_index(CI{MOI.SingleVariable,S}(idx.value))
+
+function decision_index(model::MOI.ModelLike, ci::MOI.ConstraintIndex)
+    return MOI.get(model, DecisionIndex(), ci)
 end
 
 function MOI.get(src::MOIU.MockOptimizer, attr::ScenarioDependentModelAttribute)

@@ -45,7 +45,7 @@ struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegulariz
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
-            Decision(val, T)
+            KnownDecision(val, T)
         end
         return new{T, A}(TRData{T}(),
                          TRParameters{T}(; kw...),
@@ -62,18 +62,16 @@ function initialize_regularization!(lshaped::AbstractLShaped, tr::TrustRegion{T}
     n = length(tr.ξ) + 1
     # Add projection targets
     add_projection_targets!(tr, lshaped.master)
-
     # Add trust region
     name = string(:Δ)
-    trust_region = Decision(tr.parameters.Δ, T)
-    tr.data.Δ, _ =
-        MOI.add_constrained_variable(lshaped.master,
-                                     SingleKnownSet(1, trust_region))
-    set_known_decision!(tr.decisions, tr.data.Δ, trust_region)
+    trust_region = KnownDecision(tr.parameters.Δ, T)
+    set = SingleDecisionSet(1, trust_region, NoSpecifiedConstraint(), false)
+    tr.data.Δ, _ = MOI.add_constrained_variable(lshaped.master, set)
+    set_decision!(tr.decisions, tr.data.Δ, trust_region)
     MOI.set(lshaped.master, MOI.VariableName(), tr.data.Δ, name)
-    x = VectorOfDecisions(tr.decisions.undecided)
-    ξ = VectorOfKnowns(tr.projection_targets)
-    Δ = SingleKnown(tr.data.Δ)
+    x = VectorOfDecisions(all_decisions(tr.decisions))
+    ξ = VectorOfDecisions(tr.projection_targets)
+    Δ = SingleDecision(tr.data.Δ)
     # Add trust-region constraint
     f = MOIU.operate(vcat, T, Δ, x) -
         MOIU.operate(vcat, T, zero(tr.parameters.Δ), ξ)
@@ -92,11 +90,13 @@ function restore_regularized_master!(lshaped::AbstractLShaped, tr::TrustRegion)
     # Delete trust region
     if !iszero(tr.data.Δ.value)
         MOI.delete(lshaped.master, tr.data.Δ)
+        StochasticPrograms.remove_decision!(tr.decisions, tr.data.Δ)
         tr.data.Δ = MOI.VariableIndex(0)
     end
     # Delete projection targets
     for var in tr.projection_targets
         MOI.delete(lshaped.master, var)
+        StochasticPrograms.remove_decision!(tr.decisions, var)
     end
     empty!(tr.projection_targets)
     return nothing
@@ -183,8 +183,19 @@ function process_cut!(lshaped::AbstractLShaped, cut::HyperPlane{FeasibilityCut},
 end
 
 function update_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
-    @unpack Δ, constraint = tr.data
-    MOI.modify(lshaped.master, constraint, KnownValuesChange())
+    @unpack Δ = tr.data
+    # Update projection targets
+    for vi in tr.projection_targets
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        MOI.modify(lshaped.master,
+                   ci,
+                   KnownValuesChange())
+    end
+    # Update trust-region
+    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(Δ.value)
+    MOI.modify(lshaped.master,
+               ci,
+               KnownValuesChange())
     return nothing
 end
 

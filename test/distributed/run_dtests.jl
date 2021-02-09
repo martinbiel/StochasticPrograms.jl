@@ -14,6 +14,7 @@ end
 @everywhere using JuMP
 @everywhere using LinearAlgebra
 @everywhere using GLPK
+@everywhere using Ipopt
 
 @everywhere using Distributions
 

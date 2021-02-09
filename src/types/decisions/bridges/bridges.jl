@@ -138,8 +138,6 @@ end
 function add_decision_bridges!(model::JuMP.Model)
     add_bridge(model, DecisionBridge)
     add_bridge(model, DecisionsBridge)
-    add_bridge(model, KnownBridge)
-    add_bridge(model, KnownsBridge)
     add_bridge(model, AffineDecisionObjectiveBridge)
     add_bridge(model, QuadraticDecisionObjectiveBridge)
     add_bridge(model, AffineDecisionConstraintBridge)

@@ -1,37 +1,32 @@
 # JuMP Objectives/constraints #
 # ========================== #
 function JuMP.normalized_coefficient(
-    con_ref::ConstraintRef{Model, JuMP._MOICON{F, S}}, decision
+    con_ref::ConstraintRef{Model, JuMP._MOICON{F, S}}, dref::DecisionRef
     ) where {S, T, F <: AffineDecisionFunction{T}}
     con = JuMP.constraint_object(con_ref)
-    return JuMP._affine_coefficient(con.func, decision)
+    return JuMP._affine_coefficient(con.func, dref)
 end
 
-function JuMP.set_objective_coefficient(model::Model, decision_or_known::Union{DecisionRef, KnownRef}, coeff::Real)
+function JuMP.set_objective_coefficient(model::Model, dref::DecisionRef, coeff::Real)
     if model.nlp_data !== nothing && _nlp_objective_function(model) !== nothing
         error("A nonlinear objective is already set in the model")
     end
     obj_fct_type = objective_function_type(model)
     if obj_fct_type == VariableRef || obj_fct_type == AffExpr || obj_fct_type == QuadExpr
         current_obj = objective_function(model)
-        set_objective_function(model, add_to_expression!(coeff * decision_or_known, current_obj))
-    elseif obj_fct_type == typeof(decision_or_known)
+        set_objective_function(model, add_to_expression!(coeff * dref, current_obj))
+    elseif obj_fct_type == typeof(dref)
         current_obj = objective_function(model)
-        if index(current_obj) == index(decision_or_known)
-            set_objective_function(model, coeff * decision_or_known)
+        if index(current_obj) == index(dref)
+            set_objective_function(model, coeff * dref)
         else
-            set_objective_function(model, add_to_expression!(coeff * decision_or_known, current_obj))
+            set_objective_function(model, add_to_expression!(coeff * dref, current_obj))
         end
-    elseif obj_fct_type <: Union{DecisionAffExpr, DecisionQuadExpr} && decision_or_known isa DecisionRef
+    elseif obj_fct_type <: Union{DecisionAffExpr, DecisionQuadExpr} && dref isa DecisionRef
         MOI.modify(
             backend(model),
             MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
-            DecisionCoefficientChange(index(decision_or_known), coeff))
-    elseif obj_fct_type <: Union{DecisionAffExpr, DecisionQuadExpr} && decision_or_known isa KnownRef
-        MOI.modify(
-            backend(model),
-            MOI.ObjectiveFunction{moi_function_type(obj_fct_type)}(),
-            KnownCoefficientChange(index(decision_or_known), coeff))
+            DecisionCoefficientChange(index(dref), coeff))
     else
         error("Objective function type not supported: $(obj_fct_type)")
     end
@@ -61,124 +56,45 @@ function JuMP.set_normalized_coefficient(
     return nothing
 end
 
-function JuMP.set_normalized_coefficient(
-    con_ref::ConstraintRef{Model, JuMP._MOICON{F, S}}, known::KnownRef, coeff
-    ) where {S, T, F <: AffineDecisionFunction{T}}
-    MOI.modify(backend(owner_model(con_ref)), index(con_ref),
-               KnownCoefficientChange(index(known), convert(T, coeff), convert(T, value(known))))
-    return nothing
-end
-
 # Internal update functions #
 # ========================== #
-function update_decisions!(model::JuMP.Model, change::Union{DecisionModification, KnownModification})
-    update_decision_objective!(model, objective_function_type(model), change)
-    update_decision_variable_constraints!(model, change)
-    update_decision_constraints!(model, change)
-end
-
-function update_decision_objective!(::JuMP.Model, ::DataType, ::Union{DecisionModification, KnownModification})
-    # Nothing to do if objective does not have decisions
+function update_known_decisions!(model::JuMP.Model)
+    update_known_decisions!(backend(model))
     return nothing
 end
 
-function update_decision_objective!(model::JuMP.Model, func_type::Type{<:DecisionQuadExpr}, change::DecisionModification)
-    MOI.modify(backend(model),
-               MOI.ObjectiveFunction{JuMP.moi_function_type(func_type)}(),
-               change)
-    return nothing
-end
-
-function update_decision_objective!(model::JuMP.Model, func_type::Type{F}, change::KnownModification) where F <: Union{DecisionAffExpr, DecisionQuadExpr}
-    MOI.modify(backend(model),
-               MOI.ObjectiveFunction{JuMP.moi_function_type(func_type)}(),
-               change)
-    return nothing
-end
-
-function update_decision_variable_constraints!(::JuMP.Model, ::Union{DecisionModification, KnownModification})
-    # Nothing to do in most cases
-    return nothing
-end
-
-function update_decision_variable_constraints!(model::JuMP.Model, change::DecisionStateChange)
-    for F in [DecisionRef, ]
-        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
-            for cref in all_constraints(model, F, S)
-                update_decision_constraint!(cref, change)
-            end
-        end
+function update_known_decisions!(model::MOI.ModelLike)
+    change = KnownValuesChange()
+    F = MOI.SingleVariable
+    S = SingleDecisionSet{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+        MOI.modify(model, ci, change)
+    end
+    F = MOI.VectorOfVariables
+    S = MultipleDecisionSet{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+        MOI.modify(model, ci, change)
     end
     return nothing
 end
 
-function update_decision_variable_constraints!(model::JuMP.Model, ::DecisionsStateChange)
-    for F in [DecisionRef, ]
-        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}, FreeDecision]
-            for cref in all_constraints(model, F, S)
-                # Fetch the decision
-                dref = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))
-                # Perform specific decision state change
-                change = DecisionStateChange(index(dref), state(dref), 0.0)
-                update_decision_constraint!(cref, change)
-            end
+function update_decision_state!(dref::DecisionRef, state::DecisionState)
+    model = backend(owner_model(dref))
+    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+    if MOI.is_valid(model, ci)
+        MOI.modify(model, ci, DecisionStateChange(1, state))
+        return nothing
+    end
+    # Locate multiple decision set
+    F = MOI.VectorOfVariables
+    S = MultipleDecisionSet{Float64}
+    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
+        f = MOI.get(model, MOI.ConstraintFunction(), ci)
+        i = something(findfirst(vi -> vi == index(dref), f.variables), 0)
+        if i != 0
+            MOI.modify(model, ci, DecisionStateChange(i, state))
+            return nothing
         end
     end
-    return nothing
-end
-
-function update_decision_constraints!(model::JuMP.Model, change::Union{DecisionModification, KnownModification})
-    for F in [DecisionAffExpr{Float64}, DecisionQuadExpr{Float64}]
-        for S in [MOI.EqualTo{Float64}, MOI.LessThan{Float64}, MOI.GreaterThan{Float64}]
-            for cref in all_constraints(model, F, S)
-                update_decision_constraint!(cref, change)
-            end
-        end
-    end
-    for F in [Vector{DecisionAffExpr{Float64}}]
-        for S in [MOI.Zeros, MOI.Nonnegatives, MOI.Nonpositives]
-            for cref in all_constraints(model, F, S)
-                update_decision_constraint!(cref, change)
-            end
-        end
-    end
-    return nothing
-end
-
-function update_decision_constraint!(cref::ConstraintRef, change::Union{DecisionModification, KnownModification})
-    update_decision_constraint!(backend(owner_model(cref)), cref.index, change)
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{SingleDecision, S}, change::DecisionModification) where {T,S}
-    MOI.modify(model, ci, change)
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorOfDecisions, S}, change::VectorDecisionModification) where {T,S}
-    MOI.modify(model, ci, change)
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionCoefficientChange, KnownModification}) where {T,S}
-    MOI.modify(model, ci, change)
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{AffineDecisionFunction{T}, S}, change::Union{DecisionStateChange, DecisionsStateChange}) where {T,S}
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorAffineDecisionFunction{T}, S}, change::Union{DecisionMultirowChange, KnownModification}) where {T,S}
-    MOI.modify(model, ci, change)
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{VectorAffineDecisionFunction{T}, S}, change::Union{DecisionStateChange, DecisionsStateChange}) where {T,S}
-    return nothing
-end
-
-function update_decision_constraint!(model::MOI.ModelLike, ci::MOI.ConstraintIndex{<:QuadraticDecisionFunction{T}, S}, change::Union{DecisionModification, KnownModification}) where {T,S}
-    MOI.modify(model, ci, change)
     return nothing
 end

@@ -51,10 +51,3 @@ function MOI.get(model::MOI.ModelLike, attr::MOI.ObjectiveFunction{SingleDecisio
     func = MOI.get(model, MOI.ObjectiveFunction{F}())
     return convert(SingleDecision, func)
 end
-
-# Modifications
-function MOI.modify(model::MOI.ModelLike, bridge::FunctionizeDecisionObjectiveBridge{T},
-                    change::Union{DecisionStateChange, DecisionsStateChange}) where T
-    F = AffineDecisionFunction{T}
-    MOI.modify(model, MOI.ObjectiveFunction{F}(), change)
-end

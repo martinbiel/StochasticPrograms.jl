@@ -221,6 +221,8 @@ end
 
 function MOI.set(optimizer::Optimizer, ::MasterOptimizer, optimizer_constructor)
     optimizer.master_optimizer = optimizer_constructor
+    # Clear any old parameters
+    empty!(optimizer.master_params)
     return nothing
 end
 
@@ -259,6 +261,8 @@ end
 
 function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
+    # Clear any old parameters
+    empty!(optimizer.sub_params)
     return nothing
 end
 

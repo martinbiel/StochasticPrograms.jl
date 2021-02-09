@@ -48,7 +48,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: A
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
-            Decision(val, T)
+            KnownDecision(val, T)
         end
         PT = typeof(penaltyterm)
         return new{T, A, PT}(RDData{T}(),
@@ -74,7 +74,7 @@ function initialize_regularization!(lshaped::AbstractLShaped, rd::RegularizedDec
     initialize_penaltyterm!(rd.penaltyterm,
                             lshaped.master,
                             1 / (2 * σ),
-                            rd.decisions.undecided,
+                            all_decisions(rd.decisions),
                             rd.projection_targets)
     return nothing
 end
@@ -85,6 +85,7 @@ function restore_regularized_master!(lshaped::AbstractLShaped, rd::RegularizedDe
     # Delete projection targets
     for var in rd.projection_targets
         MOI.delete(lshaped.master, var)
+        StochasticPrograms.remove_decision!(rd.decisions, var)
     end
     empty!(rd.projection_targets)
     return nothing
@@ -154,7 +155,7 @@ function take_step!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
         update_penaltyterm!(rd.penaltyterm,
                             lshaped.master,
                             1 / (2 * σ),
-                            rd.decisions.undecided,
+                            all_decisions(rd.decisions),
                             rd.projection_targets)
     end
     return nothing

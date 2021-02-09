@@ -120,7 +120,7 @@ end
 function update_solution!(lshaped::AbstractLShaped)
     ncols = num_decisions(lshaped.structure)
     nb = num_thetas(lshaped)
-    lshaped.x .= MOI.get.(lshaped.master, MOI.VariablePrimal(), lshaped.decisions.undecided)
+    lshaped.x .= MOI.get.(lshaped.master, MOI.VariablePrimal(), all_decisions(lshaped.decisions))
     θs = map(lshaped.master_variables) do vi
         if vi.value == 0
             -1e10
@@ -133,7 +133,7 @@ function update_solution!(lshaped::AbstractLShaped)
 end
 
 function decision(lshaped::AbstractLShaped, index::MOI.VariableIndex)
-    i = something(findfirst(i -> i == index, lshaped.decisions.undecided), 0)
+    i = something(findfirst(i -> i == index, all_decisions(lshaped.decisions)), 0)
     if iszero(i)
         throw(MOI.InvalidIndex(index))
     end
@@ -145,8 +145,9 @@ function evaluate_first_stage(lshaped::AbstractLShaped, x::AbstractVector)
     # Get objective
     @unpack master_objective = lshaped.data
     # Evaluate objective
+    decisions = all_decisions(lshaped.decisions)
     obj_val = MOIU.eval_variables(master_objective) do vi
-        if vi in lshaped.decisions.undecided
+        if vi in decisions
             # Only evaluate decision
             x[vi.value]
         else

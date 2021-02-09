@@ -502,7 +502,7 @@ ordered by creation time.
 function all_decision_variables(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     decisions::NTuple{stage,Decisions} = stochasticprogram.proxy[stage].ext[:decisions]
-    return map(decisions[stage].undecided) do index
+    return map(all_decisions(decisions[stage])) do index
         DecisionVariable(stochasticprogram, stage, index)
     end
 end
@@ -540,8 +540,6 @@ function Base.getindex(stochasticprogram::StochasticProgram, stage::Integer, nam
             return map(obj) do dvar
                 return DecisionVariable(stochasticprogram, stage, index(dvar))
             end
-        elseif obj isa KnownRef || obj isa AbstractArray{<:KnownRef}
-            error("$obj is known in stage $stage. Query an earlier stage for the original decision.")
         elseif obj isa ConstraintRef{Model, <:CI{<:DecisionLike}}
             return SPConstraintRef(stochasticprogram, stage, index(obj), obj.shape)
         elseif obj isa AbstractArray{<:ConstraintRef{Model, <:CI{<:DecisionLike}}}
@@ -865,28 +863,20 @@ end
 # Setters
 # ========================== #
 """
-    update_decisions!(stochasticmodel::Stochasticprogram, change::DecisionModification)
+    update_known_decisions!(stochasticprogram::Stochasticprogram)
 
-Apply the decision modification `change` to the first-stage of `stochasticprogram`.
+Update all known decision values in the first-stage of `stochasticprogram`.
 """
-function update_decisions!(stochasticprogram::StochasticProgram, change::DecisionModification)
-    update_decisions!(structure(stochasticprogram), change)
+function update_known_decisions!(stochasticprogram::StochasticProgram)
+    update_known_decisions!(structure(stochasticprogram))
 end
 """
-    update_decisions!(stochasticmodel::Stochasticprogram, change::DecisionModification, stage::Integer, scenario_index::Integer)
+    update_decisions!(stochasticprogram::Stochasticprogram, stage::Integer, scenario_index::Integer)
 
-Apply the decision modification `change` to the node at stage `stage` and scenario `scenario_index` of `stochasticprogram`.
+Update all known decision values in the node at stage `stage` and scenario `scenario_index` of `stochasticprogram`.
 """
-function update_decisions!(stochasticprogram::StochasticProgram, change::DecisionModification, stage::Integer, scenario_index::Integer)
-    update_decisions!(structure(stochasticprogram), change, stage, scenario_index)
-end
-"""
-    update_decisions!(stochasticmodel::TwoStageStochasticprogram, change::DecisionModification, scenario_index::Integer)
-
-Apply the decision modification `change` in scenario `scenario_index` of the two-stage `stochasticprogram`.
-"""
-function update_decisions!(stochasticprogram::TwoStageStochasticProgram, change::DecisionModification, scenario_index::Integer)
-    update_decisions!(structure(stochasticprogram), change, scenario_index)
+function update_decisions!(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)
+    update_known_decisions!(structure(stochasticprogram), stage, scenario_index)
 end
 """
     set_optimizer(stochasticmodel::StochasticModel, optimizer)

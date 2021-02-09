@@ -119,9 +119,8 @@ function moi_constraint(cut::HyperPlane{FeasibilityCut,T,SparseVector{T,Int}}, :
     terms = map(zip(cut.δQ.nzval, cut.δQ.nzind)) do (coeff, idx)
         MOI.ScalarAffineTerm(scaling * coeff, MOI.VariableIndex(idx))
     end
-    f = StochasticPrograms.AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, zero(T)),
-                                                  MOI.ScalarAffineFunction(terms, 0.0),
-                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    f = AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, zero(T)),
+                               MOI.ScalarAffineFunction(terms, zero(T)))
     set = MOI.GreaterThan{Float64}(scaling * cut.q)
     return f, set
 end
@@ -131,9 +130,8 @@ function moi_constraint(cut::HyperPlane{OptimalityCut,T,SparseVector{T,Int}}, ma
     end
     # Add model term
     model_terms = [MOI.ScalarAffineTerm(scaling, master_variables[cut.id])]
-    f = StochasticPrograms.AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, 0.0),
-                                                  MOI.ScalarAffineFunction(terms, 0.0),
-                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    f = AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, zero(T)),
+                               MOI.ScalarAffineFunction(terms, zero(T)))
     set = MOI.GreaterThan{Float64}(scaling * cut.q)
     return f, set
 end
@@ -145,9 +143,8 @@ function moi_constraint(cut::SparseAggregatedOptimalityCut, master_variables::Ve
     model_terms = map(cut.ids) do idx
         MOI.ScalarAffineTerm(scaling, master_variables[idx])
     end
-    f = StochasticPrograms.AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, 0.0),
-                                                  MOI.ScalarAffineFunction(terms, 0.0),
-                                                  convert(MOI.ScalarAffineFunction{T}, zero(T)))
+    f = AffineDecisionFunction(MOI.ScalarAffineFunction(model_terms, zero(T)),
+                               MOI.ScalarAffineFunction(terms, zero(T)))
     set = MOI.GreaterThan{Float64}(scaling * cut.q)
     return f, set
 end

@@ -24,7 +24,7 @@ function decision(ph::AbstractProgressiveHedging)
 end
 
 function decision(ph::AbstractProgressiveHedging, index::MOI.VariableIndex)
-    i = something(findfirst(i -> i == index, ph.decisions.undecided), 0)
+    i = something(findfirst(i -> i == index, all_decisions(ph.decisions)), 0)
     if iszero(i)
         throw(MOI.InvalidIndex(index))
     end

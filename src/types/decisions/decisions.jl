@@ -1,9 +1,6 @@
-const CleverDicts = MOI.Utilities.CleverDicts
-const CleverDict = CleverDicts.CleverDict
-
 # Decision #
 # ========================== #
-@enum DecisionState NotTaken Taken
+@enum DecisionState NotTaken Taken Known
 
 mutable struct Decision{T}
     state::DecisionState
@@ -16,14 +13,16 @@ function Decision(value, ::Type{T}) where T
     return Decision(Taken, T(value))
 end
 
+function KnownDecision(value, ::Type{T}) where T
+    return Decision(Known, T(value))
+end
+
 function Decision(info::JuMP.VariableInfo, ::Type{T}) where T
     if info.has_fix
         return Decision(Taken, T(info.fixed_value))
     end
     return Decision(NotTaken, T(NaN))
 end
-
-Base.copy(decision::Decision) = Decision(decision.state, decision.value)
 
 function KnownDecision(info::JuMP.VariableInfo, ::Type{T}) where T
     value = if info.has_fix
@@ -39,22 +38,20 @@ function KnownDecision(info::JuMP.VariableInfo, ::Type{T}) where T
             zero(T)
         end
     end
-    return Decision(Taken, value)
+    return Decision(Known, value)
 end
+
+Base.copy(decision::Decision) = Decision(decision.state, decision.value)
 
 # Decisions #
 # ========================== #
 struct IgnoreDecisions end
 
 struct Decisions
-    decisions::Dict{MOI.VariableIndex, Decision{Float64}}
-    undecided::Vector{MOI.VariableIndex}
-    knowns::Vector{MOI.VariableIndex}
+    decisions::OrderedDict{MOI.VariableIndex, Decision{Float64}}
 
     function Decisions()
-        return new(Dict{MOI.VariableIndex, Decision{Float64}}(),
-                   Vector{MOI.VariableIndex}(),
-                   Vector{MOI.VariableIndex}())
+        return new(OrderedDict{MOI.VariableIndex, Decision{Float64}}())
     end
 end
 
@@ -63,13 +60,9 @@ decision(decisions::Decisions, index::MOI.VariableIndex) = decisions.decisions[i
 decision_value(decisions::Decisions, index::MOI.VariableIndex) = decision_value(decision(decisions, index))
 
 function set_decision!(decisions::Decisions, index::MOI.VariableIndex, decision::Decision)
-    if !haskey(decisions.decisions, index)
-        push!(decisions.undecided, index)
-    end
     decisions.decisions[index] = decision
     return nothing
 end
-
 
 function remove_decision!(::IgnoreDecisions, ::MOI.VariableIndex)
     return nothing
@@ -79,65 +72,37 @@ function remove_decision!(decisions::Decisions, index::MOI.VariableIndex)
     if !haskey(decisions.decisions, index)
         return nothing
     end
-    i = something(findfirst(i -> i == index, decisions.undecided), 0)
-    if iszero(i)
-        error("Decision at index $index exists in set of decisions, but has not been properly added through `set_decision!`.")
-    end
-    deleteat!(decisions.undecided, i)
-    delete!(decisions.decisions, index)
-    return nothing
-end
-
-function set_known_decision!(decisions::Decisions, index::MOI.VariableIndex, decision::Decision)
-    if !haskey(decisions.decisions, index)
-        push!(decisions.knowns, index)
-    end
-    decisions.decisions[index] = decision
-    return nothing
-end
-
-function remove_known_decision!(::IgnoreDecisions, ::MOI.VariableIndex)
-    return nothing
-end
-
-function remove_known_decision!(decisions::Decisions, index::MOI.VariableIndex)
-    if !haskey(decisions.decisions, index)
-        return nothing
-    end
-    i = something(findfirst(i -> i == index, decisions.knowns), 0)
-    if iszero(i)
-        error("Known decision at index $index exists in set of decisions, but has not been properly added through `set_known_decision!`.")
-    end
-    deleteat!(decisions.knowns, i)
     delete!(decisions.decisions, index)
     return nothing
 end
 
 function clear!(decisions::Decisions)
     empty!(decisions.decisions)
-    empty!(decisions.undecided)
-    empty!(decisions.knowns)
     return nothing
 end
 
 function all_decisions(decisions::Decisions)
-    return map(decisions.undecided) do index
-        decisions.decisions[index]
-    end
+    return filter(decisions.decisions) do (index, decision)
+        state(decision) != Known
+    end |> keys |> collect
 end
 
 function all_known_decisions(decisions::Decisions)
-    return map(decisions.knowns) do index
-        decisions.decisions[index]
-    end
+    return filter(decisions.decisions) do (index, decision)
+        state(decision) == Known
+    end |> keys |> collect
 end
 
 function num_decisions(decisions::Decisions)
-    return length(decisions.undecided)
+    return count(decisions.decisions) do (index, decision)
+        return state(decision) != Known
+    end
 end
 
 function num_known_decisions(decisions::Decisions)
-    return length(decisions.knowns)
+    return count(decisions.decisions) do (index, decision)
+        state(decision) == Known
+    end
 end
 
 function untake_decisions!(decisions::Decisions)
@@ -167,8 +132,8 @@ function update_known_decisions!(decisions::Decisions, x::AbstractVector)
     # Check decision length
     num_known_decisions(decisions) == length(x) || error("Given decision of length $(length(x)) not compatible with number of defined known decision variables $(num_known_decisions(decisions)).")
     # Update values (assume x given in sorted order)
-    for (decision, val) in zip(all_known_decisions(decisions), x)
-        decision.value = val
+    for (key, val) in zip(all_known_decisions(decisions), x)
+        decisions.decisions[key].value = val
     end
     return nothing
 end

@@ -1,6 +1,7 @@
 using StochasticPrograms
 using JuMP
 using GLPK
+using Ipopt
 using Distributed
 using Distributions
 using LinearAlgebra

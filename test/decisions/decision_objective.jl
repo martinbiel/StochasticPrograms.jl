@@ -48,8 +48,8 @@ function test_SingleDecision_objective(Structure)
         @test x == @inferred JuMP.objective_function(sp, DecisionRef)
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x1 = KnownRef(sp[1,:x], 2, 1)
-        x2 = KnownRef(sp[1,:x], 2, 2)
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionAffExpr{Float64}
         @test JuMP.objective_function_type(sp, 2, 2) == DecisionAffExpr{Float64}
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
@@ -101,8 +101,8 @@ function test_SingleDecision_objective(Structure)
         @test x == @inferred JuMP.objective_function(sp, DecisionRef)
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x1 = KnownRef(sp[1,:x], 2, 1)
-        x2 = KnownRef(sp[1,:x], 2, 2)
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionAffExpr{Float64}
         @test JuMP.objective_function_type(sp, 2, 2) == DecisionAffExpr{Float64}
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
@@ -165,8 +165,8 @@ function test_DecisionAffExpr_objective(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x1 = KnownRef(sp[1,:x], 2, 1)
-        x2 = KnownRef(sp[1,:x], 2, 2)
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x1 + 2y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 2x2 + 4y2)
         @test JuMP.isequal_canonical(
@@ -199,7 +199,7 @@ function test_DecisionAffExpr_objective(Structure)
     @test JuMP.objective_function_type(sp, 2, 1) == DecisionAffExpr{Float64}
     @test JuMP.objective_function_type(sp, 2, 2) == DecisionAffExpr{Float64}
     if sp.structure isa StochasticPrograms.DeterministicEquivalent
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 3x + 4y1 + 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 5x + 4y2 + 2)
         @test JuMP.isequal_canonical(
@@ -212,7 +212,7 @@ function test_DecisionAffExpr_objective(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.VerticalStructure
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 3x + 4y1 + 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 5x + 4y2 + 2)
         @test JuMP.isequal_canonical(
@@ -225,8 +225,8 @@ function test_DecisionAffExpr_objective(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x1 = KnownRef(sp[1,:x], 2, 1)
-        x2 = KnownRef(sp[1,:x], 2, 2)
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 7x1 + 4y1 + 3)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 9x2 + 4y2 + 3)
         @test JuMP.isequal_canonical(
@@ -266,7 +266,7 @@ function test_DecisionQuadExpr_objective(Structure)
     # Structure specific
     x = DecisionRef(sp[1,:x])
     if sp.structure isa StochasticPrograms.DeterministicEquivalent
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), y1^2 + 2y1 + x^2 + 2x)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), y2^2 + 4y2 + x^2 + 2x)
         @test JuMP.isequal_canonical(
@@ -279,7 +279,7 @@ function test_DecisionQuadExpr_objective(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.VerticalStructure
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), y1^2 + 2y1 + x^2 + 2x)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), y2^2 + 4y2 + x^2 + 2x)
         @test JuMP.isequal_canonical(
@@ -292,8 +292,8 @@ function test_DecisionQuadExpr_objective(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x1 = KnownRef(sp[1,:x], 2, 1)
-        x2 = KnownRef(sp[1,:x], 2, 2)
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x1^2 + 4x1 + y1^2 + 2y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 2x2^2 + 4x2 + y2^2 + 4y2)
         @test JuMP.isequal_canonical(
@@ -335,7 +335,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4y2)
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
         JuMP.set_objective_coefficient(sp, x, 2, 2, 4.0)
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4x + 4y2)
         x = DecisionRef(sp[1,:x])
@@ -348,7 +348,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4y2)
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
         JuMP.set_objective_coefficient(sp, x, 2, 2, 4.0)
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4x + 4y2)
         x = DecisionRef(sp[1,:x])
@@ -357,7 +357,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x = KnownRef(sp[1,:x], 2, 1)
+        x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 4x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4x + 4y2)
         @test JuMP.isequal_canonical(4x + 4y1,
@@ -387,7 +387,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
     JuMP.set_objective_coefficient(sp, y, 2, 2, 4.0)
     # Structure specific
     if sp.structure isa StochasticPrograms.DeterministicEquivalent
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         y1 = DecisionRef(y, 1)
         y2 = DecisionRef(y, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x^2 + y1^2 + 4y1)
@@ -395,7 +395,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         x = sp[1,:x]
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
         JuMP.set_objective_coefficient(sp, x, 2, 2, 4.0)
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x^2 + y1^2 + 2x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x^2 + y2^2 + 4x + 4y2)
         x = DecisionRef(sp[1,:x])
@@ -404,7 +404,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.VerticalStructure
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         y1 = DecisionRef(y, 1)
         y2 = DecisionRef(y, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x^2 + y1^2 + 4y1)
@@ -412,7 +412,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         x = sp[1,:x]
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
         JuMP.set_objective_coefficient(sp, x, 2, 2, 4.0)
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x^2 + y1^2 + 2x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x^2 + y2^2 + 4x + 4y2)
         x = DecisionRef(sp[1,:x])
@@ -421,7 +421,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
     if sp.structure isa StochasticPrograms.HorizontalStructure
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         y1 = DecisionRef(y, 1)
         y2 = DecisionRef(y, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x^2 + y1^2 + 4x + 4y1)
@@ -433,7 +433,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         x = sp[1,:x]
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
         JuMP.set_objective_coefficient(sp, x, 2, 2, 4.0)
-        x = KnownRef(x, 2, 1)
+        x = DecisionRef(x, 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x^2 + y1^2 + 2x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 2x^2 + y2^2 + 4x + 4y2)
         @test JuMP.isequal_canonical(2x^2 + y1^2 + 2x + 4y1,

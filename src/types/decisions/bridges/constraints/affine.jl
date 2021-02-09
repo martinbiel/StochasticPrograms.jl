@@ -10,16 +10,13 @@ function MOIB.Constraint.bridge_constraint(::Type{AffineDecisionConstraintBridge
                                            model,
                                            f::AffineDecisionFunction{T},
                                            set::S) where {T, S}
-    # All decisions have been mapped to either the decision part constant or the variable part terms
+    # All decisions have been mapped to the variable part terms
     # at this point.
     F = MOI.ScalarAffineFunction{T}
-    # Calculate total constant
-    constant = f.variable_part.constant +
-        f.known_part.constant
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
                                     MOI.ScalarAffineFunction(f.variable_part.terms, zero(T)),
-                                    MOIU.shift_constant(set, -constant))
+                                    MOIU.shift_constant(set, -f.variable_part.constant))
     # Save the constraint index, the decision function, and the set, to allow modifications
     return AffineDecisionConstraintBridge{T, S}(constraint, f, set)
 end
@@ -53,8 +50,7 @@ function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintFunction,
     end
     g = AffineDecisionFunction(
         MOIU.filter_variables(v -> !from_decision(v), f.variable_part),
-        copy(f.decision_part),
-        copy(f.known_part))
+        copy(f.decision_part))
     return g
 end
 
@@ -66,6 +62,11 @@ end
 function MOI.get(model::MOI.ModelLike, attr::MOI.AbstractConstraintAttribute,
                  bridge::AffineDecisionConstraintBridge{T}) where T
     return MOI.get(model, attr, bridge.constraint)
+end
+
+function MOI.get(model::MOI.ModelLike, ::DecisionIndex,
+                 bridge::AffineDecisionConstraintBridge{T}) where T
+    return bridge.constraint
 end
 
 function MOI.delete(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge)
@@ -81,11 +82,9 @@ function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintFunction,
     # Change the function of the bridged constraints
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.ScalarAffineFunction(f.variable_part.terms, zero(T)))
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
+    # Shift constraint set
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
+            MOIU.shift_constant(bridge.set, -f.variable_part.constant))
     return nothing
 end
 
@@ -93,11 +92,9 @@ function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintSet,
                  bridge::AffineDecisionConstraintBridge{T,S}, change::S) where {T,S}
     f = bridge.decision_function
     bridge.set = change
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
+    # Shift constraint set
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(change, -constant))
+            MOIU.shift_constant(change, -f.variable_part.constant))
     return nothing
 end
 
@@ -105,11 +102,9 @@ function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge
     f = bridge.decision_function
     # Modify variable part of decision function
     f.variable_part.constant = change.new_constant
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
+    # Shift constraint set
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
+            MOIU.shift_constant(bridge.set, -f.variable_part.constant))
     return nothing
 end
 
@@ -128,60 +123,5 @@ function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge
     modify_coefficient!(f.decision_part.terms, change.decision, change.new_coefficient)
     # Update mapped variable through ScalarCoefficientChange
     MOI.modify(model, bridge, MOI.ScalarCoefficientChange(change.decision, change.new_coefficient))
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge{T,S}, change::KnownCoefficientChange) where {T,S}
-    f = bridge.decision_function
-    i = something(findfirst(t -> t.variable_index == change.known,
-                            f.known_part.terms), 0)
-    # Update known part of constraint constant
-    coefficient = iszero(i) ? zero(T) : f.known_part.terms[i].coefficient
-    known_value = MOI.get(model, MOI.VariablePrimal(), change.known)
-    f.known_part.constant +=
-        (change.new_coefficient - coefficient) * known_value
-    # Update coefficient in known part
-    modify_coefficient!(f.known_part.terms, change.known, change.new_coefficient)
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
-    MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge{T,S}, change::KnownValueChange) where {T,S}
-    f = bridge.decision_function
-    i = something(findfirst(t -> t.variable_index == change.known,
-                            f.known_part.terms), 0)
-    if iszero(i)
-        # Known value not in objective, nothing to do
-        return nothing
-    end
-    # Update known part of constraint constant
-    coefficient = f.known_part.terms[i].coefficient
-    f.known_part.constant +=
-        coefficient * change.value_difference
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
-    MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge{T,S}, change::KnownValuesChange) where {T,S}
-    f = bridge.decision_function
-    known_val = zero(T)
-    for term in f.known_part.terms
-        known_val += term.coefficient * MOI.get(model, MOI.VariablePrimal(), term.variable_index)
-    end
-    # Update known part of constraint constant
-    f.known_part.constant = known_val
-    # Recalculate total constant and shift constraint set
-    constant = f.variable_part.constant +
-        f.known_part.constant
-    MOI.set(model, MOI.ConstraintSet(), bridge.constraint,
-            MOIU.shift_constant(bridge.set, -constant))
     return nothing
 end

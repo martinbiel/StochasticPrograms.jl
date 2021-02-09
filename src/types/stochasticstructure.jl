@@ -146,7 +146,7 @@ function structure_name(structure::AbstractStochasticStructure)
 end
 function num_decisions(structure::AbstractStochasticStructure{N}, stage::Integer = 1) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    return length(structure.decisions[stage].undecided)
+    return num_decisions(structure.decisions[stage])
 end
 function scenario_type(structure::AbstractStochasticStructure, s::Integer = 2)
     return _scenario_type(scenarios(structure, s))
@@ -168,6 +168,12 @@ function expected(structure::AbstractStochasticStructure, stage::Integer = 2)
 end
 function distributed(structure::AbstractStochasticStructure, stage::Integer)
     return false
+end
+function DecisionRef(proxy::JuMP.Model, structure::AbstractStochasticStructure, index::VI, at_stage::Integer, scenario_index::Integer)
+    at_stage > 1 || error("There are no scenarios in the first at_stage.")
+    n = num_scenarios(structure, at_stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return DecisionRef(proxy, index)
 end
 # ========================== #
 

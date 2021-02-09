@@ -15,7 +15,7 @@ using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, HorizontalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
 using StochasticPrograms: AbstractExecution, ExecutionParameter, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, SubproblemOptimizer
-using StochasticPrograms: get_decisions, set_known_decision!, SingleKnownSet
+using StochasticPrograms: get_decisions, all_decisions, remove_decision!, set_decision!, SingleDecisionSet, DecisionCoefficientChange, KnownDecision, NoSpecifiedConstraint
 using StochasticPrograms: add_subscript
 using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!
 using ProgressMeter

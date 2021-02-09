@@ -71,14 +71,8 @@ function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{Dec
     length(dvars) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of decision variables $(length(dvars)).")
     # Update decisions
     for (dvar, val) in zip(dvars, vals)
-        d = decision(dvar)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
+        fix(dvar, val)
     end
-    # Update objective and constraints in model
-    update_decisions!(stochasticprogram, DecisionsStateChange())
     return nothing
 end
 function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, vals::AbstractVector, scenario_index::Integer)
@@ -96,14 +90,8 @@ function take_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{Dec
     length(dvars) == length(vals) || error("Given decision of length $(length(vals)) not compatible with number of decision variables $(length(dvars)).")
     # Update decisions
     for (dvar, val) in zip(dvars, vals)
-        d = decision(dvar, scenario_index)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
+        fix(dvar, scenario_index, val)
     end
-    # Update objective and constraints in model
-    update_decisions!(stochasticprogram, DecisionsStateChange(), stage(dvars[1]), scenario_index)
     return nothing
 end
 
@@ -121,15 +109,8 @@ function untake_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{D
     # Update decisions
     need_update = false
     for dvar in dvars
-        d = decision(dvar)
-        if state(d) == Taken
-            need_update |= true
-            # Update state
-            d.state = NotTaken
-        end
+        unfix(dvar)
     end
-    # Update objective and constraints in model (if needed)
-    need_update && update_decisions!(stochasticprogram, DecisionsStateChange())
     return nothing
 end
 function untake_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{DecisionVariable}, scenario_index::Integer)
@@ -144,17 +125,9 @@ function untake_decisions!(stochasticprogram::StochasticProgram, dvars::Vector{D
     # Check that decisions are first-stage
     stage(dvars[1]) > 1 || error("Decisions are not scenario-dependent, consider `take_decisions!(sp, dvars, vals)`")
     # Update decisions
-    need_update = false
     for dvar in dvars
-        d = decision(dvar, scenario_index)
-        if state(d) == Taken
-            need_update |= true
-            # Update state
-            d.state = NotTaken
-        end
+        unfix(dvar, scenario_index)
     end
-    # Update objective and constraints in model (if needed)
-    need_update && update_decisions!(stochasticprogram, DecisionsStateChange(), stage(dvars[1]), scenario_index)
     return nothing
 end
 
@@ -296,7 +269,7 @@ Return the index of the variable that corresponds to `dvar` in the optimizer mod
 """
 function JuMP.optimizer_index(dvar::DecisionVariable)
     stage(dvar) > 1 && error("$dvar is scenario dependent, consider `optimizer_index(dvar, scenario_index)`.")
-    return optimizer_index(structure(owner_model(dvar)), index(dvar))
+    return JuMP._moi_optimizer_index(structure(owner_model(dvar)), index(dvar))
 end
 """
     optimizer_index(dvar::DecisionVariable, scenario_index)::MOI.VariableIndex
@@ -305,7 +278,7 @@ Return the index of the variable that corresponds to the scenario-dependent `dva
 """
 function JuMP.optimizer_index(dvar::DecisionVariable, scenario_index::Integer)
     stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `optimizer_index(dvar)`.")
-    return optimizer_index(structure(owner_model(dvar)), index(dvar), scenario_index)
+    return JuMP._moi_optimizer_index(structure(owner_model(dvar)), index(dvar), scenario_index)
 end
 """
     has_duals(stochasticprogram::StochasticProgram; result::Int = 1)
@@ -496,13 +469,6 @@ function JuMP.unfix(dvar::DecisionVariable)
         return nothing
     end
     unfix(structure(owner_model(dvar)), index(dvar), stage(dvar))
-    d = decision(dvar)
-    # Update state
-    d.state = NotTaken
-    # Prepare modification
-    change = DecisionStateChange(index(dvar), NotTaken, -d.value)
-    # Update objective and constraints
-    update_decisions!(JuMP.owner_model(dvar), change)
     return nothing
 end
 """
@@ -1158,12 +1124,11 @@ function DecisionRef(dvar::DecisionVariable, scenario_index::Integer)
     sp = owner_model(dvar)
     return DecisionRef(proxy(sp, stage(dvar)), structure(sp), index(dvar), scenario_index)
 end
-
-function KnownRef(dvar::DecisionVariable, at_stage::Integer, scenario_index::Integer)
+function DecisionRef(dvar::DecisionVariable, at_stage::Integer, scenario_index::Integer)
     at_stage > stage(dvar) || error("$dvar can only be known after stage $(stage(dvar)).")
     sp = owner_model(dvar)
-    return KnownRef(proxy(sp, at_stage), structure(sp), index(dvar), at_stage, scenario_index)
-end
+    return DecisionRef(proxy(sp, at_stage), structure(sp), index(dvar), at_stage, scenario_index)
+-end
 
 is_decision_type(::Type{DecisionVariable}) = true
 

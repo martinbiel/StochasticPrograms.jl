@@ -1,14 +1,18 @@
 subsolver = GLPK.Optimizer
+qpsolver = () -> begin
+    opt = Ipopt.Optimizer()
+    MOI.set(opt, MOI.RawParameter("print_level"), 0)
+    return opt
+end
 
 regularizers = [DontRegularize(),
-                RegularizedDecomposition(penaltyterm = Linearized()),
+                RegularizedDecomposition(penaltyterm = InfNorm()),
                 TrustRegion(),
                 LevelSet(penaltyterm = InfNorm())]
 
 aggregators = [DontAggregate(),
                PartialAggregate(2),
-               Aggregate(),
-               DynamicAggregate(2, SelectUniform(2))]
+               Aggregate()]
 
 consolidators = [Consolidate(), DontConsolidate()]
 
@@ -65,10 +69,9 @@ executions = [Synchronous(), Asynchronous()]
             for execution in executions, penalizer in penalizations
                 set_optimizer_attribute(sp, Execution(), execution)
                 set_optimizer_attribute(sp, Penalizer(), penalizer)
-                set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
+                set_optimizer_attribute(sp, SubproblemOptimizer(), qpsolver)
                 set_optimizer_attribute(sp, PrimalTolerance(), 1e-3)
                 set_optimizer_attribute(sp, DualTolerance(), 1e-2)
-                set_optimizer_attribute(sp, Penaltyterm(), Linearized(num_breakpoints = 1000, spacing = 0.5))
                 @testset "$(optimizer_name(sp)): $name" begin
                     optimize!(sp)
                     @test termination_status(sp) == MOI.OPTIMAL

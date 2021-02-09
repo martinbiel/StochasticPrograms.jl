@@ -33,17 +33,17 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
         # initial decision
         MOI.optimize!(optimizer)
         status = MOI.get(optimizer, MOI.TerminationStatus())
-        x₀ = if status in StochasticPrograms.AcceptableTermination
-            x₀ = map(decisions.undecided) do vi
+        x₀ = if status in AcceptableTermination
+            x₀ = map(all_decisions(decisions)) do vi
                 T(MOI.get(optimizer, MOI.VariablePrimal(), vi))
             end
         else
             # Fallback in case crash was unsuccessful
-            x₀ = rand(T, length(decisions.undecided))
+            x₀ = rand(T, num_decisions(decisions))
         end
         A = typeof(x₀)
         ξ = map(x₀) do val
-            Decision(val, T)
+            KnownDecision(val, T)
         end
         # Penalty term
         PT = typeof(penaltyterm)
@@ -89,7 +89,7 @@ function initialize!(subproblem::SubProblem, penalty::AbstractFloat)
     initialize_penaltyterm!(subproblem.penaltyterm,
                             subproblem.optimizer,
                             penalty / 2,
-                            subproblem.decisions.undecided,
+                            all_decisions(subproblem.decisions),
                             subproblem.projection_targets)
 end
 
@@ -98,8 +98,9 @@ function add_projection_targets!(subproblem::SubProblem)
     model = subproblem.optimizer
     for i in eachindex(ξ)
         name = add_subscript(:ξ, i)
-        var_index, _ = MOI.add_constrained_variable(model, StochasticPrograms.SingleKnownSet(2, ξ[i]))
-        set_known_decision!(subproblem.decisions, var_index, ξ[i])
+        set = SingleDecisionSet(2, ξ[i], NoSpecifiedConstraint(), false)
+        var_index, _ = MOI.add_constrained_variable(model, set)
+        set_decision!(subproblem.decisions, var_index, ξ[i])
         MOI.set(model, MOI.VariableName(), var_index, name)
         subproblem.projection_targets[i] = var_index
     end
@@ -120,7 +121,7 @@ function reformulate_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::
     f = subproblem.objective
     F = AffineDecisionFunction{Float64}
     # Update dual penalty
-    for (i,vi) in enumerate(subproblem.decisions.undecided)
+    for (i,vi) in enumerate(all_decisions(subproblem.decisions))
         j = if typeof(f) <: AffineDecisionFunction
             j = something(findfirst(t -> t.variable_index == vi,
                                     f.decision_part.terms), 0)
@@ -129,7 +130,7 @@ function reformulate_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::
         end
         coefficient = iszero(j) ? 0.0 : f.decision_part.terms[j].coefficient
         MOI.modify(model, MOI.ObjectiveFunction{F}(),
-                   StochasticPrograms.DecisionCoefficientChange(vi, coefficient + subproblem.ρ[i]))
+                   DecisionCoefficientChange(vi, coefficient + subproblem.ρ[i]))
     end
     # Update projection targets
     for i in eachindex(ξ)
@@ -139,7 +140,7 @@ function reformulate_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::
     update_penaltyterm!(subproblem.penaltyterm,
                         model,
                         r / 2,
-                        subproblem.decisions.undecided,
+                        all_decisions(subproblem.decisions),
                         subproblem.projection_targets)
     return nothing
 end
@@ -150,7 +151,7 @@ function restore_subproblem!(subproblem::SubProblem)
     remove_penalty!(subproblem.penaltyterm, model)
     # Delete projection targets
     for var in subproblem.projection_targets
-        StochasticPrograms.remove_known_decision!(subproblem.decisions, var)
+        remove_decision!(subproblem.decisions, var)
         MOI.delete(model, var)
     end
     empty!(subproblem.projection_targets)
@@ -164,7 +165,7 @@ end
 function (subproblem::SubProblem{T})(ξ::AbstractVector) where T <: AbstractFloat
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
-    if status ∈ StochasticPrograms.AcceptableTermination
+    if status ∈ AcceptableTermination
         subproblem.x .= _get_iterate(subproblem)
         return SubproblemSolution(status, T(_objective_value(subproblem)))
     elseif status == MOI.INFEASIBLE
@@ -187,7 +188,7 @@ function _objective_value(subproblem::SubProblem)
 end
 
 function _get_iterate(subproblem::SubProblem)
-    return map(subproblem.decisions.undecided) do vi
+    return map(all_decisions(subproblem.decisions)) do vi
         MOI.get(subproblem.optimizer, MOI.VariablePrimal(), vi)
     end
 end

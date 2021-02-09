@@ -2,7 +2,6 @@
 # ========================== #
 struct VectorDecisionConstraintBridge{T, S <: MOI.AbstractVectorSet} <: MOIB.Constraint.AbstractBridge
     constraint::CI{MOI.VectorOfVariables, S}
-    fixing_constraints::Vector{FixingConstraint{T}}
     decisions::VectorOfDecisions
 end
 
@@ -22,7 +21,7 @@ function MOIB.Constraint.bridge_constraint(::Type{VectorDecisionConstraintBridge
                                     MOI.VectorOfVariables(mapped_variables),
                                     set)
     # Save the constraint indices and the decision to allow modifications
-    return VectorDecisionConstraintBridge{T,S}(constraint, fill(FixingConstraint{T}(0), MOI.dimension(set)), f)
+    return VectorDecisionConstraintBridge{T,S}(constraint, f)
 end
 
 function MOI.supports_constraint(::Type{<:VectorDecisionConstraintBridge{T}},
@@ -43,11 +42,7 @@ function MOIB.Constraint.concrete_bridge_type(::Type{<:VectorDecisionConstraintB
 end
 
 MOI.get(b::VectorDecisionConstraintBridge{T,S}, ::MOI.NumberOfConstraints{MOI.VectorOfVariables, S}) where {T,S} = 1
-MOI.get(b::VectorDecisionConstraintBridge{T}, ::MOI.NumberOfConstraints{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}) where T =
-    count(fc -> fc.value != 0, b.fixing_constraints)
 MOI.get(b::VectorDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.VectorOfVariables, S}) where {T,S} = [b.constraint]
-MOI.get(b::VectorDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}) where {T} =
-    filter(fc -> fc.value != 0, b.fixing_constraints)
 
 function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintFunction,
                  bridge::VectorDecisionConstraintBridge)
@@ -69,6 +64,11 @@ function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintDual,
     return MOI.get(model, attr, bridge.constraint)
 end
 
+function MOI.get(model::MOI.ModelLike, ::DecisionIndex,
+                 bridge::VectorDecisionConstraintBridge{T}) where T
+    return bridge.constraint
+end
+
 function MOI.delete(model::MOI.ModelLike, bridge::VectorDecisionConstraintBridge)
     MOI.delete(model, bridge.constraint)
     return nothing
@@ -77,31 +77,5 @@ end
 function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintSet,
                  bridge::VectorDecisionConstraintBridge{T,S}, change::S) where {T,S}
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint, change)
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::VectorDecisionConstraintBridge{T,S}, change::DecisionStateChange) where {T,S}
-    i = findfirst(d -> d.decision == change.decision, bridge.decisions.decisions)
-    # Switch on state transition
-    if change.new_state == NotTaken
-        if bridge.fixing_constraints[i].value != 0
-            # Remove the fixing constraint
-            MOI.delete(model, bridge.fixing_constraints[i])
-            bridge.fixing_constraints[i] = FixingConstraint{T}(0)
-        end
-    end
-    if change.new_state == Taken
-        if bridge.fixing_constraints[i].value != 0
-            # Remove any existing fixing constraint
-            MOI.delete(model, bridge.fixing_constraints[i])
-        end
-        # Perform the bridge mapping manually
-        aff = MOIB.bridged_function(model, AffineDecisionFunction{T}(bridge.decisions.decisions[i]))
-        f = MOI.ScalarAffineFunction{T}(MOI.SingleVariable(aff.decision_part.terms[1].variable_index))
-        # Get the decision value
-        set = MOI.EqualTo(aff.decision_part.constant)
-        # Add a fixing constraint to ensure that fixed decision is feasible.
-        bridge.fixing_constraints[i] = MOI.add_constraint(model, f, set)
-    end
     return nothing
 end

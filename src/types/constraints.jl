@@ -111,7 +111,7 @@ Return the index of the variable that corresponds to `dvar` in the optimizer mod
 """
 function JuMP.optimizer_index(sp_cref::SPConstraintRef)
     stage(sp_cref) > 1 && error("$sp_cref is scenario dependent, consider `optimizer_index(sp_cref, scenario_index)`.")
-    return optimizer_index(structure(owner_model(sp_cref)), index(sp_cref))
+    return JuMP._moi_optimizer_index(structure(owner_model(sp_cref)), index(sp_cref))
 end
 """
     optimizer_index(sp_cref::SPConstraintRef, scenario_index)::MOI.VariableIndex
@@ -119,8 +119,7 @@ end
 Return the index of the constraint that corresponds to the scenario-dependent `sp_cref` in the optimizer model at `scenario_index`.
 """
 function JuMP.optimizer_index(sp_cref::SPConstraintRef, scenario_index::Integer)
-    stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `optimizer_index(sp_cref)`.")
-    return optimizer_index(structure(owner_model(sp_cref)), index(sp_cref), scenario_index)
+    return JuMP._moi_optimizer_index(structure(owner_model(sp_cref)), index(sp_cref), scenario_index)
 end
 
 Base.broadcastable(sp_cref::SPConstraintRef) = Ref(sp_cref)

@@ -163,7 +163,7 @@ function MOI.delete(structure::VerticalStructure{N}, index::MOI.VariableIndex, s
     JuMP.delete(structure.first_stage, DecisionRef(structure.first_stage, index))
     # Remove known decisions
     for s in 2:N
-        delete_known!(scenarioproblems(structure, s), index)
+        JuMP.delete(scenarioproblems(structure, s), index)
     end
     return nothing
 end
@@ -172,7 +172,7 @@ function MOI.delete(structure::VerticalStructure{N}, indices::Vector{MOI.Variabl
     JuMP.delete(structure.first_stage, DecisionRef.(structure.first_stage, indices))
     # Remove known decisions
     for s in 2:N
-        delete_knowns!(scenarioproblems(structure, s), indices)
+        JuMP.delete(scenarioproblems(structure, s), indices)
     end
     return nothing
 end
@@ -206,22 +206,9 @@ end
 # JuMP #
 # ========================== #
 function JuMP.fix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, val::Number) where N
-    d = decision(structure, index, stage)
-    if state(d) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
-    else
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val - d.value)
-        # Just update value
-        d.value = val
-    end
-    # Update objective and constraints
-    update_decisions!(structure, change)
+    dref = DecisionRef(structure.first_stage, index)
+    fix(dref, val)
+    update_decision_state!(scenarioproblems(structure), index, Known)
     return nothing
 end
 function JuMP.fix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer, val::Number) where N
@@ -232,14 +219,8 @@ function JuMP.fix(structure::VerticalStructure{N}, index::MOI.VariableIndex, sta
     return nothing
 end
 function JuMP.unfix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
-    # Get decision
-    d = decision(structure, index, stage)
-    # Update state
-    d.state = NotTaken
-    # Prepare modification
-    change = DecisionStateChange(index, NotTaken, -d.value)
-    # Update objective and constraints
-    update_decisions!(structure, change)
+    dref = DecisionRef(structure.first_stage, index)
+    unfix(dref)
     return nothing
 end
 function JuMP.unfix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
@@ -269,20 +250,11 @@ function JuMP.objective_function(structure::AbstractBlockStructure, proxy::JuMP.
     end
 end
 
-function JuMP.optimizer_index(structure::VerticalStructure, index::VI)
-    return index
+function JuMP._moi_optimizer_index(structure::VerticalStructure, index::VI)
+    return decision_index(backend(structure.first_stage), index)
 end
-function JuMP.optimizer_index(structure::VerticalStructure, index::VI, scenario_index::Integer)
-    return MOI.VariableIndex(index.value - length(structure.decisions[2].knowns))
-end
-function JuMP.optimizer_index(structure::VerticalStructure, ci::CI)
-    return ci
-end
-function JuMP.optimizer_index(structure::VerticalStructure, ci::CI, scenario_index::Integer)
-    return ci
-end
-function JuMP.optimizer_index(structure::VerticalStructure, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
-    return CI{F,S}(ci.value - length(structure.decisions[2].knowns))
+function JuMP._moi_optimizer_index(structure::VerticalStructure, ci::CI)
+    return decision_index(backend(structure.first_stage), ci)
 end
 
 function JuMP.set_objective_coefficient(structure::VerticalStructure{N}, index::VI, var_stage::Integer, stage::Integer, coeff::Real) where N
@@ -293,7 +265,7 @@ function JuMP.set_objective_coefficient(structure::VerticalStructure{N}, index::
             dref = DecisionRef(structure.first_stage, index)
             set_objective_coefficient(structure.first_stage, dref, coeff)
         else
-            set_known_objective_coefficient(scenarioproblems(structure, stage), index, coeff)
+            set_objective_coefficient(scenarioproblems(structure, stage), index, coeff)
         end
     else
         for scenario_index in 1:num_scenarios(structure, stage)
@@ -307,7 +279,7 @@ function JuMP.set_objective_coefficient(structure::VerticalStructure{N}, index::
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     if var_stage == 1
-        set_known_objective_coefficient(scenarioproblems(structure, stage), index, scenario_index, coeff)
+        set_objective_coefficient(scenarioproblems(structure, stage), index, scenario_index, coeff)
     else
         set_objective_coefficient(scenarioproblems(structure, stage), index, scenario_index, coeff)
     end
@@ -377,13 +349,6 @@ function DecisionRef(proxy::JuMP.Model, structure::VerticalStructure, index::VI)
     return DecisionRef(structure.first_stage, index)
 end
 
-function KnownRef(proxy::JuMP.Model, structure::VerticalStructure, index::VI, at_stage::Integer, scenario_index::Integer)
-    at_stage > 1 || error("There are no scenarios in the first at_stage.")
-    n = num_scenarios(structure, at_stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    return KnownRef(proxy, index)
-end
-
 function JuMP.jump_function(structure::VerticalStructure{N},
                             proxy::JuMP.Model,
                             stage::Integer,
@@ -412,7 +377,7 @@ end
 
 # Setters
 # ========================== #
-function update_decisions!(structure::VerticalStructure, change::DecisionModification)
-    update_decisions!(structure.first_stage, change)
+function update_known_decisions!(structure::VerticalStructure)
+    update_known_decisions!(structure.first_stage)
     return nothing
 end

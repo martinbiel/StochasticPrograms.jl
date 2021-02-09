@@ -51,6 +51,13 @@ function JuMP.objective_function(structure::AbstractBlockStructure{N},
     return objective
 end
 
+function JuMP._moi_optimizer_index(structure::AbstractBlockStructure, index::VI, scenario_index::Integer)
+    return JuMP._moi_optimizer_index(scenarioproblems(structure), index, scenario_index)
+end
+function JuMP._moi_optimizer_index(structure::AbstractBlockStructure, ci::CI, scenario_index::Integer)
+    return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
+end
+
 function DecisionRef(proxy::JuMP.Model, structure::AbstractBlockStructure, index::VI, scenario_index::Integer)
     return DecisionRef(proxy, index)
 end
@@ -158,8 +165,8 @@ end
 
 # Setters
 # ========================== #
-function update_decisions!(structure::AbstractBlockStructure, change::DecisionModification, stage::Integer, scenario_index::Integer)
-    update_decisions!(scenarioproblems(structure, stage), change, scenario_index)
+function update_known_decisions!(structure::AbstractBlockStructure, change::DecisionModification, stage::Integer, scenario_index::Integer)
+    update_known_decisions!(scenarioproblems(structure, stage), change, scenario_index)
     return nothing
 end
 function add_scenario!(structure::AbstractBlockStructure, stage::Integer, scenario::AbstractScenario)

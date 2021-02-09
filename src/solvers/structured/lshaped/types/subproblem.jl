@@ -186,11 +186,13 @@ function collect_linking_constraints(model::JuMP.Model,
         for cref in all_constraints(model, F, S)
             coeffs = Vector{Tuple{Int, Int, T}}()
             aff = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::DecisionAffExpr
-            for (coef, kvar) in linear_terms(aff.knowns)
+            for (coef, kvar) in linear_terms(aff.decisions)
                 # Map known decisions to master decision,
                 # assuming sorted order
-                col = master_indices[index(kvar).value].value
-                push!(coeffs, (1, col, T(coef)))
+                if state(kvar) == Known
+                    col = master_indices[index(kvar).value].value
+                    push!(coeffs, (1, col, T(coef)))
+                end
             end
             if !isempty(coeffs)
                 push!(masterterms, coeffs)
@@ -205,11 +207,13 @@ function collect_linking_constraints(model::JuMP.Model,
             coeffs = Vector{Tuple{Int, Int, T}}()
             affs = JuMP.jump_function(model, MOI.get(model, MOI.ConstraintFunction(), cref))::Vector{DecisionAffExpr{T}}
             for (row, aff) in enumerate(affs)
-                for (coef, kvar) in linear_terms(aff.knowns)
+                for (coef, kvar) in linear_terms(aff.decisions)
                     # Map known decisions to master decision,
                     # assuming sorted order
-                    col = master_indices[index(kvar).value].value
-                    push!(coeffs, (row, col, T(coef)))
+                    if state(kvar) == Known
+                        col = master_indices[index(kvar).value].value
+                        push!(coeffs, (row, col, T(coef)))
+                    end
                 end
             end
             if !isempty(coeffs)
@@ -221,17 +225,8 @@ function collect_linking_constraints(model::JuMP.Model,
     return linking_constraints, masterterms
 end
 
-function update_subproblem!(subproblem::SubProblem, change::KnownModification)
-    func_type = MOI.get(subproblem.optimizer, MOI.ObjectiveFunctionType())
-    if func_type <: AffineDecisionFunction
-        # Only need to update if there are known decisions in objective
-        MOI.modify(subproblem.optimizer,
-                   MOI.ObjectiveFunction{func_type}(),
-                   change)
-    end
-    for cref in subproblem.linking_constraints
-        update_decision_constraint!(subproblem.optimizer, cref, change)
-    end
+function update_subproblem!(subproblem::SubProblem)
+    update_known_decisions!(subproblem.optimizer)
     return nothing
 end
 

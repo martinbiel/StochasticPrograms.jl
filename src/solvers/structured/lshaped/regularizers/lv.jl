@@ -45,7 +45,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyte
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
-            Decision(val, T)
+            KnownDecision(val, T)
         end
         PT = typeof(penaltyterm)
         return new{T, A, PT}(LVData{T}(),
@@ -67,10 +67,10 @@ function initialize_regularization!(lshaped::AbstractLShaped, lv::LevelSet)
     initialize_penaltyterm!(lv.penaltyterm,
                             lshaped.master,
                             1.0,
-                            lv.decisions.undecided,
+                            all_decisions(lv.decisions),
                             lv.projection_targets)
     # Delete penalty-term
-    StochasticPrograms.remove_penalty!(lv.penaltyterm, lshaped.master)
+    remove_penalty!(lv.penaltyterm, lshaped.master)
     return nothing
 end
 
@@ -85,6 +85,7 @@ function restore_regularized_master!(lshaped::AbstractLShaped, lv::LevelSet)
     # Delete projection targets
     for var in lv.projection_targets
         MOI.delete(lshaped.master, var)
+        StochasticPrograms.remove_decision!(lv.decisions, var)
     end
     empty!(lv.projection_targets)
     return nothing
@@ -157,7 +158,7 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
         lv.data.constraint = LVConstraint(0)
     end
     # Delete penalty-term
-    StochasticPrograms.remove_penalty!(lv.penaltyterm, lshaped.master)
+    remove_penalty!(lv.penaltyterm, lshaped.master)
     # Re-add objective
     F = typeof(objective)
     MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), objective)
@@ -179,7 +180,7 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
     initialize_penaltyterm!(lv.penaltyterm,
                             lshaped.master,
                             1.0,
-                            lv.decisions.undecided,
+                            all_decisions(lv.decisions),
                             lv.projection_targets)
     # Add level constraint
     lv.data.constraint =

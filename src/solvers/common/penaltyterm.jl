@@ -1,6 +1,6 @@
 abstract type AbstractPenaltyterm end
-const L2NormConstraint = CI{QuadraticDecisionFunction{Float64,QuadraticPart{Float64}}, MOI.LessThan{Float64}}
-const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64,LinearPart{Float64}}, MOI.LessThan{Float64}}
+const L2NormConstraint = CI{QuadraticDecisionFunction{Float64}, MOI.LessThan{Float64}}
+const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64}, MOI.LessThan{Float64}}
 const InfNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
 const ManhattanNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormOneCone}
 
@@ -40,7 +40,7 @@ function initialize_penaltyterm!(penalty::Quadratic,
     t = MOI.SingleVariable(penalty.t)
     # Prepare variable vectors
     x = VectorOfDecisions(x)
-    ξ = VectorOfKnowns(ξ)
+    ξ = VectorOfDecisions(ξ)
     # Set name
     MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂²")
     # Add quadratic ℓ₂-norm constraint
@@ -73,9 +73,12 @@ function update_penaltyterm!(penalty::Quadratic,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
-    MOI.modify(model,
-               penalty.constraint,
-               KnownValuesChange())
+    for vi in ξ
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        MOI.modify(model,
+                   ci,
+                   KnownValuesChange())
+    end
     return nothing
 end
 
@@ -175,7 +178,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     for i in eachindex(x)
         tᵢ = MOI.SingleVariable(penalty.auxilliary_variables[i])
         xᵢ = SingleDecision(x[i])
-        ξᵢ = SingleKnown(ξ[i])
+        ξᵢ = SingleDecision(ξ[i])
         for (j,r) in enumerate(breakpoints)
             # Add linearization constraint
             g = MOIU.operate(-, T, xᵢ, r * ξᵢ)
@@ -219,10 +222,11 @@ function update_penaltyterm!(penalty::Linearized,
                    MOI.ObjectiveFunction{F}(),
                    MOI.ScalarCoefficientChange(penalty.auxilliary_variables[i], correction * α))
     end
-    # Update projection target
-    for constraint in penalty.constraints
+    # Update projection targets
+    for vi in ξ
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(model,
-                   constraint,
+                   ci,
                    KnownValuesChange())
     end
     return nothing
@@ -283,7 +287,7 @@ function initialize_penaltyterm!(penalty::InfNorm,
     penalty.t = MOI.add_variable(model)
     MOI.set(model, MOI.VariableName(), penalty.t, "||x - ξ||_∞")
     x = VectorOfDecisions(x)
-    ξ = VectorOfKnowns(ξ)
+    ξ = VectorOfDecisions(ξ)
     t = MOI.SingleVariable(penalty.t)
     # Add ∞-norm constraint
     f = MOIU.operate(vcat, T, t, x) -
@@ -314,9 +318,12 @@ function update_penaltyterm!(penalty::InfNorm,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
-    MOI.modify(model,
-               penalty.constraint,
-               KnownValuesChange())
+    for vi in ξ
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        MOI.modify(model,
+                   ci,
+                   KnownValuesChange())
+    end
     return nothing
 end
 
@@ -368,7 +375,7 @@ function initialize_penaltyterm!(penalty::ManhattanNorm,
     penalty.t = MOI.add_variable(model)
     MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₁")
     x = VectorOfDecisions(x)
-    ξ = VectorOfKnowns(ξ)
+    ξ = VectorOfDecisions(ξ)
     t = MOI.SingleVariable(penalty.t)
     # Add ∞-norm constraint
     f = MOIU.operate(vcat, T, t, x) -
@@ -399,9 +406,12 @@ function update_penaltyterm!(penalty::ManhattanNorm,
                MOI.ObjectiveFunction{F}(),
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
-    MOI.modify(model,
-               penalty.constraint,
-               KnownValuesChange())
+    for vi in ξ
+        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        MOI.modify(model,
+                   ci,
+                   KnownValuesChange())
+    end
     return nothing
 end
 

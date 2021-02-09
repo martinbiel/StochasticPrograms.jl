@@ -35,7 +35,7 @@ function initialize_subworker!(subworker::SubWorker{H,T},
             subproblem(sp, i),
             start_id + i,
             T(probability(scenario(sp, i))),
-            fetch(decisions).knowns,
+            all_known_decisions(fetch(decisions)),
             H)
     end
     put!(subworker, subproblems)
@@ -70,12 +70,11 @@ function resolve_subproblems!(subworker::SubWorker{H,T},
     end
     # Update subproblems
     update_known_decisions!(fetch(decisions), x)
-    change = KnownValuesChange()
     # Aggregation policy
     aggregation::AbstractAggregation = aggregator(length(subproblems), T)
     # Solve subproblems
     for subproblem in subproblems
-        update_subproblem!(subproblem, change)
+        update_subproblem!(subproblem)
         cut::SparseHyperPlane{T} = subproblem(x)
         aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
     end
@@ -119,9 +118,8 @@ function work_on_subproblems!(subworker::SubWorker{H,T},
         x::A = fetch(iterates, t)
         # Update subproblems
         update_known_decisions!(fetch(decisions), x)
-        change = KnownValuesChange()
         for subproblem in subproblems
-            update_subproblem!(subproblem, change)
+            update_subproblem!(subproblem)
             cut::SparseHyperPlane{T} = subproblem(x)
             !quit && aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
         end

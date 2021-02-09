@@ -407,22 +407,9 @@ end
 # JuMP #
 # ========================== #
 function JuMP.fix(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer, val::Number)
-    d = decision(scenarioproblems, index, scenario_index)
-    if state(d) == NotTaken
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val)
-        # Update state
-        d.state = Taken
-        # Update value
-        d.value = val
-    else
-        # Prepare modification
-        change = DecisionStateChange(index, Taken, val - d.value)
-        # Just update value
-        d.value = val
-    end
-    # Update objective and constraints
-    update_decisions!(scenarioproblems, change)
+    subprob = scenarioproblems.problems[scenario_index]
+    dref = DecisionRef(subprob, index)
+    fix(dref, val)
     return nothing
 end
 function JuMP.fix(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer, val::Number)
@@ -432,24 +419,10 @@ function JuMP.fix(scenarioproblems::DistributedScenarioProblems, index::MOI.Vari
         n = scenarioproblems.scenario_distribution[w-1]
         if scenario_index <= n + j
             return remotecall_fetch(
-                w, scenarioproblems[w-1], scenario_index - j, index) do sp, i, index
+                w, scenarioproblems[w-1], scenario_index - j, index, val) do sp, i, index, val
                     subprob = fetch(sp).problems[i]
-                    d = decision(DecisionRef(subprob, index))
-                    if state(d) == NotTaken
-                        # Prepare modification
-                        change = DecisionStateChange(index, Taken, val)
-                        # Update state
-                        d.state = Taken
-                        # Update value
-                        d.value = val
-                    else
-                        # Prepare modification
-                        change = DecisionStateChange(index, Taken, val - d.value)
-                        # Just update value
-                        d.value = val
-                    end
-                    # Update objective and constraints
-                    update_decisions!(subprob, change)
+                    dref = DecisionRef(subprob, index)
+                    fix(dref, val)
                     return nothing
                 end
         end
@@ -458,14 +431,9 @@ function JuMP.fix(scenarioproblems::DistributedScenarioProblems, index::MOI.Vari
     throw(BoundsError(scenarioproblems, scenario_index))
 end
 function JuMP.unfix(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
-    # Get decision
-    d = decision(scenarioproblems, index, scenario_index)
-    # Update state
-    d.state = NotTaken
-    # Prepare modification
-    change = DecisionStateChange(index, NotTaken, -d.value)
-    # Update objective and constraints
-    update_decisions!(scenarioproblems, change)
+    subprob = scenarioproblems.problems[scenario_index]
+    dref = DecisionRef(subprob, index)
+    unfix(dref)
     return nothing
 end
 function JuMP.unfix(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
@@ -477,13 +445,8 @@ function JuMP.unfix(scenarioproblems::DistributedScenarioProblems, index::MOI.Va
             return remotecall_fetch(
                 w, scenarioproblems[w-1], scenario_index - j, index) do sp, i, index
                     subprob = fetch(sp).problems[i]
-                    d = decision(DecisionRef(subprob, index))
-                    # Update state
-                    d.state = NotTaken
-                    # Prepare modification
-                    change = DecisionStateChange(index, NotTaken, -d.value)
-                    # Update objective and constraints
-                    update_decisions!(subprob, change)
+                    dref = DecisionRef(subprob, index)
+                    unfix(dref)
                     return nothing
                 end
         end
@@ -545,6 +508,14 @@ function JuMP.objective_function(scenarioproblems::DistributedScenarioProblems,
     throw(BoundsError(scenarioproblems, scenario_index))
 end
 
+function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
+    return decision_index(backend(subproblem(scenarioproblems, scenario_index)), index)
+end
+
+function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, ci::CI, scenario_index::Integer)
+    return decision_index(backend(subproblem(scenarioproblems, scenario_index)), ci)
+end
+
 function JuMP.set_objective_coefficient(scenarioproblems::ScenarioProblems, index::VI, scenario_index::Integer, coeff::Real)
     subprob = subproblem(scenarioproblems, scenario_index)
     dref = DecisionRef(subprob, index)
@@ -562,51 +533,6 @@ function JuMP.set_objective_coefficient(scenarioproblems::DistributedScenarioPro
                     subprob = fetch(sp).problems[i]
                     dref = DecisionRef(subprob, index)
                     set_objective_coefficient(subprob, dref, coeff)
-                end
-        end
-        j += n
-    end
-    throw(BoundsError(scenarioproblems, scenario_index))
-end
-function set_known_objective_coefficient(scenarioproblems::ScenarioProblems, index::VI, coeff::Real)
-    for subprob in subproblems(scenarioproblems)
-        kref = KnownRef(subprob, index)
-        set_objective_coefficient(subprob, kref, coeff)
-    end
-    return nothing
-end
-function set_known_objective_coefficient(scenarioproblems::DistributedScenarioProblems, index::VI, coeff::Real)
-    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    @sync begin
-        for (i,w) in enumerate(workers())
-            @async remotecall_fetch(
-                w, scenarioproblems[w-1], index, coeff) do sp, index, coeff
-                    for subprob in fetch(sp).problems
-                        kref = KnownRef(subprob, index)
-                        set_objective_coefficient(subprob, kref, coeff)
-                    end
-                end
-        end
-    end
-    return nothing
-end
-function set_known_objective_coefficient(scenarioproblems::ScenarioProblems, index::VI, scenario_index::Integer, coeff::Real)
-    subprob = subproblem(scenarioproblems, scenario_index)
-    kref = KnownRef(subprob, index)
-    set_objective_coefficient(subprob, kref, coeff)
-    return nothing
-end
-function set_known_objective_coefficient(scenarioproblems::DistributedScenarioProblems, index::VI, scenario_index::Integer, coeff::Real)
-    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    j = 0
-    for w in workers()
-        n = scenarioproblems.scenario_distribution[w-1]
-        if scenario_index <= n + j
-            return remotecall_fetch(
-                w, scenarioproblems[w-1], scenario_index - j, index, coeff) do sp, i, index, coeff
-                    subprob = fetch(sp).problems[i]
-                    kref = KnownRef(subprob, index)
-                    set_objective_coefficient(subprob, kref, coeff)
                 end
         end
         j += n
@@ -706,6 +632,51 @@ function JuMP.set_normalized_rhs(scenarioproblems::DistributedScenarioProblems,
         j += n
     end
     throw(BoundsError(scenarioproblems, scenario_index))
+end
+
+function JuMP.delete(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex)
+    for subprob in subproblems(scenarioproblems)
+        dref = DecisionRef(subprob, index)
+        delete(subprob, dref)
+    end
+    return nothing
+end
+function JuMP.delete(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex)
+    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], index) do sp, index
+                    for subprob in fetch(sp).problems
+                        dref = DecisionRef(subprob, index)
+                        delete(subprob, dref)
+                    end
+                end
+        end
+    end
+    return nothing
+end
+function JuMP.delete(scenarioproblems::ScenarioProblems, indices::Vector{MOI.VariableIndex})
+    for subprob in subproblems(scenarioproblems)
+        drefs = DecisionRef.(subprob, indices)
+        delete(subprob, drefs)
+    end
+    return nothing
+end
+function JuMP.delete(scenarioproblems::DistributedScenarioProblems, indices::Vector{MOI.VariableIndex})
+    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(
+                w, scenarioproblems[w-1], indices) do sp, indices
+                    for subprob in fetch(sp).problems
+                        drefs = DecisionRef.(subprob, indices)
+                        delete(subprob, drefs)
+                    end
+                end
+        end
+    end
+    return nothing
 end
 
 # Getters #
@@ -885,37 +856,38 @@ distributed(scenarioproblems::DistributedScenarioProblems) = true
 
 # Setters
 # ========================== #
-function update_decisions!(scenarioproblems::ScenarioProblems, change::DecisionModification)
+function update_decision_state!(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, state::DecisionState)
     map(subproblems(scenarioproblems)) do subprob
-        update_decisions!(subprob, change)
+        dref = DecisionRef(subprob, index)
+        update_decision_state!(dref, state)
     end
     return nothing
 end
-function update_decisions!(scenarioproblems::DistributedScenarioProblems, change::DecisionModification)
+function update_decision_state!(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, state::DecisionState)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     @sync begin
         for (i,w) in enumerate(workers())
             @async remotecall_fetch(
-                w, scenarioproblems[w-1], change) do sp, change
-                    update_decisions!(fetch(sp), change)
+                w, scenarioproblems[w-1], index, state) do sp, index, state
+                    update_decision_state!(fetch(sp), index, state)
                 end
         end
     end
     return nothing
 end
-function update_decisions!(scenarioproblems::ScenarioProblems, change::DecisionModification, scenario_index::Integer)
-    update_decisions!(subproblem(scenarioproblems, scenario_index), change)
+function update_known_decisions!(scenarioproblems::ScenarioProblems, scenario_index::Integer)
+    update_known_decisions!(subproblem(scenarioproblems, scenario_index))
     return nothing
 end
-function update_decisions!(scenarioproblems::DistributedScenarioProblems, change::DecisionModification, scenario_index::Integer)
+function update_known_decisions!(scenarioproblems::DistributedScenarioProblems, scenario_index::Integer)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     j = 0
     for w in workers()
         n = scenarioproblems.scenario_distribution[w-1]
         if scenario_index <= n + j
             return remotecall_fetch(
-                w, scenarioproblems[w-1], scenario_index - j, change) do sp, i, change
-                    update_decisions!(fetch(sp).problems[i], change)
+                w, scenarioproblems[w-1], scenario_index - j) do sp, i
+                    update_known_decisions!(fetch(sp).problems[i])
                 end
         end
         j += n
@@ -1097,51 +1069,6 @@ function clear!(scenarioproblems::DistributedScenarioProblems)
             @async remotecall_fetch(
                 w, scenarioproblems[w-1]) do sp
                     clear!(fetch(sp))
-                end
-        end
-    end
-    return nothing
-end
-
-function delete_known!(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex)
-    for subprob in subproblems(scenarioproblems)
-        kref = KnownRef(subprob, index)
-        delete(subprob, kref)
-    end
-    return nothing
-end
-function delete_known!(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex)
-    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    @sync begin
-        for w in workers()
-            @async remotecall_fetch(
-                w, scenarioproblems[w-1], index) do sp, index
-                    for subprob in fetch(sp).problems
-                        kref = KnownRef(subprob, index)
-                        delete(subprob, kref)
-                    end
-                end
-        end
-    end
-    return nothing
-end
-function delete_knowns!(scenarioproblems::ScenarioProblems, indices::Vector{MOI.VariableIndex})
-    for subprob in subproblems(scenarioproblems)
-        krefs = KnownRef.(subprob, indices)
-        delete(subprob, krefs)
-    end
-    return nothing
-end
-function delete_knowns!(scenarioproblems::DistributedScenarioProblems, indices::Vector{MOI.VariableIndex})
-    isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
-    @sync begin
-        for w in workers()
-            @async remotecall_fetch(
-                w, scenarioproblems[w-1], indices) do sp, indices
-                    for subprob in fetch(sp).problems
-                        krefs = KnownRef.(subprob, indices)
-                        delete(subprob, krefs)
-                    end
                 end
         end
     end

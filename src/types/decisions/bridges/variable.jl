@@ -1,25 +1,37 @@
 # Single decision #
 # ========================== #
+const FixingConstraint{T} = CI{MOI.ScalarAffineFunction{T}, MOI.EqualTo{T}}
 mutable struct DecisionBridge{T} <: MOIB.Variable.AbstractBridge
     decision::Decision{T}
     variable::MOI.VariableIndex
+    fixing_constraint::FixingConstraint{T}
 
     function DecisionBridge(decision::Decision{T},
-                            variable::MOI.VariableIndex) where T
-        return new{T}(decision, variable)
+                            variable::MOI.VariableIndex,
+                            fixing_constraint::FixingConstraint{T}) where T
+        return new{T}(decision, variable, fixing_constraint)
     end
 end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionBridge{T}},
                                                    model::MOI.ModelLike,
                                                    set::SingleDecisionSet{T}) where T
-    variable = if set.constraint isa NoSpecifiedConstraint
+    if set.constraint isa NoSpecifiedConstraint
         variable = MOI.add_variable(model)
     else
         variable, constraint = MOI.add_constrained_variable(model, set.constraint)
-        variable
     end
-    return DecisionBridge(set.decision, variable)
+    # Check state of decision
+    if state(set.decision) == NotTaken
+        fixing_constraint = FixingConstraint{T}(0)
+    else
+        # Decision initially fixed
+        fixing_constraint =
+            MOI.add_constraint(model,
+                               MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), variable)], zero(T)),
+                               MOI.EqualTo(set.decision.value))
+    end
+    return DecisionBridge(set.decision, variable, fixing_constraint)
 end
 
 function MOIB.Variable.supports_constrained_variable(
@@ -42,7 +54,12 @@ function MOI.get(bridge::DecisionBridge, ::MOI.ListOfVariableIndices)
 end
 
 # References
-function MOI.delete(model::MOI.ModelLike, bridge::DecisionBridge)
+function MOI.delete(model::MOI.ModelLike, bridge::DecisionBridge{T}) where T
+    if bridge.fixing_constraint.value != 0
+        # Remove the fixing constraint
+        MOI.delete(model, bridge.fixing_constraint)
+        bridge.fixing_constraint = FixingConstraint{T}(0)
+    end
     MOI.delete(model, bridge.variable)
 end
 
@@ -68,6 +85,11 @@ function MOI.get(model::MOI.ModelLike, attr::Union{MOI.VariablePrimal, MOI.Varia
     return MOI.get(model, attr, bridge.variable)
 end
 
+function MOI.get(model::MOI.ModelLike, ::DecisionIndex,
+                 bridge::DecisionBridge{T}) where T
+    return bridge.variable
+end
+
 function MOI.set(model::MOI.ModelLike, attr::MOI.VariablePrimalStart,
                  bridge::DecisionBridge{T}, value) where T
     MOI.set(model, attr, bridge.variable, value)
@@ -78,94 +100,45 @@ function MOI.set(model::MOI.ModelLike, attr::MOI.ConstraintSet,
     bridge.decision = new_set.decision
 end
 
-function MOIB.bridged_function(bridge::DecisionBridge{T}) where T
-    if bridge.decision.state == NotTaken
-        # Use mapped variable as standard MOI variable.
-        return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variable))
+function MOI.modify(model::MOI.ModelLike, bridge::DecisionBridge{T}, change::DecisionStateChange) where T
+    # Switch on state transition
+    if change.new_state == NotTaken
+        if bridge.fixing_constraint.value != 0
+            # Remove the fixing constraint
+            MOI.delete(model, bridge.fixing_constraint)
+            bridge.fixing_constraint = FixingConstraint{T}(0)
+        end
     else
-        # Give mapped variable as dummy decision to be held by objective/constraint bridges
-        # in order to unbridge properly. Give the value of the taken decision in the
-        # decision part constant given to the objective/constraint bridges
-        return MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), bridge.variable)],
-                                        bridge.decision.value)
+        set = MOI.EqualTo(bridge.decision.value)
+        if bridge.fixing_constraint.value != 0
+            # Update existing
+            MOI.set(model.model, MOI.ConstraintSet(), bridge.fixing_constraint, set)
+        else
+            # Add new fixing constraint
+            bridge.fixing_constraint = MOI.add_constraint(model,
+                                                          MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), bridge.variable)], zero(T)),
+                                                          set)
+        end
     end
+    return nothing
+end
+
+function MOI.modify(model::MOI.ModelLike, bridge::DecisionBridge{T}, ::KnownValuesChange) where T
+    # Update fixing constraint if decision is known
+    if state(bridge.decision) == Known
+        set = MOI.EqualTo(bridge.decision.value)
+        MOI.set(model.model, MOI.ConstraintSet(), bridge.fixing_constraint, set)
+    end
+    return nothing
+end
+
+function MOIB.bridged_function(bridge::DecisionBridge{T}) where T
+    # Return mapped variable
+    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variable))
 end
 
 function MOIB.Variable.unbridged_map(bridge::DecisionBridge, vi::MOI.VariableIndex)
     return (bridge.variable => MOI.SingleVariable(vi),)
-end
-
-# Single known decision #
-# ========================== #
-mutable struct KnownBridge{T} <: MOIB.Variable.AbstractBridge
-    known::Decision{T}
-
-    function KnownBridge(known::Decision{T}) where T
-        return new{T}(known)
-    end
-end
-
-function MOIB.Variable.bridge_constrained_variable(::Type{KnownBridge{T}},
-                                                   model::MOI.ModelLike,
-                                                   set::SingleKnownSet{T}) where T
-    return KnownBridge(set.known)
-end
-
-function MOIB.Variable.supports_constrained_variable(
-    ::Type{KnownBridge{T}}, ::Type{SingleKnownSet{T}}) where T
-    return true
-end
-
-function MOIB.added_constrained_variable_types(::Type{<:KnownBridge})
-    return Tuple{DataType}[]
-end
-function MOIB.added_constraint_types(::Type{<:KnownBridge})
-    return Tuple{DataType, DataType}[]
-end
-
-# Attributes, Bridge acting as a model
-MOI.get(bridge::KnownBridge, ::MOI.NumberOfVariables) = 0
-function MOI.get(bridge::KnownBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
-
-# References
-function MOI.delete(::MOI.ModelLike, bridge::KnownBridge)
-    # Nothing to do
-    return nothing
-end
-
-# Attributes, Bridge acting as a constraint
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet,
-                 bridge::KnownBridge)
-    return SingleKnownSet(bridge.known)
-end
-
-function MOI.get(model::MOI.ModelLike, ::MOI.ConstraintPrimal,
-                 bridge::KnownBridge{T}) where T
-    return bridge.known.value
-end
-
-function MOI.get(model::MOI.ModelLike, attr::Union{MOI.VariablePrimal, MOI.VariablePrimalStart},
-                 bridge::KnownBridge{T}) where T
-    return bridge.known.value
-end
-
-function MOI.set(model::MOI.ModelLike, attr::MOI.ConstraintSet,
-                 bridge::KnownBridge{T}, new_set::SingleKnownSet{T}) where T
-    bridge.known = new_set.known
-    return nothing
-end
-
-function MOIB.bridged_function(bridge::KnownBridge{T}) where T
-    # Give the value of the known decision in the
-    # known part constant given to the objective/constraint bridges
-    return convert(MOI.ScalarAffineFunction{T}, bridge.known.value)
-end
-
-function MOIB.Variable.unbridged_map(bridge::KnownBridge, vi::MOI.VariableIndex)
-    # Ignore unbridging without errors
-    return (vi => MOI.SingleVariable(vi),)
 end
 
 # Multiple decisions #
@@ -173,18 +146,32 @@ end
 struct DecisionsBridge{T} <: MOIB.Variable.AbstractBridge
     decisions::Vector{Decision{T}}
     variables::Vector{MOI.VariableIndex}
+    fixing_constraints::Vector{FixingConstraint{T}}
 end
 
 function MOIB.Variable.bridge_constrained_variable(::Type{DecisionsBridge{T}},
                                                    model::MOI.ModelLike,
                                                    set::MultipleDecisionSet{T}) where T
-    variables = if set.constraint isa NoSpecifiedConstraint
+    if set.constraint isa NoSpecifiedConstraint
         variables = MOI.add_variables(model, length(set.decisions))
     else
         variables, constraints = MOI.add_constrained_variables(model, set.constraint)
-        variables
     end
-    return DecisionsBridge(set.decisions, variables)
+    fixing_constraints = FixingConstraint{T}[]
+    # Check decision states
+    for (variable, decision) in zip(variables, set.decisions)
+        if state(decision) == NotTaken
+            push!(fixing_constraints, FixingConstraint{T}(0))
+        else
+            # Decision initially fixed
+            fixing_constraint =
+                MOI.add_constraint(model,
+                                   MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), variable)], zero(T)),
+                                   MOI.EqualTo(decision.value))
+            push!(fixing_constraints, fixing_constraint)
+        end
+    end
+    return DecisionsBridge(set.decisions, variables, fixing_constraints)
 end
 
 function MOIB.Variable.supports_constrained_variable(
@@ -207,11 +194,23 @@ function MOI.get(bridge::DecisionsBridge, ::MOI.ListOfVariableIndices)
 end
 
 # References
-function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge)
+function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge{T}) where T
+    for (i,fixing_constraint) in enumerate(bridge.fixing_constraints)
+        if fixing_constraint.value != 0
+            # Remove the fixing constraint
+            MOI.delete(model, fixing_constraint)
+            bridge.fixing_constraints[i] = FixingConstraint{T}(0)
+        end
+    end
     MOI.delete(model, bridge.variables)
 end
 
-function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge, i::MOIB.Variable.IndexInVector)
+function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge{T}, i::MOIB.Variable.IndexInVector) where T
+    if bridge.fixing_constraints[i].value != 0
+        # Remove the fixing constraint
+        MOI.delete(model, bridge.fixing_constraints[i])
+        bridge.fixing_constraints[i] = FixingConstraint{T}(0)
+    end
     MOI.delete(model, bridge.variables[i.value])
     deleteat!(bridge.variables, i.value)
 end
@@ -241,6 +240,11 @@ function MOI.get(model::MOI.ModelLike,
     end
 end
 
+function MOI.get(model::MOI.ModelLike, ::DecisionIndex,
+                 bridge::DecisionBridge{T}, i::MOIB.Variable.IndexInVector) where T
+    return bridge.variables[i]
+end
+
 function MOI.set(model::MOI.ModelLike, attr::MOI.VariablePrimalStart,
                  bridge::DecisionsBridge{T}, val, i::MOIB.Variable.IndexInVector) where T
     MOI.set(model, attr, bridge.variables[i.value], val)
@@ -251,97 +255,46 @@ function MOI.set(model::MOI.ModelLike, attr::MOI.ConstraintSet,
     bridge.decisions .= new_set.decisions
 end
 
-function MOIB.bridged_function(bridge::DecisionsBridge{T}, i::MOIB.Variable.IndexInVector) where T
-    decision = bridge.decisions[i.value]
-    if decision.state == NotTaken
-        # Use mapped variable as standard MOI variable.
-        return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variables[i.value]))
+function MOI.modify(model::MOI.ModelLike, bridge::DecisionsBridge{T}, change::DecisionStateChange) where T
+    # Switch on state transition
+    if change.new_state == NotTaken
+        if bridge.fixing_constraints[change.index].value != 0
+            # Remove the fixing constraint
+            MOI.delete(model, bridge.fixing_constraints[change.index])
+            bridge.fixing_constraints[change.index] = FixingConstraint{T}(0)
+        end
     else
-        # Give mapped variable as dummy decision to be held by objective/constraint bridges
-        # in order to unbridge properly. Give the value of the taken decision in the
-        # decision part constant given to the objective/constraint bridges
-        return MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), bridge.variables[i.value])],
-                                           decision.value)
+        set = MOI.EqualTo(bridge.decisions[change.index].value)
+        if bridge.fixing_constraints[change.index].value != 0
+            # Update existing
+            MOI.set(model.model, MOI.ConstraintSet(), bridge.fixing_constraints[change.index], set)
+        else
+            # Add new fixing constraint
+            bridge.fixing_constraints[change.index] = MOI.add_constraint(model,
+                                                                         MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(one(T), bridge.variables[change.index])], zero(T)),
+                                                                         set)
+        end
     end
+    return nothing
+end
+
+function MOI.modify(model::MOI.ModelLike, bridge::DecisionsBridge{T}, ::KnownValuesChange) where T
+    # Update fixing constraints of known decisions
+    for (decision,fixing_constraint) in zip(bridge.decisions, bridge.fixing_constraints)
+        if state(decision) == Known
+            set = MOI.EqualTo(decision.value)
+            MOI.set(model.model, MOI.ConstraintSet(), fixing_constraint, set)
+        end
+    end
+    return nothing
+end
+
+function MOIB.bridged_function(bridge::DecisionsBridge{T}, i::MOIB.Variable.IndexInVector) where T
+    # Return mapped variable
+    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variables[i.value]))
 end
 function MOIB.Variable.unbridged_map(bridge::DecisionsBridge, vi::MOI.VariableIndex, i::MOIB.Variable.IndexInVector)
     return (bridge.variables[i.value] => MOI.SingleVariable(vi),)
-end
-
-# Multiple knowns #
-# ========================== #
-struct KnownsBridge{T} <: MOIB.Variable.AbstractBridge
-    knowns::Vector{Decision{T}}
-end
-
-function MOIB.Variable.bridge_constrained_variable(::Type{KnownsBridge{T}},
-                                                   model::MOI.ModelLike,
-                                                   set::MultipleKnownSet{T}) where T
-    return KnownsBridge(set.knowns)
-end
-
-function MOIB.Variable.supports_constrained_variable(
-    ::Type{KnownsBridge{T}}, ::Type{MultipleKnownSet{T}}) where T
-    return true
-end
-
-function MOIB.added_constrained_variable_types(::Type{<:KnownsBridge})
-    return Tuple{DataType}[]
-end
-function MOIB.added_constraint_types(::Type{<:KnownsBridge})
-    return Tuple{DataType, DataType}[]
-end
-
-# Attributes, Bridge acting as a model
-MOI.get(bridge::KnownsBridge, ::MOI.NumberOfVariables) = 0
-function MOI.get(bridge::KnownsBridge, ::MOI.ListOfVariableIndices)
-    return MOI.VariableIndex[]
-end
-
-# References
-function MOI.delete(model::MOI.ModelLike, bridge::KnownsBridge)
-    # Nothing to do
-    return nothing
-end
-
-function MOI.delete(model::MOI.ModelLike, bridge::KnownsBridge, i::MOIB.Variable.IndexInVector)
-    # Nothing to do
-    return nothing
-end
-
-# Attributes, Bridge acting as a constraint
-function MOI.get(::MOI.ModelLike, ::MOI.ConstraintSet,
-                 bridge::KnownsBridge)
-    return MultipleKnownSet(bridge.knowns)
-end
-
-function MOI.get(model::MOI.ModelLike, ::MOI.ConstraintPrimal,
-                 bridge::KnownsBridge{T}) where T
-    return map(bridge.knowns) do known
-        known.value
-    end
-end
-
-function MOI.get(model::MOI.ModelLike,
-                 attr::Union{MOI.VariablePrimal, MOI.VariablePrimalStart},
-                 bridge::KnownsBridge, i::MOIB.Variable.IndexInVector)
-    return bridge.knowns[i.value].value
-end
-
-function MOI.set(model::MOI.ModelLike, attr::MOI.ConstraintSet,
-                 bridge::KnownsBridge{T}, new_set::MultipleDecisionSet{T}) where T
-    bridge.knowns .= new_set.knowns
-end
-
-function MOIB.bridged_function(bridge::KnownsBridge{T}, i::MOIB.Variable.IndexInVector) where T
-    known = bridge.knowns[i.value]
-    # Give the value of the known decision in the
-    # known part constant given to the objective/constraint bridges
-    return convert(MOI.ScalarAffineFunction{T}, known.value)
-end
-function MOIB.Variable.unbridged_map(bridge::KnownsBridge, vi::MOI.VariableIndex, i::MOIB.Variable.IndexInVector)
-    # Ignore unbridging without errors
-    return (vi => MOI.SingleVariable(vi),)
 end
 
 # Modifications #
@@ -354,9 +307,7 @@ function MOIB.is_bridged(b::MOIB.AbstractBridgeOptimizer,
 end
 
 function MOIB.is_bridged(b::MOIB.AbstractBridgeOptimizer,
-                         change::Union{DecisionStateChange, DecisionsStateChange,
-                                       KnownCoefficientChange, KnownMultirowChange,
-                                       KnownValueChange, KnownValuesChange})
+                         change::Union{DecisionStateChange, KnownValuesChange})
     # These modifications should not be handled by the variable bridges
     return false
 end

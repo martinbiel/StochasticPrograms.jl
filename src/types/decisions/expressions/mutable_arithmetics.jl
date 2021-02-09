@@ -1,5 +1,5 @@
 const _Variable = VariableRef
-const _Decision = Union{DecisionRef, KnownRef}
+const _Decision = DecisionRef
 const _Scalar = Union{_Variable, _Decision, _Constant}
 const _DecisionAffOrQuadExpr{C} = Union{DecisionAffExpr{C}, DecisionQuadExpr{C}}
 
@@ -99,13 +99,13 @@ function MA.promote_operation(::typeof(*), ::Type{DecisionAffExpr{T}}, ::Type{V}
 end
 
 function MA.scaling(aff::DecisionAffExpr{C}) where C
-    if !isempty(aff.variables.terms) || !isempty(aff.decisions.terms) || !isempty(aff.knowns.terms)
+    if !isempty(aff.variables.terms) || !isempty(aff.decisions.terms)
         throw(InexactError("Cannot convert `$aff` to `$C`."))
     end
     return MA.scaling(aff.variables.constant)
 end
 function MA.scaling(quad::DecisionQuadExpr{C}) where C
-    if !isempty(quad.variables.terms) || !isempty(quad.decisions.terms) || !isempty(quad.decisions.quad.terms) || !isempty(quad.knowns.terms) || !isempty(quad.knowns.aff.terms) || !isempty(quad.cross_terms) || !isempty(quad.known_variable_terms.terms) || !isempty(quad.known_decisions_terms.terms)
+    if !isempty(quad.variables.terms) || !isempty(quad.decisions.terms) || !isempty(quad.decisions.quad.terms) || !isempty(quad.cross_terms)
         throw(InexactError("Cannot convert `$quad` to `$C`."))
     end
     return MA.scaling(quad.variables.aff)
@@ -119,16 +119,12 @@ end
 function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, aff::DecisionAffExpr)
     MA.mutable_operate!(op, aff.variables)
     MA.mutable_operate!(zerl, aff.decisions)
-    MA.mutable_operate!(zero, aff.knowns)
     return aff
 end
 function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, quad::DecisionQuadExpr)
     MA.mutable_operate!(op, quad.variables)
     MA.mutable_operate!(zero, quad.decisions)
-    MA.mutable_operate!(zero, quad.knowns)
     empty!(quad.cross_terms)
-    MA.mutable_operate!(zero, quad.known_variable_terms)
-    MA.mutable_operate!(zero, quad.known_decisions_terms)
     return quad
 end
 
