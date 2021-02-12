@@ -58,7 +58,7 @@ function restore_master!(quasigradient::AbstractQuasiGradient)
 end
 
 function decision(quasigradient::AbstractQuasiGradient, index::MOI.VariableIndex)
-    i = something(findfirst(i -> i == index, quasigradient.decisions.undecided), 0)
+    i = something(findfirst(i -> i == index, all_decisions(quasigradient.decisions)), 0)
     if iszero(i)
         throw(MOI.InvalidIndex(index))
     end
@@ -70,7 +70,7 @@ function evaluate_first_stage(quasigradient::AbstractQuasiGradient, x::AbstractV
     @unpack master_objective = quasigradient.data
     # Evaluate objective
     obj_val = MOIU.eval_variables(master_objective) do vi
-        if vi in quasigradient.decisions.undecided
+        if vi in all_decisions(quasigradient.decisions)
             # Only evaluate decision
             x[vi.value]
         else

@@ -7,7 +7,7 @@ struct PolyhedronProjection{T <: AbstractFloat, PT <: AbstractPenaltyterm} <: Ab
         PT = typeof(penaltyterm)
         projection_targets = Vector{MOI.VariableIndex}(undef, length(ξ₀))
         ξ = map(ξ₀) do val
-            Decision(val, T)
+            KnownDecision(val, T)
         end
         return new{T, PT}(penaltyterm, projection_targets, ξ)
     end
@@ -19,8 +19,9 @@ function initialize_prox!(quasigradient::AbstractQuasiGradient, polyhedron::Poly
     decisions = get_decisions(quasigradient.structure.first_stage, 1)
     for i in eachindex(ξ)
         name = add_subscript(:ξ, i)
-        var_index, _ = MOI.add_constrained_variable(quasigradient.master, SingleKnownSet(1, ξ[i]))
-        set_known_decision!(decisions, var_index, ξ[i])
+        set = SingleDecisionSet(1, ξ[i], NoSpecifiedConstraint(), false)
+        var_index, _ = MOI.add_constrained_variable(quasigradient.master, set)
+        set_decision!(decisions, var_index, ξ[i])
         MOI.set(quasigradient.master, MOI.VariableName(), var_index, name)
         polyhedron.projection_targets[i] = var_index
     end
@@ -30,7 +31,7 @@ function initialize_prox!(quasigradient::AbstractQuasiGradient, polyhedron::Poly
     initialize_penaltyterm!(polyhedron.penaltyterm,
                             quasigradient.master,
                             1.0,
-                            decisions.undecided,
+                            all_decisions(decisions),
                             polyhedron.projection_targets)
     return nothing
 end
@@ -56,12 +57,12 @@ function prox!(quasigradient::AbstractQuasiGradient, polyhedron::PolyhedronProje
     update_penaltyterm!(polyhedron.penaltyterm,
                         quasigradient.master,
                         1.0,
-                        decisions.undecided,
+                        all_decisions(decisions),
                         polyhedron.projection_targets)
     # Solve projection problem
     MOI.optimize!(quasigradient.master)
     # Get solution
-    x .= MOI.get.(quasigradient.master, MOI.VariablePrimal(), decisions.undecided)
+    x .= MOI.get.(quasigradient.master, MOI.VariablePrimal(), all_decisions(decisions))
     return nothing
 end
 

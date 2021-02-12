@@ -34,12 +34,11 @@ end
 function resolve_subproblems!(quasigradient::AbstractQuasiGradient, execution::SerialExecution{T}) where T <: AbstractFloat
     # Update subproblems
     update_known_decisions!(execution.decisions, quasigradient.x)
-    change = KnownValuesChange()
     # Initialize subgradient
     quasigradient.subgradient .= quasigradient.c
     # Update and solve subproblems
     for subproblem in execution.subproblems
-        update_subproblem!(subproblem, change)
+        update_subproblem!(subproblem)
         subgradient::SparseSubgradient{T} = subproblem(quasigradient.x)
         quasigradient.subgradient .-= subgradient.δQ
         execution.subobjectives[subgradient.id] = subgradient.Q
