@@ -11,7 +11,7 @@ is_decision_type(::Type{DecisionRef}) = true
 
 # Getters (model) #
 # ========================== #
-function get_decisions(model::JuMP.Model, s::Integer = 1)
+function get_decisions(model::JuMP.Model, s::Integer = 1)::Decisions
     !haskey(model.ext, :decisions) && return IgnoreDecisions()
     N = length(model.ext[:decisions])
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
@@ -102,22 +102,15 @@ end
 # Getters (refs) #
 # ========================== #
 function stage(dref::DecisionRef)
-    haskey(dref.model.ext, :decisions) || error("No decisions in model.")
-    N = length(dref.model.ext[:decisions])
-    for i in 1:N
-        if haskey(dref.model.ext[:decisions][i].decisions, index(dref))
-            return i
-        end
-    end
-    return nothing
+    haskey(dref.model.ext, :stage_map) || error("No decisions in model.")
+    return dref.model.ext[:stage_map][index(dref)]
 end
 
-function get_decisions(dref::DecisionRef)
+function get_decisions(dref::DecisionRef)::Decisions
     s = stage(dref)
-    s === nothing && return IgnoreDecisions()
+    s == 0 && return IgnoreDecisions()
     return get_decisions(dref.model, s)
 end
-
 """
     decision(dref::DecisionRef)
 

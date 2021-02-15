@@ -23,6 +23,7 @@ function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation
         return JuMP.add_variable(model, variable.scalar_variable, name)
     end
     var_index, con_index = MOI.add_constrained_variable(backend(model), variable.set)
+    model.ext[:stage_map][var_index] = variable.set.stage
     # Map to model decisions after indices are known
     if !has_decision(decisions, var_index)
         # Store decision if is seen for the first time
@@ -52,41 +53,52 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
         end
         return reshape_vector(var_refs, variable.shape)
     end
-    var_indices, con_index = MOI.add_constrained_variables(backend(model), variable.set)
-    # Map to model decisions after indices are known
-    seen_decisions = Vector{Decision{Float64}}()
-    for (i, var_index) in enumerate(var_indices)
-        if !has_decision(decisions, var_index)
-            # Store decision if is seen for the first time
-            set_decision!(decisions, var_index, variable.set.decisions[i])
-        else
-            # Reuse if decision has been created already
-            push!(seen_decisions, decision(decisions, var_index))
+    if variable.set.constraint isa NoSpecifiedConstraint
+        # Sufficient to use single decision bridges if decisions
+        # are not initially constrained.
+        refs = map(zip(variable.scalar_variables, variable.set.decisions, names)) do (scalar_variable, decision, name)
+            set = SingleDecisionSet(variable.set.stage, decision, variable.set.constraint, variable.set.is_recourse)
+            add_variable(model, VariableConstrainedOnCreation(scalar_variable, set), name)
         end
-    end
-    if !isempty(seen_decisions)
-        # Sanity check
-        length(seen_decisions) == length(variable.scalar_variables) || error("Inconsistency in number of seen decisions and created variables.")
-        # Update decision set for reuse
-        MOI.set(backend(model), MOI.ConstraintSet(), con_index, reuse(variable.set, seen_decisions))
-    end
-    # Add any given decision constraints
-    for (index, scalar_variable, decision) in zip(var_indices, variable.scalar_variables, variable.set.decisions)
-        if decision.state != Known
-            _moi_constrain_decision(backend(model), index, scalar_variable.info, variable.set)
+        return reshape_vector(refs, variable.shape)
+    else
+        var_indices, con_index = MOI.add_constrained_variables(backend(model), variable.set)
+        # Map to model decisions after indices are known
+        seen_decisions = Vector{Decision{Float64}}()
+        for (i, var_index) in enumerate(var_indices)
+            model.ext[:stage_map][var_index] = variable.set.stage
+            if !has_decision(decisions, var_index)
+                # Store decision if is seen for the first time
+                set_decision!(decisions, var_index, variable.set.decisions[i])
+            else
+                # Reuse if decision has been created already
+                push!(seen_decisions, decision(decisions, var_index))
+            end
         end
-    end
-    # Finally, set any given names
-    for (var_index, name) in zip(var_indices, JuMP.vectorize(names, variable.shape))
-        if !isempty(name)
-            MOI.set(backend(model), MOI.VariableName(), var_index, name)
+        if !isempty(seen_decisions)
+            # Sanity check
+            length(seen_decisions) == length(variable.scalar_variables) || error("Inconsistency in number of seen decisions and created variables.")
+            # Update decision set for reuse
+            MOI.set(backend(model), MOI.ConstraintSet(), con_index, reuse(variable.set, seen_decisions))
         end
+        # Add any given decision constraints
+        for (index, scalar_variable, decision) in zip(var_indices, variable.scalar_variables, variable.set.decisions)
+            if decision.state != Known
+                _moi_constrain_decision(backend(model), index, scalar_variable.info, variable.set)
+            end
+        end
+        # Finally, set any given names
+        for (var_index, name) in zip(var_indices, JuMP.vectorize(names, variable.shape))
+            if !isempty(name)
+                MOI.set(backend(model), MOI.VariableName(), var_index, name)
+            end
+        end
+        # Return created decisions as DecisionRef
+        refs = map(var_indices) do index
+            DecisionRef(model, index)
+        end
+        return reshape_vector(refs, variable.shape)
     end
-    # Return created decisions as DecisionRef
-    refs = map(var_indices) do index
-        DecisionRef(model, index)
-    end
-    return reshape_vector(refs, variable.shape)
 end
 
 # Containers #

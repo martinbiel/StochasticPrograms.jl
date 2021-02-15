@@ -33,6 +33,7 @@ function _WS(stage_one_generator::Function,
              optimizer_constructor)
     ws_model = optimizer_constructor == nothing ? Model() : Model(optimizer_constructor)
     # Prepare decisions
+    ws_model.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
     ws_model.ext[:decisions] = (stage_one_decisions, stage_two_decisions)
     add_decision_bridges!(ws_model)
     # Generate first stage and cache objective

@@ -21,6 +21,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
             end
         end
         # Prepare decisions
+        structure.first_stage.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
         structure.first_stage.ext[:decisions] = (structure.decisions[1],)
         add_decision_bridges!(structure.first_stage)
         # Generate first stage
@@ -61,6 +62,7 @@ function generate_vertical!(scenarioproblems::ScenarioProblems,
         # Create subproblem
         subproblem = optimizer == nothing ? Model() : Model(optimizer)
         # Prepare decisions
+        subproblem.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
         subproblem.ext[:decisions] = ntuple(Val{stage}()) do s
             if s == stage - 1
                 # Known decisions from the previous stages are

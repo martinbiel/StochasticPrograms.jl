@@ -78,6 +78,7 @@ end
 
 function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
     # First-stage decisions are unique (reuse)
+    stochasticprogram.proxy[1].ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
     stochasticprogram.proxy[1].ext[:decisions] = (stochasticprogram.decisions[1],)
     # Generate first stage
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
@@ -85,6 +86,7 @@ function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
     # Generate remaining stages
     for s in 2:N
         # Initialize decisions
+        stochasticprogram.proxy[s].ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
         stochasticprogram.proxy[s].ext[:decisions] = ntuple(Val{s}()) do i
             if i == s - 1
                 # Known decisions from the previous stages are
