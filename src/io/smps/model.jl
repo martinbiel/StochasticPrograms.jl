@@ -122,7 +122,7 @@ function stochastic_model(smps::SMPSModel{2})
                 @constraint(model, A * x .== b)
             end
             if length(C) > 0 && length(d) > 0
-                @constraint(model, C * x .- d in MOI.Nonpositives(m₂))
+                @constraint(model, C * x .<= d)
             end
         end
         @stage 2 begin
@@ -177,7 +177,7 @@ function stochastic_model(smps::SMPSModel{2})
                 @constraint(model, (T + ΔT) * x + (W + ΔW) * y .== (h + Δh))
             end
             if (length(T̃) > 0 || length(W̃) > 0) && length(h̃) > 0
-                @constraint(model, T̃ * x + W̃ * y - h̃ in MOI.Nonpositives(m₂))
+                @constraint(model, T̃ * x + W̃ * y .<= h̃)
             end
         end
     end
