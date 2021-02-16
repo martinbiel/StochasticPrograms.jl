@@ -80,7 +80,7 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
         prox = _prox(structure, x₀_, T)
         P = typeof(prox)
         # Step
-        stepsize = step()
+        stepsize = step(T)
         S = typeof(stepsize)
         # Execution policy
         execution = _execution(structure, T)

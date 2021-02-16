@@ -3,4 +3,14 @@ abstract type AbstractStepSize end
 
 step(quasigradient::AbstractQuasiGradient, k::Integer, f::Float64, ∇f::AbstractVector) = step(quasigradient.step, k, f, ∇f)
 
+"""
+    RawStepParameter
+
+An optimizer attribute used for raw parameters of the step. Defers to `RawParameter`.
+"""
+struct RawStepParameter <: StepParameter
+    name::Any
+end
+
+include("common.jl")
 include("constant.jl")
