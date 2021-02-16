@@ -83,7 +83,7 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
         stepsize = step()
         S = typeof(stepsize)
         # Execution policy
-        execution = _execution(structure, T, A)
+        execution = _execution(structure, T)
         E = typeof(execution)
         # Algorithm parameters
         params = QuasiGradientParameters{T}(; kw...)

@@ -15,8 +15,6 @@ function initialize!(quasigradient::AbstractQuasiGradient)
     initialize_prox!(quasigradient)
     # # Initialize step policy
     # initialize_step!(quasigradient)
-    # Finish initialization
-    finish_initilization!(quasigradient)
     return nothing
 end
 # ======================================================================== #
@@ -81,13 +79,12 @@ function evaluate_first_stage(quasigradient::AbstractQuasiGradient, x::AbstractV
     return obj_val
 end
 
-function current_objective_value(quasigradient::AbstractQuasiGradient)
+function current_objective_value(quasigradient::AbstractQuasiGradient, Q::AbstractFloat)
     # Get sense
     sense = MOI.get(quasigradient.master, MOI.ObjectiveSense())
     correction = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     # Return sense-corrected value
-    return evaluate_first_stage(quasigradient, current_decision(quasigradient)) +
-        correction * sum(subobjectives(quasigradient))
+    return evaluate_first_stage(quasigradient, current_decision(quasigradient)) + correction * Q
 end
 
 function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = nothing)

@@ -10,6 +10,8 @@ struct Subgradient{T <: AbstractFloat, A <: AbstractVector}
     end
 end
 SparseSubgradient{T <: AbstractFloat} = Subgradient{T, SparseVector{T,Int64}}
+QGradient{T} = Tuple{Int,SparseSubgradient{T}}
+GradientQueue{T} = RemoteChannel{Channel{QGradient{T}}}
 
 struct SubProblem{T <: AbstractFloat}
     id::Int
