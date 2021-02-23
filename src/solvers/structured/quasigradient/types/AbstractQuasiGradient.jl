@@ -8,7 +8,6 @@ tolerance(quasigradient::AbstractQuasiGradient) = quasigradient.parameters.τ
 # ======================================================================== #
 function initialize!(quasigradient::AbstractQuasiGradient)
     # Initialize subproblems
-    initialize_subproblems!(quasigradient, scenarioproblems(quasigradient.structure, 2))
     # Prepare the master optimization problem
     prepare_master_objective!(quasigradient)
     # # Initialize prox policy
@@ -60,7 +59,7 @@ function decision(quasigradient::AbstractQuasiGradient, index::MOI.VariableIndex
     if iszero(i)
         throw(MOI.InvalidIndex(index))
     end
-    return quasigradient.x[i]
+    return quasigradient.ξ[i]
 end
 
 function evaluate_first_stage(quasigradient::AbstractQuasiGradient, x::AbstractVector)
@@ -90,6 +89,7 @@ end
 function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = nothing)
     @unpack Q, iterations = quasigradient.data
     @unpack keep, offset, indent = quasigradient.parameters
+    update_value = progress_value(quasigradient.criterion, iterations, Q, norm(quasigradient.gradient))
     # Early termination log
     if status != nothing && quasigradient.parameters.log
         quasigradient.progress.thresh = Inf
@@ -101,10 +101,11 @@ function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = no
         else
             0.0
         end
-        ProgressMeter.update!(quasigradient.progress, iterations,
+        ProgressMeter.update!(quasigradient.progress, update_value,
                               showvalues = [
                                   ("$(indentstr(indent))Objective", val),
-                                  ("$(indentstr(indent))Early termination", status)
+                                  ("$(indentstr(indent))Early termination", status),
+                                  ("$(indentstr(indent))Iterations", iterations)
                               ], keep = keep, offset = offset)
         return nothing
     end
@@ -113,39 +114,11 @@ function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = no
     quasigradient.data.iterations += 1
     # Log
     if quasigradient.parameters.log
-        ProgressMeter.update!(quasigradient.progress, iterations,
+        ProgressMeter.update!(quasigradient.progress, update_value,
                               showvalues = [
                                   ("$(indentstr(indent))Objective", Q),
-                                  ("$(indentstr(indent))||∇Q||:", norm(quasigradient.subgradient))
-                              ], keep = keep, offset = offset)
-    end
-    return nothing
-end
-
-function log!(quasigradient::AbstractQuasiGradient, t::Integer; optimal = false, status = nothing)
-    @unpack Q,θ,iterations = quasigradient.data
-    @unpack keep, offset, indent = quasigradient.parameters
-    quasigradient.Q_history[t] = Q
-    if status != nothing && quasigradient.parameters.log
-        val = if status == MOI.INFEASIBLE
-            Inf
-        elseif status == MOI.DUAL_INFEASIBLE
-            -Inf
-        else
-            0.0
-        end
-        ProgressMeter.update!(quasigradient.progress, iterations,
-                              showvalues = [
-                                  ("$(indentstr(indent))Objective", val),
-                                  ("$(indentstr(indent))Early termination", status)
-                              ], keep = keep, offset = offset)
-        return nothing
-    end
-    if quasigradient.parameters.log
-        ProgressMeter.update!(quasigradient.progress, iterations,
-                              showvalues = [
-                                  ("$(indentstr(indent))Objective", Q),
-                                  ("$(indentstr(indent))||∇Q||:", norm(quasigradient.subgradient))
+                                  ("$(indentstr(indent))||∇Q||:", norm(quasigradient.gradient)),
+                                  ("$(indentstr(indent))Iterations", iterations)
                               ], keep = keep, offset = offset)
     end
     return nothing
@@ -153,10 +126,5 @@ end
 
 function indentstr(n::Integer)
     return repeat(" ", n)
-end
-
-function terminate(quasigradient::AbstractQuasiGradient)
-    @unpack τ, maximum_iterations = quasigradient.parameters
-    return quasigradient.data.iterations >= maximum_iterations || norm(quasigradient.subgradient) <= τ
 end
 # ======================================================================== #

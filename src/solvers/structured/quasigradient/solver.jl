@@ -6,8 +6,6 @@
 end
 
 @with_kw mutable struct QuasiGradientParameters{T <: AbstractFloat}
-    τ::T = 1e-6
-    maximum_iterations::Int = 1000
     debug::Bool = false
     time_limit::T = Inf
     log::Bool = true
@@ -19,14 +17,11 @@ end
 """
     QuasiGradientAlgorithm
 
-Functor object for the L-shaped algorithm.
+Functor object for the quasi-gradient algorithm.
 
 ...
 # Algorithm parameters
-- `τ::AbstractFloat = 1e-6`: Relative tolerance for convergence checks.
-- `debug::Bool = false`: Specifies if extra information should be saved for debugging purposes. Defaults to false for memory efficiency.
-- `maximum_iterations::Int = 1000`: Number of iterations.
-- `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
+- `log::Bool = true`: Specifices if quasi-gradient procedure should be logged on standard output or not.
 ...
 """
 struct QuasiGradientAlgorithm{T <: AbstractFloat,
@@ -35,7 +30,9 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
                               M <: MOI.AbstractOptimizer,
                               E <: AbstractQuasiGradientExecution,
                               P <: AbstractProximal,
-                              S <: AbstractStep} <: AbstractQuasiGradient
+                              S <: AbstractStep,
+                              C <: AbstractTerminationCriterion,
+                              Pr <: AbstractProgress} <: AbstractQuasiGradient
     structure::ST
     num_subproblems::Int
     data::QuasiGradientData{T}
@@ -45,8 +42,9 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
     master::M
     decisions::Decisions
     x::A
+    ξ::A
     c::A
-    subgradient::A
+    gradient::A
     Q_history::A
 
     # Execution
@@ -58,13 +56,18 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
     # Step
     step::S
 
-    progress::Progress
+    # Termination
+    criterion::C
+
+    progress::Pr
 
     function QuasiGradientAlgorithm(structure::VerticalStructure,
                                     x₀::AbstractVector,
                                     _execution::AbstractExecution,
+                                    subproblems::AbstractSubProblemState,
                                     _prox::AbstractProx,
-                                    step::AbstractStepSize; kw...)
+                                    step::AbstractStepSize,
+                                    _criterion::AbstractTermination; kw...)
         # Sanity checks
         length(x₀) != num_decisions(structure, 1) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure, 1))
         n = num_subproblems(structure, 2)
@@ -82,26 +85,34 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
         # Step
         stepsize = step(T)
         S = typeof(stepsize)
+        # Termination
+        criterion = _criterion(T)
+        C = typeof(criterion)
         # Execution policy
-        execution = _execution(structure, T)
+        execution = _execution(structure, x₀_, subproblems, T)
         E = typeof(execution)
         # Algorithm parameters
         params = QuasiGradientParameters{T}(; kw...)
+        # Progress
+        progress = Progress(criterion, "$(indentstr(params.indent))Quasi-gradient Progress ")
+        Pr = typeof(progress)
 
-        quasigradient = new{T,A,ST,M,E,P,S}(structure,
-                                            n,
-                                            QuasiGradientData{T}(),
-                                            params,
-                                            backend(structure.first_stage),
-                                            structure.decisions[1],
-                                            x₀_,
-                                            zero(x₀_),
-                                            zero(x₀_),
-                                            A(),
-                                            execution,
-                                            prox,
-                                            stepsize,
-                                            Progress(params.maximum_iterations, "$(indentstr(params.indent))Quasi-gradient Progress "))
+        quasigradient = new{T,A,ST,M,E,P,S,C,Pr}(structure,
+                                                 n,
+                                                 QuasiGradientData{T}(),
+                                                 params,
+                                                 backend(structure.first_stage),
+                                                 structure.decisions[1],
+                                                 x₀_,
+                                                 copy(x₀_),
+                                                 zero(x₀_),
+                                                 zero(x₀_),
+                                                 A(),
+                                                 execution,
+                                                 prox,
+                                                 stepsize,
+                                                 criterion,
+                                                 progress)
         # Initialize solver
         initialize!(quasigradient)
         return quasigradient

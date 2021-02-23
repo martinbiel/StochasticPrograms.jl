@@ -18,8 +18,10 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     master_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     sub_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     execution::AbstractExecution
+    subproblems::AbstractSubProblemState
     prox::AbstractProx
     step::AbstractStepSize
+    termination::AbstractTermination
     parameters::QuasiGradientParameters{Float64}
 
     status::MOI.TerminationStatusCode
@@ -32,16 +34,20 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
 
     function Optimizer(; master_optimizer = nothing,
                        execution::AbstractExecution = nworkers() == 1 ? Serial() : Synchronous(),
+                       subproblems::AbstractSubProblemState = Unaltered(),
                        prox::AbstractProx = Polyhedron(),
-                       step::AbstractStepSize = Constant(γ = 0.1),
+                       step::AbstractStepSize = Constant(),
+                       terminate::AbstractTermination = AfterMaximumIterations(),
                        subproblem_optimizer = nothing, kw...)
         return new(master_optimizer,
                    subproblem_optimizer,
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    execution,
+                   subproblems,
                    prox,
                    step,
+                   terminate,
                    QuasiGradientParameters{Float64}(; kw...),
                    MOI.OPTIMIZE_NOT_CALLED,
                    MOI.NO_SOLUTION,
@@ -101,8 +107,10 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, x�
     optimizer.quasigradient = QuasiGradientAlgorithm(structure,
                                                      x₀,
                                                      optimizer.execution,
+                                                     optimizer.subproblems,
                                                      optimizer.prox,
-                                                     optimizer.step;
+                                                     optimizer.step,
+                                                     optimizer.termination;
                                                      type2dict(optimizer.parameters)...)
     # Set any given prox/sub optimizer attributes
     for (attr, value) in optimizer.master_params
@@ -117,6 +125,7 @@ end
 function restore_structure!(optimizer::Optimizer)
     if optimizer.quasigradient !== nothing
         restore_master!(optimizer.quasigradient)
+        restore_subproblems!(optimizer.quasigradient)
     end
     return nothing
 end
@@ -275,6 +284,15 @@ function MOI.set(optimizer::Optimizer, ::Execution, execution::AbstractExecution
     return nothing
 end
 
+function MOI.get(optimizer::Optimizer, ::SubProblems)
+    return optimizer.subproblems
+end
+
+function MOI.set(optimizer::Optimizer, ::SubProblems, subproblems::AbstractSubProblemState)
+    optimizer.subproblems = subproblems
+    return nothing
+end
+
 function MOI.get(optimizer::Optimizer, ::Prox)
     return optimizer.prox
 end
@@ -290,6 +308,15 @@ end
 
 function MOI.set(optimizer::Optimizer, ::StepSize, step::AbstractStepSize)
     optimizer.step = step
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::Termination)
+    return optimizer.termination
+end
+
+function MOI.set(optimizer::Optimizer, ::Termination, termination::AbstractTermination)
+    optimizer.termination = termination
     return nothing
 end
 
@@ -545,5 +572,41 @@ end
 function set_step_attributes(stochasticprogram::StochasticProgram; kw...)
     for (name, value) in kw
         set_step_attribute(stochasticprogram, name, value)
+    end
+end
+"""
+    get_termination_attribute(stochasticprogram::StochasticProgram, name::String)
+
+Return the value associated with the termination-specific attribute named `name` in `stochasticprogram`.
+
+See also: [`set_termination_attribute`](@ref), [`set_termination_attributes`](@ref).
+"""
+function get_termination_attribute(stochasticprogram::StochasticProgram, name::String)
+    return MOI.get(optimizer(stochasticprogram), RawTerminationParameter(name))
+end
+"""
+    set_termination_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+
+Sets the termination-specific attribute identified by `name` to `value`.
+
+"""
+function set_termination_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
+    return set_optimizer_attribute(stochasticprogram, RawTerminationParameter(String(name)), value)
+end
+"""
+    set_termination_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+
+Given a list of `attribute => value` pairs or a collection of keyword arguments, calls
+`set_termination_attribute(stochasticprogram, attribute, value)` for each pair.
+
+"""
+function set_termination_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)
+    for (name, value) in pairs
+        set_termination_attribute(stochasticprogram, name, value)
+    end
+end
+function set_termination_attributes(stochasticprogram::StochasticProgram; kw...)
+    for (name, value) in kw
+        set_termination_attribute(stochasticprogram, name, value)
     end
 end

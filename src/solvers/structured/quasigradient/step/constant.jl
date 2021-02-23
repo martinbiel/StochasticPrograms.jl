@@ -9,7 +9,7 @@ struct ConstantStep{T <: AbstractFloat} <: AbstractStep
         return new{T}(ConstantStepParameters{T}(; kw...))
     end
 end
-step(step::ConstantStep, ::Integer, ::Float64, ::AbstractVector) = step.parameters.γ
+step(step::ConstantStep, ::Integer, ::Float64, ::AbstractVector, ::AbstractVector) = step.parameters.γ
 
 
 # API

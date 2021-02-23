@@ -1,8 +1,7 @@
 abstract type AbstractQuasiGradientExecution end
 # Execution API #
 # ------------------------------------------------------------
-initialize_subproblems!(quasigradient::AbstractQuasiGradient, scenarioproblems::AbstractScenarioProblems) = initialize_subproblems!(quasigradient.execution, scenarioproblems)
-#restore_subproblems!(quasigradient::AbstractQuasiGradient) = restore_subproblems!(quasigradient, quasigradient.execution)
+restore_subproblems!(quasigradient::AbstractQuasiGradient) = restore_subproblems!(quasigradient, quasigradient.execution)
 solve_master!(quasigradient::AbstractQuasiGradient) = solve_master!(quasigradient, quasigradient.execution)
 iterate!(quasigradient::AbstractQuasiGradient) = iterate!(quasigradient, quasigradient.execution)
 start_workers!(quasigradient::AbstractQuasiGradient) = start_workers!(quasigradient, quasigradient.execution)
@@ -16,6 +15,5 @@ set_subobjectives(quasigradient::AbstractQuasiGradient, Qs::AbstractVector) = se
 # ------------------------------------------------------------
 include("common.jl")
 include("serial.jl")
-include("distributed.jl")
 include("synchronous.jl")
 #include("asynchronous.jl")

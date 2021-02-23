@@ -38,7 +38,7 @@ function solve_master!(quasigradient::AbstractQuasiGradient, ::AbstractQuasiGrad
     return MOI.get(quasigradient.master, MOI.TerminationStatus())
 end
 
-function iterate!(quasigradient::AbstractQuasiGradient, ::AbstractQuasiGradientExecution)
+function iterate!(quasigradient::AbstractQuasiGradient, execution::AbstractQuasiGradientExecution)
     # Resolve all subproblems at the current optimal solution
     Q = resolve_subproblems!(quasigradient)
     if Q == Inf
@@ -53,21 +53,27 @@ function iterate!(quasigradient::AbstractQuasiGradient, ::AbstractQuasiGradientE
     end
     if Q <= quasigradient.data.Q
         quasigradient.data.Q = Q
+        quasigradient.ξ .= quasigradient.x
     end
     # Determine stepsize
     γ = step(quasigradient,
              quasigradient.data.iterations,
              Q,
-             quasigradient.subgradient)
+             quasigradient.x,
+             quasigradient.gradient)
     # Proximal subgradient update
     prox!(quasigradient,
           quasigradient.x,
-          quasigradient.subgradient,
+          quasigradient.gradient,
           γ)
     # Log progress
     log!(quasigradient)
     # Check optimality
-    if terminate(quasigradient)
+    if terminate(quasigradient,
+                 quasigradient.data.iterations,
+                 Q,
+                 quasigradient.x,
+                 quasigradient.gradient)
         # Optimal, final log
         log!(quasigradient; optimal = true)
         return MOI.OPTIMAL

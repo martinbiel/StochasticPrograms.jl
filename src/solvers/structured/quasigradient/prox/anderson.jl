@@ -73,7 +73,11 @@ function prox!(quasigradient::AbstractQuasiGradient, anderson::AndersonAccelerat
                 quasigradient.data.Q = Q
             end
             # Skip anderson step if this is the final iteration
-            if terminate(quasigradient)
+            if terminate(quasigradient,
+                         quasigradient.data.iterations,
+                         Q,
+                         x,
+                         quasigradient.gradient)
                 return nothing
             end
         end

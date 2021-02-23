@@ -1,7 +1,7 @@
 abstract type AbstractStep end
 abstract type AbstractStepSize end
 
-step(quasigradient::AbstractQuasiGradient, k::Integer, f::Float64, ∇f::AbstractVector) = step(quasigradient.step, k, f, ∇f)
+step(quasigradient::AbstractQuasiGradient, k::Integer, f::Float64, x::AbstractVector, ∇f::AbstractVector) = step(quasigradient.step, k, f, x, ∇f)
 
 """
     RawStepParameter
@@ -14,3 +14,4 @@ end
 
 include("common.jl")
 include("constant.jl")
+include("bb.jl")
