@@ -8,7 +8,7 @@ end
 end
 
 struct AndersonAcceleratedProximal{T <: AbstractFloat, P <: AbstractProximal} <: AbstractProximal
-    data::AndersonAccelerationData
+    data::AndersonAccelerationData{T}
     parameters::AndersonAccelerationParameters
 
     prox::P

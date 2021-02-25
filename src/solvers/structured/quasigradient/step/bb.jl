@@ -35,7 +35,7 @@ end
 
 # API
 # ------------------------------------------------------------
-mutable struct BB <: AbstractStepSize
+struct BB <: AbstractStepSize
     parameters::BBParameters{Float64}
 end
 BB(γ₀::AbstractFloat) = BB(BBParameters(; γ₀ = Float64(γ₀)))

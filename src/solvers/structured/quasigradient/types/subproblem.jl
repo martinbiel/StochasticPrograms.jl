@@ -125,7 +125,8 @@ end
 end
 
 @with_kw mutable struct SmoothingParameters{T <: AbstractFloat}
-    μ::T = 1.
+    μ::T = 1.0
+    objective_correction::Bool = false
 end
 
 """
@@ -165,33 +166,17 @@ struct SmoothSubProblem{T <: AbstractFloat} <: AbstractSubProblem{T}
         # Cache objective
         F = MOI.get(backend(model), MOI.ObjectiveFunctionType())
         data.objective = MOI.get(backend(model), MOI.ObjectiveFunction{F}())
-        # Add shared projection targets
-        n = num_decisions(model, 1)
-        projection_targets = Vector{MOI.VariableIndex}(undef, n)
-        for i in eachindex(ξ)
-            name = add_subscript(:ξ, i)
-            set = SingleDecisionSet(1, KnownDecision(ξ[i], T), NoSpecifiedConstraint(), false)
-            empty = ScalarVariable(VariableInfo(false, NaN, false, NaN, false, NaN, false, NaN, false, false))
-            dref = add_variable(model, VariableConstrainedOnCreation(empty, set), name)
-            projection_targets[i] = index(dref)
-        end
-        # Initialize quadratic penalty
-        penalty = Quadratic()
-        x = index.(all_decision_variables(model, 1))
-        initialize_penaltyterm!(penalty,
-                                backend(model),
-                                1 / (2 * μ),
-                                x,
-                                projection_targets)
         # Create and return smoothed subproblem
-        subproblem =  new{T}(data,
-                             params,
-                             id,
-                             π,
-                             model,
-                             optimizer,
-                             projection_targets,
-                             penalty)
+        subproblem = new{T}(data,
+                            params,
+                            id,
+                            π,
+                            model,
+                            optimizer,
+                            Vector{MOI.VariableIndex}(),
+                            Quadratic())
+        # Setup Moreau envelope
+        add_projection_targets!(subproblem, ξ)
         return subproblem
     end
 end
@@ -212,6 +197,27 @@ function solve_subproblem(subproblem::SmoothSubProblem, x::AbstractVector)
     else
         error("Subproblem $(subproblem.id) was not solved properly, returned status code: $status")
     end
+end
+
+function add_projection_targets!(subproblem::SmoothSubProblem{T}, ξ::AbstractVector) where T <: AbstractFloat
+    @unpack μ = subproblem.parameters
+    n = num_decisions(subproblem.model, 1)
+    resize!(subproblem.projection_targets, n)
+    for i in eachindex(ξ)
+        name = add_subscript(:ξ, i)
+        set = SingleDecisionSet(1, KnownDecision(ξ[i], T), NoSpecifiedConstraint(), false)
+        empty = ScalarVariable(VariableInfo(false, NaN, false, NaN, false, NaN, false, NaN, false, false))
+        dref = add_variable(subproblem.model, VariableConstrainedOnCreation(empty, set), name)
+        subproblem.projection_targets[i] = index(dref)
+    end
+    # Initialize quadratic penalty
+    x = index.(all_decision_variables(subproblem.model, 1))
+    initialize_penaltyterm!(subproblem.penaltyterm,
+                            subproblem.optimizer,
+                            1 / (2 * μ),
+                            x,
+                            subproblem.projection_targets)
+    return nothing
 end
 
 function restore_subproblem!(subproblem::SmoothSubProblem)
@@ -258,7 +264,7 @@ function Subgradient(subproblem::SubProblem{T}, x::AbstractVector) where T <: Ab
 end
 
 function Gradient(subproblem::SmoothSubProblem{T}, x::AbstractVector) where T <: AbstractFloat
-    @unpack μ = subproblem.parameters
+    @unpack μ, objective_correction = subproblem.parameters
     π = subproblem.probability
     # Get sense
     sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
@@ -268,20 +274,34 @@ function Gradient(subproblem::SmoothSubProblem{T}, x::AbstractVector) where T <:
     # Sense corrected gradient
     δQ = π * (1/μ) * (x - u)
     # Sense corrected objective
-    StochasticPrograms.update_penaltyterm!(subproblem.penaltyterm,
-                                           subproblem.optimizer,
-                                           1 / (2 * (1e-6)),
-                                           index.(all_decision_variables(subproblem.model, 1)),
-                                           subproblem.projection_targets)
-    MOI.optimize!(subproblem.optimizer)
+    decisions = index.(all_decision_variables(subproblem.model, 1))
+    if objective_correction
+        fix.(all_decision_variables(subproblem.model, 1), x)
+        StochasticPrograms.disable_penalty!(subproblem.penaltyterm,
+                         subproblem.optimizer,
+                         decisions,
+                         subproblem.projection_targets)
+        MOI.optimize!(subproblem.optimizer)
+        status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
+        if !(status ∈ AcceptableTermination)
+            if status == MOI.INFEASIBLE
+                return Infeasible(subproblem)
+            elseif status == MOI.DUAL_INFEASIBLE
+                return Unbounded(subproblem)
+            end
+        end
+    end
     Q = correction * π * MOIU.eval_variables(subproblem.data.objective) do vi
         MOI.get(subproblem.optimizer, MOI.VariablePrimal(), vi)
     end
-    StochasticPrograms.update_penaltyterm!(subproblem.penaltyterm,
+    if objective_correction
+        unfix.(all_decision_variables(subproblem.model, 1))
+        StochasticPrograms.enable_penalty!(subproblem.penaltyterm,
                                            subproblem.optimizer,
                                            1 / (2 * μ),
-                                           index.(all_decision_variables(subproblem.model, 1)),
+                                           decisions,
                                            subproblem.projection_targets)
+    end
     return Gradient(δQ, Q, subproblem.id)
 end
 

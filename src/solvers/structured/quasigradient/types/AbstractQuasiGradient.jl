@@ -92,7 +92,9 @@ function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = no
     update_value = progress_value(quasigradient.criterion, iterations, Q, norm(quasigradient.gradient))
     # Early termination log
     if status != nothing && quasigradient.parameters.log
-        quasigradient.progress.thresh = Inf
+        if quasigradient.progress isa ProgressThresh
+            quasigradient.progress.thresh = Inf
+        end
         quasigradient.progress.printed = true
         val = if status == MOI.INFEASIBLE
             Inf

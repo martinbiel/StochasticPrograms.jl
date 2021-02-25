@@ -52,6 +52,8 @@ export
     NoProx,
     Polyhedron,
     AndersonAcceleration,
+    DryFriction,
+    Nesterov,
     Termination,
     TerminationParameter,
     set_termination_attribute,
@@ -63,6 +65,7 @@ export
 # Include files
 include("types/types.jl")
 include("step/step.jl")
+#include("boosting/boosting.jl")
 include("prox/prox.jl")
 include("termination/termination.jl")
 include("execution/execution.jl")

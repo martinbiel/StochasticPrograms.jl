@@ -60,6 +60,9 @@ function resolve_subproblems!(quasigradient::AbstractQuasiGradient, execution::S
     for subproblem in execution.subproblems
         update_subproblem!(subproblem)
         subgradient = subproblem(quasigradient.x)
+        if isinf(gradient.Q)
+            return gradient.Q
+        end
         quasigradient.gradient .-= subgradient.δQ
         Q += subgradient.Q
     end
@@ -77,6 +80,9 @@ function resolve_subproblems!(quasigradient::AbstractQuasiGradient, execution::S
     for subproblem in execution.subproblems
         update_subproblem!(subproblem)
         gradient = subproblem(quasigradient.x)
+        if isinf(gradient.Q)
+            return gradient.Q
+        end
         quasigradient.gradient .+= gradient.δQ
         Q += gradient.Q
     end

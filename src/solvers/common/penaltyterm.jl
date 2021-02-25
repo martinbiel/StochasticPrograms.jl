@@ -82,6 +82,40 @@ function update_penaltyterm!(penalty::Quadratic,
     return nothing
 end
 
+function disable_penalty!(penalty::Quadratic,
+                          model::MOI.AbstractOptimizer,
+                          x::Vector{MOI.VariableIndex},
+                          ξ::Vector{MOI.VariableIndex})
+    # Remove constraint
+    if !iszero(penalty.constraint.value)
+        MOI.delete(model, penalty.constraint)
+        penalty.constraint = L2NormConstraint(0)
+    end
+    update_penaltyterm!(penalty, model, 0.0, x, ξ)
+end
+
+function enable_penalty!(penalty::Quadratic,
+                         model::MOI.AbstractOptimizer,
+                         α::AbstractFloat,
+                         x::Vector{MOI.VariableIndex},
+                         ξ::Vector{MOI.VariableIndex})
+    update_penaltyterm!(penalty, model, α, x, ξ)
+    T = typeof(α)
+    t = MOI.SingleVariable(penalty.t)
+    # Prepare variable vectors
+    x = VectorOfDecisions(x)
+    ξ = VectorOfDecisions(ξ)
+    # Set name
+    MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₂²")
+    # Add quadratic ℓ₂-norm constraint
+    g = MOIU.operate(-, T, x, ξ)
+    g = LinearAlgebra.dot(g, g)
+    MOIU.operate!(-, T, g, t)
+    penalty.constraint =
+        MOI.add_constraint(model, g,
+                           MOI.LessThan(0.0))
+end
+
 function remove_penalty!(penalty::Quadratic,
                          model::MOI.AbstractOptimizer)
     # Delete ℓ₂-norm constraint
