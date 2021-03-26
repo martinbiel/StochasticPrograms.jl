@@ -6,9 +6,12 @@ Return a quasi-gradient optimizer.
 # Arguments
 - `master_optimizer::AbstractOptimizer`: MathOptInterface solver capable of solving linear (and possibly quadratic) programs.
 - `subproblem_optimizer::AbstractOptimizer`: Optionally specify a different solver for the subproblems.
-- `prox::AbstractProx`
-- `step::AbstractStetp`
 - `execution::Execution = Serial`: Specify how algorithm should be executed (Serial, Synchronous, Asynchronous). Distributed variants requires worker cores.
+- `subproblems::AbstractSubProblemState = Unaltered()`: Specify if a smoothing procedure should be applied.
+- `prox::AbstractProx = Polyhedron()`: Specify proximal step.
+- `step::AbstractStep = Constant()`: Specify step-size
+- `termination::AbstractTermination = AfterMaximumIterations()`: Specify termination criterion
+
 - <keyword arguments>: Algorithm specific parameters, See `?LShaped` for list of possible arguments and default values.
 ...
 """

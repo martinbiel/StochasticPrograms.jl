@@ -43,6 +43,8 @@ export
     set_step_attribute,
     set_step_attributes,
     Constant,
+    Diminishing,
+    Polyak,
     BB,
     Prox,
     ProxParameter,

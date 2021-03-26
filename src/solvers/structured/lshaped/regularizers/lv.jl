@@ -24,7 +24,7 @@ Functor object for using level-set regularization in an L-shaped algorithm. Crea
 ...
 # Parameters
 - `λ::AbstractFloat = 0.5`: Controls the level position L = (1-λ)*θ + λ*Q̃, a convex combination of the current lower and upper bound.
-- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
 struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization

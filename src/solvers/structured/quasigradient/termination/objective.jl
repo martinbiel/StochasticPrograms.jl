@@ -3,6 +3,17 @@
     τ::T = 1e-6
 end
 
+"""
+    ObjectiveThreshold
+
+Functor object for using an objective threshold as termination criterion in a quasigradient algorithm. Create by supplying a [`AtObjectiveThreshold`](@ref) object through `terminate` to `QuasiGradient.Optimizer` or by setting the [`Termination`](@ref) attribute.
+
+...
+# Parameters
+- `reference::AbstractFloat = 0.0`: Reference objective value
+- `τ::AbstractFloat = 1e-6`: Relative tolerance
+...
+"""
 struct ObjectiveThreshold{T <: AbstractFloat} <: AbstractTerminationCriterion
     parameters::ObjectiveThresholdParameters{T}
 end
@@ -24,6 +35,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    AtObjectiveThreshold
+
+Factory object for [`ObjectiveThreshold`](@ref). Pass to `terminate` in `Quasigradient.Optimizer` or set the [`Termination`](@ref) attribute. See ?ObjectiveThreshold for parameter descriptions.
+
+"""
 struct AtObjectiveThreshold <: AbstractTermination
     parameters::ObjectiveThresholdParameters{Float64}
 end

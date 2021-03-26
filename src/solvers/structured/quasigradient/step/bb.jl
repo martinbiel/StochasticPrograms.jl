@@ -1,7 +1,17 @@
 @with_kw mutable struct BBParameters{T <: AbstractFloat}
-    γ₀::T = 1.
+    γ₀::T = 0.1
 end
 
+"""
+    BBStep
+
+Functor object for using the Barzilai-Borwein step size in a quasigradient algorithm. Create by supplying a [`BB`](@ref) object through `step` to `QuasiGradient.Optimizer` or by setting the [`StepSize`](@ref) attribute.
+
+...
+# Parameters
+- `γ₀::AbstractFloat = 0.1`: Initial step-size and fallback if BB is numerically unstable
+...
+"""
 struct BBStep{T <: AbstractFloat} <: AbstractStep
     parameters::BBParameters{T}
     xprev::Vector{T}
@@ -35,6 +45,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    BB
+
+Factory object for [`BBStep`](@ref). Pass to `step` in `Quasigradient.Optimizer` or set the [`StepSize`](@ref) attribute. See ?BBStep for parameter descriptions.
+
+"""
 struct BB <: AbstractStepSize
     parameters::BBParameters{Float64}
 end

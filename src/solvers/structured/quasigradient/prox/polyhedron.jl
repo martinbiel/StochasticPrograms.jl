@@ -1,3 +1,13 @@
+"""
+    PolyhedronProjection
+
+Functor object for using polyhedral projection in the prox step of a quasigradient algorithm. Create by supplying a [`Polyhedral`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+
+...
+# Parameters
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
+...
+"""
 struct PolyhedronProjection{T <: AbstractFloat, PT <: AbstractPenaltyterm} <: AbstractProximal
     penaltyterm::PT
     projection_targets::Vector{MOI.VariableIndex}
@@ -68,6 +78,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    Polyhedron
+
+Factory object for [`PolyhedronProjection`](@ref). Pass to `prox` in `Quasigradient.Optimizer` or set the [`Prox`](@ref) attribute. See ?PolyhedronProjection for parameter descriptions.
+
+"""
 mutable struct Polyhedron <: AbstractProx
     penaltyterm::AbstractPenaltyterm
 end

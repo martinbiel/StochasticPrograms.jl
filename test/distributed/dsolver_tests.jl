@@ -81,4 +81,48 @@ executions = [Synchronous(), Asynchronous()]
             end
         end
     end
+    @info "Running Quasi-gradient tests..."
+    @testset "Quasi-gradient: simple problems" begin
+        for (model,scenarios,res,name) in problems
+            tol = 1e-2
+            sp = instantiate(model,
+                             scenarios,
+                             optimizer = QuasiGradient.Optimizer)
+            @test_throws UnloadableStructure optimize!(sp)
+            set_optimizer_attribute(sp, Execution(), Synchronous())
+            #set_silent(sp)
+            if name != "Infeasible" && name != "Vectorized Infeasible"
+                # Non-smooth
+                @testset "Quasi-gradient: $name" begin
+                    set_optimizer_attribute(sp, MasterOptimizer(), qpsolver)
+                    set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
+                    set_optimizer_attribute(sp, Prox(), DryFriction())
+                    set_optimizer_attribute(sp, Termination(), AtObjectiveThreshold(res.VRP, 1e-3))
+                    optimize!(sp, crash = Crash.EVP())
+                    @test termination_status(sp) == MOI.OPTIMAL
+                    @test isapprox(objective_value(sp), res.VRP, rtol = tol)
+                    @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+                    for i in 1:num_scenarios(sp)
+                        @test isapprox(optimal_recourse_decision(sp, i), res.ȳ[i], rtol = sqrt(tol))
+                    end
+                end
+                # Smooth
+                @testset "Quasi-gradient with smoothing: $name" begin
+                    set_optimizer_attribute(sp, SubProblems(), Smoothed(μ = 1e-4, objective_correction = true))
+                    set_optimizer_attribute(sp, MasterOptimizer(), qpsolver)
+                    set_optimizer_attribute(sp, SubproblemOptimizer(), qpsolver)
+                    set_optimizer_attribute(sp, StepSize(), Constant(1e-3))
+                    set_optimizer_attribute(sp, Prox(), Nesterov())
+                    set_optimizer_attribute(sp, Termination(), AtObjectiveThreshold(res.VRP, 1e-3))
+                    optimize!(sp, crash = Crash.EVP())
+                    @test termination_status(sp) == MOI.OPTIMAL
+                    @test isapprox(objective_value(sp), res.VRP, rtol = tol)
+                    @test isapprox(optimal_decision(sp), res.x̄, rtol = sqrt(tol))
+                    for i in 1:num_scenarios(sp)
+                        @test isapprox(optimal_recourse_decision(sp, i), res.ȳ[i], rtol = sqrt(tol))
+                    end
+                end
+            end
+        end
+    end
 end

@@ -18,7 +18,7 @@ vec_infeasible = @stochastic_model begin
         @uncertain ξ[1:2]
         @recourse(model, 0.8 * ξ[i] <= y[i in 1:2] <= ξ[i])
         @objective(model, Min, dot(q, y))
-        @constraint(model, T * x + W * y in MOI.Nonpositives(2))
+        @constraint(model, T * x + W * y .<= 0)
     end
 end
 

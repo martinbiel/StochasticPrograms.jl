@@ -27,7 +27,7 @@ Functor object for using regularized decomposition regularization in an L-shaped
 - `σ̅::AbstractFloat = 4.0`: Maximum value of the regularization parameter.
 - `σ̲::AbstractFloat = 0.5`: Minimum value of the regularization parameter.
 - `log::Bool = true`: Specifices if L-shaped procedure should be logged on standard output or not.
-- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`Linearized`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
+- `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
 struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization

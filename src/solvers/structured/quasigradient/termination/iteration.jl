@@ -2,6 +2,16 @@
     maximum::Int = 1000
 end
 
+"""
+    MaximumIterations
+
+Functor object for using maximum number of iterations as termination criterion in a quasigradient algorithm. Create by supplying a [`AfterMaximumIterations`](@ref) object through `terminate` to `QuasiGradient.Optimizer` or by setting the [`Termination`](@ref) attribute.
+
+...
+# Parameters
+- `maximum::Integer = 1000`: Maximum number of iterations
+...
+"""
 struct MaximumIterations <: AbstractTerminationCriterion
     parameters::MaximumIterationParameters
 
@@ -24,6 +34,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    AfterMaximumIterations
+
+Factory object for [`MaximumIterations`](@ref). Pass to `terminate` in `Quasigradient.Optimizer` or set the [`Termination`](@ref) attribute. See ?MaximumIterations for parameter descriptions.
+
+"""
 struct AfterMaximumIterations <: AbstractTermination
     parameters::MaximumIterationParameters
 end

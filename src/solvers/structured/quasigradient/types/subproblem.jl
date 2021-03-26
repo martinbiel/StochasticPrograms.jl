@@ -88,7 +88,7 @@ function collect_linking_constraints(model::JuMP.Model,
             end
             if !isempty(coeffs)
                 push!(masterterms, coeffs)
-                push!(linking_constraints, cref.index)
+                push!(linking_constraints, ci)
             end
         end
     end
@@ -186,6 +186,16 @@ function (subproblem::SmoothSubProblem)(x::AbstractVector)
 end
 
 function solve_subproblem(subproblem::SmoothSubProblem, x::AbstractVector)
+    @unpack μ, objective_correction = subproblem.parameters
+    decisions = index.(all_decision_variables(subproblem.model, 1))
+    if objective_correction
+        unfix.(all_decision_variables(subproblem.model, 1))
+        StochasticPrograms.enable_penalty!(subproblem.penaltyterm,
+                                           subproblem.optimizer,
+                                           1 / (2 * μ),
+                                           decisions,
+                                           subproblem.projection_targets)
+    end
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
     if status ∈ AcceptableTermination
@@ -293,14 +303,6 @@ function Gradient(subproblem::SmoothSubProblem{T}, x::AbstractVector) where T <:
     end
     Q = correction * π * MOIU.eval_variables(subproblem.data.objective) do vi
         MOI.get(subproblem.optimizer, MOI.VariablePrimal(), vi)
-    end
-    if objective_correction
-        unfix.(all_decision_variables(subproblem.model, 1))
-        StochasticPrograms.enable_penalty!(subproblem.penaltyterm,
-                                           subproblem.optimizer,
-                                           1 / (2 * μ),
-                                           decisions,
-                                           subproblem.projection_targets)
     end
     return Gradient(δQ, Q, subproblem.id)
 end

@@ -107,7 +107,6 @@ The following L-shaped regularizations are available:
 Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractOptimizer` capable of solving QP problems. Alternatively, the quadratic proximal term in the objective can be approximated through various linear terms. This is achieved by supplying a `AbstractPenaltyterm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
 
 - [`Quadratic`](@ref) (default)
-- [`Linearized`](@ref)
 - [`InfNorm`](@ref)
 - [`ManhattanNorm`](@ref)
 
@@ -192,6 +191,7 @@ As an example, we solve the simple problem introduced in the [Quick start](@ref)
 ```julia
 set_optimizer(sp, ProgressiveHedging.Optimizer)
 set_optimizer_attribute(sp, SubproblemOptimizer(), Ipopt.Optimizer)
+optimize!(sp)
 ```
 ```julia
 Progressive Hedging Time: 0:00:05 (303 iterations)
@@ -199,7 +199,6 @@ Progressive Hedging Time: 0:00:05 (303 iterations)
   Primal gap:  7.2622997706326046e-6
   Dual gap:    8.749063651111478e-6
   Iterations:  302
-:Optimal
 ```
 Note, that an QP/LP capable `AbstractOptimizer` is required to solve emerging subproblems.
 
@@ -225,7 +224,6 @@ The same execution policies as for `LShaped` are available in `ProgressiveHedgin
 As with the L-shaped variants with quadratic 2-norm terms, the 2-norm term in progressive-hedging subproblems can be approximated. This enables the use of an `AbstractOptimizer` that only support linear problems. The alternatives are as before:
 
 - [`Quadratic`](@ref) (default)
-- [`Linearized`](@ref)
 - [`InfNorm`](@ref)
 - [`ManhattanNorm`](@ref)
 
@@ -234,3 +232,67 @@ As with the L-shaped variants with quadratic 2-norm terms, the 2-norm term in pr
 1. R. T. Rockafellar and Roger J.-B. Wets (1991), [Scenarios and Policy Aggregation in Optimization Under Uncertainty](https://pubsonline.informs.org/doi/10.1287/moor.16.1.119), Mathematics of Operations Research, vol. 16, no. 1, pp. 119-147.
 
 2. Zehtabian. S and Bastin. F (2016), [Penalty parameter update strategies in progressive hedging algorithm](http://www.cirrelt.ca/DocumentsTravail/CIRRELT-2016-12.pdf)
+
+## Quasi-gradient solvers
+
+StochasticPrograms also includes a collection of quasi-gradient algorithms in the submodule `QuasiGradient`. All algorithm variants are based on projected subgradient methods. `QuasiGradient` interfaces with StochasticPrograms through the structured solver interface. Every algorithm variant is an instance of the functor object [`QuasiGradientAlgorithm`](@ref), and are instanced using the API object [`QuasiGradient.Optimizer`](@ref). Consider subtypes of [`AbstractQuasiGradientAttribute`](@ref) for a summary of available configurations.
+
+As an example, we solve the simple problem introduced in the [Quick start](@ref):
+```julia
+set_optimizer(sp, QuasiGradient.Optimizer)
+set_optimizer_attribute(sp, MasterOptimizer(), Ipopt.Optimizer)
+set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+optimize!(sp)
+```
+```julia
+Quasi-gradient Progress 100%|██████████████████████████████████████████████████████████████████| Time: 0:00:08
+  Objective:   -854.9691513511461
+  ||∇Q||::     34.64997546896679
+  Iterations:  1000
+```
+Note, that an QP/LP capable `AbstractOptimizer` is required to solve emerging subproblems.
+
+`QuasiGradient` also uses a policy-based design. See [`QuasiGradient.Optimizer`](@ref) for options. We briefly describe the various policies in the following.
+
+### Step-size
+
+The following step-size policies are available:
+
+- [`Constant`](@ref) (default)
+- [`Diminishing`](@ref)
+- [`Polyak`](@ref)
+- [`BB`](@ref)
+
+### Prox
+
+A proximal step is taken each iteration in a projected (sub)gradient method. The following prox steps are currently available:
+
+- [`NoProx`](@ref)
+- [`Polyhedron`](@ref) (default)
+- [`AndersonAcceleration`](@ref)
+- [`Nesterov`](@ref)
+- [`DryFriction`](@ref)
+
+At the very least, a polyhedral projection on the first-stage constraints are required when solving stochastic programs.
+
+### Termination
+
+The following termination criteria are available:
+
+- [`AfterMaximumIterations`](@ref) (default)
+- [`AtObjectiveThreshold`](@ref)
+- [`AtGradientThreshold`](@ref)
+
+### Execution
+
+The following execution policies are available in `QuasiGradient`, i.e.
+
+- [`Serial`](@ref) (default)
+- [`Synchronous`](@ref)
+
+### Smoothing
+
+A smooth approximation can be applied to the subproblems to enable gradient-based method that require smooth properties. The smoothing procedure is based on Moreau envelopes.
+
+- [`Unaltered`](@ref) (default)
+- [`Smoothed`](@ref)

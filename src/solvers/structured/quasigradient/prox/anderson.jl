@@ -7,6 +7,17 @@ end
     m::Int = 10
 end
 
+"""
+    AndersonAcceleratedProximal
+
+Functor object for using anderson accleration in the prox step of a quasigradient algorithm. Create by supplying an [`AndersonAcceleration`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+
+...
+# Parameters
+- `prox::AbstractProx = Polyhedron`: Inner prox step
+- `m::Integer = 10`: Anderson memory
+...
+"""
 struct AndersonAcceleratedProximal{T <: AbstractFloat, P <: AbstractProximal} <: AbstractProximal
     data::AndersonAccelerationData{T}
     parameters::AndersonAccelerationParameters
@@ -120,6 +131,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    AndersonAcceleration
+
+Factory object for [`AndersonAcceleratedProximal`](@ref). Pass to `prox` in `Quasigradient.Optimizer` or set the [`Prox`](@ref) attribute. See ?AndersonAcceleratedProximal for parameter descriptions.
+
+"""
 mutable struct AndersonAcceleration <: AbstractProx
     prox::AbstractProx
     parameters::AndersonAccelerationParameters

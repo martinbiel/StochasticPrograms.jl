@@ -3,6 +3,18 @@
     r::T = 1e-3
 end
 
+"""
+    DryFrictionProximal
+
+Functor object for using dry-friction acceleration in the prox step of a quasigradient algorithm. Create by supplying a [`Dryfriction`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+
+...
+# Parameters
+- `prox::AbstractProx = Polyhedron`: Inner prox step
+- `γ::AbstractFloat = 0.9`: Heavy-ball parameter
+- `r::AbstractFloat = 1e-3`: Dry-friction parameter
+...
+"""
 struct DryFrictionProximal{T <: AbstractFloat, P <: AbstractProximal} <: AbstractProximal
     parameters::DryFrictionParameters{T}
 
@@ -54,6 +66,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    DryFriction
+
+Factory object for [`DryFrictionProximal`](@ref). Pass to `prox` in `Quasigradient.Optimizer` or set the [`Prox`](@ref) attribute. See ?DryFrictionProximal for parameter descriptions.
+
+"""
 mutable struct DryFriction <: AbstractProx
     prox::AbstractProx
     parameters::DryFrictionParameters

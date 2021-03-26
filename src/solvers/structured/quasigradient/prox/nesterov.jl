@@ -6,6 +6,17 @@ end
     stabilizing_projection::Bool = false
 end
 
+"""
+    NesterovProximal
+
+Functor object for using nesterov accleration, with FISTA updates, in the prox step of a quasigradient algorithm. Create by supplying a [`Nesterov`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+
+...
+# Parameters
+- `prox::AbstractProx = Polyhedron`: Inner prox step
+- `stabilizing_projection::Bool = false`: Specify if an extra guarding projection should be performed to ensure first-stage feasibility
+...
+"""
 struct NesterovProximal{T <: AbstractFloat, P <: AbstractProximal} <: AbstractProximal
     data::NesterovData{T}
     parameters::NesterovParameters
@@ -61,6 +72,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    Nesterov
+
+Factory object for [`NesterovProximal`](@ref). Pass to `prox` in `Quasigradient.Optimizer` or set the [`Prox`](@ref) attribute. See ?NesterovProximal for parameter descriptions.
+
+"""
 mutable struct Nesterov <: AbstractProx
     prox::AbstractProx
     parameters::NesterovParameters

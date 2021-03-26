@@ -14,4 +14,6 @@ end
 
 include("common.jl")
 include("constant.jl")
+include("diminishing.jl")
+include("polyak.jl")
 include("bb.jl")

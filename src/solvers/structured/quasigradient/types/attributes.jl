@@ -20,36 +20,32 @@ struct SubProblems <: AbstractQuasiGradientAttribute end
 
 An optimizer attribute for specifying a prox policy to be used in the quasi-gradient algorithm. Options are:
 
-- [`NoProx`](@ref):  L-shaped algorithm (default)
-- [`RegularizedDecomposition`](@ref):  Regularized decomposition ?RegularizedDecomposition for parameter descriptions.
-- [`TrustRegion`](@ref):  Trust-region ?TrustRegion for parameter descriptions.
-- [`LevelSet`](@ref):  Level-set ?LevelSet for parameter descriptions.
+- [`NoProx`](@ref): Unconstrained.
+- [`Polyhedron`](@ref): QP projection on polyhedral space ?PolyhedronProjection for parameter descriptions. (default)
+- [`AndersonAcceleration`](@ref):  Anderson acceleration of inner prox step ?AndersonAcceleratedProximal for parameter descriptions.
+- [`Nesterov`](@ref):  Nesterov acceleration of inner prox step ?NesterovProximal for parameter descriptions.
+- [`DryFriction`](@ref):  Dry-friction acceleration of inner prox step ?DryFrictionProximal for parameter descriptions.
 """
 struct Prox <: AbstractQuasiGradientAttribute end
 """
     StepSize
 
-An optimizer attribute for specifying an aggregation procedure to be used in the L-shaped algorithm. Options are:
+An optimizer attribute for specifying an aggregation procedure to be used in the quasi-gradient algorithm. Options are:
 
-- [`NoAggregation`](@ref):  Multi-cut L-shaped algorithm (default)
-- [`PartialAggregation`](@ref):  ?PartialAggregation for parameter descriptions.
-- [`FullAggregation`](@ref):  ?FullAggregation for parameter descriptions.
-- [`DynamicAggregation`](@ref):  ?DynamicAggregation for parameter descriptions.
-- [`ClusterAggregation`](@ref):  ?ClusterAggregation for parameter descriptions.
-- [`HybridAggregation`](@ref):  ?HybridAggregation for parameter descriptions.
+- [`Constant`](@ref):  Constant step size ?ConstantStep for parameter descriptions (default)
+- [`Diminishing`](@ref):  Diminishing step size ?DiminishingStep for parameter descriptions.
+- [`Polyak`](@ref):  Polyak step size ?PolyakStep for parameter descriptions.
+- [`BB`](@ref):  Barzilai-Borwein step size ?BBStep for parameter descriptions.
 """
 struct StepSize <: AbstractQuasiGradientAttribute end
 """
     Termination
 
-An optimizer attribute for specifying an aggregation procedure to be used in the L-shaped algorithm. Options are:
+An optimizer attribute for specifying a termination criterion to be used in the quasi-gradient algorithm. Options are:
 
-- [`NoAggregation`](@ref):  Multi-cut L-shaped algorithm (default)
-- [`PartialAggregation`](@ref):  ?PartialAggregation for parameter descriptions.
-- [`FullAggregation`](@ref):  ?FullAggregation for parameter descriptions.
-- [`DynamicAggregation`](@ref):  ?DynamicAggregation for parameter descriptions.
-- [`ClusterAggregation`](@ref):  ?ClusterAggregation for parameter descriptions.
-- [`HybridAggregation`](@ref):  ?HybridAggregation for parameter descriptions.
+- [`AfterMaximumIterations`](@ref):  Terminate after set number of iterations ?MaximumIterations for parameter descriptions (default)
+- [`AtObjectiveThreshold`](@ref):  Terminate after reaching reference objective ?ObjectiveThreshold for parameter descriptions.
+- [`AtGradientThreshold`](@ref):  Terminate after reaching zero gradient ?GradientThreshold for parameter descriptions.
 """
 struct Termination <: AbstractQuasiGradientAttribute end
 """

@@ -62,6 +62,10 @@ function decision(quasigradient::AbstractQuasiGradient, index::MOI.VariableIndex
     return quasigradient.ξ[i]
 end
 
+function objective_value(quasigradient::AbstractQuasiGradient)
+    return quasigradient.data.Q
+end
+
 function evaluate_first_stage(quasigradient::AbstractQuasiGradient, x::AbstractVector)
     # Get objective
     @unpack master_objective = quasigradient.data

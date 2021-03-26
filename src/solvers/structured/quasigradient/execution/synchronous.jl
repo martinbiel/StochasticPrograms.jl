@@ -153,6 +153,9 @@ function resolve_subproblems!(quasigradient::AbstractQuasiGradient, execution::S
                                      for subproblem in subproblems
                                          update_subproblem!(subproblem)
                                          subgradient::SparseGradient{T} = subproblem(x)
+                                         if isinf(subgradient.Q)
+                                             return subgradient.Q, partial_subgradient
+                                         end
                                          partial_subgradient .-= subgradient.δQ
                                          Q += subgradient.Q
                                      end
@@ -193,6 +196,9 @@ function resolve_subproblems!(quasigradient::AbstractQuasiGradient, execution::S
                                      for subproblem in subproblems
                                          update_subproblem!(subproblem)
                                          gradient::DenseGradient{T} = subproblem(x)
+                                         if isinf(gradient.Q)
+                                             return gradient.Q, partial_gradient
+                                         end
                                          partial_gradient .+= gradient.δQ
                                          Q += gradient.Q
                                      end

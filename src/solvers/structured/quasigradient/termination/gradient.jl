@@ -2,6 +2,16 @@
     τ::T = 1e-6
 end
 
+"""
+    ObjectiveThreshold
+
+Functor object for using a zero gradient threshold as termination criterion in a quasigradient algorithm. Create by supplying a [`AtGradientThreshold`](@ref) object through `terminate` to `QuasiGradient.Optimizer` or by setting the [`Termination`](@ref) attribute.
+
+...
+# Parameters
+- `τ::AbstractFloat = 1e-6`: Numerical tolerance for zero gradient
+...
+"""
 struct GradientThreshold{T <: AbstractFloat} <: AbstractTerminationCriterion
     parameters::GradientThresholdParameters{T}
 
@@ -25,6 +35,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    AtGradientThreshold
+
+Factory object for [`GradientThreshold`](@ref). Pass to `terminate` in `Quasigradient.Optimizer` or set the [`Termination`](@ref) attribute. See ?GradientThreshold for parameter descriptions.
+
+"""
 mutable struct AtGradientThreshold <: AbstractTermination
     parameters::GradientThresholdParameters{Float64}
 end

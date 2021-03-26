@@ -1,7 +1,17 @@
 @with_kw mutable struct ConstantStepParameters{T <: AbstractFloat}
-    γ::T = 0.1
+    γ::T = 0.01
 end
 
+"""
+    ConstantStep
+
+Functor object for using a constant step size in a quasigradient algorithm. Create by supplying a [`Constant`](@ref) object through `step` to `QuasiGradient.Optimizer` or by setting the [`StepSize`](@ref) attribute.
+
+...
+# Parameters
+- `γ::AbstractFloat = 0.01`: Step length
+...
+"""
 struct ConstantStep{T <: AbstractFloat} <: AbstractStep
     parameters::ConstantStepParameters{T}
 
@@ -14,7 +24,13 @@ step(step::ConstantStep, ::Integer, ::Float64, ::AbstractVector, ::AbstractVecto
 
 # API
 # ------------------------------------------------------------
-mutable struct Constant <: AbstractStepSize
+"""
+    Constant
+
+Factory object for [`ConstantStep`](@ref). Pass to `step` in `Quasigradient.Optimizer` or set the [`StepSize`](@ref) attribute. See ?ConstantStep for parameter descriptions.
+
+"""
+struct Constant <: AbstractStepSize
     parameters::ConstantStepParameters{Float64}
 end
 Constant(γ::AbstractFloat) = Constant(ConstantStepParameters(; γ = Float64(γ)))
