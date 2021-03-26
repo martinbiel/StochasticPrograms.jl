@@ -250,10 +250,10 @@ Factory object for [`TrustRegion`](@ref). Pass to `regularize ` in the `LShapedS
 mutable struct TR <: AbstractRegularizer
     parameters::TRParameters{Float64}
 end
-TR(; kw...) = TR(TRParameters(kw...))
-WithTR(; kw...) = TR(TRParameters(kw...))
-TrustRegion(; kw...) = TR(TRParameters(kw...))
-WithTrustRegion(; kw...) = TR(TRParameters(kw...))
+TR(; kw...) = TR(TRParameters(; kw...))
+WithTR(; kw...) = TR(TRParameters(; kw...))
+TrustRegion(; kw...) = TR(TRParameters(; kw...))
+WithTrustRegion(; kw...) = TR(TRParameters(; kw...))
 
 function (tr::TR)(decisions::Decisions, x::AbstractVector)
     return TrustRegion(decisions, x; type2dict(tr.parameters)...)

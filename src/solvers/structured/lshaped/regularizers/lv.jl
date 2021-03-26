@@ -217,10 +217,10 @@ mutable struct LV <: AbstractRegularizer
     penaltyterm::AbstractPenaltyterm
     parameters::LVParameters{Float64}
 end
-LV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
-WithLV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
-LevelSet(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
-WithLevelSets(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(kw...))
+LV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
+WithLV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
+LevelSet(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
+WithLevelSets(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
 
 function MOI.get(lv::LV, ::RegularizationPenaltyterm)
     return lv.penaltyterm

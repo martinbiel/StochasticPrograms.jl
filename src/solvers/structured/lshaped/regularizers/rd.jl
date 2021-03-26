@@ -173,10 +173,10 @@ mutable struct RD <: AbstractRegularizer
     penaltyterm::AbstractPenaltyterm
     parameters::RDParameters{Float64}
 end
-RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
-WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
-RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
-WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(kw...))
+RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
+WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
+RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
+WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
 
 function MOI.get(rd::RD, ::RegularizationPenaltyterm)
     return rd.penaltyterm
