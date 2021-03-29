@@ -43,7 +43,7 @@ Factory object for [`MaximumIterations`](@ref). Pass to `terminate` in `Quasigra
 struct AfterMaximumIterations <: AbstractTermination
     parameters::MaximumIterationParameters
 end
-AfterMaximumIterations(maximum::Integer) = AfterMaximumIterations(MaximumIterationParameters(; maximum))
+AfterMaximumIterations(maximum::Integer) = AfterMaximumIterations(MaximumIterationParameters(; maximum = maximum))
 AfterMaximumIterations(; kw...) = AfterMaximumIterations(MaximumIterationParameters(; kw...))
 
 function (criteria::AfterMaximumIterations)(::Type{T}) where T <: AbstractFloat
