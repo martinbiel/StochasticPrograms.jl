@@ -69,7 +69,7 @@ function solve_subproblem(subproblem::SubProblem,
     # Check feasibility
     if w > sqrt(eps())
         # Subproblem is infeasible, create feasibility cut
-        return FeasibilityCut(subproblem, metadata, x)
+        return FeasibilityCut(subproblem, x)
     end
     # Restore subproblem and solve as usual
     restore_subproblem!(subproblem)

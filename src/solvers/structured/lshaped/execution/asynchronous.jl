@@ -255,7 +255,7 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{T})
             # Update incumbent (if applicable)
             take_step!(lshaped)
             # Early optimality check if using level sets
-            if lshaped.regularization isa LevelSet && check_optimality(lshaped)
+            if lshaped.regularization isa LevelSet && check_optimality(lshaped, true)
                 # Resolve subproblems with optimal vector
                 lshaped.x .= decision(lshaped)
                 t = lshaped.data.iterations
@@ -311,7 +311,7 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{T})
             lshaped.data.θ = θ
             lshaped.θ_history[t] = θ
             # Check if optimal
-            if check_optimality(lshaped)
+            if check_optimality(lshaped, true)
                 # Optimal, final log
                 log!(lshaped, t)
                 return MOI.OPTIMAL

@@ -103,7 +103,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
     # Update incumbent (if applicable)
     take_step!(lshaped)
     # Early gap optimality check if using level sets
-    if lshaped.regularization isa LevelSet && check_optimality(lshaped, false)
+    if lshaped.regularization isa LevelSet && check_optimality(lshaped, true)
         # Resolve subproblems with optimal vector
         lshaped.x .= decision(lshaped)
         resolve_subproblems!(lshaped)

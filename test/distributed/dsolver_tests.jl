@@ -42,10 +42,10 @@ executions = [Synchronous(), Asynchronous()]
                         set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
                         if name == "Infeasible" || name == "Vectorized Infeasible"
                             with_logger(NullLogger()) do
-                                set_optimizer_attribute(sp, FeasibilityCuts(), false)
+                                set_optimizer_attribute(sp, FeasibilityStrategy(), IgnoreFeasibility())
                                 optimize!(sp, crash = Crash.EVP())
                                 @test termination_status(sp) == MOI.INFEASIBLE
-                                set_optimizer_attribute(sp, FeasibilityCuts(), true)
+                                set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
                             end
                         end
                         optimize!(sp, crash = Crash.EVP())
