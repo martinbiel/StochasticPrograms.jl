@@ -88,11 +88,30 @@ Note, that an LP capable `AbstractOptimizer` is required to solve emerging subpr
 
 ### Feasibility cuts
 
-If the stochastic program does not have complete, or relatively complete, recourse then subproblems may be infeasible for some master iterates. Convergence can be maintained through the use of feasibility cuts. To reduce overhead and memory usage, feasibility issues are ignored by default. If you know that your problem does not have complete recourse, or if the algorithm terminates due to infeasibility, set the [`FeasibilityCuts`](@ref) attribute to `true`:
+If the stochastic program does not have complete, or relatively complete, recourse then subproblems may be infeasible for some master iterates. Convergence can be maintained through the use of feasibility cuts. To reduce overhead and memory usage, feasibility issues are ignored by default. If you know that your problem does not have complete recourse, or if the algorithm terminates due to infeasibility, set the [`FeasibilityStrategy`](@ref) attribute to `FeasibilityCuts`:
 ```julia
-set_optimizer_attribute(sp, FeasibilityCuts(), true)
+set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
 optimize!(sp)
 ```
+
+### Integer strategies
+
+If the stochastic program includes binary or integer decisions, especially in the second-stage, special strategies are required for the L-shaped algorihm to stay effective. Integer restrictions are ignored by default and the procedure will generally not converge if they are present.
+```julia
+set_optimizer_attribute(sp, IntegerStrategy(), CombinatorialCuts())
+optimize!(sp)
+```
+
+The following L-shaped integer strategies are available:
+- [`IgnoreIntegers`](@ref) (default)
+- [`CombinatorialCuts`](@ref)
+- [`Convexification`](@ref)
+
+Note, that [`CombinatorialCuts`](@ref) requires a third-party subproblem optimizer with integer capabilities. [`Convexification`](@ref) solves linear subproblems through cutting-plane approximations, determined by a convexification strategy. The currently availiable strategies are:
+- `Gomory`
+- `LiftAndProject`
+- `CuttingPlaneTree`
+The `Gomory` strategy is cheapest and often the most effective. The latter strategies involves solving extra linear programs using a supplied `optimizer`.
 
 ### Regularization
 

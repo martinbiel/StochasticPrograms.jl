@@ -18,7 +18,7 @@ end
 """
     ConvexificationMaster
 
-Master functor object for using weak optimality cuts in an integer L-shaped algorithm. Requires all first-stage decisions to be binary. Create by supplying a [`UseConvexification`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
+Master functor object for using weak optimality cuts in an integer L-shaped algorithm. Requires all first-stage decisions to be binary. Create by supplying a [`Convexification`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
 
 """
 struct ConvexificationMaster <: AbstractIntegerAlgorithm end
@@ -41,7 +41,7 @@ end
 """
     ConvexificationWorker
 
-Worker functor object for using weak optimality cuts in an integer L-shaped algorithm. Create by supplying a [`UseConvexification`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
+Worker functor object for using weak optimality cuts in an integer L-shaped algorithm. Create by supplying a [`Convexification`](@ref) object through `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
 
 """
 struct ConvexificationWorker{T <: AbstractFloat} <: AbstractIntegerAlgorithm
@@ -769,6 +769,13 @@ end
     Convexification
 
 Factory object for using convexification to handle integer recourse. Pass to `integer_strategy` in `LShaped.Optimizer` or set the [`IntegerStrategy`](@ref) attribute.
+
+...
+# Parameters
+- `maximum_iterations::Integer = 1`: Determines the number of iterations spent generating cutting-planes each time a subproblem is solved.
+- `strategy::ConvexificationStrategy = Gomory()`: Specify convexification strategy (`Gomory`, `LiftAndProject`, `CuttingPlaneTree`)
+- `optimizer = nothing`: Optionally specify an optimizer used to solve auxilliary problems in the `LiftAndProject` or `CuttingPlaneTree` strategies.
+...
 
 """
 struct Convexification <: AbstractIntegerStrategy
