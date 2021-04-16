@@ -10,7 +10,7 @@
         set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
         set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
         if name == "Infeasible" || name == "Vectorized Infeasible"
-            set_optimizer_attribute(sp, FeasibilityCuts(), true)
+            set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
         end
         @testset "Distributed SP Constructs: $name" begin
             optimize!(sp, cache = true)
@@ -35,7 +35,7 @@
             set_optimizer_attribute(sp_nondist, MasterOptimizer(), GLPK.Optimizer)
             set_optimizer_attribute(sp_nondist, SubproblemOptimizer(), GLPK.Optimizer)
             if name == "Infeasible" || name == "Vectorized Infeasible"
-                set_optimizer_attribute(sp_nondist, FeasibilityCuts(), true)
+                set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
             end
             optimize!(sp_nondist)
             @test termination_status(sp_nondist) == MOI.OPTIMAL
@@ -68,7 +68,7 @@
             set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer())
             set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer())
             if name == "Infeasible" || name == "Vectorized Infeasible"
-                set_optimizer_attribute(sp_copy, FeasibilityCuts(), true)
+                set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
             end
             optimize!(sp)
             optimize!(sp_copy)
