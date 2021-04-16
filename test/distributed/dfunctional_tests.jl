@@ -35,7 +35,7 @@
             set_optimizer_attribute(sp_nondist, MasterOptimizer(), GLPK.Optimizer)
             set_optimizer_attribute(sp_nondist, SubproblemOptimizer(), GLPK.Optimizer)
             if name == "Infeasible" || name == "Vectorized Infeasible"
-                set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
+                set_optimizer_attribute(sp_nondist, FeasibilityStrategy(), FeasibilityCuts())
             end
             optimize!(sp_nondist)
             @test termination_status(sp_nondist) == MOI.OPTIMAL
@@ -68,7 +68,7 @@
             set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer())
             set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer())
             if name == "Infeasible" || name == "Vectorized Infeasible"
-                set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
+                set_optimizer_attribute(sp_copy, FeasibilityStrategy(), FeasibilityCuts())
             end
             optimize!(sp)
             optimize!(sp_copy)
