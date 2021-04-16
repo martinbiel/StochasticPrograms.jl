@@ -148,6 +148,13 @@ function MOI.optimize!(optimizer::Optimizer)
     return nothing
 end
 
+function num_iterations(optimizer::Optimizer)
+    if optimizer.quasigradient === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return num_iterations(optimizer.quasigradient)
+end
+
 function optimizer_name(optimizer::Optimizer)
     return "$(str(optimizer.execution))Quasi-gradient"
 end

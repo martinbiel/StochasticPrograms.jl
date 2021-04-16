@@ -23,7 +23,7 @@ using ProgressMeter
 using Clustering
 
 import Base: show, put!, wait, isready, take!, fetch, zero, +, length, size
-import StochasticPrograms: supports_structure, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems, remove_penalty_variables!, remove_penalty_constraints!, relax_decision_integrality
+import StochasticPrograms: supports_structure, num_iterations, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems, remove_penalty_variables!, remove_penalty_constraints!, relax_decision_integrality
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities

@@ -23,7 +23,7 @@ using ProgressMeter
 using ProgressMeter: AbstractProgress
 
 import Base: show, put!, wait, isready, take!, fetch, zero, +, length, size
-import StochasticPrograms: supports_structure, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems, remove_penalty_variables!, remove_penalty_constraints!
+import StochasticPrograms: supports_structure, num_iterations, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems, remove_penalty_variables!, remove_penalty_constraints!
 using ProgressMeter: Progress
 
 const MOI = MathOptInterface

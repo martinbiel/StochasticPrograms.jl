@@ -1,6 +1,7 @@
 abstract type AbstractProgressiveHedging end
 
 StochasticPrograms.num_subproblems(ph::AbstractProgressiveHedging) = StochasticPrograms.num_subproblems(ph.structure, 2)
+num_iterations(ph::AbstractProgressiveHedging) = ph.data.iterations
 
 # Initialization #
 # ======================================================================== #

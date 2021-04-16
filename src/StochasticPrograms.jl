@@ -187,6 +187,7 @@ export
     set_instanceoptimizer_attribute,
     set_instanceoptimizer_attributes,
     optimize!,
+    num_iterations,
     default_structure,
     supports_structure,
     check_loadable,

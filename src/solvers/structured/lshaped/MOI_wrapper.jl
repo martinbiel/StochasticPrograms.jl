@@ -159,6 +159,13 @@ function MOI.optimize!(optimizer::Optimizer)
     return nothing
 end
 
+function num_iterations(optimizer::Optimizer)
+    if optimizer.lshaped === nothing
+        throw(UnloadedStructure{Optimizer}())
+    end
+    return num_iterations(optimizer.lshaped)
+end
+
 function optimizer_name(optimizer::Optimizer)
     optimizer_str = "$(str(optimizer.execution))$(str(optimizer.regularizer))"
     aggregate_str = str(optimizer.aggregator)

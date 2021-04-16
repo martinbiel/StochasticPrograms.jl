@@ -34,6 +34,7 @@ In summary, the solver interface that a new [`AbstractStructuredOptimizer`](@ref
  - [`restore_structure!`](@ref)
  - [`optimize!`](@ref)
  - [`optimizer_name`](@ref)
+ - [`num_iterations`](@ref)
  - [`master_optimizer`](@ref)
  - [`subproblem_optimizer`](@ref)
 

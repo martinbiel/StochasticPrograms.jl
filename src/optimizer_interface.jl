@@ -60,6 +60,14 @@ function master_optimizer end
 Return a MOI optimizer constructor for solving subproblems
 """
 function subproblem_optimizer end
+"""
+    num_iterations(optimizer::AbstractStructuredOptimizer)
+
+Return the number of iterations ran by the structured optimizer
+
+See also: [`optimize`](@ref)
+"""
+function num_iterations end
 # Sample-based solver interface
 # ========================== #
 """

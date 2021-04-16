@@ -21,7 +21,7 @@ using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm
 using ProgressMeter
 
 import Base: show, put!, wait, isready, take!, fetch
-import StochasticPrograms: supports_structure, default_structure, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems
+import StochasticPrograms: supports_structure, num_iterations, default_structure, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities
