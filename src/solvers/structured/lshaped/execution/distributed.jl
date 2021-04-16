@@ -49,6 +49,19 @@ function initialize_subworker!(subworker::SubWorker{T,F,I},
     return nothing
 end
 
+function mutate_subproblems!(mutator::Function, subworkers::Vector{<:SubWorker})
+    @sync begin
+        for w in workers()
+            @async remotecall_fetch(w, mutator, subworkers[w-1]) do mutator, sw
+                for subproblem in fetch(sw)
+                    mutator(subproblem)
+                end
+            end
+        end
+    end
+    return nothing
+end
+
 function restore_subproblems!(subworkers::Vector{<:SubWorker})
      @sync begin
         for w in workers()
@@ -68,9 +81,10 @@ function resolve_subproblems!(subworker::SubWorker{T,F,I},
                               cutqueue::CutQueue{T},
                               aggregator::AbstractAggregator,
                               t::Integer,
-                              metadata::MetaData) where {T <: AbstractFloat,
-                                                         F <: AbstractFeasibilityAlgorithm,
-                                                         I <: AbstractIntegerAlgorithm}
+                              metadata::MetaDataChannel,
+                              worker_metadata::MetaDataChannel) where {T <: AbstractFloat,
+                                                                F <: AbstractFeasibilityAlgorithm,
+                                                                I <: AbstractIntegerAlgorithm}
     # Fetch all subproblems stored in worker
     subproblems::Vector{SubProblem{T,F,I}} = fetch(subworker)
     if isempty(subproblems)
@@ -84,10 +98,10 @@ function resolve_subproblems!(subworker::SubWorker{T,F,I},
     # Solve subproblems
     for subproblem in subproblems
         update_subproblem!(subproblem)
-        cut::SparseHyperPlane{T} = subproblem(x)
-        aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
+        cut::SparseHyperPlane{T} = subproblem(x, metadata)
+        aggregate_cut!(cutqueue, aggregation, worker_metadata, t, cut, x)
     end
-    flush!(cutqueue, aggregation, metadata, t, x)
+    flush!(cutqueue, aggregation, worker_metadata, t, x)
     return nothing
 end
 
@@ -97,7 +111,8 @@ function work_on_subproblems!(subworker::SubWorker{T,F,I},
                               finalize::Work,
                               cutqueue::CutQueue{T},
                               iterates::RemoteIterates{A},
-                              metadata::MetaData,
+                              metadata::MetaDataChannel,
+                              worker_metadata::MetaDataChannel,
                               aggregator::AbstractAggregator) where {T <: AbstractFloat,
                                                                      A <: AbstractVector,
                                                                      F <: AbstractFeasibilityAlgorithm,
@@ -130,10 +145,10 @@ function work_on_subproblems!(subworker::SubWorker{T,F,I},
         update_known_decisions!(fetch(decisions), x)
         for subproblem in subproblems
             update_subproblem!(subproblem)
-            cut::SparseHyperPlane{T} = subproblem(x)
-            !quit && aggregate_cut!(cutqueue, aggregation, metadata, t, cut, x)
+            cut::SparseHyperPlane{T} = subproblem(x, metadata)
+            !quit && aggregate_cut!(cutqueue, aggregation, worker_metadata, t, cut, x)
         end
-        !quit && flush!(cutqueue, aggregation, metadata, t, x)
+        !quit && flush!(cutqueue, aggregation, worker_metadata, t, x)
         if quit
             # Worker finished
             return nothing

@@ -24,17 +24,16 @@ struct SynchronousExecution{T <: AbstractFloat,
                                                     A <: AbstractVector}
         F = worker_type(feasibility_strategy)
         I = worker_type(integer_strategy)
-        execution =  new{T,A,F,I}(Vector{SubWorker{H,T}}(undef, nworkers()),
+        execution =  new{T,A,F,I}(Vector{SubWorker{T,F,I}}(undef, nworkers()),
                                   scenarioproblems(structure).decisions,
                                   A(),
                                   A(),
                                   RemoteChannel(() -> MetaChannel()),
                                   Vector{MetaDataChannel}(undef, nworkers()),
-                                  RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))),
-                                  Vector{Future}(undef, nworkers()))
+                                  RemoteChannel(() -> Channel{QCut{T}}(4 * nworkers() * num_scenarios(structure))))
         # Start loading subproblems
         load_subproblems!(execution.subworkers,
-                          scenarioproblems,
+                          scenarioproblems(structure, 2),
                           execution.decisions,
                           feasibility_strategy,
                           integer_strategy)
@@ -51,6 +50,11 @@ function finish_initilization!(lshaped::AbstractLShaped, execution::SynchronousE
     return lshaped
 end
 
+function mutate_subproblems!(mutator::Function, execution::SynchronousExecution)
+    mutate_subproblems!(mutator, execution.subworkers)
+    return nothing
+end
+
 function restore_subproblems!(::AbstractLShaped, execution::SynchronousExecution)
     restore_subproblems!(execution.subworkers)
     return nothing
@@ -59,7 +63,7 @@ end
 function resolve_subproblems!(lshaped::AbstractLShaped, execution::SynchronousExecution{T}) where T <: AbstractFloat
     # Update metadata
     for w in workers()
-        put!(execution.metadata[w-1], timestamp(lshaped), :gap, gap(lshaped))
+        put!(execution.remote_metadata[w-1], timestamp(lshaped), :gap, gap(lshaped))
     end
     @sync begin
         for (i,w) in enumerate(workers())
@@ -72,7 +76,8 @@ function resolve_subproblems!(lshaped::AbstractLShaped, execution::SynchronousEx
                                     execution.cutqueue,
                                     worker_aggregator,
                                     timestamp(lshaped),
-                                    execution.metadata[w-1])
+                                    execution.metadata,
+                                    execution.remote_metadata[w-1])
         end
     end
     # Assume no cuts are added

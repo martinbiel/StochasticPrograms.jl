@@ -54,7 +54,7 @@ function aggregate_cut!(lshaped::AbstractLShaped, aggregation::HybridAggregation
     return aggregate_cut!(lshaped, active(aggregation), cut)
 end
 
-function aggregate_cut!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
+function aggregate_cut!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaDataChannel, t::Integer, cut::HyperPlane, x::AbstractArray)
     return aggregate_cut!(cutqueue, active(aggregation), metadata, t, cut, x)
 end
 
@@ -74,7 +74,7 @@ function flush!(lshaped::AbstractLShaped, aggregation::HybridAggregation)
     return added
 end
 
-function flush!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaData, t::Integer, x::AbstractArray) where T <: AbstractFloat
+function flush!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaDataChannel, t::Integer, x::AbstractArray) where T <: AbstractFloat
     flush!(cutqueue, active(aggregation), metadata, t, x)
     if shift(fetch(metadata, t, :gap), aggregation.τ)
         activate_final!(aggregation)

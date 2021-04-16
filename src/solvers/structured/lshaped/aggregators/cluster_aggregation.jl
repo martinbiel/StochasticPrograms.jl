@@ -47,7 +47,7 @@ function aggregate_cut!(cutqueue::CutQueue, aggregation::ClusterAggregation, ::M
     return nothing
 end
 
-function aggregate_cut!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata::MetaData, t::Integer, cut::HyperPlane{OptimalityCut}, x::AbstractArray) where T <: AbstractFloat
+function aggregate_cut!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata::MetaDataChannel, t::Integer, cut::HyperPlane{OptimalityCut}, x::AbstractArray) where T <: AbstractFloat
     gap = fetch(metadata, t, :gap)
     if aggregation.lock(gap, t) && haskey(aggregation.partitioning, cut.id)
         aggregation.aggregates[aggregation.partitioning[cut.id]] += cut
@@ -95,7 +95,7 @@ function flush!(lshaped::AbstractLShaped, aggregation::ClusterAggregation{T}) wh
     return added
 end
 
-function flush!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata::MetaData, t::Integer, x::AbstractArray) where T <: AbstractFloat
+function flush!(cutqueue::CutQueue, aggregation::ClusterAggregation{T}, metadata::MetaDataChannel, t::Integer, x::AbstractArray) where T <: AbstractFloat
     gap = fetch(metadata, t, :gap)
     if aggregation.lock(gap, t) && !isempty(aggregation.partitioning)
         for (idx,aggregate) in enumerate(aggregation.aggregates)

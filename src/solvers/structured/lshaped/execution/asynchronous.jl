@@ -59,7 +59,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
                                  max_active,
                                  κ)
         # Start loading subproblems
-        load_subproblems!(execution,
+        load_subproblems!(execution.subworkers,
                           scenarioproblems(structure, 2),
                           execution.decisions,
                           feasibility_strategy,
@@ -102,6 +102,7 @@ function start_workers!(lshaped::AbstractLShaped, execution::AsynchronousExecuti
                                                    execution.finalize[w-1],
                                                    execution.cutqueue,
                                                    execution.iterates,
+                                                   execution.metadata,
                                                    execution.remote_metadata[w-1],
                                                    worker_aggregator)
     end
@@ -113,6 +114,11 @@ function close_workers!(::AbstractLShaped, execution::AsynchronousExecution)
     map((w, aw)->!isready(aw) && put!(w, t), execution.finalize, execution.active_workers)
     map((w, aw)->!isready(aw) && put!(w, -1), execution.work, execution.active_workers)
     map(wait, execution.active_workers)
+    return nothing
+end
+
+function mutate_subproblems!(mutator::Function, execution::AsynchronousExecution)
+    mutate_subproblems!(mutator, execution.subworkers)
     return nothing
 end
 

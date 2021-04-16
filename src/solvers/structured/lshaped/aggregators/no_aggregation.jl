@@ -12,7 +12,7 @@ function aggregate_cut!(lshaped::AbstractLShaped, ::NoAggregation, cut::HyperPla
     return add_cut!(lshaped, cut)
 end
 
-function aggregate_cut!(cutqueue::CutQueue, ::NoAggregation, ::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
+function aggregate_cut!(cutqueue::CutQueue, ::NoAggregation, ::MetaDataChannel, t::Integer, cut::HyperPlane, x::AbstractArray)
     put!(cutqueue, (t, cut))
     return nothing
 end
@@ -29,7 +29,7 @@ function flush!(::AbstractLShaped, ::NoAggregation)
     return false
 end
 
-function flush!(::CutQueue, ::NoAggregation, ::MetaData, ::Integer, ::AbstractArray)
+function flush!(::CutQueue, ::NoAggregation, ::MetaDataChannel, ::Integer, ::AbstractArray)
     return false
 end
 

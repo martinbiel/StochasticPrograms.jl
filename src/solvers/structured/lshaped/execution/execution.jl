@@ -3,6 +3,7 @@ abstract type AbstractLShapedExecution end
 # ------------------------------------------------------------
 num_thetas(lshaped::AbstractLShaped) = num_thetas(lshaped, lshaped.execution)
 initialize_subproblems!(lshaped::AbstractLShaped, scenarioproblems::AbstractScenarioProblems) = initialize_subproblems!(lshaped.execution, scenarioproblems)
+mutate_subproblems!(mutator::Function, lshaped::AbstractLShaped) = mutate_subproblems!(mutator, lshaped.execution)
 finish_initilization!(lshaped::AbstractLShaped) = finish_initilization!(lshaped, lshaped.execution)
 restore_subproblems!(lshaped::AbstractLShaped) = restore_subproblems!(lshaped, lshaped.execution)
 solve_master!(lshaped::AbstractLShaped) = solve_master!(lshaped, lshaped.execution)

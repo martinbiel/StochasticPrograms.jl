@@ -55,6 +55,13 @@ function initialize_subproblems!(execution::SerialExecution{T},
     return nothing
 end
 
+function mutate_subproblems!(mutator::Function, execution::SerialExecution)
+    for subproblem in execution.subproblems
+        mutator(subproblem)
+    end
+    return nothing
+end
+
 function finish_initilization!(lshaped::AbstractLShaped, execution::SerialExecution)
     append!(execution.subobjectives, fill(1e10, num_thetas(lshaped)))
     append!(execution.model_objectives, fill(-1e10, num_thetas(lshaped)))

@@ -70,7 +70,7 @@ function handle_integrality!(lshaped::AbstractLShaped, master::CombinatorialCuts
             θs = model_objectives(lshaped)
         end
         master.parameters.lower_bound = sum(θs)
-        for subproblem in lshaped.execution.subproblems
+        mutate_subproblems!(lshaped) do subproblem
             update_lower_bound!(subproblem.integer_algorithm, θs[subproblem.id])
         end
     end
