@@ -90,7 +90,7 @@ executions = [Synchronous(), Asynchronous()]
                              optimizer = QuasiGradient.Optimizer)
             @test_throws UnloadableStructure optimize!(sp)
             set_optimizer_attribute(sp, Execution(), Synchronous())
-            #set_silent(sp)
+            set_silent(sp)
             if name != "Infeasible" && name != "Vectorized Infeasible"
                 # Non-smooth
                 @testset "Quasi-gradient: $name" begin
