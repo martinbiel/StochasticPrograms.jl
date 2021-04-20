@@ -14,7 +14,7 @@ struct RawProxParameter <: ProxParameter
     name::Any
 end
 """
-    ProxPenaltyterm
+    ProxPenaltyTerm
 
 An optimizer attribute used to set the proximal term in the prox step. Options are:
 
@@ -22,7 +22,7 @@ An optimizer attribute used to set the proximal term in the prox step. Options a
 - [`InfNorm`](@ref)
 - [`ManhattanNorm`](@ref)
 """
-struct ProxPenaltyterm <: ProxParameter end
+struct ProxPenaltyTerm <: ProxParameter end
 
 include("common.jl")
 include("no_prox.jl")

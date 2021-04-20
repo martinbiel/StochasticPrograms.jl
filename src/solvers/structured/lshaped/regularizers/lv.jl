@@ -27,7 +27,7 @@ Functor object for using level-set regularization in an L-shaped algorithm. Crea
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
-struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization
+struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTerm} <: AbstractRegularization
     data::LVData{T}
     parameters::LVParameters{T}
 
@@ -41,7 +41,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyte
 
     penaltyterm::PT
 
-    function LevelSet(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyterm; kw...)
+    function LevelSet(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -214,7 +214,7 @@ Factory object for [`LevelSet`](@ref). Pass to `regularize` in `LShaped.Optimize
 
 """
 mutable struct LV <: AbstractRegularizer
-    penaltyterm::AbstractPenaltyterm
+    penaltyterm::AbstractPenaltyTerm
     parameters::LVParameters{Float64}
 end
 LV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
@@ -222,11 +222,11 @@ WithLV(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw..
 LevelSet(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
 WithLevelSets(; penaltyterm = Quadratic(), kw...) = LV(penaltyterm, LVParameters(; kw...))
 
-function MOI.get(lv::LV, ::RegularizationPenaltyterm)
+function MOI.get(lv::LV, ::RegularizationPenaltyTerm)
     return lv.penaltyterm
 end
 
-function MOI.set(lv::LV, ::RegularizationPenaltyterm, penaltyterm::AbstractPenaltyterm)
+function MOI.set(lv::LV, ::RegularizationPenaltyTerm, penaltyterm::AbstractPenaltyTerm)
     return lv.penaltyterm = penaltyterm
 end
 

@@ -73,7 +73,7 @@ As an example, we solve the simple problem introduced in the [Quick start](@ref)
 ```julia
 set_optimizer(sp, LShaped.Optimizer)
 set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
-set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp, SubProblemOptimizer(), GLPK.Optimizer)
 optimize!(sp)
 ```
 ```julia
@@ -124,7 +124,7 @@ The following L-shaped regularizations are available:
 - [`TrustRegion`](@ref)
 - [`LevelSet`](@ref)
 
-Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractOptimizer` capable of solving QP problems. Alternatively, the quadratic proximal term in the objective can be approximated through various linear terms. This is achieved by supplying a `AbstractPenaltyterm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
+Note, that [`RegularizedDecomposition`](@ref) and [`LevelSet`](@ref) require an `AbstractOptimizer` capable of solving QP problems. Alternatively, the quadratic proximal term in the objective can be approximated through various linear terms. This is achieved by supplying a `AbstractPenaltyTerm` object through `penaltyterm` in either [`RD`](@ref) or [`LV`](@ref). The alternatives are given below:
 
 - [`Quadratic`](@ref) (default)
 - [`InfNorm`](@ref)
@@ -163,7 +163,7 @@ Below are a few examples of L-shaped algorithm with advanced policy configuratio
 function tr_with_partial_aggregation()
     opt = LShaped.Optimizer()
     MOI.set(opt, MasterOptimizer(), GLPK.Optimizer)
-    MOI.set(opt, SubproblemOptimizer(), GLPK.Optimizer)
+    MOI.set(opt, SubProblemOptimizer(), GLPK.Optimizer)
     MOI.set(opt, Regularizer(), TR()) # Set regularization to trust-region
     MOI.set(opt, Aggregator(), PartialAggregate(36)) # Use partial aggregation in groups of 36 cuts
     return opt
@@ -172,7 +172,7 @@ end
 function lv_with_kmedoids_aggregation_and_consolidation()
     opt = LShaped.Optimizer()
     MOI.set(opt, MasterOptimizer(), Gurobi.Optimizer)
-    MOI.set(opt, SubproblemOptimizer(), Gurobi.Optimizer)
+    MOI.set(opt, SubProblemOptimizer(), Gurobi.Optimizer)
     MOI.set(opt, Regularizer(), LV()) # Use level-set regularization
     MOI.set(opt, Aggregator(), ClusterAggregate(Kmedoids(20, distance = angular_distance) # Use K-medoids cluster aggregation
     MOI.set(opt, Consolidator(), Consolidate()) # Enable consolidation
@@ -210,7 +210,7 @@ StochasticPrograms also includes a collection of progressive-hedging algorithms 
 As an example, we solve the simple problem introduced in the [Quick start](@ref):
 ```julia
 set_optimizer(sp, ProgressiveHedging.Optimizer)
-set_optimizer_attribute(sp, SubproblemOptimizer(), Ipopt.Optimizer)
+set_optimizer_attribute(sp, SubProblemOptimizer(), Ipopt.Optimizer)
 optimize!(sp)
 ```
 ```julia
@@ -261,7 +261,7 @@ As an example, we solve the simple problem introduced in the [Quick start](@ref)
 ```julia
 set_optimizer(sp, QuasiGradient.Optimizer)
 set_optimizer_attribute(sp, MasterOptimizer(), Ipopt.Optimizer)
-set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp, SubProblemOptimizer(), GLPK.Optimizer)
 optimize!(sp)
 ```
 ```julia

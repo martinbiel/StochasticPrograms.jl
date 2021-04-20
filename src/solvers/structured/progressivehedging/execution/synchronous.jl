@@ -6,12 +6,12 @@ Functor object for using synchronous execution in a progressive-hedging algorith
 """
 struct SynchronousExecution{T <: AbstractFloat,
                             A <: AbstractVector,
-                            PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
+                            PT <: AbstractPenaltyTerm} <: AbstractProgressiveHedgingExecution
     subworkers::Vector{SubWorker{T,A,PT}}
 
     function SynchronousExecution(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
                                                                            A <: AbstractVector,
-                                                                           PT <: AbstractPenaltyterm}
+                                                                           PT <: AbstractPenaltyTerm}
         return new{T,A,PT}(Vector{SubWorker{T,A,PT}}(undef, nworkers()))
     end
 end
@@ -19,7 +19,7 @@ end
 function initialize_subproblems!(ph::AbstractProgressiveHedging,
                                  execution::SynchronousExecution,
                                  scenarioproblems::DistributedScenarioProblems,
-                                 penaltyterm::AbstractPenaltyterm)
+                                 penaltyterm::AbstractPenaltyTerm)
     # Create subproblems on worker processes
     initialize_subproblems!(ph,
                             execution.subworkers,
@@ -130,7 +130,7 @@ end
 # ------------------------------------------------------------
 function (execution::Synchronous)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
                                                                            A <: AbstractVector,
-                                                                           PT <: AbstractPenaltyterm}
+                                                                           PT <: AbstractPenaltyTerm}
     return SynchronousExecution(T,A,PT)
 end
 

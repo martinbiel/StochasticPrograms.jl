@@ -30,7 +30,7 @@ Functor object for using regularized decomposition regularization in an L-shaped
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
-struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm} <: AbstractRegularization
+struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTerm} <: AbstractRegularization
     data::RDData{T}
     parameters::RDParameters{T}
 
@@ -44,7 +44,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: A
 
     penaltyterm::PT
 
-    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyterm; kw...)
+    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -170,7 +170,7 @@ Factory object for [`RegularizedDecomposition`](@ref). Pass to `regularize` in `
 
 """
 mutable struct RD <: AbstractRegularizer
-    penaltyterm::AbstractPenaltyterm
+    penaltyterm::AbstractPenaltyTerm
     parameters::RDParameters{Float64}
 end
 RD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
@@ -178,11 +178,11 @@ WithRD(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw..
 RegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
 WithRegularizedDecomposition(; penaltyterm = Quadratic(), kw...) = RD(penaltyterm, RDParameters(; kw...))
 
-function MOI.get(rd::RD, ::RegularizationPenaltyterm)
+function MOI.get(rd::RD, ::RegularizationPenaltyTerm)
     return rd.penaltyterm
 end
 
-function MOI.set(rd::RD, ::RegularizationPenaltyterm, penaltyterm::AbstractPenaltyterm)
+function MOI.set(rd::RD, ::RegularizationPenaltyTerm, penaltyterm::AbstractPenaltyTerm)
     return rd.penaltyterm = penaltyterm
 end
 

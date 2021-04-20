@@ -8,7 +8,7 @@
         @test_throws UnloadableStructure optimize!(sp)
         set_silent(sp)
         set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
-        set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+        set_optimizer_attribute(sp, SubProblemOptimizer(), GLPK.Optimizer)
         if name == "Infeasible" || name == "Vectorized Infeasible"
             set_optimizer_attribute(sp, FeasibilityStrategy(), FeasibilityCuts())
         end
@@ -33,7 +33,7 @@
             set_silent(sp_nondist)
             set_optimizer_attribute(sp_nondist, Execution(), Serial())
             set_optimizer_attribute(sp_nondist, MasterOptimizer(), GLPK.Optimizer)
-            set_optimizer_attribute(sp_nondist, SubproblemOptimizer(), GLPK.Optimizer)
+            set_optimizer_attribute(sp_nondist, SubProblemOptimizer(), GLPK.Optimizer)
             if name == "Infeasible" || name == "Vectorized Infeasible"
                 set_optimizer_attribute(sp_nondist, FeasibilityStrategy(), FeasibilityCuts())
             end
@@ -66,7 +66,7 @@
             generate!(sp_copy)
             @test num_subproblems(sp_copy) == num_subproblems(sp)
             set_optimizer_attribute(sp_copy, MasterOptimizer(), () -> GLPK.Optimizer())
-            set_optimizer_attribute(sp_copy, SubproblemOptimizer(), () -> GLPK.Optimizer())
+            set_optimizer_attribute(sp_copy, SubProblemOptimizer(), () -> GLPK.Optimizer())
             if name == "Infeasible" || name == "Vectorized Infeasible"
                 set_optimizer_attribute(sp_copy, FeasibilityStrategy(), FeasibilityCuts())
             end

@@ -1,10 +1,10 @@
-abstract type AbstractPenaltyterm end
+abstract type AbstractPenaltyTerm end
 const L2NormConstraint = CI{QuadraticDecisionFunction{Float64}, MOI.LessThan{Float64}}
 const LinearizationConstraint = CI{QuadraticDecisionFunction{Float64}, MOI.LessThan{Float64}}
 const InfNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormInfinityCone}
 const ManhattanNormConstraint = CI{VectorAffineDecisionFunction{Float64}, MOI.NormOneCone}
 
-Base.copy(::PT) where PT <: AbstractPenaltyterm = PT()
+Base.copy(::PT) where PT <: AbstractPenaltyTerm = PT()
 
 """
     Quadratic
@@ -12,7 +12,7 @@ Base.copy(::PT) where PT <: AbstractPenaltyterm = PT()
 Functor object for using a quadratic 2-norm penalty term. Requires an `AbstractMathProgSolver` capable of solving QP problems. Passed by default through `penalty` where applicable.
 
 """
-mutable struct Quadratic <: AbstractPenaltyterm
+mutable struct Quadratic <: AbstractPenaltyTerm
     t::MOI.VariableIndex
     constraint::L2NormConstraint
 
@@ -131,7 +131,7 @@ function remove_penalty!(penalty::Quadratic,
     return nothing
 end
 
-function remove_penalty_variables!(penalty::AbstractPenaltyterm,
+function remove_penalty_variables!(penalty::AbstractPenaltyTerm,
                                    list::Vector{MOI.VariableIndex})
     i = something(findfirst(isequal(penalty.t), list), 0)
     if !iszero(i)
@@ -140,7 +140,7 @@ function remove_penalty_variables!(penalty::AbstractPenaltyterm,
     return nothing
 end
 
-function remove_penalty_constraints!(penalty::AbstractPenaltyterm,
+function remove_penalty_constraints!(penalty::AbstractPenaltyTerm,
                                      list)
     # Nothing to do if constraints do not match
     return nothing
@@ -165,7 +165,7 @@ Functor object for using an approximately quadratic penalty term, through linear
 - `nbreakpoints::Int`: Number of cutting planes used to approximate quadratic term
 ...
 """
-mutable struct Linearized <: AbstractPenaltyterm
+mutable struct Linearized <: AbstractPenaltyTerm
     num_breakpoints::Int
     spacing::Float64
     auxiliary_variables::Vector{MOI.VariableIndex}
@@ -303,7 +303,7 @@ end
 Functor object for using a linear ∞-norm penalty term. Pass through `penalty` where applicable.
 
 """
-mutable struct InfNorm <: AbstractPenaltyterm
+mutable struct InfNorm <: AbstractPenaltyTerm
     t::MOI.VariableIndex
     constraint::InfNormConstraint
 
@@ -391,7 +391,7 @@ end
 Functor object for using a linear 1-norm penalty term. Pass through `penalty` where applicable.
 
 """
-mutable struct ManhattanNorm <: AbstractPenaltyterm
+mutable struct ManhattanNorm <: AbstractPenaltyTerm
     t::MOI.VariableIndex
     constraint::ManhattanNormConstraint
 

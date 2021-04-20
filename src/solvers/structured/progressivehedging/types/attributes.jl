@@ -26,7 +26,7 @@ An optimizer attribute for specifying a penalization procedure to be used in the
 """
 struct Penalizer <: AbstractProgressiveHedgingAttribute end
 """
-    Penaltyterm
+    PenaltyTerm
 
 An optimizer attribute for specifying what proximal term should be used in subproblemsof the progressive-hedging algorithm. Options are:
 
@@ -35,7 +35,7 @@ An optimizer attribute for specifying what proximal term should be used in subpr
 - [`InfNorm`](@ref)
 - [`ManhattanNorm`](@ref)
 """
-struct Penaltyterm <: AbstractProgressiveHedgingAttribute end
+struct PenaltyTerm <: AbstractProgressiveHedgingAttribute end
 """
     PenalizationParameter
 

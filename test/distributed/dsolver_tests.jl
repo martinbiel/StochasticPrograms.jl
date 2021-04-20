@@ -39,7 +39,7 @@ executions = [Synchronous(), Asynchronous()]
                     set_optimizer_attribute(sp, Consolidator(), consolidator)
                     @testset "$(optimizer_name(sp)): $name" begin
                         set_optimizer_attribute(sp, MasterOptimizer(), subsolver)
-                        set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
+                        set_optimizer_attribute(sp, SubProblemOptimizer(), subsolver)
                         if name == "Infeasible" || name == "Vectorized Infeasible"
                             with_logger(NullLogger()) do
                                 set_optimizer_attribute(sp, FeasibilityStrategy(), IgnoreFeasibility())
@@ -69,7 +69,7 @@ executions = [Synchronous(), Asynchronous()]
             for execution in executions, penalizer in penalizations
                 set_optimizer_attribute(sp, Execution(), execution)
                 set_optimizer_attribute(sp, Penalizer(), penalizer)
-                set_optimizer_attribute(sp, SubproblemOptimizer(), qpsolver)
+                set_optimizer_attribute(sp, SubProblemOptimizer(), qpsolver)
                 set_optimizer_attribute(sp, PrimalTolerance(), 1e-3)
                 set_optimizer_attribute(sp, DualTolerance(), 1e-2)
                 @testset "$(optimizer_name(sp)): $name" begin
@@ -95,7 +95,7 @@ executions = [Synchronous(), Asynchronous()]
                 # Non-smooth
                 @testset "Quasi-gradient: $name" begin
                     set_optimizer_attribute(sp, MasterOptimizer(), qpsolver)
-                    set_optimizer_attribute(sp, SubproblemOptimizer(), subsolver)
+                    set_optimizer_attribute(sp, SubProblemOptimizer(), subsolver)
                     set_optimizer_attribute(sp, Prox(), DryFriction())
                     set_optimizer_attribute(sp, Termination(), AtObjectiveThreshold(res.VRP, 1e-3))
                     optimize!(sp, crash = Crash.EVP())
@@ -110,7 +110,7 @@ executions = [Synchronous(), Asynchronous()]
                 @testset "Quasi-gradient with smoothing: $name" begin
                     set_optimizer_attribute(sp, SubProblems(), Smoothed(μ = 1e-4, objective_correction = true))
                     set_optimizer_attribute(sp, MasterOptimizer(), qpsolver)
-                    set_optimizer_attribute(sp, SubproblemOptimizer(), qpsolver)
+                    set_optimizer_attribute(sp, SubProblemOptimizer(), qpsolver)
                     set_optimizer_attribute(sp, StepSize(), Constant(1e-3))
                     set_optimizer_attribute(sp, Prox(), Nesterov())
                     set_optimizer_attribute(sp, Termination(), AtObjectiveThreshold(res.VRP, 1e-3))

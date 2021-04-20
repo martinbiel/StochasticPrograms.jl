@@ -14,11 +14,11 @@ using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, VerticalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
-using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubproblemOptimizer
+using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubProblemOptimizer
 using StochasticPrograms: all_decisions, set_decision!, SingleDecisionSet, NoSpecifiedConstraint
 using StochasticPrograms: all_known_decisions, update_known_decisions!, KnownValuesChange, Known, KnownDecision
 using StochasticPrograms: add_subscript
-using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!, remove_penalty_variables!, remove_penalty_constraints!
+using StochasticPrograms: AbstractPenaltyTerm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!, remove_penalty_variables!, remove_penalty_constraints!
 using ProgressMeter
 using Clustering
 

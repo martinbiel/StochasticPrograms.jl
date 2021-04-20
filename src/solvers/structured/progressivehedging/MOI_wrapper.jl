@@ -17,7 +17,7 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     sub_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     execution::AbstractExecution
     penalizer::AbstractPenalizer
-    penaltyterm::AbstractPenaltyterm
+    penaltyterm::AbstractPenaltyTerm
     parameters::ProgressiveHedgingParameters{Float64}
 
     status::MOI.TerminationStatusCode
@@ -30,7 +30,7 @@ mutable struct Optimizer <: AbstractStructuredOptimizer
     function Optimizer(; subproblem_optimizer = nothing,
                        execution::AbstractExecution = nworkers() == 1 ? Serial() : Synchronous(),
                        penalty::AbstractPenalizer = Fixed(),
-                       penaltyterm::AbstractPenaltyterm = Quadratic(),
+                       penaltyterm::AbstractPenaltyTerm = Quadratic(),
                        kw...)
         return new(subproblem_optimizer,
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
@@ -63,7 +63,7 @@ end
 
 function check_loadable(optimizer::Optimizer, ::HorizontalStructure)
     if optimizer.subproblem_optimizer === nothing
-        msg = "Subproblem optimizer not set. Consider setting `SubproblemOptimizer` attribute."
+        msg = "Subproblem optimizer not set. Consider setting `SubProblemOptimizer` attribute."
         throw(UnloadableStructure{Optimizer, HorizontalStructure}(msg))
     end
     return nothing
@@ -197,36 +197,36 @@ function MOI.set(optimizer::Optimizer, ::DualTolerance, limit::Real)
 end
 
 function MOI.get(optimizer::Optimizer, ::MasterOptimizer)
-    return MOI.get(optimizer, SubproblemOptimizer())
+    return MOI.get(optimizer, SubProblemOptimizer())
 end
 
-function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
+function MOI.get(optimizer::Optimizer, ::SubProblemOptimizer)
     if optimizer.subproblem_optimizer === nothing
         return MOI.get(optimizer, MasterOptimizer())
     end
     return MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
 end
 
-function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
+function MOI.set(optimizer::Optimizer, ::SubProblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
     # Clear any old parameters
     empty!(optimizer.sub_params)
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
+function MOI.get(optimizer::Optimizer, ::SubProblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
     if !haskey(optimizer.sub_params, attr)
         error("Subproblem optimizer attribute $(attr) has not been set.")
     end
     return optimizer.sub_params[attr]
 end
 
-function MOI.set(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
+function MOI.set(optimizer::Optimizer, ::SubProblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
     optimizer.sub_params[attr] = value
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
+function MOI.get(optimizer::Optimizer, param::RawSubProblemOptimizerParameter)
     moi_param = MOI.RawParameter(param.name)
     if !haskey(optimizer.sub_params, moi_param)
         error("Subproblem optimizer attribute $(param.name) has not been set.")
@@ -234,7 +234,7 @@ function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
     return optimizer.sub_params[moi_param]
 end
 
-function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, value)
+function MOI.set(optimizer::Optimizer, param::RawSubProblemOptimizerParameter, value)
     moi_param = MOI.RawParameter(param.name)
     optimizer.sub_params[moi_param] = value
     return nothing
@@ -258,11 +258,11 @@ function MOI.set(optimizer::Optimizer, ::Penalizer, penalizer::AbstractPenalizer
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::Penaltyterm)
+function MOI.get(optimizer::Optimizer, ::PenaltyTerm)
     return optimizer.penaltyterm
 end
 
-function MOI.set(optimizer::Optimizer, ::Penaltyterm, penaltyterm::AbstractPenaltyterm)
+function MOI.set(optimizer::Optimizer, ::PenaltyTerm, penaltyterm::AbstractPenaltyTerm)
     optimizer.penaltyterm = penaltyterm
     return nothing
 end

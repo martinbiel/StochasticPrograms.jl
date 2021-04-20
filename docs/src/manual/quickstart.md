@@ -168,7 +168,7 @@ print(sp_lshaped)
 To solve the problem with L-shaped, we must first specify internal optimizers that can solve emerging subproblems:
 ```@example simple
 set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
-set_optimizer_attribute(sp_lshaped, SubproblemOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp_lshaped, SubProblemOptimizer(), GLPK.Optimizer)
 ```
 We can now run the optimization procedure:
 ```julia
@@ -242,7 +242,7 @@ Solver name: Progressive-hedging with fixed penalty
 ```
 To solve the problem with progressive-hedging, we must also specify an internal optimizers that can solve the subproblems:
 ```julia
-set_optimizer_attribute(sp_progressivehedging, SubproblemOptimizer(), Ipopt.Optimizer)
+set_optimizer_attribute(sp_progressivehedging, SubProblemOptimizer(), Ipopt.Optimizer)
 set_suboptimizer_attribute(sp_progressivehedging, MOI.RawParameter("print_level"), 0) # Silence Ipopt
 ```
 We can now run the optimization procedure:

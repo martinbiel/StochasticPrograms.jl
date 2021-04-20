@@ -5,7 +5,7 @@ num_iterations(ph::AbstractProgressiveHedging) = ph.data.iterations
 
 # Initialization #
 # ======================================================================== #
-function initialize!(ph::AbstractProgressiveHedging, penaltyterm::AbstractPenaltyterm)
+function initialize!(ph::AbstractProgressiveHedging, penaltyterm::AbstractPenaltyTerm)
     # Initialize progress meter
     ph.progress.thresh = sqrt(ph.parameters.ϵ₁ ^ 2 + ph.parameters.ϵ₂ ^ 2)
     # Initialize subproblems

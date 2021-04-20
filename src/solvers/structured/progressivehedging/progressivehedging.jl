@@ -14,10 +14,10 @@ using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, HorizontalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
 using StochasticPrograms: AbstractExecution, ExecutionParameter, Serial, Synchronous, Asynchronous
-using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, SubproblemOptimizer
+using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, SubProblemOptimizer
 using StochasticPrograms: get_decisions, all_decisions, remove_decision!, set_decision!, SingleDecisionSet, DecisionCoefficientChange, KnownDecision, NoSpecifiedConstraint
 using StochasticPrograms: add_subscript
-using StochasticPrograms: AbstractPenaltyterm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!
+using StochasticPrograms: AbstractPenaltyTerm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!
 using ProgressMeter
 
 import Base: show, put!, wait, isready, take!, fetch
@@ -36,7 +36,7 @@ export
     RawPenalizationParameter,
     set_penalization_attribute,
     set_penalization_attributes,
-    Penaltyterm,
+    PenaltyTerm,
     Fixed,
     Adaptive
 

@@ -25,7 +25,7 @@ struct RawRegularizationParameter <: RegularizationParameter
     name::Any
 end
 """
-    RegularizationPenaltyterm
+    RegularizationPenaltyTerm
 
 An optimizer attribute used to set the proximal term in regulariztion procedures (RD/LV). Options are:
 
@@ -34,7 +34,7 @@ An optimizer attribute used to set the proximal term in regulariztion procedures
 - [`InfNorm`](@ref)
 - [`ManhattanNorm`](@ref)
 """
-struct RegularizationPenaltyterm <: RegularizationParameter end
+struct RegularizationPenaltyTerm <: RegularizationParameter end
 
 include("common.jl")
 include("no_regularization.jl")

@@ -6,10 +6,10 @@ Functor object for using serial execution in a progressive-hedging algorithm. Cr
 """
 struct SerialExecution{T <: AbstractFloat,
                        A <: AbstractVector,
-                       PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
+                       PT <: AbstractPenaltyTerm} <: AbstractProgressiveHedgingExecution
     subproblems::Vector{SubProblem{T,A,PT}}
 
-    function SerialExecution(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
+    function SerialExecution(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTerm}
         return new{T,A,PT}(Vector{SubProblem{T,A,PT}}())
     end
 end
@@ -17,7 +17,7 @@ end
 function initialize_subproblems!(ph::AbstractProgressiveHedging,
                                  execution::SerialExecution{T},
                                  scenarioproblems::ScenarioProblems,
-                                 penaltyterm::AbstractPenaltyterm) where T <: AbstractFloat
+                                 penaltyterm::AbstractPenaltyTerm) where T <: AbstractFloat
     # Create subproblems
     for i = 1:num_subproblems(scenarioproblems)
         push!(execution.subproblems, SubProblem(
@@ -108,7 +108,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
+function (execution::Serial)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTerm}
     return SerialExecution(T, A, PT)
 end
 

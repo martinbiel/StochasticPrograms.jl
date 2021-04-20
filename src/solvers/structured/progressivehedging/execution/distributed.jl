@@ -7,9 +7,9 @@ ProgressQueue{T <: AbstractFloat} = RemoteChannel{Channel{Progress{T}}}
 function initialize_subproblems!(ph::AbstractProgressiveHedging,
                                  subworkers::Vector{SubWorker{T,A,PT}},
                                  scenarioproblems::DistributedScenarioProblems,
-                                 penaltyterm::AbstractPenaltyterm) where {T <: AbstractFloat,
+                                 penaltyterm::AbstractPenaltyTerm) where {T <: AbstractFloat,
                                                                           A <: AbstractVector,
-                                                                          PT <: AbstractPenaltyterm}
+                                                                          PT <: AbstractPenaltyTerm}
     # Create subproblems on worker processes
     @sync begin
         for w in workers()
@@ -54,10 +54,10 @@ end
 
 function initialize_subworker!(subworker::SubWorker{T,A,PT},
                                scenarioproblems::ScenarioProblemChannel,
-                               penaltyterm::AbstractPenaltyterm,
+                               penaltyterm::AbstractPenaltyTerm,
                                start_id::Integer) where {T <: AbstractFloat,
                                                          A <: AbstractArray,
-                                                         PT <: AbstractPenaltyterm}
+                                                         PT <: AbstractPenaltyTerm}
     sp = fetch(scenarioproblems)
     subproblems = Vector{SubProblem{T,A,PT}}(undef, num_subproblems(sp))
     for i = 1:num_subproblems(sp)
@@ -88,7 +88,7 @@ function resolve_subproblems!(subworker::SubWorker{T,A,PT},
                               ξ::AbstractVector,
                               r::AbstractFloat) where {T <: AbstractFloat,
                                                        A <: AbstractArray,
-                                                       PT <: AbstractPenaltyterm}
+                                                       PT <: AbstractPenaltyTerm}
     subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     Qs = Vector{SubproblemSolution{T}}(undef, length(subproblems))
     # Reformulate and solve sub problems
@@ -102,7 +102,7 @@ end
 
 function collect_primals(subworker::SubWorker{T,A,PT}, n::Integer) where {T <: AbstractFloat,
                                                                           A <: AbstractArray,
-                                                                          PT <: AbstractPenaltyterm}
+                                                                          PT <: AbstractPenaltyTerm}
     subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     return mapreduce(+, subproblems, init = zeros(T, n)) do subproblem
         π = subproblem.probability
@@ -134,7 +134,7 @@ function work_on_subproblems!(subworker::SubWorker{T,A,PT},
                               iterates::RemoteIterates{A},
                               r::IteratedValue{T}) where {T <: AbstractFloat,
                                                           A <: AbstractArray,
-                                                          PT <: AbstractPenaltyterm}
+                                                          PT <: AbstractPenaltyTerm}
     subproblems::Vector{SubProblem{T,A,PT}} = fetch(subworker)
     if isempty(subproblems)
        # Workers has nothing do to, return.

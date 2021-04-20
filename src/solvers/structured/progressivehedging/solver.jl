@@ -30,7 +30,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
                                    ST <: HorizontalStructure,
                                    E <: AbstractProgressiveHedgingExecution,
                                    P <: AbstractPenalization,
-                                   PT <: AbstractPenaltyterm} <: AbstractProgressiveHedging
+                                   PT <: AbstractPenaltyTerm} <: AbstractProgressiveHedging
     structure::ST
     data::ProgressiveHedgingData{T}
     parameters::ProgressiveHedgingParameters{T}
@@ -54,7 +54,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
                                          x₀::AbstractVector,
                                          executer::AbstractExecution,
                                          penalizer::AbstractPenalizer,
-                                         penaltyterm::AbstractPenaltyterm; kw...)
+                                         penaltyterm::AbstractPenaltyTerm; kw...)
         # Sanity checks
         length(x₀) != num_decisions(structure) && error("Incorrect length of starting guess, has ", length(x₀), " should be ", num_decisions(structure))
         num_subproblems == 0 && error("No subproblems in stochastic program. Cannot run progressive-hedging procedure.")

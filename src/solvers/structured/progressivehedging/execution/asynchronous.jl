@@ -6,7 +6,7 @@ Functor object for using asynchronous execution in a progressive-hedging algorit
 """
 struct AsynchronousExecution{T <: AbstractFloat,
                              A <: AbstractVector,
-                             PT <: AbstractPenaltyterm} <: AbstractProgressiveHedgingExecution
+                             PT <: AbstractPenaltyTerm} <: AbstractProgressiveHedgingExecution
     subworkers::Vector{SubWorker{T,A,PT}}
     work::Vector{Work}
     finalize::Vector{Work}
@@ -25,7 +25,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
     function AsynchronousExecution(κ::T,
                                    ::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
                                                                             A <: AbstractVector,
-                                                                            PT <: AbstractPenaltyterm}
+                                                                            PT <: AbstractPenaltyTerm}
         return new{T,A,PT}(Vector{SubWorker{T,A,PT}}(undef, nworkers()),
                            Vector{Work}(undef, nworkers()),
                            Vector{Work}(undef, nworkers()),
@@ -44,7 +44,7 @@ end
 function initialize_subproblems!(ph::AbstractProgressiveHedging,
                                  execution::AsynchronousExecution{T,A},
                                  scenarioproblems::DistributedScenarioProblems,
-                                 penaltyterm::AbstractPenaltyterm) where {T <: AbstractFloat, A <: AbstractVector}
+                                 penaltyterm::AbstractPenaltyTerm) where {T <: AbstractFloat, A <: AbstractVector}
     # Create subproblems on worker processes
     initialize_subproblems!(ph,
                             execution.subworkers,
@@ -258,7 +258,7 @@ end
 # ------------------------------------------------------------
 function (execution::Asynchronous)(::Type{T}, ::Type{A}, ::Type{PT}) where {T <: AbstractFloat,
                                                                             A <: AbstractVector,
-                                                                            PT <: AbstractPenaltyterm}
+                                                                            PT <: AbstractPenaltyTerm}
     return AsynchronousExecution(execution.κ, T, A, PT)
 end
 

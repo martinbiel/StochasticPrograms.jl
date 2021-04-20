@@ -102,38 +102,38 @@ function set_masteroptimizer_attributes(stochasticprogram::StochasticProgram; kw
     end
 end
 """
-    SubproblemOptimizer
+    SubProblemOptimizer
 
 An optimizer attribute for specifying the MathOptInterface optimizer used to solve subproblems arising in a structure-exploiting procedure.
 """
-struct SubproblemOptimizer <: AbstractStructuredOptimizerAttribute end
+struct SubProblemOptimizer <: AbstractStructuredOptimizerAttribute end
 
-function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::SubproblemOptimizer, value)
+function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::SubProblemOptimizer, value)
     MOI.set(stochasticprogram, attr, value)
     set_subproblem_optimizer!(structure(stochasticprogram), value)
 end
 
-struct SubproblemOptimizerAttribute <: AbstractStructuredOptimizerAttribute end
+struct SubProblemOptimizerAttribute <: AbstractStructuredOptimizerAttribute end
 """
-    RawSubproblemOptimizerParameter
+    RawSubProblemOptimizerParameter
 
 An optimizer attribute used for raw parameters of the subproblem optimizer. Defers to `RawParameter`.
 """
-struct RawSubproblemOptimizerParameter <: AbstractStructuredOptimizerAttribute
+struct RawSubProblemOptimizerParameter <: AbstractStructuredOptimizerAttribute
     name::Any
 end
 
-function MOI.set(sp::StochasticProgram, attr::SubproblemOptimizerAttribute, sub_attr::MOI.AbstractOptimizerAttribute, value)
+function MOI.set(sp::StochasticProgram, attr::SubProblemOptimizerAttribute, sub_attr::MOI.AbstractOptimizerAttribute, value)
     MOI.set(optimizer(sp), attr, sub_attr, value)
     return nothing
 end
 
-function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::SubproblemOptimizerAttribute, sub_attr::MOI.AbstractOptimizerAttribute, value)
+function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::SubProblemOptimizerAttribute, sub_attr::MOI.AbstractOptimizerAttribute, value)
     MOI.set(stochasticprogram, attr, sub_attr, value)
     set_subproblem_optimizer_attribute!(structure(stochasticprogram), sub_attr, value)
 end
 
-function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, param::RawSubproblemOptimizerParameter, value)
+function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, param::RawSubProblemOptimizerParameter, value)
     MOI.set(stochasticprogram, param, value)
     set_subproblem_optimizer_attribute!(structure(stochasticprogram), MOI.RawParameter(param.name), value)
 end
@@ -145,7 +145,7 @@ Return the value associated with the solver-specific attribute named `name` of t
 See also: [`set_suboptimizer_attribute`](@ref), [`set_suboptimizer_attributes`](@ref).
 """
 function get_suboptimizer_attribute(stochasticprogram::StochasticProgram, name::String)
-    return get_suboptimizer_attribute(stochasticprogram, RawSubproblemOptimizerParameter(name))
+    return get_suboptimizer_attribute(stochasticprogram, RawSubProblemOptimizerParameter(name))
 end
 """
     get_suboptimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
@@ -155,7 +155,7 @@ Return the value of the solver-specific attribute `attr` of the subproblem optim
 See also: [`set_suboptimizer_attribute`](@ref), [`set_suboptimizer_attributes`](@ref).
 """
 function get_suboptimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
-    return MOI.get(optimizer(stochasticprogram), SubproblemOptimizerAttribute(), attr)
+    return MOI.get(optimizer(stochasticprogram), SubProblemOptimizerAttribute(), attr)
 end
 """
     set_suboptimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
@@ -164,7 +164,7 @@ Sets solver-specific attribute `attr` of the subproblem optimizer to `value`.
 
 """
 function set_suboptimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
-    return set_optimizer_attribute(stochasticprogram, SubproblemOptimizerAttribute(), attr, value)
+    return set_optimizer_attribute(stochasticprogram, SubProblemOptimizerAttribute(), attr, value)
 end
 """
     set_suboptimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
@@ -173,7 +173,7 @@ Sets solver-specific attribute of the subproblem optimizer identified by `name` 
 
 """
 function set_suboptimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, RawSubproblemOptimizerParameter(String(name)), value)
+    return set_optimizer_attribute(stochasticprogram, RawSubProblemOptimizerParameter(String(name)), value)
 end
 """
     set_suboptimizer_attributes(stochasticprogram::StochasticProgram, pairs::Pair...)

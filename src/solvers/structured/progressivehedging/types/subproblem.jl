@@ -1,4 +1,4 @@
-struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyterm}
+struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTerm}
     id::Int
     probability::T
     optimizer::MOI.AbstractOptimizer
@@ -16,7 +16,7 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
     function SubProblem(model::JuMP.Model,
                         id::Integer,
                         π::AbstractFloat,
-                        penaltyterm::AbstractPenaltyterm)
+                        penaltyterm::AbstractPenaltyTerm)
         T = typeof(π)
         # Get optimizer backend and initial objective
         optimizer = backend(model)

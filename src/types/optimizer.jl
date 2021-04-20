@@ -112,7 +112,7 @@ end
 
 function subproblem_optimizer(sp_optimizer::StochasticProgramOptimizer, optimizer::AbstractStructuredOptimizer)
     try
-        return MOI.get(optimizer, SubproblemOptimizer())
+        return MOI.get(optimizer, SubProblemOptimizer())
     catch err
         return nothing
     end

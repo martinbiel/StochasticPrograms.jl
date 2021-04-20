@@ -247,31 +247,31 @@ function MOI.set(optimizer::Optimizer, param::RawMasterOptimizerParameter, value
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::SubproblemOptimizer)
+function MOI.get(optimizer::Optimizer, ::SubProblemOptimizer)
     if optimizer.subproblem_optimizer === nothing
         return MOI.get(optimizer, MasterOptimizer())
     end
     return MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
 end
 
-function MOI.set(optimizer::Optimizer, ::SubproblemOptimizer, optimizer_constructor)
+function MOI.set(optimizer::Optimizer, ::SubProblemOptimizer, optimizer_constructor)
     optimizer.subproblem_optimizer = optimizer_constructor
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
+function MOI.get(optimizer::Optimizer, ::SubProblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute)
     if !haskey(optimizer.sub_params, attr)
         error("Subproblem optimizer attribute $(attr) has not been set.")
     end
     return optimizer.sub_params[attr]
 end
 
-function MOI.set(optimizer::Optimizer, ::SubproblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
+function MOI.set(optimizer::Optimizer, ::SubProblemOptimizerAttribute, attr::MOI.AbstractOptimizerAttribute, value)
     optimizer.sub_params[attr] = value
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
+function MOI.get(optimizer::Optimizer, param::RawSubProblemOptimizerParameter)
     moi_param = MOI.RawParameter(param.name)
     if !haskey(optimizer.sub_params, moi_param)
         error("Subproblem optimizer attribute $(param.name) has not been set.")
@@ -279,7 +279,7 @@ function MOI.get(optimizer::Optimizer, param::RawSubproblemOptimizerParameter)
     return optimizer.sub_params[moi_param]
 end
 
-function MOI.set(optimizer::Optimizer, param::RawSubproblemOptimizerParameter, value)
+function MOI.set(optimizer::Optimizer, param::RawSubProblemOptimizerParameter, value)
     moi_param = MOI.RawParameter(param.name)
     optimizer.sub_params[moi_param] = value
     return nothing

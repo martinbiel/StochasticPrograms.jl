@@ -19,7 +19,7 @@ function VerticalOptimizer()
     )
     opt = LShaped.Optimizer()
     MOI.set(opt, MasterOptimizer(), () -> master)
-    MOI.set(opt, SubproblemOptimizer(), () -> sub)
+    MOI.set(opt, SubProblemOptimizer(), () -> sub)
     return opt, master, sub
 end
 
@@ -28,7 +28,7 @@ function HorizontalOptimizer()
         MOIU.Model{Float64}(), eval_objective_value = false, eval_variable_constraint_dual = false
     )
     opt = ProgressiveHedging.Optimizer()
-    MOI.set(opt, SubproblemOptimizer(), () -> sub)
+    MOI.set(opt, SubProblemOptimizer(), () -> sub)
     return opt, sub, sub
 end
 

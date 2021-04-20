@@ -8,12 +8,12 @@ Functor object for using polyhedral projection in the prox step of a quasigradie
 - `penaltyterm::PenaltyTerm = Quadratic`: Specify penaltyterm variant ([`Quadratic`](@ref), [`InfNorm`](@ref), [`ManhattanNorm`][@ref])
 ...
 """
-struct PolyhedronProjection{T <: AbstractFloat, PT <: AbstractPenaltyterm} <: AbstractProximal
+struct PolyhedronProjection{T <: AbstractFloat, PT <: AbstractPenaltyTerm} <: AbstractProximal
     penaltyterm::PT
     projection_targets::Vector{MOI.VariableIndex}
     ξ::Vector{Decision{T}}
 
-    function PolyhedronProjection(penaltyterm::AbstractPenaltyterm, ξ₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
+    function PolyhedronProjection(penaltyterm::AbstractPenaltyTerm, ξ₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
         PT = typeof(penaltyterm)
         projection_targets = Vector{MOI.VariableIndex}(undef, length(ξ₀))
         ξ = map(ξ₀) do val
@@ -85,7 +85,7 @@ Factory object for [`PolyhedronProjection`](@ref). Pass to `prox` in `Quasigradi
 
 """
 mutable struct Polyhedron <: AbstractProx
-    penaltyterm::AbstractPenaltyterm
+    penaltyterm::AbstractPenaltyTerm
 end
 Polyhedron(; penaltyterm = Quadratic()) = Polyhedron(penaltyterm)
 

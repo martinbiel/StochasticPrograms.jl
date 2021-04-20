@@ -172,7 +172,7 @@ The following solves the stochastic program `sp` using the L-shaped algorithm.
 ```julia
 set_optimizer(sp, LShaped.Optimizer)
 set_optimizer_attribute(sp, MasterOptimizer(), GLPK.Optimizer)
-set_optimizer_attribute(sp, SubproblemOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp, SubProblemOptimizer(), GLPK.Optimizer)
 optimize!(sp);
 
 # output
