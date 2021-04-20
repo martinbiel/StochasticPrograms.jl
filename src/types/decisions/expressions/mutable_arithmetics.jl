@@ -1,8 +1,20 @@
+# Type shorthands #
+# ========================== #
 const _Variable = VariableRef
 const _Decision = DecisionRef
 const _Scalar = Union{_Variable, _Decision, _Constant}
 const _DecisionAffOrQuadExpr{C} = Union{DecisionAffExpr{C}, DecisionQuadExpr{C}}
 
+# Basic operations #
+# ========================== #
+MA.mutability(::Type{<:_DecisionAffOrQuadExpr}) = MA.IsMutable()
+function MA.mutable_copy(expr::_DecisionAffOrQuadExpr)
+    return map_coefficients(MA.copy_if_mutable, expr)
+end
+
+# Promote operation #
+# ========================== #
+# _Constant--_Decision
 function MA.promote_operation(::Union{typeof(+), typeof(-), typeof(*)},
                                ::Type{<:_Constant}, S::Type{<:_Decision})
     return DAE
@@ -11,6 +23,16 @@ function MA.promote_operation(::Union{typeof(+), typeof(-), typeof(*)},
                                S::Type{<:_Decision}, ::Type{<:_Constant})
     return DAE
 end
+# _Variable--Decision
+function MA.promote_operation(::Union{typeof(+), typeof(-)},
+                               ::Type{<:_Variable}, S::Type{<:_Decision})
+    return DAE
+end
+function MA.promote_operation(::Union{typeof(+), typeof(-)},
+                               S::Type{<:_Decision}, ::Type{<:_Variable})
+    return DAE
+end
+# _Constant--_DecisionAffOrQuadExpr
 function MA.promote_operation(::Union{typeof(+), typeof(-), typeof(*)},
                                ::Type{<:_Constant}, S::Type{<:_DecisionAffOrQuadExpr})
     return S
@@ -19,6 +41,7 @@ function MA.promote_operation(::Union{typeof(+), typeof(-), typeof(*)},
                                S::Type{<:_DecisionAffOrQuadExpr}, ::Type{<:_Constant})
     return S
 end
+# _Variable/_Decision--_DecisionAffOrQuadExpr
 function MA.promote_operation(
     ::Union{typeof(+), typeof(-)}, ::Type{<:Union{_Variable, _Decision}},
     S::Type{<:_DecisionAffOrQuadExpr})
@@ -29,6 +52,20 @@ function MA.promote_operation(
     ::Type{<:Union{_Variable, _Decision}})
     return S
 end
+# (_Variable/_Decision)AffExpr--(_Variable/_Decision)AffExpr
+function MA.promote_operation(
+    op::Union{typeof(+), typeof(-)}, ::Type{GenericAffExpr{C1, _Variable}},
+    ::Type{GenericAffExpr{C2, _Decision}}) where {C1, C2}
+    C = MA.promote_operation(op, C1, C2)
+    return DecisionAffExpr{C}
+end
+function MA.promote_operation(
+    op::Union{typeof(+), typeof(-)}, ::Type{GenericAffExpr{C1, _Decision}},
+    ::Type{GenericAffExpr{C2, _Variable}}) where {C1, C2}
+    C = MA.promote_operation(op, C1, C2)
+    return DecisionAffExpr{C}
+end
+# (_Variable/_Decision)AffExpr--_DecisionAffOrQuadExpr
 function MA.promote_operation(
     ::Union{typeof(+), typeof(-)}, ::Type{GenericAffExpr{C,V}},
     S::Type{_DecisionAffOrQuadExpr{C}}) where {C, V <: Union{_Variable, _Decision}}
@@ -39,16 +76,7 @@ function MA.promote_operation(
     ::Type{GenericAffExpr{C,V}}) where {C, V <: Union{_Variable, _Decision}}
     return S
 end
-function MA.promote_operation(
-    ::Union{typeof(+), typeof(-)}, ::Type{GenericQuadExpr{C,V}},
-    S::Type{_DecisionAffOrQuadExpr{C}}) where {C, V <: Union{_Variable, _Decision}}
-    return DecisionQuadExpr{C}
-end
-function MA.promote_operation(
-    ::Union{typeof(+), typeof(-)}, S::Type{_DecisionAffOrQuadExpr{C}},
-    ::Type{GenericQuadExpr{C,V}}) where {C, V <: Union{_Variable, _Decision}}
-    return DecisionQuadExpr{C}
-end
+# _DecisionAffOrQuadExpr--_DecisionAffOrQuadExpr
 function MA.promote_operation(::Union{typeof(+), typeof(-)}, ::Type{A},
                                ::Type{A}) where {A <: _DecisionAffOrQuadExpr}
     return A
@@ -63,39 +91,42 @@ function MA.promote_operation(::Union{typeof(+), typeof(-)},
                                ::Type{<:DecisionAffExpr})
     return S
 end
-
+# _Variable--DecisionRef
 function MA.promote_operation(::typeof(*), ::Type{<:_Variable}, ::Type{<:_Decision})
     return DQE
 end
 function MA.promote_operation(::typeof(*), ::Type{<:_Decision}, ::Type{<:_Variable})
     return DQE
 end
+# _Decision--_Decision
 function MA.promote_operation(::typeof(*), ::Type{<:_Decision}, ::Type{<:_Decision})
     return DQE
 end
-function MA.promote_operation(::typeof(*), ::Type{<:_Variable}, ::Type{GenericAffExpr{T, D}}) where {T, D <: _Decision}
-    return DecisionQuadExpr{T}
+# _Variable/_Decision--(_Variable/_Decision)AffExpr
+function MA.promote_operation(::typeof(*), ::Type{<:_Variable}, ::Type{GenericAffExpr{C, _Decision}}) where {C, D <: _Decision}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{T, D}}, ::Type{<:_Variable}) where {T, D <: _Decision}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{C, D}}, ::Type{<:_Variable}) where {C, D <: _Decision}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{<:_Decision}, ::Type{GenericAffExpr{T, V}}) where {T, V <: _Variable}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{<:_Decision}, ::Type{GenericAffExpr{C, V}}) where {C, V <: _Variable}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{T, V}}, ::Type{<:_Decision}) where {T, V <: _Variable}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{C, V}}, ::Type{<:_Decision}) where {C, V <: _Variable}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{D}, ::Type{GenericAffExpr{T, D}}) where {T, D <: _Decision}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{D}, ::Type{GenericAffExpr{C, D}}) where {C, D <: _Decision}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{T, D}}, ::Type{D}) where {T, D <: _Decision}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{C, D}}, ::Type{D}) where {C, D <: _Decision}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{V}, ::Type{DecisionAffExpr{T}}) where {T, V <: Union{_Variable, _Decision}}
-    return DecisionQuadExpr{T}
+# _Variable/_Decision--DecisionAffExpr
+function MA.promote_operation(::typeof(*), ::Type{V}, ::Type{DecisionAffExpr{C}}) where {C, V <: Union{_Variable, _Decision}}
+    return DecisionQuadExpr{C}
 end
-function MA.promote_operation(::typeof(*), ::Type{DecisionAffExpr{T}}, ::Type{V}) where {T, V <: Union{_Variable, _Decision}}
-    return DecisionQuadExpr{T}
+function MA.promote_operation(::typeof(*), ::Type{DecisionAffExpr{C}}, ::Type{V}) where {C, V <: Union{_Variable, _Decision}}
+    return DecisionQuadExpr{C}
 end
 
 function MA.scaling(aff::DecisionAffExpr{C}) where C
@@ -111,23 +142,21 @@ function MA.scaling(quad::DecisionQuadExpr{C}) where C
     return MA.scaling(quad.variables.aff)
 end
 
-MA.mutability(::Type{<:_DecisionAffOrQuadExpr}) = MA.IsMutable()
-function MA.mutable_copy(expr::_DecisionAffOrQuadExpr)
-    return map_coefficients(MA.copy_if_mutable, expr)
-end
-
+# Mutable operate #
+# ========================== #
+# zero/one #
 function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, aff::DecisionAffExpr)
     MA.mutable_operate!(op, aff.variables)
-    MA.mutable_operate!(zerl, aff.decisions)
+    MA.mutable_operate!(op, aff.decisions)
     return aff
 end
 function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, quad::DecisionQuadExpr)
     MA.mutable_operate!(op, quad.variables)
-    MA.mutable_operate!(zero, quad.decisions)
+    MA.mutable_operate!(op, quad.decisions)
     empty!(quad.cross_terms)
     return quad
 end
-
+# * #
 function MA.mutable_operate!(::typeof(*), expr::_DecisionAffOrQuadExpr, α::_Constant)
     if iszero(α)
         return MA.mutable_operate!(zero, expr)
@@ -135,14 +164,14 @@ function MA.mutable_operate!(::typeof(*), expr::_DecisionAffOrQuadExpr, α::_Con
         return map_coefficients_inplace!(x -> MA.mul!(x, α), expr)
     end
 end
-
+# +/- #
 function MA.mutable_operate!(::typeof(+), expr::_DecisionAffOrQuadExpr, x)
     return JuMP.add_to_expression!(expr, x)
 end
 function MA.mutable_operate!(::typeof(-), expr::_DecisionAffOrQuadExpr, x)
     return JuMP.add_to_expression!(expr, -1, x)
 end
-
+# add/sub_mul #
 function MA.mutable_operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
     return JuMP.add_to_expression!(expr, x)
 end
