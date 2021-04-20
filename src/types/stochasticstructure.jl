@@ -74,7 +74,15 @@ function StochasticStructure end
 Returns a `StochasticInstantiation` based on the provided `instantiation` and `optimizer`. If an explicit `instantiation` is provided it is always prioritized. Otherwise, if `instantiation` is `UnspecifiedInstantiation`, returns whatever structure requested by the optimizer. Defaults to `Deterministic` if no optimizer is provided.
 """
 function default_structure(instantiation::StochasticInstantiation, optimizer)
-    return instantiation
+    if instantiation isa DistributedVertical && nworkers() == 1
+        @warn "The distributed vertical structure is not available in a single-core setup. Switching to the `Vertical` structure by default."
+        return Vertical()
+    elseif instantiation isa DistributedHorizontal && nworkers() == 1
+        @warn "The distributed vertical structure is not available in a single-core setup. Switching to the `Vertical` structure by default."
+        return Horizontal()
+    else
+        return instantiation
+    end
 end
 function default_structure(::UnspecifiedInstantiation, optimizer)
     if optimizer isa MOI.AbstractOptimizer
