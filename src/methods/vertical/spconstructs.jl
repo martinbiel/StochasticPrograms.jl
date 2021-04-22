@@ -30,7 +30,7 @@ end
 function statistical_EWS(stochasticprogram::StochasticProgram,
                          structure::VerticalStructure{2,1,Tuple{SP}}) where SP <: DistributedScenarioProblems
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())
-    𝔼WS, σ², _ =  get_from_scenarioproblems(
+    𝔼WS, σ², wₖ, N = get_from_scenarioproblems(
         scenarioproblems(structure),
         aggregate_welford,
         partial_welfords,

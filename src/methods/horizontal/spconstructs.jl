@@ -28,7 +28,7 @@ function statistical_EWS_horizontal(scenarioproblems::ScenarioProblems)
 end
 function statistical_EWS_horizontal(scenarioproblems::DistributedScenarioProblems)
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())
-    𝔼WS, σ², _ = return get_from_scenarioproblems(scenarioproblems, aggregate_welford, partial_welfords) do sp
+    𝔼WS, σ², wₖ, N = return get_from_scenarioproblems(scenarioproblems, aggregate_welford, partial_welfords) do sp
         scenarioproblems = fetch(sp)
         num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
         return welford(subproblems(scenarioproblems),
