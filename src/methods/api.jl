@@ -637,6 +637,8 @@ Return the exected scenario of all scenarios of the `stochasticprogram` at `stag
 function expected(stochasticprogram::StochasticProgram{N}, stage::Integer = 2) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage == 1 && error("The first stage does not have scenarios.")
+    p = stage_probability(stochasticprogram, stage)
+    abs(p - 1.0) <= 1e-6 || @warn "Scenario probabilities do not add up to one. The probability sum is given by $p"
     return expected(structure(stochasticprogram), stage)
 end
 """

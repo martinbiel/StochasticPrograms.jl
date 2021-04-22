@@ -67,7 +67,9 @@ See also [`expected`](@ref)
 struct ExpectedScenario{S <: AbstractScenario} <: AbstractScenario
     scenario::S
 
-    (::Type{ExpectedScenario})(scenario::AbstractScenario) = new{typeof(scenario)}(scenario)
+    function ExpectedScenario(scenario::AbstractScenario)
+        return new{typeof(scenario)}(scenario)
+    end
 end
 function Base.show(io::IO, scenario::ExpectedScenario{S}) where S <: AbstractScenario
     print(io, "Expected scenario of type $(S.name.name)")
@@ -85,9 +87,24 @@ Otherwise, user-defined scenario types must implement this method for full funct
 
 See also [`ExpectedScenario`](@ref)
 """
-function expected(::Vector{S}) where S <: AbstractScenario
-    error("Expectation not implemented for scenario type: ", S)
+function expected(scenarios::Vector{S}) where S <: AbstractScenario
+    isempty(scenarios) && return ExpectedScenario(zero(S))
+    return reduce(expected, scenarios; init = ExpectedScenario(zero(S)))
 end
+function expected(ξ₁::ExpectedScenario{S}, ξ₂::S) where S <: AbstractScenario
+    set_probability!(ξ₁.scenario, 1.0)
+    return expected(ξ₁.scenario, ξ₂)
+end
+function expected(ξ₁::S, ξ₂::ExpectedScenario{S}) where S <: AbstractScenario
+    set_probability!(ξ₂.scenario, 1.0)
+    return expected(ξ₁, ξ₂.scenario)
+end
+function expected(ξ₁::ExpectedScenario{S}, ξ₂::ExpectedScenario{S}) where S <: AbstractScenario
+    set_probability!(ξ₁.scenario, 1.0)
+    set_probability!(ξ₂.scenario, 1.0)
+    return expected(ξ₁.scenario, ξ₂.scenario)
+end
+
 """
     Scenario
 
@@ -114,8 +131,9 @@ end
 function Base.zero(::Type{Scenario{D}}) where {T, N, D <: Array{T,N}}
     return Scenario(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end); probability = 1.0)
 end
-function Base.zero(::Type{Scenario{D}}) where {T, N, D <: DenseAxisArray{T,N}}
-    return Scenario(DenseAxisArray(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end), ntuple(Val{N}()) do i end); probability = 1.0)
+function Base.zero(::Type{Scenario{D}}) where {T, N, Ax <: NTuple, D <: DenseAxisArray{T,N,Ax}}
+    axs = ntuple(Val{N}()) do i Ax.types[i]() end
+    return Scenario(DenseAxisArray(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end), axs...); probability = 1.0)
 end
 function Base.zero(::Type{Scenario{D}}) where {T, N, K, D <: SparseAxisArray{T,N,K}}
     return Scenario(Dict{K,T}(); probability = 1.0)
@@ -135,58 +153,55 @@ end
 Scenarios{S <: AbstractScenario} = Vector{S}
 ScenarioTypes{N} = NTuple{N, Union{DataType, UnionAll}}
 
-function expected(scenarios::Vector{<:Scenario{NT}}) where NT <: NamedTuple
-    isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{NT}))
-    expected = reduce(scenarios) do s₁, s₂
-        keys(s₁.data) == keys(s₂.data) || error("Inconsistent scenarios. $(keys(s₁)) and $(keys(s₂)) do not match.")
-        Scenario(NamedTuple{Tuple(keys(s₁.data))}([probability(s₁) * x + probability(s₂) * y for (x,y) in zip(values(s₁.data), values(s₂.data))]); probability = 1.0)
+function expected(ξ₁::Scenario{NT}, ξ₂::Scenario{NT}) where NT <: NamedTuple
+    keys(ξ₁.data) == keys(ξ₂.data) || error("Inconsistent scenarios. $(keys(ξ₁)) and $(keys(ξ₂)) do not match.")
+    data = map(zip(values(ξ₁.data), values(ξ₂.data))) do (x, y)
+        probability(ξ₁) * x + probability(ξ₂) * y
     end
-    return StochasticPrograms.ExpectedScenario(expected)
+    expected = Scenario(NamedTuple{Tuple(keys(ξ₁.data))}(data))
+    return ExpectedScenario(expected)
 end
 
-function expected(scenarios::Vector{<:Scenario{D}}) where D <: Array
-    isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{D}))
-    expected = reduce(scenarios) do s₁, s₂
-        if isempty(s₁.data)
-            return s₂
-        end
-        if isempty(s₂.data)
-            return s₁
-        end
-        size(s₁.data) == size(s₂.data) || error("Inconsistent scenarios. $(size(s₁.data)) and $(size(s₂.data)) do not match.")
-        Scenario(probability(s₁) * s₁.data + probability(s₂) * s₂.data; probability = 1.0)
+function expected(ξ₁::Scenario{D}, ξ₂::Scenario{D}) where D <: Array
+    if isempty(ξ₁.data)
+        weighted = Scenario(probability(ξ₂) * ξ₂.data)
+        return ExpectedScenario(weighted)
     end
-    return StochasticPrograms.ExpectedScenario(expected)
+    if isempty(ξ₂.data)
+        weighted = Scenario(probability(ξ₁) * ξ₁.data)
+        return ExpectedScenario(weighted)
+    end
+    size(ξ₁.data) == size(ξ₂.data) || error("Inconsistent scenarios. $(size(ξ₁.data)) and $(size(ξ₂.data)) do not match.")
+    expected = Scenario(probability(ξ₁) * ξ₁.data + probability(ξ₂) * ξ₂.data)
+    return ExpectedScenario(expected)
 end
 
-function expected(scenarios::Vector{<:Scenario{D}}) where D <: DenseAxisArray
-    isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{D}))
-    expected = reduce(scenarios) do s₁, s₂
-        if isempty(s₁.data.data)
-            return s₂
-        end
-        if isempty(s₂.data.data)
-            return s₁
-        end
-        axes(s₁.data) == axes(s₂.data) || error("Inconsistent scenarios. $(axes(s₁.data)) and $(axes(s₂.data)) do not match.")
-        size(s₁.data) == size(s₂.data) || error("Inconsistent scenarios. $(size(s₁.data)) and $(size(s₂.data)) do not match.")
-        data = DenseAxisArray(probability(s₁) * s₁.data.data + probability(s₂) * s₂.data.data, axes(s₁.data)...)
-        Scenario(data; probability = 1.0)
+function expected(ξ₁::Scenario{D}, ξ₂::Scenario{D}) where D <: DenseAxisArray
+    if isempty(ξ₁.data.data)
+        weighted = Scenario(DenseAxisArray(probability(ξ₂) * ξ₂.data.data, axes(ξ₂.data)...))
+        return ExpectedScenario(weighted)
     end
-    return StochasticPrograms.ExpectedScenario(expected)
+    if isempty(ξ₂.data.data)
+        weighted = Scenario(DenseAxisArray(probability(ξ₁) * ξ₁.data.data, axes(ξ₁.data)...))
+        return ExpectedScenario(weighted)
+    end
+    axes(ξ₁.data) == axes(ξ₂.data) || error("Inconsistent scenarios. $(axes(ξ₁.data)) and $(axes(ξ₂.data)) do not match.")
+    size(ξ₁.data) == size(ξ₂.data) || error("Inconsistent scenarios. $(size(ξ₁.data)) and $(size(ξ₂.data)) do not match.")
+    data = DenseAxisArray(probability(ξ₁) * ξ₁.data.data + probability(ξ₂) * ξ₂.data.data, axes(ξ₁.data)...)
+    expected = Scenario(data)
+    return ExpectedScenario(expected)
 end
 
-function expected(scenarios::Vector{<:Scenario{D}}) where D <: SparseAxisArray
-    isempty(scenarios) && return StochasticPrograms.ExpectedScenario(zero(Scenario{D}))
-    expected = reduce(scenarios) do s₁, s₂
-        if isempty(s₁.data.data)
-            return s₂
-        end
-        if isempty(s₂.data.data)
-            return s₁
-        end
-        keys(s₁.data.data) == keys(s₂.data.data) || error("Inconsistent scenarios. $(keys(s₁.data.data)) and $(keys(s₂.data.data)) do not match.")
-        Scenario(Dict([key => probability(s₁) * s₁.data.data[key] + probability(s₂) * s₂.data.data[key] for key in keys(s₁.data.data)]); probability = 1.0)
+function expected(ξ₁::Scenario{D}, ξ₂::Scenario{D}) where D <: SparseAxisArray
+    if isempty(ξ₁.data.data)
+        weighted = Scenario(Dict([key => probability(ξ₂) * ξ₂.data.data[key] for key in keys(ξ₂.data.data)]))
+        return ExpectedScenario(weighted)
     end
-    return StochasticPrograms.ExpectedScenario(expected)
+    if isempty(ξ₂.data.data)
+        weighted = Scenario(Dict([key => probability(ξ₁) * ξ₁.data.data[key] for key in keys(ξ₁.data.data)]))
+        return ExpectedScenario(weighted)
+    end
+    keys(ξ₁.data.data) == keys(ξ₂.data.data) || error("Inconsistent scenarios. $(keys(ξ₁.data.data)) and $(keys(ξ₂.data.data)) do not match.")
+    expected = Scenario(Dict([key => probability(ξ₁) * ξ₁.data.data[key] + probability(ξ₂) * ξ₂.data.data[key] for key in keys(ξ₁.data.data)]))
+    return ExpectedScenario(expected)
 end

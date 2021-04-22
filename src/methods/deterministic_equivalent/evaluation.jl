@@ -58,7 +58,7 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
     probabilities = map(1:num_scenarios(structure, 2)) do i
         probability(structure, 2, i)
     end
-    weights = Distributions.StatsBase.ProbabilityWeights(probabilities)
+    weights = ProbabilityWeights(probabilities)
     σ = std(Q, weights, corrected = true)
     return Q̂, σ
 end

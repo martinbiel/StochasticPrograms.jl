@@ -12,7 +12,7 @@ using JuMP
 using Compat
 using OrderedCollections
 using MathOptInterface
-using Distributions
+import Distributions: mean, std, quantile, ProbabilityWeights, TDist, Normal
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
 using Reexport

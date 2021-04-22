@@ -18,6 +18,10 @@ function stage(sp_cref::SPConstraintRef)
     return sp_cref.stage
 end
 
+function JuMP.shape(sp_cref::SPConstraintRef)
+    return sp_cref.shape
+end
+
 struct SPConstraintNotOwned{C <: SPConstraintRef} <: Exception
     constraint_ref::C
 end
