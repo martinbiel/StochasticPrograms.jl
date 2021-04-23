@@ -65,7 +65,7 @@ end
   q₁: -28.0
   q₂: -32.0
   d₁: 300.0
-  d₂: 300.0</pre><p>Next, an unmodeled stochastic program can be instantiated using the two created scenarios:</p><pre><code class="language-julia">sp = StochasticProgram([ξ₁, ξ₂], Deterministic())</code></pre><pre class="documenter-example-output">Deferred stochastic program with 2 scenarios</pre><p>Note that we must provide the instantiation type explicitly as well. A slightly diferrent modeling syntax is now used to define the stage models of <code>sp</code>:</p><pre><code class="language-julia">@first_stage sp = begin
+  d₂: 300.0</pre><p>Next, an unmodeled stochastic program can be instantiated using the two created scenarios:</p><pre><code class="language-julia">sp = StochasticProgram([ξ₁, ξ₂], Deterministic())</code></pre><pre class="documenter-example-output">Deferred stochastic program with 2 scenarios</pre><p>Note that we must provide the instantiation type explicitly as well. A slightly diferrent modeling syntax is now used to define the stage models of <code>sp</code>:</p><pre><code class="language-">@first_stage sp = begin
     @decision(model, x₁ &gt;= 40)
     @decision(model, x₂ &gt;= 20)
     @objective(model, Min, 100*x₁ + 150*x₂)
@@ -79,31 +79,7 @@ end
     @objective(model, Min, q₁*y₁ + q₂*y₂)
     @constraint(model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
     @constraint(model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
-end</code></pre><p>Here, <code>@first_stage</code> and <code>@second_stage</code> are just syntactic sugar for <code>@stage 1</code> and <code>@stage 2</code>. This is is the definition syntax used internally by <code>StochasticModel</code> objects when instantiating stochastic programs. Note, that we must explicitly add the <code>@known</code> annotations to the second stage with this approach. We can verify that this approach yields the same stochastic program by printing and comparing to the <a href="../quickstart/#Quick-start">Quick start</a>:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
-Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁₁ - 11.200000000000001 y₂₁ - 16.8 y₁₂ - 19.2 y₂₂
-Subject to
- x₁ ∈ Decisions
- x₂ ∈ Decisions
- y₁₁ ∈ RecourseDecisions
- y₂₁ ∈ RecourseDecisions
- y₁₂ ∈ RecourseDecisions
- y₂₂ ∈ RecourseDecisions
- x₁ ≥ 40.0
- x₂ ≥ 20.0
- y₁₁ ≥ 0.0
- y₂₁ ≥ 0.0
- y₁₂ ≥ 0.0
- y₂₂ ≥ 0.0
- x₁ + x₂ ≤ 120.0
- 6 y₁₁ + 10 y₂₁ - 60 x₁ ≤ 0.0
- 8 y₁₁ + 5 y₂₁ - 80 x₂ ≤ 0.0
- 6 y₁₂ + 10 y₂₂ - 60 x₁ ≤ 0.0
- 8 y₁₂ + 5 y₂₂ - 80 x₂ ≤ 0.0
- y₁₁ ≤ 500.0
- y₂₁ ≤ 100.0
- y₁₂ ≤ 300.0
- y₂₂ ≤ 300.0
-Solver name: No optimizer attached.</pre><p>As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and upon regeneration all internal problems. For example, the following increases the lower bound on the second stage variables to 2:</p><pre><code class="language-julia">@stage 2 sp = begin
+end</code></pre><p>Here, <code>@first_stage</code> and <code>@second_stage</code> are just syntactic sugar for <code>@stage 1</code> and <code>@stage 2</code>. This is is the definition syntax used internally by <code>StochasticModel</code> objects when instantiating stochastic programs. Note, that we must explicitly add the <code>@known</code> annotations to the second stage with this approach. We can verify that this approach yields the same stochastic program by printing and comparing to the <a href="../quickstart/#Quick-start">Quick start</a>:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deferred stochastic program with 2 scenarios</pre><p>As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and upon regeneration all internal problems. For example, the following increases the lower bound on the second stage variables to 2:</p><pre><code class="language-">@stage 2 sp = begin
     @known x₁ x₂
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
     @recourse(model, 2 &lt;= y₁ &lt;= d₁)
@@ -115,31 +91,7 @@ end
 
 generate!(sp)
 
-print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
-Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁₁ - 11.200000000000001 y₂₁ - 16.8 y₁₂ - 19.2 y₂₂
-Subject to
- x₁ ∈ Decisions
- x₂ ∈ Decisions
- y₁₁ ∈ RecourseDecisions
- y₂₁ ∈ RecourseDecisions
- y₁₂ ∈ RecourseDecisions
- y₂₂ ∈ RecourseDecisions
- x₁ ≥ 40.0
- x₂ ≥ 20.0
- y₁₁ ≥ 2.0
- y₂₁ ≥ 2.0
- y₁₂ ≥ 2.0
- y₂₂ ≥ 2.0
- x₁ + x₂ ≤ 120.0
- 6 y₁₁ + 10 y₂₁ - 60 x₁ ≤ 0.0
- 8 y₁₁ + 5 y₂₁ - 80 x₂ ≤ 0.0
- 6 y₁₂ + 10 y₂₂ - 60 x₁ ≤ 0.0
- 8 y₁₂ + 5 y₂₂ - 80 x₂ ≤ 0.0
- y₁₁ ≤ 500.0
- y₂₁ ≤ 100.0
- y₁₂ ≤ 300.0
- y₂₂ ≤ 300.0
-Solver name: No optimizer attached.</pre><p>It is of course also possible to do this on programs instantiated from a <code>StochasticModel</code>.</p><h2 id="SMPS"><a class="docs-heading-anchor" href="#SMPS">SMPS</a><a id="SMPS-1"></a><a class="docs-heading-anchor-permalink" href="#SMPS" title="Permalink"></a></h2><p>StochasticPrograms also support reading models specified in the SMPS format. Specifically, SMPS definitions with uncertain data of types INDEP or BLOCKS are supported. We show how the simple example can be specified in SMPS. An SMPS definition consist of the following files:</p><ul><li>problem.smps</li><li>problem.tim</li><li>problem.cor</li><li>problem.sto</li></ul><p>Here, <code>problem.smps</code> is just an empty file that shares the name with the others to simplify IO commands. The <code>problem.tim</code> file specifies the stage structure of the stochastic program. An example for the simple problem is given below.</p><pre><code class="language-none">TIME          SIMPLE
+print(sp)</code></pre><p>It is of course also possible to do this on programs instantiated from a <code>StochasticModel</code>.</p><h2 id="SMPS"><a class="docs-heading-anchor" href="#SMPS">SMPS</a><a id="SMPS-1"></a><a class="docs-heading-anchor-permalink" href="#SMPS" title="Permalink"></a></h2><p>StochasticPrograms also support reading models specified in the SMPS format. Specifically, SMPS definitions with uncertain data of types INDEP or BLOCKS are supported. We show how the simple example can be specified in SMPS. An SMPS definition consist of the following files:</p><ul><li>problem.smps</li><li>problem.tim</li><li>problem.cor</li><li>problem.sto</li></ul><p>Here, <code>problem.smps</code> is just an empty file that shares the name with the others to simplify IO commands. The <code>problem.tim</code> file specifies the stage structure of the stochastic program. An example for the simple problem is given below.</p><pre><code class="language-none">TIME          SIMPLE
 PERIODS
     X1        BOUND                    STAGE1
     Y1        LINK1                    STAGE2
@@ -228,4 +180,4 @@ Subject to
  [x[1] + x[2] - 120] ∈ MathOptInterface.Nonpositives(1)
  [-60 x[1] + 6 y₁[1] + 10 y₁[2], -80 x[2] + 8 y₁[1] + 5 y₁[2], y₁[1] - 500, y₁[2] - 100] ∈ MathOptInterface.Nonpositives(4)
  [-60 x[1] + 6 y₂[1] + 10 y₂[2], -80 x[2] + 8 y₂[1] + 5 y₂[2], y₂[1] - 300, y₂[2] - 300] ∈ MathOptInterface.Nonpositives(4)
-Solver name: No optimizer attached.</code></pre><p>A warning is issued if the full support contains more than <code>1e5</code> scenarios.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../data/">« Stochastic data</a><a class="docs-footer-nextpage" href="../decisions/">Multi-stage decisions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 22 April 2021 16:45">Thursday 22 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Solver name: No optimizer attached.</code></pre><p>A warning is issued if the full support contains more than <code>1e5</code> scenarios.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../data/">« Stochastic data</a><a class="docs-footer-nextpage" href="../decisions/">Multi-stage decisions »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 23 April 2021 13:45">Friday 23 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
