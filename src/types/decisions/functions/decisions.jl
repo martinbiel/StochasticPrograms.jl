@@ -65,12 +65,12 @@ function MOIU.map_indices(index_map::Function, f::VectorOfDecisions)
 end
 
 function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorOfDecisions},
-                       i::Integer)
-    return SingleDecision(it.f.decisions[i])
+                       output_index::Integer)
+    return SingleDecision(it.f.decisions[output_index])
 end
 function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorOfDecisions},
-                       I::AbstractVector)
-    return VectorOfDecisions(it.f.decisions[I])
+                       output_indices::AbstractVector)
+    return VectorOfDecisions(it.f.decisions[output_indices])
 end
 
 MOIU.scalar_type(::Type{VectorOfDecisions}) = SingleDecision

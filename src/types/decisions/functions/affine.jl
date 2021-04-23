@@ -263,29 +263,46 @@ end
 
 Base.eltype(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}) where T = AffineDecisionFunction{T}
 
-function Base.getindex(it::MOIU.ScalarFunctionIterator{<:VectorAffineDecisionFunction}, i::Integer)
-    AffineDecisionFunction(
-        MOI.ScalarAffineFunction(
-            MOIU.scalar_terms_at_index(it.f.variable_part.terms, i),
-            it.f.variable_part.constants[i]),
-        MOI.ScalarAffineFunction(
-            MOIU.scalar_terms_at_index(it.f.decision_part.terms, i),
-            it.f.decision_part.constants[i]))
+function MOIU.ScalarFunctionIterator(f::VectorAffineDecisionFunction)
+    return MOIU.ScalarFunctionIterator(
+        f,
+        (
+            MOIU.output_index_iterator(f.variable_part.terms, MOI.output_dimension(f)),
+            MOIU.output_index_iterator(f.decision_part.terms, MOI.output_dimension(f))
+        ),
+    )
 end
-function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}, I::AbstractVector) where T
+
+function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}, output_index::Integer) where T
+    variable_part = MOI.ScalarAffineFunction{T}(
+        MOI.ScalarAffineTerm{T}[
+            it.f.variable_part.terms[i].scalar_term for
+            i in MOIU.ChainedIteratorAtIndex(it.cache[1], output_index)
+        ],
+        it.f.variable_part.constants[output_index],
+    )
+    decision_part = MOI.ScalarAffineFunction{T}(
+        MOI.ScalarAffineTerm{T}[
+            it.f.decision_part.terms[i].scalar_term for
+            i in MOIU.ChainedIteratorAtIndex(it.cache[2], output_index)
+        ],
+        it.f.decision_part.constants[output_index],
+    )
+    AffineDecisionFunction(variable_part, decision_part)
+end
+function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunction{T}}, output_indices::AbstractVector) where T
     variable_terms = MOI.VectorAffineTerm{T}[]
     decision_terms = MOI.VectorAffineTerm{T}[]
-    variable_constant = Vector{T}(undef, length(I))
-    decision_constant = Vector{T}(undef, length(I))
-    for (i, j) in enumerate(I)
-        g = it[j]
-        append!(variable_terms, map(t -> MOI.VectorAffineTerm(i, t), g.variable_part.terms))
-        append!(decision_terms, map(t -> MOI.VectorAffineTerm(i, t), g.decision_part.terms))
-        variable_constant[i] = g.variable_part.constant
-        decision_constant[i] = g.decision_part.constant
+    for (i, output_index) in enumerate(output_indices)
+        for j in MOIU.ChainedIteratorAtIndex(it.cache[1], output_index)
+            push!(variable_terms, MOI.VectorAffineTerm(i, it.f.variable_part.terms[j].scalar_term))
+        end
+        for j in MOIU.ChainedIteratorAtIndex(it.cache[2], output_index)
+            push!(decision_terms, MOI.VectorAffineTerm(i, it.f.decision_part.terms[j].scalar_term))
+        end
     end
-    return VectorAffineDecisionFunction(MOIU.VAF(variable_terms, variable_constant),
-                                        MOIU.VAF(decision_terms, decision_constant))
+    return VectorAffineDecisionFunction(MOIU.VAF(variable_terms, it.f.variable_part.constants[output_indices]),
+                                        MOIU.VAF(decision_terms, it.f.decision_part.constants[output_indices]))
 end
 
 

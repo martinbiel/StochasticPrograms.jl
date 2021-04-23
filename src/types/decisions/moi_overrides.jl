@@ -91,10 +91,10 @@ function MOI.add_constraint(uf::MOIU.UniversalFallback, f::SingleDecision, s::MO
     S = typeof(s)
     # Add constraint as usual but force index
     constraints = get!(uf.constraints, (F, S)) do
-        OrderedDict{CI{F, S}, Tuple{F, S}}()
-    end::OrderedDict{CI{F, S}, Tuple{F, S}}
-    ci = CI{typeof(f), typeof(s)}(f.decision.value)
-    constraints[ci] = (f, s)
+        return MOIU.VectorOfConstraints{F,S}()
+    end::MOIU.VectorOfConstraints{F,S}
+    ci = CI{SingleDecision,S}(f.decision.value)
+    constraints.constraints[ci] = (f, s)
     return ci
 end
 
@@ -109,7 +109,7 @@ function MOI.delete(uf::MOIU.UniversalFallback, ci::CI{F, S}) where {F <: Single
     end
     # Delete constraint as usual
     if MOI.is_valid(uf, ci)
-        delete!(uf.constraints[(F, S)], ci)
+        MOI.delete(MOIU.constraints(uf, ci), ci)
         delete!(uf.con_to_name, ci)
         uf.name_to_con = nothing
         for d in values(uf.conattr)
