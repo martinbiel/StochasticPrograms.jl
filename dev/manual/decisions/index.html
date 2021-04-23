@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Multi-stage decisions · StochasticPrograms.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">StochasticPrograms.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../quickstart/">Quick start</a></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li class="is-active"><a class="tocitem" href>Multi-stage decisions</a><ul class="internal"><li><a class="tocitem" href="#Decision-variables"><span>Decision variables</span></a></li><li><a class="tocitem" href="#Decision-constraints"><span>Decision constraints</span></a></li><li><a class="tocitem" href="#Decision-objectives"><span>Decision objectives</span></a></li><li><a class="tocitem" href="#Solved-problem"><span>Solved problem</span></a></li></ul></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li><a class="tocitem" href="../examples/">Examples</a></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Multi-stage decisions</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Multi-stage decisions</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/decisions.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Multi-stage-decisions"><a class="docs-heading-anchor" href="#Multi-stage-decisions">Multi-stage decisions</a><a id="Multi-stage-decisions-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-stage-decisions" title="Permalink"></a></h1><p>StochasticPrograms provides an extended version of JuMPs API for decision variables/constraints/objectives with stage and scenario dependence. Consider the following problem:</p><pre><code class="language-">using StochasticPrograms
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Multi-stage decisions · StochasticPrograms.jl</title><link href="https://fonts.googleapis.com/css?family=Lato|Roboto+Mono" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.0/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.11.1/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit">StochasticPrograms.jl</span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li><a class="tocitem" href="../quickstart/">Quick start</a></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li class="is-active"><a class="tocitem" href>Multi-stage decisions</a><ul class="internal"><li><a class="tocitem" href="#Decision-variables"><span>Decision variables</span></a></li><li><a class="tocitem" href="#Decision-constraints"><span>Decision constraints</span></a></li><li><a class="tocitem" href="#Decision-objectives"><span>Decision objectives</span></a></li><li><a class="tocitem" href="#Solved-problem"><span>Solved problem</span></a></li></ul></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li><a class="tocitem" href="../examples/">Examples</a></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Multi-stage decisions</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Multi-stage decisions</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/decisions.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Multi-stage-decisions"><a class="docs-heading-anchor" href="#Multi-stage-decisions">Multi-stage decisions</a><a id="Multi-stage-decisions-1"></a><a class="docs-heading-anchor-permalink" href="#Multi-stage-decisions" title="Permalink"></a></h1><p>StochasticPrograms provides an extended version of JuMPs API for decision variables/constraints/objectives with stage and scenario dependence. Consider the following problem:</p><pre><code class="language-julia">using StochasticPrograms
 using GLPK
 
 ξ₁ = @scenario a = 1 probability = 0.5
@@ -17,15 +17,32 @@ end
     @recourse(model, y &gt;= 1/a)
     @objective(model, Max, y)
     @constraint(model, con, a*y &lt;= x)
-end</code></pre><p>A first-stage decision and a second-stage recourse decision has been identified. We include a printout of the stochastic program for reference:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deferred stochastic program with 2 scenarios</pre><h2 id="Decision-variables"><a class="docs-heading-anchor" href="#Decision-variables">Decision variables</a><a id="Decision-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-variables" title="Permalink"></a></h2><p>All variables annotated with either <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> become available through the API. We can query all such variables:</p><pre><code class="language-">all_decision_variables(sp)</code></pre><p>stage-wise lists can also be obtained:</p><pre><code class="language-julia">all_decision_variables(sp, 1)</code></pre><pre class="documenter-example-output">1-element Vector{DecisionVariable}:
- noname</pre><p>and</p><pre><code class="language-">all_decision_variables(sp, 2)</code></pre><p>JuMPs <code>[]</code> syntax is available as well, with the addition that the stage must be provided as well:</p><pre><code class="language-">x = sp[1,:x]
+end</code></pre><p>A first-stage decision and a second-stage recourse decision has been identified. We include a printout of the stochastic program for reference:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
+Min x - 0.5 y₁ - 0.5 y₂
+Subject to
+ x ∈ Decisions
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ x ≥ 2.0
+ y₁ ≥ 1.0
+ y₂ ≥ 0.5
+ con : -x + y₁ ≤ 0.0
+ con : -x + 2 y₂ ≤ 0.0
+Solver name: No optimizer attached.</pre><h2 id="Decision-variables"><a class="docs-heading-anchor" href="#Decision-variables">Decision variables</a><a id="Decision-variables-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-variables" title="Permalink"></a></h2><p>All variables annotated with either <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> become available through the API. We can query all such variables:</p><pre><code class="language-julia">all_decision_variables(sp)</code></pre><pre class="documenter-example-output">(DecisionVariable[x], DecisionVariable[y])</pre><p>stage-wise lists can also be obtained:</p><pre><code class="language-julia">all_decision_variables(sp, 1)</code></pre><pre class="documenter-example-output">1-element Vector{DecisionVariable}:
+ x</pre><p>and</p><pre><code class="language-julia">all_decision_variables(sp, 2)</code></pre><pre class="documenter-example-output">1-element Vector{DecisionVariable}:
+ y</pre><p>JuMPs <code>[]</code> syntax is available as well, with the addition that the stage must be provided as well:</p><pre><code class="language-julia">x = sp[1,:x]
 println(x)
-println(typeof(x))</code></pre><p>The return type is <a href="../../library/public/#StochasticPrograms.DecisionVariable"><code>DecisionVariable</code></a> a specialized <code>AbstractVariableRef</code>. For first-stage variables, the syntax is unchanged from JuMP:</p><pre><code class="language-">println(name(x))
+println(typeof(x))</code></pre><pre class="documenter-example-output">x
+DecisionVariable</pre><p>The return type is <a href="../../library/public/#StochasticPrograms.DecisionVariable"><code>DecisionVariable</code></a> a specialized <code>AbstractVariableRef</code>. For first-stage variables, the syntax is unchanged from JuMP:</p><pre><code class="language-julia">println(name(x))
 println(&quot;x has lower bound: $(has_lower_bound(x))&quot;)
 println(&quot;x has upper bound: $(has_upper_bound(x))&quot;)
-println(&quot;lower_bound(x) = $(lower_bound(x))&quot;)</code></pre><p>If we instead query for the recourse decision <span>$y$</span>:</p><pre><code class="language-">y = sp[2,:y]
+println(&quot;lower_bound(x) = $(lower_bound(x))&quot;)</code></pre><pre class="documenter-example-output">x
+x has lower bound: true
+x has upper bound: false
+lower_bound(x) = 2.0</pre><p>If we instead query for the recourse decision <span>$y$</span>:</p><pre><code class="language-julia">y = sp[2,:y]
 println(y)
-println(typeof(y))</code></pre><p>The same getters will error:</p><pre><code class="language-julia">lower_bound(y)</code></pre><pre><code class="language-julia">ERROR: y is scenario dependent, consider `lower_bound(dvar, scenario_index)`.</code></pre><p>As indicated by the error, <span>$y$</span> is scenario-dependent so a <code>scenario_index</code> must be provided as well:</p><pre><code class="language-">println(name(y, 1))
+println(typeof(y))</code></pre><pre class="documenter-example-output">y
+DecisionVariable</pre><p>The same getters will error:</p><pre><code class="language-julia">lower_bound(y)</code></pre><pre><code class="language-julia">ERROR: y is scenario dependent, consider `lower_bound(dvar, scenario_index)`.</code></pre><p>As indicated by the error, <span>$y$</span> is scenario-dependent so a <code>scenario_index</code> must be provided as well:</p><pre><code class="language-julia">println(name(y, 1))
 println(&quot;y has lower bound in scenario 1: $(has_lower_bound(y, 1))&quot;)
 println(&quot;y has upper bound in scenario 1: $(has_upper_bound(y, 1))&quot;)
 println(&quot;lower_bound(y, 1) = lower_bound(y, 1)&quot;)
@@ -33,10 +50,19 @@ println(&quot;lower_bound(y, 1) = lower_bound(y, 1)&quot;)
 println(name(y, 2))
 println(&quot;y has lower bound in scenario 2: $(has_lower_bound(y, 2))&quot;)
 println(&quot;y has upper bound in scenario 2: $(has_upper_bound(y, 2))&quot;)
-println(&quot;lower_bound(y, 2) = lower_bound(y, 2)&quot;)</code></pre><p>The lower bound of <span>$y$</span> is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> structure. Auxiliary variables created with the standard <code>@variable</code> are not available through this API. To access them, either annotate them with <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> (or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:</p><pre><code class="language-">w = DEP(sp)[:w]
+println(&quot;lower_bound(y, 2) = lower_bound(y, 2)&quot;)</code></pre><pre class="documenter-example-output">y₁
+y has lower bound in scenario 1: true
+y has upper bound in scenario 1: false
+lower_bound(y, 1) = lower_bound(y, 1)
+y₂
+y has lower bound in scenario 2: true
+y has upper bound in scenario 2: false
+lower_bound(y, 2) = lower_bound(y, 2)</pre><p>The lower bound of <span>$y$</span> is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> structure. Auxiliary variables created with the standard <code>@variable</code> are not available through this API. To access them, either annotate them with <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> (or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:</p><pre><code class="language-julia">w = DEP(sp)[:w]
 println(w)
-println(typeof(w))</code></pre><h2 id="Decision-constraints"><a class="docs-heading-anchor" href="#Decision-constraints">Decision constraints</a><a id="Decision-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-constraints" title="Permalink"></a></h2><p>Constraints that include variables annotated with either <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> can also be accessed in the extended API. Stage-wise list of all such constraints can be obtained:</p><pre><code class="language-julia">println(list_of_constraint_types(sp, 1))</code></pre><pre class="documenter-example-output">Tuple{DataType, DataType}[]</pre><pre><code class="language-julia">println(list_of_constraint_types(sp, 2))</code></pre><pre class="documenter-example-output">Tuple{DataType, DataType}[]</pre><p>and type-sorted constraints can be obtained through a stage-dependent variant of <a href="../../library/public/#JuMP.all_constraints-Union{Tuple{V}, Tuple{N}, Tuple{StochasticProgram{N, S, ST} where {S&lt;:Tuple{Vararg{StochasticPrograms.Stage, N}}, ST&lt;:AbstractStochasticStructure{N}}, Integer, Type{var&quot;#s195&quot;} where var&quot;#s195&quot;&lt;:Union{Vector{var&quot;#s194&quot;} where var&quot;#s194&quot;&lt;:V, V}, Type{var&quot;#s193&quot;} where var&quot;#s193&quot;&lt;:MathOptInterface.AbstractSet}} where {N, V&lt;:AbstractJuMPScalar}"><code>all_constraints</code></a>:</p><pre><code class="language-julia">all_constraints(sp, 2, DecisionAffExpr{Float64}, MOI.LessThan{Float64});</code></pre><pre class="documenter-example-output">SPConstraintRef{MathOptInterface.ConstraintIndex{AffineDecisionFunction{Float64}, MathOptInterface.LessThan{Float64}}, ScalarShape}[]</pre><p>The scenario-dependent constraint in stage 2 can also be accessed through</p><pre><code class="language-">con = sp[2,:con];
-println(con)</code></pre><p>This returns an <a href="../../library/public/#StochasticPrograms.SPConstraintRef"><code>SPConstraintRef</code></a>, similar in function to <a href="../../library/public/#StochasticPrograms.DecisionVariable"><code>DecisionVariable</code></a>. The constraint originates from stage-two, so most attributes are scenario-dependent:</p><pre><code class="language-">println(name(con, 1))
+println(typeof(w))</code></pre><pre class="documenter-example-output">w
+VariableRef</pre><h2 id="Decision-constraints"><a class="docs-heading-anchor" href="#Decision-constraints">Decision constraints</a><a id="Decision-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-constraints" title="Permalink"></a></h2><p>Constraints that include variables annotated with either <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> can also be accessed in the extended API. Stage-wise list of all such constraints can be obtained:</p><pre><code class="language-julia">println(list_of_constraint_types(sp, 1))</code></pre><pre class="documenter-example-output">Tuple{DataType, DataType}[(DecisionRef, MathOptInterface.GreaterThan{Float64})]</pre><pre><code class="language-julia">println(list_of_constraint_types(sp, 2))</code></pre><pre class="documenter-example-output">Tuple{DataType, DataType}[(DecisionRef, MathOptInterface.GreaterThan{Float64}), (DecisionAffExpr{Float64}, MathOptInterface.LessThan{Float64})]</pre><p>and type-sorted constraints can be obtained through a stage-dependent variant of <a href="../../library/public/#JuMP.all_constraints-Union{Tuple{V}, Tuple{N}, Tuple{StochasticProgram{N, S, ST} where {S&lt;:Tuple{Vararg{StochasticPrograms.Stage, N}}, ST&lt;:AbstractStochasticStructure{N}}, Integer, Type{var&quot;#s197&quot;} where var&quot;#s197&quot;&lt;:Union{Vector{var&quot;#s196&quot;} where var&quot;#s196&quot;&lt;:V, V}, Type{var&quot;#s195&quot;} where var&quot;#s195&quot;&lt;:MathOptInterface.AbstractSet}} where {N, V&lt;:AbstractJuMPScalar}"><code>all_constraints</code></a>:</p><pre><code class="language-julia">all_constraints(sp, 2, DecisionAffExpr{Float64}, MOI.LessThan{Float64});</code></pre><pre class="documenter-example-output">1-element Vector{SPConstraintRef{MathOptInterface.ConstraintIndex{AffineDecisionFunction{Float64}, MathOptInterface.LessThan{Float64}}, ScalarShape}}:
+ con : -x + w ≤ 0.0</pre><p>The scenario-dependent constraint in stage 2 can also be accessed through</p><pre><code class="language-julia">con = sp[2,:con];
+println(con)</code></pre><pre class="documenter-example-output">con : -x + w ≤ 0.0</pre><p>This returns an <a href="../../library/public/#StochasticPrograms.SPConstraintRef"><code>SPConstraintRef</code></a>, similar in function to <a href="../../library/public/#StochasticPrograms.DecisionVariable"><code>DecisionVariable</code></a>. The constraint originates from stage-two, so most attributes are scenario-dependent:</p><pre><code class="language-julia">println(name(con, 1))
 println(&quot;RHS of con in scenario 1 = $(normalized_rhs(con, 1))&quot;)
 println(&quot;Coefficient of x in scenario 1 = $(normalized_coefficient(con, x, 1))&quot;)
 println(&quot;Coefficient of y in scenario 1 = $(normalized_coefficient(con, y, 1))&quot;)
@@ -44,13 +70,24 @@ println(&quot;Coefficient of y in scenario 1 = $(normalized_coefficient(con, y, 
 println(name(con, 2))
 println(&quot;RHS of con in scenario 2 = $(normalized_rhs(con, 2))&quot;)
 println(&quot;Coefficient of x in scenario 2 = $(normalized_coefficient(con, x, 2))&quot;)
-println(&quot;Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))&quot;)</code></pre><h2 id="Decision-objectives"><a class="docs-heading-anchor" href="#Decision-objectives">Decision objectives</a><a id="Decision-objectives-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-objectives" title="Permalink"></a></h2><p>The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:</p><pre><code class="language-">println(&quot;Objective in stage 1: $(objective_function(sp, 1))&quot;)
+println(&quot;Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))&quot;)</code></pre><pre class="documenter-example-output">con
+RHS of con in scenario 1 = 0.0
+Coefficient of x in scenario 1 = -1.0
+Coefficient of y in scenario 1 = 1.0
+con
+RHS of con in scenario 2 = 0.0
+Coefficient of x in scenario 2 = -1.0
+Coefficient of y in scenario 2 = 2.0</pre><h2 id="Decision-objectives"><a class="docs-heading-anchor" href="#Decision-objectives">Decision objectives</a><a id="Decision-objectives-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-objectives" title="Permalink"></a></h2><p>The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:</p><pre><code class="language-julia">println(&quot;Objective in stage 1: $(objective_function(sp, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 2: $(objective_function(sp, 2, 2))&quot;)
-println(&quot;Full objective: $(objective_function(sp))&quot;)</code></pre><p>and can be modified accordingly:</p><pre><code class="language-">set_objective_coefficient(sp, y, 2, 1, 2.);
+println(&quot;Full objective: $(objective_function(sp))&quot;)</code></pre><pre class="documenter-example-output">Objective in stage 1: x
+Objective in stage 2, scenario 1: y₁
+Objective in stage 2, scenario 2: y₂
+Full objective: x - 0.5 y₁ - 0.5 y₂</pre><p>and can be modified accordingly:</p><pre><code class="language-julia">set_objective_coefficient(sp, y, 2, 1, 2.);
 println(&quot;Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))&quot;)
 println(&quot;Full objective: $(objective_function(sp))&quot;)
-set_objective_coefficient(sp, y, 2, 1, 1.);</code></pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-">set_optimizer(sp, GLPK.Optimizer)
+set_objective_coefficient(sp, y, 2, 1, 1.);</code></pre><pre class="documenter-example-output">Objective in stage 2, scenario 1: 2 y₁
+Full objective: x + y₁ - 0.5 y₂</pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-julia">set_optimizer(sp, GLPK.Optimizer)
 
 optimize!(sp)
 
@@ -76,7 +113,32 @@ println(&quot;value(y, 2) = $(value(y, 2))&quot;)
 println(&quot;reduced_cost(y, 2) = $(reduced_cost(y, 2))&quot;)
 println(&quot;dual(con, 2) = $(dual(con, 2))&quot;)
 println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
-println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deferred stochastic program with 2 scenarios</pre><p>This is more apparent in a vertical structure:</p><pre><code class="language-">vertical_sp = StochasticProgram([ξ₁,ξ₂], Vertical())
+println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+Objective value: 2.0
+Optimal decision: [2.0]
+value(x) = 2.0
+reduced_cost(x) = 0.75
+value(y, 1) = 1.0
+reduced_cost(y, 1) = 0.5
+dual(con, 1) = 0.0
+Objective value in scenario 1: 1.0
+Optimal recourse in scenario 1: [1.0]
+value(y, 2) = 1.0
+reduced_cost(y, 2) = 0.0
+dual(con, 2) = -0.25
+Objective value in scenario 2: 1.0
+Optimal recourse in scenario 2: [1.0]</pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-julia">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
+Min x + 0.5 y₁ - 0.5 y₂
+Subject to
+ x ∈ Decisions(value = 3.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ x ≥ 2.0
+ y₁ ≥ 1.0
+ y₂ ≥ 0.5
+ con : -x + y₁ ≤ 0.0
+ con : -x + 2 y₂ ≤ 0.0
+Solver name: GLPK</pre><p>This is more apparent in a vertical structure:</p><pre><code class="language-julia">vertical_sp = StochasticProgram([ξ₁,ξ₂], Vertical())
 @first_stage vertical_sp = begin
     @decision(model, x &gt;= 2)
     @variable(model, w)
@@ -93,7 +155,32 @@ end
 x = vertical_sp[1,:x]
 fix(x, 3.)
 
-print(vertical_sp)</code></pre><p>We resolve the problem to verify:</p><pre><code class="language-">optimize!(sp)
+print(vertical_sp)</code></pre><pre class="documenter-example-output">First-stage
+==============
+Min x
+Subject to
+ x ∈ Decisions(value = 3.0)
+ x ≥ 2.0
+
+Second-stage
+==============
+Subproblem 1 (p = 0.50):
+Max y
+Subject to
+ x ∈ Known(value = 2.0)
+ y ∈ RecourseDecisions
+ y ≥ 1.0
+ con : -x + y ≤ 0.0
+
+Subproblem 2 (p = 0.50):
+Max y
+Subject to
+ x ∈ Known(value = 2.0)
+ y ∈ RecourseDecisions
+ y ≥ 0.5
+ con : -x + 2 y ≤ 0.0
+
+Solver name: No optimizer attached.</pre><p>We resolve the problem to verify:</p><pre><code class="language-julia">optimize!(sp)
 
 # Main result
 println(&quot;Termination status: $(termination_status(sp))&quot;)
@@ -119,7 +206,21 @@ println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
 println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-">fix(y, 1, 2.)
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+Objective value: 2.75
+Optimal decision: [3.0]
+value(x) = 3.0
+value(y, 1) = 1.0
+reduced_cost(y, 1) = 0.5
+dual(con, 1) = 0.0
+Objective value in scenario 1: 1.0
+Optimal recourse in scenario 1: [1.0]
+value(y, 2) = 1.5
+reduced_cost(y, 2) = 0.0
+dual(con, 2) = -0.25
+Objective value in scenario 2: 1.5
+Optimal recourse in scenario 2: [1.5]
+Equivalent decision evaluation: 2.75</pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-julia">fix(y, 1, 2.)
 optimize!(sp)
 
 # Main result
@@ -145,4 +246,15 @@ println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2)
 println(evaluate_decision(sp, [3.]))
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 23 April 2021 13:45">Friday 23 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+Objective value: 2.5
+Optimal decision: [2.0]
+value(x) = 3.0
+value(y, 1) = 2.0
+Objective value in scenario 1: 2.0
+Optimal recourse in scenario 1: [2.0]
+value(y, 2) = 1.0
+Objective value in scenario 2: 1.0
+Optimal recourse in scenario 2: [1.0]
+3.25
+Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 23 April 2021 17:01">Friday 23 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

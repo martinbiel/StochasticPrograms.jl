@@ -56,7 +56,12 @@ f(x,ξ) = min  f(y; x, ξ)
   q₁: 28.0
   q₂: 32.0
   d₁: 300.0
-  d₂: 300.0</pre><p>where the variable names should match those given in the <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> annotation. We are now ready to instantiate the stochastic program introduced above.</p><pre><code class="language-">sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)</code></pre><p>By default, the stochastic program is instantiated with a deterministic equivalent structure. It is straightforward to work out the extended form because the example problem is small:</p><p class="math-container">\[\begin{aligned}
+  d₂: 300.0</pre><p>where the variable names should match those given in the <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> annotation. We are now ready to instantiate the stochastic program introduced above.</p><pre><code class="language-julia">sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)</code></pre><pre class="documenter-example-output">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Deterministic equivalent
+Solver name: GLPK</pre><p>By default, the stochastic program is instantiated with a deterministic equivalent structure. It is straightforward to work out the extended form because the example problem is small:</p><p class="math-container">\[\begin{aligned}
  \operatorname*{minimize}_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
  \text{s.t.} &amp; \quad x_1 + x_2 \leq 120 \\
  &amp; \quad 6 y_{11} + 10 y_{21} \leq 60 x_1 \\
@@ -69,7 +74,78 @@ f(x,ξ) = min  f(y; x, ξ)
  &amp; \quad 0 \leq y_{21} \leq 100 \\
  &amp; \quad 0 \leq y_{12} \leq 300 \\
  &amp; \quad 0 \leq y_{22} \leq 300
-\end{aligned}\]</p><p>We can print the stochastic program and confirm that it indeed models the example recourse problem given above:</p><pre><code class="language-">print(sp)</code></pre><h3 id="Optimization"><a class="docs-heading-anchor" href="#Optimization">Optimization</a><a id="Optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Optimization" title="Permalink"></a></h3><p>The most common operation is to solve the instantiated stochastic program for an optimal first-stage decision. We instantiated the problem with the <code>GLPK</code> optimizer, so we can solve the problem directly:</p><pre><code class="language-">optimize!(sp)</code></pre><p>We can then query the resulting optimal value:</p><pre><code class="language-">objective_value(sp)</code></pre><p>and the optimal first-stage decision:</p><pre><code class="language-">optimal_decision(sp)</code></pre><p>Alternatively, we can solve the problem with a structure-exploiting solver. The framework provides both <code>LShaped</code> and <code>ProgressiveHedging</code> solvers. We first re-instantiate the problem using an L-shaped optimizer:</p><pre><code class="language-">sp_lshaped = instantiate(simple_model, [ξ₁, ξ₂], optimizer = LShaped.Optimizer)</code></pre><p>It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program in a vertical block form that decomposes the problem into stages:</p><pre><code class="language-">print(sp_lshaped)</code></pre><p>To solve the problem with L-shaped, we must first specify internal optimizers that can solve emerging subproblems:</p><pre><code class="language-">set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
+\end{aligned}\]</p><p>We can print the stochastic program and confirm that it indeed models the example recourse problem given above:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
+Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁₁ - 11.200000000000001 y₂₁ - 16.8 y₁₂ - 19.2 y₂₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ y₁₁ ∈ RecourseDecisions
+ y₂₁ ∈ RecourseDecisions
+ y₁₂ ∈ RecourseDecisions
+ y₂₂ ∈ RecourseDecisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ y₁₁ ≥ 0.0
+ y₂₁ ≥ 0.0
+ y₁₂ ≥ 0.0
+ y₂₂ ≥ 0.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁₁ + 10 y₂₁ ≤ 0.0
+ -80 x₂ + 8 y₁₁ + 5 y₂₁ ≤ 0.0
+ -60 x₁ + 6 y₁₂ + 10 y₂₂ ≤ 0.0
+ -80 x₂ + 8 y₁₂ + 5 y₂₂ ≤ 0.0
+ y₁₁ ≤ 500.0
+ y₂₁ ≤ 100.0
+ y₁₂ ≤ 300.0
+ y₂₂ ≤ 300.0
+Solver name: GLPK</pre><h3 id="Optimization"><a class="docs-heading-anchor" href="#Optimization">Optimization</a><a id="Optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Optimization" title="Permalink"></a></h3><p>The most common operation is to solve the instantiated stochastic program for an optimal first-stage decision. We instantiated the problem with the <code>GLPK</code> optimizer, so we can solve the problem directly:</p><pre><code class="language-julia">optimize!(sp)</code></pre><p>We can then query the resulting optimal value:</p><pre><code class="language-julia">objective_value(sp)</code></pre><pre class="documenter-example-output">-855.8333333333321</pre><p>and the optimal first-stage decision:</p><pre><code class="language-julia">optimal_decision(sp)</code></pre><pre class="documenter-example-output">2-element Vector{Float64}:
+ 46.66666666666667
+ 36.25</pre><p>Alternatively, we can solve the problem with a structure-exploiting solver. The framework provides both <code>LShaped</code> and <code>ProgressiveHedging</code> solvers. We first re-instantiate the problem using an L-shaped optimizer:</p><pre><code class="language-julia">sp_lshaped = instantiate(simple_model, [ξ₁, ξ₂], optimizer = LShaped.Optimizer)</code></pre><pre class="documenter-example-output">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Vertical
+Solver name: L-shaped with disaggregate cuts</pre><p>It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program in a vertical block form that decomposes the problem into stages:</p><pre><code class="language-julia">print(sp_lshaped)</code></pre><pre class="documenter-example-output">First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+
+Second-stage
+==============
+Subproblem 1 (p = 0.40):
+Max 24 y₁ + 28 y₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Subproblem 2 (p = 0.60):
+Max 28 y₁ + 32 y₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 300.0
+ y₂ ≤ 300.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Solver name: L-shaped with disaggregate cuts</pre><p>To solve the problem with L-shaped, we must first specify internal optimizers that can solve emerging subproblems:</p><pre><code class="language-julia">set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
 set_optimizer_attribute(sp_lshaped, SubProblemOptimizer(), GLPK.Optimizer)</code></pre><p>We can now run the optimization procedure:</p><pre><code class="language-julia">optimize!(sp_lshaped)</code></pre><pre><code class="language-julia">L-Shaped Gap  Time: 0:00:01 (6 iterations)
   Objective:       -855.8333333333339
   Gap:             0.0
@@ -117,20 +193,49 @@ set_suboptimizer_attribute(sp_progressivehedging, MOI.RawParameter(&quot;print_l
  46.65459574079722
  36.24298005619633</code></pre><h3 id="Decision-evaluation"><a class="docs-heading-anchor" href="#Decision-evaluation">Decision evaluation</a><a id="Decision-evaluation-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-evaluation" title="Permalink"></a></h3><p>Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision <span>$x$</span> is given by</p><p class="math-container">\[V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]\]</p><p>If the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:</p><pre><code class="language-julia">x = [40., 20.]</code></pre><pre class="documenter-example-output">2-element Vector{Float64}:
  40.0
- 20.0</pre><p>The expected result of taking this decision in the simple finite model can be determined through:</p><pre><code class="language-">evaluate_decision(sp, x)</code></pre><p>Internally, this fixes all occurances of the first-stage variables in the deterministic equivalent and solves the resulting problem. An equivalent approach is to fix the decisions manually:</p><pre><code class="language-">another_sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
+ 20.0</pre><p>The expected result of taking this decision in the simple finite model can be determined through:</p><pre><code class="language-julia">evaluate_decision(sp, x)</code></pre><pre class="documenter-example-output">-470.39999999999964</pre><p>Internally, this fixes all occurances of the first-stage variables in the deterministic equivalent and solves the resulting problem. An equivalent approach is to fix the decisions manually:</p><pre><code class="language-julia">another_sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
 fix.(all_decision_variables(another_sp, 1), x)
 optimize!(another_sp)
-objective_value(another_sp)</code></pre><p>Decision evaluation is supported by the other storage structures as well:</p><pre><code class="language-julia">evaluate_decision(sp_lshaped, x)</code></pre><pre><code class="language-julia">-470.39999999999964</code></pre><p>and</p><pre><code class="language-julia">evaluate_decision(sp_progressivehedging, x)</code></pre><pre><code class="language-julia">-470.40000522896185</code></pre><p>In a vertical structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:</p><pre><code class="language-">print(outcome_model(sp, x, ξ₁))</code></pre><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><pre><code class="language-">evaluate_decision(sp, x, ξ₁)</code></pre><h3 id="Stochastic-performance"><a class="docs-heading-anchor" href="#Stochastic-performance">Stochastic performance</a><a id="Stochastic-performance-1"></a><a class="docs-heading-anchor-permalink" href="#Stochastic-performance" title="Permalink"></a></h3><p>Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:</p><p class="math-container">\[\mathrm{EWS} = \operatorname{\mathbb{E}}_{\omega}\left[
+objective_value(another_sp)</code></pre><pre class="documenter-example-output">-470.39999999999964</pre><p>Decision evaluation is supported by the other storage structures as well:</p><pre><code class="language-julia">evaluate_decision(sp_lshaped, x)</code></pre><pre><code class="language-julia">-470.39999999999964</code></pre><p>and</p><pre><code class="language-julia">evaluate_decision(sp_progressivehedging, x)</code></pre><pre><code class="language-julia">-470.40000522896185</code></pre><p>In a vertical structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:</p><pre><code class="language-julia">print(outcome_model(sp, x, ξ₁))</code></pre><pre class="documenter-example-output">Max 24 y₁ + 28 y₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0</pre><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><pre><code class="language-julia">evaluate_decision(sp, x, ξ₁)</code></pre><pre class="documenter-example-output">6100.0</pre><h3 id="Stochastic-performance"><a class="docs-heading-anchor" href="#Stochastic-performance">Stochastic performance</a><a id="Stochastic-performance-1"></a><a class="docs-heading-anchor-permalink" href="#Stochastic-performance" title="Permalink"></a></h3><p>Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:</p><p class="math-container">\[\mathrm{EWS} = \operatorname{\mathbb{E}}_{\omega}\left[
   \begin{aligned}
     \min_{x \in \mathbb{R}^n} &amp; \quad c^T x + Q(x,\xi(\omega)) \\
     \text{s.t.} &amp; \quad Ax = b \\
     &amp; \quad x \geq 0.
-  \end{aligned}\right]\]</p><p>Now, the first- and second-stage decisions are taken with knowledge about the uncertainty. If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><pre><code class="language-">ws = WS(sp, ξ₁)
-print(ws)</code></pre><p>The optimal first-stage decision in this scenario can be determined through:</p><pre><code class="language-">x₁ = wait_and_see_decision(sp, ξ₁)</code></pre><p>We can evaluate this decision:</p><pre><code class="language-">evaluate_decision(sp, x₁)</code></pre><p>The outcome is of course worse than taking the optimal decision. However, it would perform better if <span>$ξ₁$</span> is the actual outcome:</p><pre><code class="language-">evaluate_decision(sp, x₁, ξ₁)</code></pre><p>as compared to:</p><pre><code class="language-">evaluate_decision(sp, optimal_decision(sp), ξ₁)</code></pre><p>The difference between the expected wait-and-see value and the value of the recourse problem is known as the <strong>expected value of perfect information</strong>:</p><p class="math-container">\[\mathrm{EVPI} = \mathrm{EWS} - \mathrm{VRP}.\]</p><p>The EVPI measures the expected loss of not knowing the exact outcome beforehand. It quantifies the value of having access to an accurate forecast. We calculate it in the framework through:</p><pre><code class="language-">EVPI(sp)</code></pre><p>EVPI is supported in the other structures as well:</p><pre><code class="language-julia">EVPI(sp_lshaped)</code></pre><pre><code class="language-julia">662.9166666666661</code></pre><p>and</p><pre><code class="language-julia">EVPI(sp_progressivehedging)</code></pre><pre><code class="language-julia">663.165763660815</code></pre><p>We can also compute EWS directly using <a href="../../library/public/#StochasticPrograms.EWS-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EWS</code></a>. Note, that the horizontal structure is ideal for solving wait-and-see type problems.</p><p>If the expectation in the original model is instead taken inside the second-stage objective function <span>$Q$</span>, we obtain the expected-value-problem:</p><p class="math-container">\[\begin{aligned}
+  \end{aligned}\right]\]</p><p>Now, the first- and second-stage decisions are taken with knowledge about the uncertainty. If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><pre><code class="language-julia">ws = WS(sp, ξ₁)
+print(ws)</code></pre><pre class="documenter-example-output">Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0</pre><p>The optimal first-stage decision in this scenario can be determined through:</p><pre><code class="language-julia">x₁ = wait_and_see_decision(sp, ξ₁)</code></pre><pre class="documenter-example-output">2-element Vector{Float64}:
+ 40.0
+ 29.583333333333336</pre><p>We can evaluate this decision:</p><pre><code class="language-julia">evaluate_decision(sp, x₁)</code></pre><pre class="documenter-example-output">-762.5000000000014</pre><p>The outcome is of course worse than taking the optimal decision. However, it would perform better if <span>$ξ₁$</span> is the actual outcome:</p><pre><code class="language-julia">evaluate_decision(sp, x₁, ξ₁)</code></pre><pre class="documenter-example-output">8400.0</pre><p>as compared to:</p><pre><code class="language-julia">evaluate_decision(sp, optimal_decision(sp), ξ₁)</code></pre><pre class="documenter-example-output">8400.0</pre><p>The difference between the expected wait-and-see value and the value of the recourse problem is known as the <strong>expected value of perfect information</strong>:</p><p class="math-container">\[\mathrm{EVPI} = \mathrm{EWS} - \mathrm{VRP}.\]</p><p>The EVPI measures the expected loss of not knowing the exact outcome beforehand. It quantifies the value of having access to an accurate forecast. We calculate it in the framework through:</p><pre><code class="language-julia">EVPI(sp)</code></pre><pre class="documenter-example-output">662.9166666666679</pre><p>EVPI is supported in the other structures as well:</p><pre><code class="language-julia">EVPI(sp_lshaped)</code></pre><pre><code class="language-julia">662.9166666666661</code></pre><p>and</p><pre><code class="language-julia">EVPI(sp_progressivehedging)</code></pre><pre><code class="language-julia">663.165763660815</code></pre><p>We can also compute EWS directly using <a href="../../library/public/#StochasticPrograms.EWS-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EWS</code></a>. Note, that the horizontal structure is ideal for solving wait-and-see type problems.</p><p>If the expectation in the original model is instead taken inside the second-stage objective function <span>$Q$</span>, we obtain the expected-value-problem:</p><p class="math-container">\[\begin{aligned}
     \operatorname*{minimize}_{x \in \mathbb{R}^n} &amp; \quad c^T x + Q(x,\operatorname{\mathbb{E}}_{\omega}[\xi(\omega)]) \\
     \text{s.t.} &amp; \quad Ax = b \\
     &amp; \quad x \geq 0.
-  \end{aligned}\]</p><p>The solution to the expected-value-problem is known as the <strong>expected value decision</strong>, and is denote by <span>$\bar{x}$</span>. We can compute it through</p><pre><code class="language-">x̄ = expected_value_decision(sp)</code></pre><p>The expected result of taking the expected value decision is known as the <strong>expected result of the expected value decision</strong>:</p><p class="math-container">\[\mathrm{EEV} = c^T \bar{x} + \expect[\xi]{Q(\bar{x},\xi(\omega))}.\]</p><p>The difference between the value of the recourse problem and the expected result of the expected value decision is known as the <strong>value of the stochastic solution</strong>:</p><p class="math-container">\[\mathrm{VSS} = \mathrm{EEV} - \mathrm{VRP}.\]</p><p>The VSS measures the expected loss of ignoring the uncertainty in the problem. A large VSS indicates that the second stage is sensitive to the stochastic data. We calculate it using</p><pre><code class="language-">VSS(sp)</code></pre><p>VSS is supported in the other structures as well:</p><pre><code class="language-julia">VSS(sp_lshaped)</code></pre><pre><code class="language-julia">286.91666666666606</code></pre><p>and</p><pre><code class="language-julia">VSS(sp_progressivehedging)</code></pre><pre><code class="language-julia">286.6675823650668</code></pre><p>We can also compute EEV directly using <a href="../../library/public/#StochasticPrograms.EEV-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EEV</code></a>. Note, that the vertical structure is ideal for solving VSS type problems.</p><h2 id="Infinite-sample-space"><a class="docs-heading-anchor" href="#Infinite-sample-space">Infinite sample space</a><a id="Infinite-sample-space-1"></a><a class="docs-heading-anchor-permalink" href="#Infinite-sample-space" title="Permalink"></a></h2><p>In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that <span>$\xi$</span> follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let <span>$\xi \sim \mathcal{N}(\mu, \Sigma)$</span> with</p><p class="math-container">\[\mu = \begin{pmatrix}
+  \end{aligned}\]</p><p>The solution to the expected-value-problem is known as the <strong>expected value decision</strong>, and is denote by <span>$\bar{x}$</span>. We can compute it through</p><pre><code class="language-julia">x̄ = expected_value_decision(sp)</code></pre><pre class="documenter-example-output">2-element Vector{Float64}:
+ 71.45833333333334
+ 48.54166666666667</pre><p>The expected result of taking the expected value decision is known as the <strong>expected result of the expected value decision</strong>:</p><p class="math-container">\[\mathrm{EEV} = c^T \bar{x} + \expect[\xi]{Q(\bar{x},\xi(\omega))}.\]</p><p>The difference between the value of the recourse problem and the expected result of the expected value decision is known as the <strong>value of the stochastic solution</strong>:</p><p class="math-container">\[\mathrm{VSS} = \mathrm{EEV} - \mathrm{VRP}.\]</p><p>The VSS measures the expected loss of ignoring the uncertainty in the problem. A large VSS indicates that the second stage is sensitive to the stochastic data. We calculate it using</p><pre><code class="language-julia">VSS(sp)</code></pre><pre class="documenter-example-output">286.91666666666515</pre><p>VSS is supported in the other structures as well:</p><pre><code class="language-julia">VSS(sp_lshaped)</code></pre><pre><code class="language-julia">286.91666666666606</code></pre><p>and</p><pre><code class="language-julia">VSS(sp_progressivehedging)</code></pre><pre><code class="language-julia">286.6675823650668</code></pre><p>We can also compute EEV directly using <a href="../../library/public/#StochasticPrograms.EEV-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EEV</code></a>. Note, that the vertical structure is ideal for solving VSS type problems.</p><h2 id="Infinite-sample-space"><a class="docs-heading-anchor" href="#Infinite-sample-space">Infinite sample space</a><a id="Infinite-sample-space-1"></a><a class="docs-heading-anchor-permalink" href="#Infinite-sample-space" title="Permalink"></a></h2><p>In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that <span>$\xi$</span> follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let <span>$\xi \sim \mathcal{N}(\mu, \Sigma)$</span> with</p><p class="math-container">\[\mu = \begin{pmatrix}
  24 \\
  32 \\
  400 \\
@@ -164,4 +269,4 @@ set_optimizer_attribute(simple_model, NumEvalSamples(), 300)</code></pre><p>We c
   Relative error:       0.021487453807842415
   Sample size:          64</code></pre><p>and query the result:</p><pre><code class="language-julia">objective_value(simple_model);objective_value(simple_model);</code></pre><pre><code class="language-julia">objective_value(simple_model) = Confidence interval (p = 95%): [-1095.65 − -1072.36]</code></pre><p>Note, that we can just replace the sampler object to use another model of the uncertainty.</p><h3 id="Decision-evaluation-2"><a class="docs-heading-anchor" href="#Decision-evaluation-2">Decision evaluation</a><a class="docs-heading-anchor-permalink" href="#Decision-evaluation-2" title="Permalink"></a></h3><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, a first-stage decision also can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the sampled model created above:</p><pre><code class="language-">evaluate_decision(sampled_sp, x)</code></pre><p>and compare it to the result of evaluating it on another sampled model of similar size:</p><pre><code class="language-">another_sp = instantiate(simple_model, sampler, 5, optimizer = GLPK.Optimizer)
 evaluate_decision(another_sp, x)</code></pre><p>which, if any, of these values should be a candidate for the true value of <span>$V(x)$</span>? A more precise result is obtained by evaluating the decision using a sampled-based approach:</p><pre><code class="language-">evaluate_decision(simple_model, x, sampler)</code></pre><h3 id="Stochastic-performance-2"><a class="docs-heading-anchor" href="#Stochastic-performance-2">Stochastic performance</a><a class="docs-heading-anchor-permalink" href="#Stochastic-performance-2" title="Permalink"></a></h3><p>Using the same techniques as above, we can calculate confidence intervals around the EVPI and VSS:</p><pre><code class="language-julia">EVPI(simple_model, sampler)</code></pre><pre><code class="language-julia">Confidence interval (p = 99%): [32.96 − 144.51]</code></pre><p>and</p><pre><code class="language-julia">VSS(simple_model, sampler)</code></pre><pre><code class="language-julia">Warning: VSS is not statistically significant to the chosen confidence level and tolerance
-Confidence interval (p = 95%): [-0.05 − 0.05]</code></pre><p>Note, that the VSS is not statistically significant. This is not surprising for a normally distributed uncertainty model. The expected value decision is expected to perform well.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../data/">Stochastic data »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 23 April 2021 13:45">Friday 23 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+Confidence interval (p = 95%): [-0.05 − 0.05]</code></pre><p>Note, that the VSS is not statistically significant. This is not surprising for a normally distributed uncertainty model. The expected value decision is expected to perform well.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../data/">Stochastic data »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 23 April 2021 17:01">Friday 23 April 2021</span>. Using Julia version 1.6.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
