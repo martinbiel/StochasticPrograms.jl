@@ -82,7 +82,7 @@ function collect_linking_constraints(model::JuMP.Model,
                     # assuming sorted order
                     if state(kvar) == Known
                         col = master_indices[index(kvar).value].value
-                        push!(coeffs, (1, col, T(coef)))
+                        push!(coeffs, (row, col, T(coef)))
                     end
                 end
             end

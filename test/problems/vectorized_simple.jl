@@ -8,7 +8,7 @@ vec_simple = @stochastic_model begin
         end
         @decision(model, x[i in 1:2] >= lb[i])
         @objective(model, Min, dot(c, x))
-        @constraint(model, A * x .<= b)
+        @constraint(model, A * x - b in MOI.Nonpositives(1))
     end
     @stage 2 begin
         @parameters begin
@@ -23,7 +23,7 @@ vec_simple = @stochastic_model begin
         ub = [ξ[3], ξ[4]]
         @recourse(model, lb[i] <= y[i in 1:2] <= ub[i])
         @objective(model, Max, dot(q, y))
-        @constraint(model, T * x + W * y .<= 0)
+        @constraint(model, T * x + W * y in MOI.Nonpositives(2))
     end
 end
 
