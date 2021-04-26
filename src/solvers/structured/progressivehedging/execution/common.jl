@@ -22,6 +22,12 @@ function iterate!(ph::AbstractProgressiveHedging, ::AbstractProgressiveHedgingEx
         # Optimal
         return MOI.OPTIMAL
     end
+    # Calculate time spent so far and check perform time limit check
+    t = ph.progress.tlast - ph.progress.tfirst
+    if t >= ph.parameters.time_limit
+        log!(ph; status = MOI.TIME_LIMIT)
+        return MOI.TIME_LIMIT
+    end
     # Log progress
     log!(ph)
     # Dont return a status as procedure should continue

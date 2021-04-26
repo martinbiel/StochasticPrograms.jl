@@ -322,6 +322,12 @@ function iterate!(lshaped::AbstractLShaped, execution::AsynchronousExecution{T})
                 log!(lshaped, t)
                 return MOI.OPTIMAL
             end
+            # Calculate time spent so far and check perform time limit check
+            t = lshaped.progress.tlast - lshaped.progress.tfirst
+            if t >= lshaped.parameters.time_limit
+                log!(lshaped; status = MOI.TIME_LIMIT)
+                return MOI.TIME_LIMIT
+            end
             # Log progress at current timestamp
             log_regularization!(lshaped, t)
             # Update workers

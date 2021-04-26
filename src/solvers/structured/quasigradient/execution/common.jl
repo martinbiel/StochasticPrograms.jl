@@ -78,6 +78,12 @@ function iterate!(quasigradient::AbstractQuasiGradient, execution::AbstractQuasi
         log!(quasigradient; optimal = true)
         return MOI.OPTIMAL
     end
+    # Calculate time spent so far and check perform time limit check
+    t = quasigradient.progress.tlast - quasigradient.progress.tfirst
+    if t >= quasigradient.parameters.time_limit
+        log!(quasigradient; status = MOI.TIME_LIMIT)
+        return MOI.TIME_LIMIT
+    end
     # Dont return a status as procedure should continue
     return nothing
 end

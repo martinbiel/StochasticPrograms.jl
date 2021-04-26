@@ -131,6 +131,12 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
         log!(lshaped; optimal = true)
         return MOI.OPTIMAL
     end
+    # Calculate time spent so far and check perform time limit check
+    t = lshaped.progress.tlast - lshaped.progress.tfirst
+    if t >= lshaped.parameters.time_limit
+        log!(lshaped; status = MOI.TIME_LIMIT)
+        return MOI.TIME_LIMIT
+    end
     # Consolidate (if applicable)
     consolidate!(lshaped, lshaped.consolidation)
     # Dont return a status as procedure should continue

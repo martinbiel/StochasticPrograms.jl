@@ -148,14 +148,16 @@ function MOI.optimize!(optimizer::Optimizer)
     if optimizer.lshaped === nothing
         throw(UnloadedStructure{Optimizer}())
     end
-    start_time = time()
+    # Run L-shaped procedure
     optimizer.status = optimizer.lshaped()
+    # Check if optimal
     if optimizer.status == MOI.OPTIMAL
         optimizer.primal_status = MOI.FEASIBLE_POINT
         optimizer.dual_status = MOI.FEASIBLE_POINT
         optimizer.raw_status = "L-shaped procedure converged to optimal solution."
     end
-    optimizer.solve_time = time() - start_time
+    # Extract solve time
+    optimizer.solve_time = optimizer.lshaped.progress.tlast - optimizer.lshaped.progress.tfirst
     return nothing
 end
 

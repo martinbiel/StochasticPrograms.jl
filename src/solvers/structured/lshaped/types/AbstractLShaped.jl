@@ -188,7 +188,7 @@ function log!(lshaped::AbstractLShaped; optimal = false, status = nothing)
         elseif status == MOI.DUAL_INFEASIBLE
             -Inf
         else
-            0.0
+            Q
         end
         ProgressMeter.update!(lshaped.progress, val,
                               showvalues = [

@@ -116,14 +116,16 @@ function MOI.optimize!(optimizer::Optimizer)
     if optimizer.progressivehedging === nothing
         throw(StochasticProgram.UnloadedStructure{Optimizer}())
     end
-    start_time = time()
+    # Run progressive-hedging procedure
     optimizer.status = optimizer.progressivehedging()
+    # Check if optimal
     if optimizer.status == MOI.OPTIMAL
         optimizer.primal_status = MOI.FEASIBLE_POINT
         optimizer.dual_status = MOI.FEASIBLE_POINT
         optimizer.raw_status = "Progressive-hedging procedure converged to optimal solution."
     end
-    optimizer.solve_time = time() - start_time
+    # Extract solve time
+    optimizer.solve_time = optimizer.progressivehedging.progress.tlast - optimizer.progressivehedging.progress.tfirst
     return nothing
 end
 

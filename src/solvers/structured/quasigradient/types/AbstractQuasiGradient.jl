@@ -99,13 +99,16 @@ function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = no
         if quasigradient.progress isa ProgressThresh
             quasigradient.progress.thresh = Inf
         end
+        if quasigradient.progress isa Progress
+            sleep(0.1)
+        end
         quasigradient.progress.printed = true
         val = if status == MOI.INFEASIBLE
             Inf
         elseif status == MOI.DUAL_INFEASIBLE
             -Inf
         else
-            0.0
+            Q
         end
         ProgressMeter.update!(quasigradient.progress, update_value,
                               showvalues = [
@@ -113,6 +116,11 @@ function log!(quasigradient::AbstractQuasiGradient; optimal = false, status = no
                                   ("$(indentstr(indent))Early termination", status),
                                   ("$(indentstr(indent))Iterations", iterations)
                               ], keep = keep, offset = offset)
+        if quasigradient.progress isa Progress
+            p = quasigradient.progress
+            print(p.output, "\n" ^ (p.offset + p.numprintedvalues + 1))
+            flush(p.output)
+        end
         return nothing
     end
     # Value update
