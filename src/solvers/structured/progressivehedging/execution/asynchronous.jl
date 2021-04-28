@@ -149,8 +149,8 @@ function iterate!(ph::AbstractProgressiveHedging, execution::AsynchronousExecuti
             return MOI.OPTIMAL
         end
         # Calculate time spent so far and check perform time limit check
-        t = ph.progress.tlast - ph.progress.tfirst
-        if t >= ph.parameters.time_limit
+        time_spent = ph.progress.tlast - ph.progress.tfirst
+        if time_spent >= ph.parameters.time_limit
             log!(ph; status = MOI.TIME_LIMIT)
             return MOI.TIME_LIMIT
         end

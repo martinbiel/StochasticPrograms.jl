@@ -79,8 +79,8 @@ function iterate!(quasigradient::AbstractQuasiGradient, execution::AbstractQuasi
         return MOI.OPTIMAL
     end
     # Calculate time spent so far and check perform time limit check
-    t = quasigradient.progress.tlast - quasigradient.progress.tfirst
-    if t >= quasigradient.parameters.time_limit
+    time_spent = quasigradient.progress.tlast - quasigradient.progress.tfirst
+    if time_spent >= quasigradient.parameters.time_limit
         log!(quasigradient; status = MOI.TIME_LIMIT)
         return MOI.TIME_LIMIT
     end
