@@ -64,11 +64,11 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
         # Define second-stage problems, renaming variables according to scenario.
         stage_two_params = stage_parameters(stochasticprogram, 2)
         visited_objs = collect(keys(object_dictionary(dep_model)))
-        seen_constraints = CI[]
+        first_stage_constraints = CI[]
         # Do not need to map any first-stage decision constraints
         for (F,S) in MOI.get(structure.model, MOI.ListOfConstraints())
             if is_decision_type(F)
-                append!(seen_constraints, MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}()))
+                append!(first_stage_constraints, MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}()))
             end
         end
         # Loop through scenarios and incrementally build deterministic equivalent
@@ -158,16 +158,28 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                 # Bookkeep newkey to avoid handling again
                 push!(visited_objs, newkey)
             end
-            # Update constraint map
-            for (F,S) in MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraints())
-                if is_decision_type(F)
-                    constraints =  filter(MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}())) do ci
-                        !(ci in seen_constraints)
-                    end
-                    proxy_constraints = MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraintIndices{F,S}())
-                    for (proxy,ci) in zip(proxy_constraints, constraints)
-                        structure.constraint_map[(proxy, i)] = typeof(ci)(ci.value)
-                        push!(seen_constraints, ci)
+        end
+        # Update constraint map
+        for (F,S) in MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraints())
+            if is_decision_type(F)
+                # Get all second-stage (F-in-S)-constraints
+                constraints =  filter(MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}())) do ci
+                    !(ci in first_stage_constraints)
+                end
+                # Get all second-stage (F-in-S)-constraints
+                proxy_constraints = MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraintIndices{F,S}())
+                num_proxy = length(proxy_constraints)
+                # Initialize counters
+                scenario_index = 1
+                counter = 0
+                for (i, ci) in enumerate(constraints)
+                    proxy = proxy_constraints[i - (scenario_index - 1) * num_proxy]
+                    structure.constraint_map[(proxy, scenario_index)] = typeof(ci)(ci.value)
+                    counter += 1
+                    if counter == num_proxy
+                        # Reset counter and increment scenario index
+                        counter = 0
+                        scenario_index += 1
                     end
                 end
             end
