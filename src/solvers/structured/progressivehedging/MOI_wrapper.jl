@@ -88,6 +88,8 @@ end
 function load_structure!(optimizer::Optimizer, structure::HorizontalStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
+    # Set subproblem optimizers
+    set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
     # Restore structure if optimization has been run before
     restore_structure!(optimizer)
     # Ensure that execution policy is compatible

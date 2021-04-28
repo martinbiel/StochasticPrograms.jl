@@ -104,11 +104,16 @@ end
 function load_structure!(optimizer::Optimizer, structure::VerticalStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
+    # Set master optimizer
+    set_master_optimizer!(structure, optimizer.master_optimizer)
     # Default subproblem optimizer to master optimizer if
     # none have been set
     if optimizer.subproblem_optimizer === nothing
-        StochasticPrograms.set_subproblem_optimizer!(structure, optimizer.master_optimizer)
+        optimizer.subproblem_optimizer = optimizer.master_optimizer
     end
+    # Set subproblem optimizers
+    set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
+    # Supply the subproblem optimizer if the integer strategy requires it and none have been set
     if optimizer.integer_strategy isa Convexification && optimizer.integer_strategy.parameters.optimizer === nothing
         optimizer.integer_strategy.parameters.optimizer = MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
     end

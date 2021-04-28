@@ -21,7 +21,7 @@ struct MaximumIterations <: AbstractTerminationCriterion
 end
 
 function Progress(termination::MaximumIterations, str::AbstractString)
-    return Progress(termination.parameters.maximum, str)
+    return Progress(termination.parameters.maximum, 0.0, str)
 end
 
 function progress_value(::MaximumIterations, k::Integer, f::AbstractFloat, ∇f_norm::AbstractFloat)

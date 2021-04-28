@@ -106,6 +106,10 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
     restore_structure!(optimizer)
     # Ensure that execution policy is compatible
     ensure_compatible_execution!(optimizer, structure)
+    # Set master optimizer
+    set_master_optimizer!(structure, optimizer.master_optimizer)
+    # Set subproblem optimizers
+    set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
     # Create new L-shaped algorithm
     optimizer.quasigradient = QuasiGradientAlgorithm(structure,
                                                      xâ‚€,

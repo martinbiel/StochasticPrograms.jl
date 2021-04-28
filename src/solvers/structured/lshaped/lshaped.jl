@@ -14,7 +14,7 @@ using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, VerticalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
-using StochasticPrograms: AbstractStructuredOptimizer, RelativeTolerance, MasterOptimizer, SubProblemOptimizer
+using StochasticPrograms: AbstractStructuredOptimizer, set_master_optimizer!, set_subproblem_optimizer!
 using StochasticPrograms: all_decisions, set_decision!, SingleDecisionSet, NoSpecifiedConstraint
 using StochasticPrograms: all_known_decisions, update_known_decisions!, KnownValuesChange, Known, KnownDecision
 using StochasticPrograms: add_subscript

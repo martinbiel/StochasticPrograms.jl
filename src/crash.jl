@@ -28,7 +28,7 @@ L-Shaped Gap  Time: 0:00:00 (8 iterations)
 module Crash
 
 using StochasticPrograms
-using StochasticPrograms: AbstractCrash
+using StochasticPrograms: AbstractCrash, StochasticProgramOptimizer
 using MathOptInterface
 
 const MOI = MathOptInterface
@@ -118,6 +118,52 @@ function (crash::Scenario)(stochasticmodel::StochasticModel, sampler::AbstractSa
     # Get instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
     sp = instantiate(stochasticmodel, sampler, 10; optimizer = optimizer)
+    return crash(sp)
+end
+
+"""
+    PreSolve
+
+Run a provided (ideally suboptimal) optimization procedure and use the (sub)optimal solution as initial decision.
+
+"""
+struct PreSolve <: AbstractCrash
+    optimizer::StochasticProgramOptimizer
+
+    function PreSolve(optimizer_constructor)
+        return new(StochasticProgramOptimizer(optimizer_constructor))
+    end
+end
+
+function (crash::PreSolve)(stochasticprogram::StochasticProgram)
+    optimizer = crash.optimizer.optimizer
+    structure_ = structure(stochasticprogram)
+    # Generate random starting point
+    x₀ = None()(stochasticprogram)
+    # Sanity checks
+    if !supports_structure(optimizer, structure_)
+        @warn "The provided presolve optimizer does not support the underlying structure of the stochastic program. Defaulting to random starting point."
+        return x₀
+    end
+    check_loadable(optimizer, structure_)
+    # Better printing
+    MOI.set(optimizer, MOI.RawParameter("keep"), false)
+    # Load structure
+    load_structure!(optimizer, structure_, x₀)
+    # Run presolve
+    MOI.optimize!(optimizer)
+    # Get solution
+    x₀ = map(all_decision_variables(stochasticprogram, 1)) do dvar
+        return MOI.get(optimizer, MOI.VariablePrimal(), index(dvar))
+    end
+    # Restore problem
+    restore_structure!(optimizer)
+    return x₀
+end
+
+function (crash::PreSolve)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
+    # Get instance optimizer
+    sp = instantiate(stochasticmodel, sampler, 10; optimizer = crash.optimizer.optimizer_constructor)
     return crash(sp)
 end
 
