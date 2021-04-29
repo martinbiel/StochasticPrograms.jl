@@ -2,7 +2,6 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
     stages::S
     decisions::NTuple{N, Decisions}
     structure::ST
-    proxy::NTuple{N,JuMP.Model}
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
     solutioncache::Dict{Symbol, SolutionCache}
@@ -21,13 +20,9 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
         structure = StochasticStructure(decisions, scenario_types, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)
-        proxy = ntuple(Val{N}()) do _
-            Model()
-        end
         return new{N, S, ST}(stages,
                              decisions,
                              structure,
-                             proxy,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
                              Dict{Symbol, SolutionCache}(),
@@ -47,13 +42,9 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
         structure = StochasticStructure(decisions, scenarios, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)
-        proxy = ntuple(Val{N}()) do _
-            Model()
-        end
         return new{N, S, ST}(stages,
                              decisions,
                              structure,
-                             proxy,
                              Dict{Symbol, Function}(),
                              Dict{Symbol, JuMP.Model}(),
                              Dict{Symbol, SolutionCache}(),

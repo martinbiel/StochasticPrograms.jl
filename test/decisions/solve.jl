@@ -93,8 +93,8 @@ function fill_solution!(optimizer::ProgressiveHedging.Optimizer, master_optimize
     MOI.set(subproblem_optimizer, MOI.DualStatus(), MOI.FEASIBLE_POINT)
     MOI.set(subproblem_optimizer, MOI.VariablePrimal(), JuMP.optimizer_index(y,1), 2.0)
     MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(c,1), -1.0)
-    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 1), 2.0)
-    MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 2), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 1), 2.0)
+    MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x), 2), 2.0)
     MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(y), 1), 0.0)
     # Progressive-hedging specific
     optimizer.progressivehedging.data.Q = 4.0

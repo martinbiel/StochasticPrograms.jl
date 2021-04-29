@@ -269,7 +269,7 @@ function JuMP.objective_function(stochasticprogram::StochasticProgram{N},
                                  stage::Integer,
                                  FunType::Type{<:AbstractJuMPScalar} = objective_function_type(stochasticprogram, stage)) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    return objective_function(structure(stochasticprogram), proxy(stochasticprogram, stage), stage, FunType)
+    return objective_function(structure(stochasticprogram), stage, FunType)
 end
 """
     objective_function(stochasticprogram::StochasticProgram,
@@ -284,7 +284,7 @@ function JuMP.objective_function(stochasticprogram::StochasticProgram,
                                  stage::Integer,
                                  scenario_index::Integer,
                                  FunType::Type{<:AbstractJuMPScalar} = objective_function_type(stochasticprogram, stage, scenario_index))
-    return objective_function(structure(stochasticprogram), proxy(stochasticprogram, stage), stage, scenario_index, FunType)
+    return objective_function(structure(stochasticprogram), stage, scenario_index, FunType)
 end
 """
     set_objective_coefficient(stochasticprogram::StochasticProgram, dvar::DecisionVariable, stage::Integer, coefficient::Real)

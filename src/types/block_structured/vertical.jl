@@ -8,11 +8,15 @@ struct VerticalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: Abs
     decisions::NTuple{N, Decisions}
     first_stage::JuMP.Model
     scenarioproblems::SP
+    proxy::NTuple{N,JuMP.Model}
 
     function VerticalStructure(decisions::NTuple{N, Decisions}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         SP = typeof(scenarioproblems)
-        return new{N,M,SP}(decisions, Model(), scenarioproblems)
+        proxy = ntuple(Val{N}()) do _
+            Model()
+        end
+        return new{N,M,SP}(decisions, Model(), scenarioproblems, proxy)
     end
 end
 
@@ -242,11 +246,11 @@ function JuMP.objective_function(structure::VerticalStructure, FunType::Type{<:A
     return jump_function(structure.first_stage, func)
 end
 
-function JuMP.objective_function(structure::AbstractBlockStructure, proxy::JuMP.Model, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
+function JuMP.objective_function(structure::AbstractBlockStructure, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
     if stage == 1
         return objective_function(structure, FunType)
     else
-        return objective_function(proxy, FunType)
+        return objective_function(structure.proxy, FunType)
     end
 end
 
@@ -345,19 +349,18 @@ function JuMP.set_normalized_rhs(structure::VerticalStructure{N},
     return nothing
 end
 
-function DecisionRef(proxy::JuMP.Model, structure::VerticalStructure, index::VI)
+function DecisionRef(structure::VerticalStructure, index::VI)
     return DecisionRef(structure.first_stage, index)
 end
 
 function JuMP.jump_function(structure::VerticalStructure{N},
-                            proxy::JuMP.Model,
                             stage::Integer,
                             f::MOI.AbstractFunction) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     if stage == 1
         return JuMP.jump_function(structure.first_stage, f)
     else
-        return JuMP.jump_function(proxy, f)
+        return JuMP.jump_function(structure.proxy[stage], f)
     end
 end
 

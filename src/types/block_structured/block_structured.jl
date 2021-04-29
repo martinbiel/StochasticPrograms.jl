@@ -39,7 +39,6 @@ function JuMP.objective_function_type(structure::AbstractBlockStructure{N}, stag
 end
 
 function JuMP.objective_function(structure::AbstractBlockStructure{N},
-                                 proxy::JuMP.Model,
                                  stage::Integer,
                                  scenario_index::Integer,
                                  FunType::Type{<:AbstractJuMPScalar}) where N
@@ -47,7 +46,7 @@ function JuMP.objective_function(structure::AbstractBlockStructure{N},
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    objective::FunType = objective_function(scenarioproblems(structure, stage), proxy, scenario_index, FunType)
+    objective::FunType = objective_function(scenarioproblems(structure, stage), structure.proxy[stage], scenario_index, FunType)
     return objective
 end
 
@@ -58,8 +57,14 @@ function JuMP._moi_optimizer_index(structure::AbstractBlockStructure, ci::CI, sc
     return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
 end
 
-function DecisionRef(proxy::JuMP.Model, structure::AbstractBlockStructure, index::VI, scenario_index::Integer)
-    return DecisionRef(proxy, index)
+function DecisionRef(structure::AbstractBlockStructure, index::VI, stage::Integer, scenario_index::Integer)
+    return DecisionRef(structure.proxy[stage], index)
+end
+function DecisionRef(structure::AbstractBlockStructure, index::VI, at_stage::Integer, stage::Integer, scenario_index::Integer)
+    at_stage > 1 || error("There are no scenarios in the first at_stage.")
+    n = num_scenarios(structure, at_stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return DecisionRef(structure.proxy[at_stage], index)
 end
 
 # Getters #
@@ -77,6 +82,10 @@ function scenario_types(structure::AbstractBlockStructure{N}) where N
     return ntuple(Val{N-1}()) do s
         scenario_type(scenarioproblems(structure), s + 1)
     end
+end
+function proxy(structure::AbstractBlockStructure{N}, stage::Integer) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    return structure.proxy[stage]
 end
 function decision(structure::AbstractBlockStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
     stage > 1 || error("There are no scenarios in the first stage.")

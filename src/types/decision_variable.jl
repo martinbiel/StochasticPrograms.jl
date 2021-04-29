@@ -545,7 +545,7 @@ function JuMP.delete(stochasticprogram::StochasticProgram, dvar::DecisionVariabl
               "belong to the stochastic program.")
     end
     proxy_ = proxy(stochasticprogram, stage(dvar))
-    JuMP.delete(proxy_, DecisionRef(proxy_, index(dvar)))
+    #JuMP.delete(proxy_, DecisionRef(proxy_, index(dvar)))
     MOI.delete(structure(stochasticprogram), index(dvar), stage(dvar))
     return nothing
 end
@@ -576,7 +576,7 @@ function JuMP.delete(stochasticprogram::StochasticProgram, dvars::Vector{Decisio
               "belong to the stochastic program.")
     end
     proxy_ = proxy(stochasticprogram, stage(dvars[1]))
-    JuMP.delete(proxy_, DecisionRef.(proxy_, index.(dvars)))
+    #JuMP.delete(proxy_, DecisionRef.(proxy_, index.(dvars)))
     MOI.delete(structure(stochasticprogram), index.(dvars), stage(dvars[1]))
     return nothing
 end
@@ -629,7 +629,6 @@ function JuMP.LowerBoundRef(dvar::DecisionVariable)
                                                 ScalarShape())
 end
 """
-
     set_lower_bound(dvar::DecisionVariable)
 
 Set the lower bound of the first-stage decision variable `dvar` to `lower`. If one does not exist, create a new lower bound constraint.
@@ -1117,17 +1116,17 @@ Base.broadcastable(dvar::DecisionVariable) = Ref(dvar)
 function DecisionRef(dvar::DecisionVariable)
     stage(dvar) > 1 && error("$dvar is scenario dependent, consider `DecisionRef(dvar, scenario_index)`.")
     sp = owner_model(dvar)
-    return DecisionRef(proxy(sp, stage(dvar)), structure(sp), index(dvar))
+    return DecisionRef(structure(sp), index(dvar))
 end
 function DecisionRef(dvar::DecisionVariable, scenario_index::Integer)
     stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `DecisionRef(dvar)`.")
     sp = owner_model(dvar)
-    return DecisionRef(proxy(sp, stage(dvar)), structure(sp), index(dvar), scenario_index)
+    return DecisionRef(structure(sp), index(dvar), stage(dvar), scenario_index)
 end
 function DecisionRef(dvar::DecisionVariable, at_stage::Integer, scenario_index::Integer)
     at_stage > stage(dvar) || error("$dvar can only be known after stage $(stage(dvar)).")
     sp = owner_model(dvar)
-    return DecisionRef(proxy(sp, at_stage), structure(sp), index(dvar), at_stage, scenario_index)
+    return DecisionRef(structure(sp), index(dvar), at_stage, scenario_index)
 -end
 
 is_decision_type(::Type{DecisionVariable}) = true

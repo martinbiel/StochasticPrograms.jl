@@ -80,16 +80,16 @@ end
 
 function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
     # First-stage decisions are unique (reuse)
-    stochasticprogram.proxy[1].ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
-    stochasticprogram.proxy[1].ext[:decisions] = (stochasticprogram.decisions[1],)
+    proxy(stochasticprogram, 1).ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
+    proxy(stochasticprogram, 1).ext[:decisions] = (stochasticprogram.decisions[1],)
     # Generate first stage
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
-    generator(stochasticprogram, :stage_1)(stochasticprogram.proxy[1], stage_parameters(stochasticprogram, 1))
+    generator(stochasticprogram, :stage_1)(proxy(stochasticprogram, 1), stage_parameters(stochasticprogram, 1))
     # Generate remaining stages
     for s in 2:N
         # Initialize decisions
-        stochasticprogram.proxy[s].ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
-        stochasticprogram.proxy[s].ext[:decisions] = ntuple(Val{s}()) do i
+        proxy(stochasticprogram, s).ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
+        proxy(stochasticprogram, s).ext[:decisions] = ntuple(Val{s}()) do i
             if i == s - 1
                 # Known decisions from the previous stages are
                 # the same everywhere.
@@ -103,8 +103,8 @@ function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
         has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
         has_generator(stochasticprogram, decision_key) || error("No decision variables defined in stage problem $(stage-1).")
         # Generate
-        generator(stochasticprogram, decision_key)(stochasticprogram.proxy[s], stage_parameters(stochasticprogram, s-1))
-        generator(stochasticprogram, stage_key)(stochasticprogram.proxy[s], stage_parameters(stochasticprogram, s), scenario(stochasticprogram, s, 1))
+        generator(stochasticprogram, decision_key)(proxy(stochasticprogram, s), stage_parameters(stochasticprogram, s-1))
+        generator(stochasticprogram, stage_key)(proxy(stochasticprogram, s), stage_parameters(stochasticprogram, s), scenario(stochasticprogram, s, 1))
     end
     return nothing
 end

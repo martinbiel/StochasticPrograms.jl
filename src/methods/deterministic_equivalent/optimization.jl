@@ -81,13 +81,14 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Det
         cache[key] = SolutionCache(backend(structure.model))
         cache_model_attributes!(cache[key], backend(structure.model))
         cache_variable_attributes!(cache[key], backend(structure.model), variables) do index
-            structure.variable_map[(index, i)]
+            mapped_index(structure, index, i)
         end
         cache_constraint_attributes!(cache[key], backend(structure.model), constraints) do ci
             if ci isa CI{SingleDecision}
-                return typeof(ci)(structure.variable_map[(MOI.VariableIndex(ci.value), i)].value)
+                mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), i)
+                return typeof(ci)(mapped_vi.value)
             else
-                return structure.constraint_map[(ci, i)]
+                return mapped_index(structure, ci, i)
             end
         end
         # Cache subobjective

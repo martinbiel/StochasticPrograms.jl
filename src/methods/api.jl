@@ -501,8 +501,12 @@ ordered by creation time.
 """
 function all_decision_variables(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    decisions::NTuple{stage,Decisions} = stochasticprogram.proxy[stage].ext[:decisions]
-    return map(all_decisions(decisions[stage])) do index
+    decisions::Decisions = if stage == 1
+        stochasticprogram.decisions[1]
+    else
+        proxy(stochasticprogram, stage).ext[:decisions][stage]
+    end
+    return map(all_decisions(decisions)) do index
         DecisionVariable(stochasticprogram, stage, index)
     end
 end
@@ -520,8 +524,7 @@ end
 Return the proxy model of the `stochasticprogram` at `stage`.
 """
 function proxy(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
-    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    return stochasticprogram.proxy[stage]
+    return proxy(structure(stochasticprogram), stage)
 end
 """
     Base.getindex(stochasticprogram::StochasticProgram, stage::Integer, name::Symbol)

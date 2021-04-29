@@ -241,7 +241,6 @@ function JuMP.delete(stochasticprogram::StochasticProgram, sp_cref::SPConstraint
         error("The constraint reference you are trying to delete does not " *
               "belong to the stochasticprogram.")
     end
-    MOI.delete(backend(proxy(stochasticprogram, 1)), index(sp_cref))
     MOI.delete(structure(stochasticprogram), index(sp_cref), stage(sp_cref))
 end
 """
@@ -269,7 +268,6 @@ function JuMP.delete(stochasticprogram::StochasticProgram, sp_crefs::Vector{<:SP
         error("A constraint reference you are trying to delete does not " *
               "belong to the stochasticprogram.")
     end
-    MOI.delete(backend(proxy(stochasticprogram, stage(sp_crefs[1]))), index.(sp_crefs))
     MOI.delete(structure(stochasticprogram), index.(sp_crefs), stage(sp_crefs[1]))
 end
 """
@@ -316,7 +314,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) wh
     sp = owner_model(sp_cref)
     f = MOI.get(sp, MOI.ConstraintFunction(), sp_cref)::F
     s = MOI.get(sp, MOI.ConstraintSet(), sp_cref)::S
-    return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s)
+    return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), f), s)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where
     {F <: SingleDecision, S <: MOI.AbstractScalarSet}
@@ -327,20 +325,20 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) wh
         s = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintSet(), ci)::SingleDecisionSet
         if s.constraint isa S
             f = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintFunction(), ci)::MOI.SingleVariable
-            return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cef), SingleDecision(f.variable)), s.constraint)
+            return ScalarConstraint(jump_function(structure(sp), stage(sp_cef), SingleDecision(f.variable)), s.constraint)
         end
     end
     # Try to get constraint as usual
     f = MOI.get(sp, MOI.ConstraintFunction(), sp_cref)::F
     s = MOI.get(sp, MOI.ConstraintSet(), sp_cref)::S
-    return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s)
+    return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), f), s)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where
     {F <: VectorDecisionLike, S <: MOI.AbstractVectorSet}
     sp = owner_model(sp_cref)
     f = MOI.get(sp, MOI.ConstraintFunction(), sp_cref)::F
     s = MOI.get(sp, MOI.ConstraintSet(), sp_cref)::S
-    return VectorConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s, sp_cref.shape)
+    return VectorConstraint(jump_function(structure(sp), stage(sp_cref), f), s, sp_cref.shape)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where
     {F <: VectorOfDecisions, S <: MOI.AbstractVectorSet}
@@ -351,13 +349,13 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) wh
         s = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintSet(), ci)::MultipleDecisionSet
         if s.constraint isa S
             f = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintFunction(), ci)::MOI.VectorOfVariables
-            return VectorConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), VectorOfDecisions(f.variables)), s.constraint, sp_cref.shape)
+            return VectorConstraint(jump_function(structure(sp), stage(sp_cref), VectorOfDecisions(f.variables)), s.constraint, sp_cref.shape)
         end
     end
     # Try to get constraint as usual
     f = MOI.get(sp, MOI.ConstraintFunction(), sp_cref)::F
     s = MOI.get(sp, MOI.ConstraintSet(), sp_cref)::S
-    return VectorConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s, sp_cref.shape)
+    return VectorConstraint(jump_function(structure(sp), stage(sp_cref), f), s, sp_cref.shape)
 end
 """
     constraint_object(sp_cref::SPConstraintRef, scenario_index)
@@ -373,7 +371,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
     f = MOI.get(sp, f_attr, sp_cref)::F
     s_attr  = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
     s = MOI.get(sp, s_attr, sp_cref)::S
-    return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s)
+    return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), f), s)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where
     {F <: SingleDecision, S <: MOI.AbstractScalarSet}
@@ -385,7 +383,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
         s_attr = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
         s = MOI.get(structure(sp), s_attr, ci)::SingleDecisionSet
         if s.constraint isa S
-            return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref). SingleDecision(f.variable)), s.constraint)
+            return ScalarConstraint(jump_function(structure(sp), stage(sp_cref). SingleDecision(f.variable)), s.constraint)
         end
     end
     # Try to get constraint as usual
@@ -393,7 +391,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
     f = MOI.get(sp, f_attr, sp_cref)::F
     s_attr  = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
     s = MOI.get(sp, s_attr, sp_cref)::S
-    return ScalarConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s)
+    return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), f), s)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where
     {F <: VectorDecisionLike, S <: MOI.AbstractVectorSet}
@@ -403,7 +401,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
     f = MOI.get(sp, f_attr, sp_cref)::F
     s_attr  = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
     s = MOI.get(sp, s_attr, sp_cref)::S
-    return VectorConstraint(jump_function(structure(sp), f), proxy(sp, stage(sp_cref)), stage(sp_cref), s, sp_cref.shape)
+    return VectorConstraint(jump_function(structure(sp), f), stage(sp_cref), s, sp_cref.shape)
 end
 function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where
     {F <: VectorOfDecisions, S <: MOI.AbstractVectorSet}
@@ -417,7 +415,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
         if s.constraint isa S
             f_attr = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintFunction())
             f = MOI.get(structure(sp), f_attr, ci)::MOI.VectorOfVariables
-            return VectorConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), VectorOfDecisions(f.variables)), s.constraint, sp_cref.shape)
+            return VectorConstraint(jump_function(structure(sp), stage(sp_cref), VectorOfDecisions(f.variables)), s.constraint, sp_cref.shape)
         end
     end
     # Try to get constraint as usual
@@ -425,7 +423,7 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
     f = MOI.get(sp, f_attr, sp_cref)::F
     s_attr  = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
     s = MOI.get(sp, s_attr, sp_cref)::S
-    return VectorConstraint(jump_function(structure(sp), proxy(sp, stage(sp_cref)), stage(sp_cref), f), s, sp_cref.shape)
+    return VectorConstraint(jump_function(structure(sp), stage(sp_cref), f), s, sp_cref.shape)
 end
 """
     set_normalized_coefficient(sp_cref::SPConstraintRef, dvar::DecisionVariable, value)

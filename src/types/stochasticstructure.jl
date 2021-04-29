@@ -177,12 +177,6 @@ end
 function distributed(structure::AbstractStochasticStructure, stage::Integer)
     return false
 end
-function DecisionRef(proxy::JuMP.Model, structure::AbstractStochasticStructure, index::VI, at_stage::Integer, scenario_index::Integer)
-    at_stage > 1 || error("There are no scenarios in the first at_stage.")
-    n = num_scenarios(structure, at_stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    return DecisionRef(proxy, index)
-end
 # ========================== #
 
 # Printing #

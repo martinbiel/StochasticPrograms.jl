@@ -26,30 +26,6 @@ function generate!(stochasticprogram::TwoStageStochasticProgram, structure::Hori
                          stage_parameters(stochasticprogram, 2),
                          structure.decisions[stage-1],
                          subproblem_optimizer(stochasticprogram))
-    # Generate constraint map
-    first_stage_constraints = CI[]
-    # Do not need to map any first-stage decision constraints
-    for (F,S) in MOI.get(proxy(stochasticprogram, 1), MOI.ListOfConstraints())
-        if is_decision_type(F)
-            append!(first_stage_constraints, MOI.get(proxy(stochasticprogram, 1), MOI.ListOfConstraintIndices{F,S}()))
-        end
-    end
-    # Create a temporary WS model
-    proxy_ = proxy(stochasticprogram, 2)
-    ws = WS(stochasticprogram, scenario(stochasticprogram, 1))
-    for (F,S) in MOI.get(proxy_, MOI.ListOfConstraints())
-        if is_decision_type(F)
-            constraints =  filter(MOI.get(ws, MOI.ListOfConstraintIndices{F,S}())) do ci
-                !(ci in first_stage_constraints)
-            end
-            proxy_constraints = MOI.get(proxy_, MOI.ListOfConstraintIndices{F,S}())
-            for (proxy,ci) in zip(proxy_constraints, constraints)
-                for scenario_index in 1:num_scenarios(stochasticprogram, 2)
-                    structure.constraint_map[(proxy, scenario_index)] = typeof(ci)(ci.value)
-                end
-            end
-        end
-    end
     return nothing
 end
 

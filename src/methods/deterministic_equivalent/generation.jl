@@ -24,31 +24,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
         obj = objective_function(dep_model)
         sense = objective_sense(dep_model)
         push!(structure.sub_objectives[1], (sense, moi_function(obj)))
-        # Bookkeeping
-        for (objkey, obj) in object_dictionary(dep_model)
-            if isa(obj, DecisionRef)
-                # Get common index in proxy and add to variable map
-                proxy_var = proxy(stochasticprogram, stage)[objkey]
-                for s in 2:N
-                    # TODO: Update for multi-stage
-                    for i in 1:num_scenarios(structure, s)
-                        structure.variable_map[(index(proxy_var), i)] = index(obj)
-                    end
-                end
-            elseif isa(obj, AbstractArray{<:DecisionRef})
-                # Get common index in proxy
-                proxy_var = proxy(stochasticprogram, stage)[objkey]
-                for (var, proxy) in zip(obj, proxy_var)
-                    # Update variable map
-                    for s in 2:N
-                        # TODO: Update for multi-stage
-                        for i in 1:num_scenarios(structure, s)
-                            structure.variable_map[(index(proxy), i)] = index(var)
-                        end
-                    end
-                end
-            end
-        end
     else
         # Sanity check on scenario probabilities
         if num_scenarios(stochasticprogram, stage) > 0
@@ -64,13 +39,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
         # Define second-stage problems, renaming variables according to scenario.
         stage_two_params = stage_parameters(stochasticprogram, 2)
         visited_objs = collect(keys(object_dictionary(dep_model)))
-        first_stage_constraints = CI[]
-        # Do not need to map any first-stage decision constraints
-        for (F,S) in MOI.get(structure.model, MOI.ListOfConstraints())
-            if is_decision_type(F)
-                append!(first_stage_constraints, MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}()))
-            end
-        end
         # Loop through scenarios and incrementally build deterministic equivalent
         for (i, scenario) in enumerate(scenarios(stochasticprogram))
             # Generate model information for scenario i
@@ -88,11 +56,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
             # Bookkeeping for objects added in scenario i
             for (objkey,obj) in filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
                 newkey = if isa(obj, VariableRef) || isa(obj, DecisionRef)
-                    if isa(obj, DecisionRef)
-                        # Get common index in proxy and add to variable map
-                        proxy_var = proxy(stochasticprogram, stage)[objkey]
-                        structure.variable_map[(index(proxy_var), i)] = index(obj)
-                    end
                     # Update variable name to reflect stage and scenario
                     varname = if N > 2
                         varname = add_subscript(add_subscript(JuMP.name(obj), stage), i)
@@ -113,10 +76,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                     proxy_var = proxy(stochasticprogram, stage)[objkey]
                     # Handle each individual variable in array
                     for (var, proxy) in zip(obj, proxy_var)
-                        # Update variable map
-                        if isa(obj, AbstractArray{<:DecisionRef})
-                            structure.variable_map[(index(proxy), i)] = index(var)
-                        end
                         # Update variable name to reflect stage and scenario
                         splitname = split(name(var), "[")
                         varname = if N > 2
@@ -157,31 +116,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                 delete!(dep_model.obj_dict, objkey)
                 # Bookkeep newkey to avoid handling again
                 push!(visited_objs, newkey)
-            end
-        end
-        # Update constraint map
-        for (F,S) in MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraints())
-            if is_decision_type(F)
-                # Get all second-stage (F-in-S)-constraints
-                constraints =  filter(MOI.get(structure.model, MOI.ListOfConstraintIndices{F,S}())) do ci
-                    !(ci in first_stage_constraints)
-                end
-                # Get all second-stage (F-in-S)-constraints
-                proxy_constraints = MOI.get(proxy(stochasticprogram, stage), MOI.ListOfConstraintIndices{F,S}())
-                num_proxy = length(proxy_constraints)
-                # Initialize counters
-                scenario_index = 1
-                counter = 0
-                for (i, ci) in enumerate(constraints)
-                    proxy = proxy_constraints[i - (scenario_index - 1) * num_proxy]
-                    structure.constraint_map[(proxy, scenario_index)] = typeof(ci)(ci.value)
-                    counter += 1
-                    if counter == num_proxy
-                        # Reset counter and increment scenario index
-                        counter = 0
-                        scenario_index += 1
-                    end
-                end
             end
         end
         # Update objective
