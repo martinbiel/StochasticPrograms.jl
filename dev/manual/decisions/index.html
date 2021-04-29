@@ -50,12 +50,12 @@ println(&quot;lower_bound(y, 1) = lower_bound(y, 1)&quot;)
 println(name(y, 2))
 println(&quot;y has lower bound in scenario 2: $(has_lower_bound(y, 2))&quot;)
 println(&quot;y has upper bound in scenario 2: $(has_upper_bound(y, 2))&quot;)
-println(&quot;lower_bound(y, 2) = lower_bound(y, 2)&quot;)</code></pre><pre class="documenter-example-output">y₁
-y has lower bound in scenario 1: true
+println(&quot;lower_bound(y, 2) = lower_bound(y, 2)&quot;)</code></pre><pre class="documenter-example-output">w
+y has lower bound in scenario 1: false
 y has upper bound in scenario 1: false
 lower_bound(y, 1) = lower_bound(y, 1)
-y₂
-y has lower bound in scenario 2: true
+w
+y has lower bound in scenario 2: false
 y has upper bound in scenario 2: false
 lower_bound(y, 2) = lower_bound(y, 2)</pre><p>The lower bound of <span>$y$</span> is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> structure. Auxiliary variables created with the standard <code>@variable</code> are not available through this API. To access them, either annotate them with <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a> (or <a href="../../library/public/#StochasticPrograms.@recourse"><code>@recourse</code></a> in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:</p><pre><code class="language-julia">w = DEP(sp)[:w]
 println(w)
@@ -73,11 +73,11 @@ println(&quot;Coefficient of x in scenario 2 = $(normalized_coefficient(con, x, 
 println(&quot;Coefficient of y in scenario 2 = $(normalized_coefficient(con, y, 2))&quot;)</code></pre><pre class="documenter-example-output">con
 RHS of con in scenario 1 = 0.0
 Coefficient of x in scenario 1 = -1.0
-Coefficient of y in scenario 1 = 1.0
+Coefficient of y in scenario 1 = 0.0
 con
 RHS of con in scenario 2 = 0.0
 Coefficient of x in scenario 2 = -1.0
-Coefficient of y in scenario 2 = 2.0</pre><h2 id="Decision-objectives"><a class="docs-heading-anchor" href="#Decision-objectives">Decision objectives</a><a id="Decision-objectives-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-objectives" title="Permalink"></a></h2><p>The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:</p><pre><code class="language-julia">println(&quot;Objective in stage 1: $(objective_function(sp, 1))&quot;)
+Coefficient of y in scenario 2 = 0.0</pre><h2 id="Decision-objectives"><a class="docs-heading-anchor" href="#Decision-objectives">Decision objectives</a><a id="Decision-objectives-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-objectives" title="Permalink"></a></h2><p>The objective function of a stochastic program can be obtained in full or in stage and scenario-dependent chunks:</p><pre><code class="language-julia">println(&quot;Objective in stage 1: $(objective_function(sp, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))&quot;)
 println(&quot;Objective in stage 2, scenario 2: $(objective_function(sp, 2, 2))&quot;)
 println(&quot;Full objective: $(objective_function(sp))&quot;)</code></pre><pre class="documenter-example-output">Objective in stage 1: x
@@ -86,8 +86,8 @@ Objective in stage 2, scenario 2: y₂
 Full objective: x - 0.5 y₁ - 0.5 y₂</pre><p>and can be modified accordingly:</p><pre><code class="language-julia">set_objective_coefficient(sp, y, 2, 1, 2.);
 println(&quot;Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))&quot;)
 println(&quot;Full objective: $(objective_function(sp))&quot;)
-set_objective_coefficient(sp, y, 2, 1, 1.);</code></pre><pre class="documenter-example-output">Objective in stage 2, scenario 1: 2 y₁
-Full objective: x + y₁ - 0.5 y₂</pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-julia">set_optimizer(sp, GLPK.Optimizer)
+set_objective_coefficient(sp, y, 2, 1, 1.);</code></pre><pre class="documenter-example-output">Objective in stage 2, scenario 1: 2 w + y₁
+Full objective: x - 0.5 y₁ - 0.5 y₂ + w</pre><p>The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with <a href="../../library/public/#StochasticPrograms.Vertical"><code>Vertical</code></a> or <a href="../../library/public/#StochasticPrograms.Horizontal"><code>Horizontal</code></a> instead.</p><h2 id="Solved-problem"><a class="docs-heading-anchor" href="#Solved-problem">Solved problem</a><a id="Solved-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Solved-problem" title="Permalink"></a></h2><p>After optimizing the stochastic program, attributes for which <code>is_set_by_optimize</code> is true can be accessed using the same scenario-dependent syntax:</p><pre><code class="language-">set_optimizer(sp, GLPK.Optimizer)
 
 optimize!(sp)
 
@@ -113,22 +113,8 @@ println(&quot;value(y, 2) = $(value(y, 2))&quot;)
 println(&quot;reduced_cost(y, 2) = $(reduced_cost(y, 2))&quot;)
 println(&quot;dual(con, 2) = $(dual(con, 2))&quot;)
 println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
-println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
-Objective value: 2.0
-Optimal decision: [2.0]
-value(x) = 2.0
-reduced_cost(x) = 0.75
-value(y, 1) = 1.0
-reduced_cost(y, 1) = 0.5
-dual(con, 1) = 0.0
-Objective value in scenario 1: 1.0
-Optimal recourse in scenario 1: [1.0]
-value(y, 2) = 1.0
-reduced_cost(y, 2) = 0.0
-dual(con, 2) = -0.25
-Objective value in scenario 2: 1.0
-Optimal recourse in scenario 2: [1.0]</pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-julia">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
-Min x + 0.5 y₁ - 0.5 y₂
+println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><p>As mentioned in the <a href="../quickstart/#Quick-start">Quick start</a>, decision evaluation can be performed manually through the decision API. Consider:</p><pre><code class="language-julia">fix(x, 3.);</code></pre><p>This not only fixes <span>$x$</span> in the first-stage, but also in all occurances in subsequent stages:</p><pre><code class="language-julia">print(sp)</code></pre><pre class="documenter-example-output">Deterministic equivalent problem
+Min x - 0.5 y₁ - 0.5 y₂ + 0.5 w
 Subject to
  x ∈ Decisions(value = 3.0)
  y₁ ∈ RecourseDecisions
@@ -180,7 +166,7 @@ Subject to
  y ≥ 0.5
  con : -x + 2 y ≤ 0.0
 
-Solver name: No optimizer attached.</pre><p>We resolve the problem to verify:</p><pre><code class="language-julia">optimize!(sp)
+Solver name: No optimizer attached.</pre><p>We resolve the problem to verify:</p><pre><code class="language-">optimize!(sp)
 
 # Main result
 println(&quot;Termination status: $(termination_status(sp))&quot;)
@@ -206,21 +192,7 @@ println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
 println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
-Objective value: 2.75
-Optimal decision: [3.0]
-value(x) = 3.0
-value(y, 1) = 1.0
-reduced_cost(y, 1) = 0.5
-dual(con, 1) = 0.0
-Objective value in scenario 1: 1.0
-Optimal recourse in scenario 1: [1.0]
-value(y, 2) = 1.5
-reduced_cost(y, 2) = 0.0
-dual(con, 2) = -0.25
-Objective value in scenario 2: 1.5
-Optimal recourse in scenario 2: [1.5]
-Equivalent decision evaluation: 2.75</pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-julia">fix(y, 1, 2.)
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-">fix(y, 1, 2.)
 optimize!(sp)
 
 # Main result
@@ -246,15 +218,4 @@ println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2)
 println(evaluate_decision(sp, [3.]))
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
-Objective value: 2.5
-Optimal decision: [2.0]
-value(x) = 3.0
-value(y, 1) = 2.0
-Objective value in scenario 1: 2.0
-Optimal recourse in scenario 1: [2.0]
-value(y, 2) = 1.0
-Objective value in scenario 2: 1.0
-Optimal recourse in scenario 2: [1.0]
-3.25
-Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Wednesday 28 April 2021 13:24">Wednesday 28 April 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 29 April 2021 13:49">Thursday 29 April 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
