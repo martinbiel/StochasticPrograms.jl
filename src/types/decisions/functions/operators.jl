@@ -8,6 +8,8 @@ const ScalarQuadraticDecisionLike{T} = Union{SingleDecision, AffineDecisionFunct
 
 const TypedScalarDecisionLike{T} = Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}
 const ScalarDecisionLike{T} = Union{SingleDecision, TypedScalarDecisionLike{T}}
+const MixedTypedScalarLike{T} = Union{MOIU.TypedScalarLike{T}, TypedScalarDecisionLike{T}}
+const MixedScalarLike{T} = Union{MOIU.ScalarLike{T}, ScalarDecisionLike{T}}
 
 # Functions convertible to a VectorAffineDecisionFunction
 const VectorAffineLike{T} = Union{MOIU.VectorAffineLike{T}, VectorOfDecisions, VectorAffineDecisionFunction{T}}
@@ -15,6 +17,7 @@ const VectorAffineDecisionLike{T} = Union{VectorOfDecisions, VectorAffineDecisio
 
 const TypedVectorDecisionLike{T} = Union{VectorAffineDecisionFunction{T}}
 const VectorDecisionLike{T} = Union{VectorOfDecisions, VectorAffineDecisionFunction{T}}
+const MixedVectorLike{T} = Union{MOIU.VectorLike{T}, VectorDecisionLike{T}}
 
 const TypedDecisionLike{T} = Union{TypedScalarDecisionLike{T}, TypedVectorDecisionLike{T}}
 const AffineLike{T} = Union{ScalarAffineLike{T}, VectorAffineLike{T}}
@@ -36,7 +39,6 @@ function MOIU.promote_operation(::typeof(-), ::Type{T},
     return QuadraticDecisionFunction{T}
 end
 
-# Separate addition/subtraction into two cases to avoid type piracy
 function MOIU.promote_operation(::Union{typeof(+), typeof(-)}, ::Type{T},
                                 ::Type{<:ScalarAffineDecisionLike{T}},
                                 ::Type{<:ScalarAffineLike{T}}) where T
@@ -79,6 +81,11 @@ function MOIU.operate!(op::Union{typeof(+), typeof(-)}, ::Type{T},
 end
 function MOIU.operate!(op::Union{typeof(+), typeof(-)}, ::Type{T},
                        f::AffineDecisionFunction{T},
+                       g::MOI.ScalarQuadraticFunction{T}) where T
+    return MOIU.operate(op, T, f, g)
+end
+function MOIU.operate!(op::Union{typeof(+), typeof(-)}, ::Type{T},
+                       f::AffineDecisionFunction{T},
                        g::QuadraticDecisionFunction{T}) where T
     return MOIU.operate(op, T, f, g)
 end
@@ -91,10 +98,10 @@ end
 
 # Scalar number +/- ...
 function MOIU.operate(op::typeof(+), ::Type{T}, α::T, f::ScalarDecisionLike{T}) where T
-    return operate(op, T, f, α)
+    return MOIU.operate(op, T, f, α)
 end
 function MOIU.operate(op::typeof(-), ::Type{T}, α::T, f::ScalarDecisionLike{T}) where T
-    return operate!(+, T, operate(-, T, f), α)
+    return MOIU.operate!(+, T, MOIU.operate(-, T, f), α)
 end
 
 # SingleDecision +/- ...
@@ -118,18 +125,33 @@ function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
                       g::SingleDecision) where T
     return AffineDecisionFunction{T}(convert(MOI.ScalarAffineFunction{T}, zero(T)),
                                      MOI.ScalarAffineFunction(
-                                         [MOI.ScalarAffineTerm(-one(T), f.decision),
+                                         [MOI.ScalarAffineTerm(one(T), f.decision),
                                           MOI.ScalarAffineTerm(op(one(T)), g.decision)], zero(T)))
 end
 function MOIU.operate(op::typeof(+), ::Type{T},
                       f::SingleDecision,
-                      g::ScalarAffineLike{T}) where T
+                      g::MOI.ScalarAffineFunction{T}) where T
     return MOIU.operate(op, T, convert(AffineDecisionFunction{T}, g), f)
 end
 function MOIU.operate(op::typeof(-), ::Type{T},
                       f::SingleDecision,
-                      g::ScalarAffineLike{T}) where T
+                      g::MOI.ScalarAffineFunction{T}) where T
     return MOIU.operate!(+, T, MOIU.operate(-, T, convert(AffineDecisionFunction{T}, g)), f)
+end
+function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
+                      f::SingleDecision,
+                      g::AffineDecisionFunction{T}) where T
+    return MOIU.operate(op, T, convert(AffineDecisionFunction{T}, f), g)
+end
+function MOIU.operate(op::typeof(+), ::Type{T},
+                      f::SingleDecision,
+                      g::MOI.ScalarQuadraticFunction{T}) where T
+    return MOIU.operate(op, T, convert(QuadraticDecisionFunction{T}, g), f)
+end
+function MOIU.operate(op::typeof(-), ::Type{T},
+                      f::SingleDecision,
+                      g::MOI.ScalarQuadraticFunction{T}) where T
+    return MOIU.operate!(+, T, MOIU.operate(-, T, convert(QuadraticDecisionFunction{T}, g)), f)
 end
 function MOIU.operate(op::typeof(+), ::Type{T},
                       f::SingleDecision,
@@ -140,16 +162,6 @@ function MOIU.operate(op::typeof(-), ::Type{T},
                       f::SingleDecision,
                       g::QuadraticDecisionFunction{T}) where T
     return MOIU.operate!(+, T, operate(-, T, g), f)
-end
-function MOIU.operate(op::typeof(+), ::Type{T},
-                      f::SingleDecision,
-                      g::ScalarQuadraticLike{T}) where T
-    return MOIU.operate(op, T, convert(QuadraticDecisionFunction{T}, g), f)
-end
-function MOIU.operate(op::typeof(-), ::Type{T},
-                      f::SingleDecision,
-                      g::ScalarQuadraticLike{T}) where T
-    return MOIU.operate!(+, T, operate(-, T, convert(QuadraticDecisionFunction{T}, g)), f)
 end
 
 # SingleVariable +- SingleDecision
@@ -195,20 +207,18 @@ function MOIU.operate(op::Union{typeof(-)}, ::Type{T},
 end
 function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
                       f::QuadraticDecisionFunction{T},
-                      g::ScalarAffineLike{T}) where T
-    MOIU.operate!(op, T, copy(f), g)
-end
-function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
-                      f::QuadraticDecisionFunction{T},
                       g::ScalarQuadraticLike{T}) where T
-    MOIU.operate!(op, T, convert(QuadraticDecisionFunction{T}, g), f)
+    MOIU.operate!(op, T, copy(f), g)
 end
 
 # Base overloads
-function Base.:+(arg::ScalarDecisionLike{T}, args::ScalarDecisionLike{T}...) where T
+function Base.:+(arg::ScalarDecisionLike{T}, args::MixedScalarLike{T}...) where T
     return MOIU.operate(+, T, arg, args...)
 end
-function Base.:+(α::T, arg::TypedScalarDecisionLike{T}, args::ScalarDecisionLike{T}...) where T
+function Base.:+(arg::MOIU.ScalarLike{T}, args::MixedScalarLike{T}...) where T
+    return MOIU.operate(+, T, convert(AffineDecisionFunction{T}, arg), args...)
+end
+function Base.:+(α::T, arg::TypedScalarDecisionLike{T}, args::MixedScalarLike{T}...) where T
     return MOIU.operate(+, T, α, arg, args...)
 end
 function Base.:+(α::Number, f::SingleDecision)
@@ -220,8 +230,11 @@ end
 function Base.:+(f::SingleDecision, α::Number)
     return MOIU.operate(+, typeof(α), f, α)
 end
-function Base.:-(arg::ScalarDecisionLike{T}, args::ScalarDecisionLike{T}...) where T
+function Base.:-(arg::ScalarDecisionLike{T}, args::MixedScalarLike{T}...) where T
     return MOIU.operate(-, T, arg, args...)
+end
+function Base.:-(arg::MOIU.ScalarLike{T}, args::MixedScalarLike{T}...) where T
+    return MOIU.operate(-, T, convert(AffineDecisionFunction{T}, arg), args...)
 end
 function Base.:-(f::TypedScalarDecisionLike{T}, α::T) where T
     return MOIU.operate(-, T, f, α)
@@ -243,7 +256,6 @@ function MOIU.promote_operation(::typeof(-), ::Type{T},
     return VectorAffineDecisionFunction{T}
 end
 
-# Separate addition/subtraction into two cases to avoid type piracy
 function MOIU.promote_operation(::Union{typeof(+), typeof(-)}, ::Type{T},
                                 ::Type{<:VectorAffineDecisionLike{T}},
                                 ::Type{<:VectorAffineLike{T}}) where T
@@ -441,17 +453,23 @@ function MOIU.operate(op::Union{typeof(+), typeof(-)}, ::Type{T},
     return MOIU.operate!(op, T, copy(f), g)
 end
 
-function Base.:+(args::VectorDecisionLike{T}...) where T
-    return MOIU.operate(+, T, args...)
+function Base.:+(arg::VectorDecisionLike{T}, args::MixedVectorLike{T}...) where T
+    return MOIU.operate(+, T, arg, args...)
 end
-function Base.:+(α::Vector{T}, f::VectorDecisionLike{T}, g::VectorDecisionLike{T}...) where T
+function Base.:+(arg::MOIU.VectorLike{T}, args::MixedVectorLike{T}...) where T
+    return MOIU.operate(+, T, convert(VectorAffineDecisionFunction{T}, arg), args...)
+end
+function Base.:+(α::Vector{T}, f::VectorDecisionLike{T}, g::MixedVectorLike{T}...) where T
     return MOIU.operate(+, T, α, f, g...)
 end
 function Base.:+(f::VectorDecisionLike{T}, α::Vector{T}) where T
     return MOIU.operate(+, T, f, α)
 end
-function Base.:-(args::VectorDecisionLike{T}...) where T
-    return MOIU.operate(-, T, args...)
+function Base.:-(arg::VectorDecisionLike{T}, args::MixedVectorLike{T}...) where T
+    return MOIU.operate(-, T, arg, args...)
+end
+function Base.:-(arg::MOIU.VectorLike{T}, args::MixedVectorLike{T}...) where T
+    return MOIU.operate(-, T, convert(VectorAffineDecisionFunction{T}, arg), args...)
 end
 function Base.:-(f::VectorDecisionLike{T}, α::Vector{T}) where T
     return MOIU.operate(-, T, f, α)
@@ -491,6 +509,9 @@ function MOIU.promote_operation(::typeof(*), ::Type{T},
     return QuadraticDecisionFunction{T}
 end
 
+function MOIU.operate!(::typeof(*), ::Type{T}, f::SingleDecision, α::T) where T
+    return MOIU.operate(*, T, α, f)
+end
 function MOIU.operate(::typeof(*), ::Type{T}, α::T, f::SingleDecision) where T
     return AffineDecisionFunction{T}(convert(MOIU.ScalarAffineLike{T}, zero(T)),
                                      MOI.ScalarAffineFunction{T}([MOI.ScalarAffineTerm(α, f.decision)], zero(T)))
@@ -502,6 +523,9 @@ function MOIU.operate(::typeof(*), ::Type{T}, α::T, f::VectorOfDecisions) where
         MOI.VectorAffineFunction(
             [MOI.VectorAffineTerm(i, MOI.ScalarAffineTerm(α, f.decisions[i]))
              for i in eachindex(f.decisions)], zeros(T, MOI.output_dimension(f))))
+end
+function MOIU.operate(::typeof(*), ::Type{T}, f::Union{SingleDecision, VectorOfDecisions}, α::T) where T
+    return MOIU.operate(*, T, α, f)
 end
 
 function MOIU.operate!(::typeof(*), ::Type{T},
@@ -525,9 +549,6 @@ function MOIU.operate!(::typeof(*), ::Type{T},
     return f
 end
 
-function MOIU.operate!(::typeof(*), ::Type{T}, f::Union{SingleDecision, VectorOfDecisions}, α::T) where T
-    return MOIU.operate(*, T, α, f)
-end
 function MOIU.operate(::typeof(*), ::Type{T}, α::T, f::TypedDecisionLike{T}) where T
     return MOIU.operate!(*, T, copy(f), α)
 end
@@ -581,13 +602,13 @@ function MOIU.operate(::typeof(*), ::Type{T}, f::AffineDecisionFunction{T},
     for var_term in f.variable_part.terms
         for dvar_term in g.decision_part.terms
             new_term = MOIU.operate_term(*, dvar_term, var_term)
-            add_term!(cross_terms.quadratic_part, new_term)
+            add_term!(cross_terms.quadratic_terms, new_term)
         end
     end
     for var_term in g.variable_part.terms
         for dvar_term in f.decision_part.terms
             new_term = MOIU.operate_term(*, dvar_term, var_term)
-            add_term!(cross_terms.quadratic_part, new_term)
+            add_term!(cross_terms.quadratic_terms, new_term)
         end
     end
     return QuadraticDecisionFunction(
@@ -612,8 +633,11 @@ MOIU.is_coefficient_type(::Type{<:Union{SingleDecision, VectorOfDecisions}}, ::T
 MOIU.is_coefficient_type(::Type{<:TypedDecisionLike{T}}, ::Type{T}) where T = true
 MOIU.is_coefficient_type(::Type{<:TypedDecisionLike}, ::Type) = false
 
-function Base.:*(f::ScalarDecisionLike{T}, g::ScalarDecisionLike{T}, args::ScalarDecisionLike{T}...) where T
+function Base.:*(f::ScalarDecisionLike{T}, g::MixedScalarLike{T}, args::MixedScalarLike{T}...) where T
     return MOIU.operate(*, T, f, g, args...)
+end
+function Base.:*(f::MOIU.ScalarLike{T}, g::MixedScalarLike{T}, args::MixedScalarLike{T}...) where T
+    return MOIU.operate(*, T, convert(AffineDecisionFunction{T}, f), g, args...)
 end
 function Base.:*(α::T, g::TypedDecisionLike{T}) where T
     return MOIU.operate_coefficients(β -> α * β, g)
@@ -697,6 +721,11 @@ function MOIU.promote_operation(::typeof(/), ::Type{T},
                                 ::Type{<:ScalarAffineDecisionLike{T}},
                                 ::Type{T}) where T
     AffineDecisionFunction{T}
+end
+function MOIU.promote_operation(::typeof(/), ::Type{T},
+                                ::Type{QuadraticDecisionFunction{T}},
+                                ::Type{T}) where T
+    QuadraticDecisionFunction{T}
 end
 
 function MOIU.operate!(::typeof(/), ::Type{T}, f::SingleDecision,

@@ -38,7 +38,7 @@ end
 function MOIU.modify_function(f::VectorAffineDecisionFunction, change::DecisionMultirowChange)
     return typeof(f)(copy(f.variable_part),
                      MOIU.modify_function(f.decision_part,
-                                          DecisionMultirowChange(change.decision, change.new_coefficients)))
+                                          MOI.MultirowChange(change.decision, change.new_coefficients)))
 end
 
 function MOIU.modify_function(f::Union{SingleDecision, AffineDecisionFunction, QuadraticDecisionFunction, VectorAffineDecisionFunction}, change::Union{DecisionStateChange, KnownValuesChange})

@@ -426,6 +426,29 @@ function MOIU.scalarize(f::VectorAffineDecisionFunction{T}, ignore_constants::Bo
     end
 end
 
+function MOIU.convert_approx(::Type{SingleDecision},
+                             func::AffineDecisionFunction{T};
+                             tol = MOIU.tol_default(T)) where {T}
+    f = MOIU.canonical(func)
+    i = findfirst(t -> isapprox(t.coefficient, one(T), atol = tol), f.decision_part.terms)
+    if abs(MOI.constant(f)) > tol ||
+        i === nothing ||
+        any(j -> j != i && abs(f.decision_part.terms[j].coefficient) > tol, eachindex(f.decision_part.terms)) ||
+        any(j -> abs(f.variable_part.terms[j].coefficient) > tol, eachindex(f.variable_part.terms))
+        throw(InexactError(:convert_approx, SingleDecision, func))
+    end
+    return SingleDecision(f.decision_part.terms[i].variable_index)
+end
+
+function MOIU.convert_approx(::Type{VectorOfDecisions},
+                             func::VectorAffineDecisionFunction{T};
+                             tol = MOIU.tol_default(T)) where {T}
+    return VectorOfDecisions([
+        MOIU.convert_approx(SingleDecision, f, tol = tol).decision for
+        f in MOIU.scalarize(func)
+    ])
+end
+
 function modify_coefficient!(terms::Vector{MOI.ScalarAffineTerm{T}},
                              index::MOI.VariableIndex,
                              new_coefficient::Number) where T

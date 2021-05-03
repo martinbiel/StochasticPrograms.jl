@@ -134,7 +134,7 @@ end
 function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::SingleDecision) where T
-    _operate_terms!(op, f.decision_part, convert(AffineDecisionFunction{T}, g))
+    _operate_terms!(op, f.decision_part, convert(AffineDecisionFunction{T}, g).decision_part)
     return f
 end
 function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},

@@ -30,7 +30,11 @@ function Base.convert(::Type{QuadraticDecisionFunction{T}},
                       f::SingleDecision) where T
     return QuadraticDecisionFunction{T}(
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
-        convert(MOI.ScalarQuadraticFunction{T}, f),
+        MOI.ScalarQuadraticFunction{T}(
+            [MOI.ScalarAffineTerm(one(T), f.decision)],
+            MOI.ScalarQuadraticTerm{T}[],
+            zero(T),
+        ),
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
 end
 function Base.convert(::Type{QuadraticDecisionFunction{T}},
