@@ -99,7 +99,7 @@ end
 function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute, value)
     if attr isa MOI.ObjectiveFunction
         # Get full objective+sense
-        dep_obj = value
+        dep_obj = copy(value)
         obj_sense = objective_sense(structure.model)
         # Update first-stage objective
         structure.sub_objectives[1][1] = (obj_sense, value)
@@ -115,7 +115,7 @@ function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttr
         MOI.set(backend(structure.model), attr, dep_obj)
     elseif attr isa MOI.ObjectiveSense
         # Get full objective+sense
-        dep_obj, prev_sense = structure.sub_objective[1][1]
+        prev_sense, dep_obj = structure.sub_objectives[1][1]
         # Update first-stage objective
         structure.sub_objectives[1][1] = (value, dep_obj)
         # Update main objective (if necessary)
@@ -378,7 +378,7 @@ function JuMP.set_objective_sense(structure::DeterministicEquivalent, stage::Int
         # Changes the first-stage sense modifies the whole objective as usual
         MOI.set(structure, MOI.ObjectiveSense(), sense)
     else
-        # Every sub-objective in the given stage should be changes
+        # Every sub-objective in the given stage should be changed
         for scenario_index in 1:num_scenarios(structure, stage)
             # Use temporary model to apply modification
             attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.ObjectiveSense())
@@ -478,8 +478,6 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
             MOI.set(structure, attr, obj)
         end
     end
-    dref = DecisionRef(structure.model, index)
-    set_objective_coefficient(structure.model, dref, coeff)
     return nothing
 end
 function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, index::VI, var_stage::Integer, stage::Integer, scenario_index::Integer, coeff::Real) where N

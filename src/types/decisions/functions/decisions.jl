@@ -15,6 +15,21 @@ Base.copy(f::VectorOfDecisions) = VectorOfDecisions(copy(f.decisions))
 Base.iszero(::SingleDecision) = false
 Base.isone(::SingleDecision) = false
 
+function Base.:(==)(f::VectorOfDecisions, g::VectorOfDecisions)
+    return f.decisions == g.decisions
+end
+
+function Base.isapprox(f::Union{SingleDecision,VectorOfDecisions},
+                       g::Union{SingleDecision,VectorOfDecisions};
+                       kwargs...)
+    return f == g
+end
+
+function Base.convert(::Type{MOI.ScalarAffineFunction{T}},
+                      f::SingleDecision) where T
+    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(f.decision))
+end
+
 # JuMP overrides #
 # ========================== #
 function DecisionRef(model::Model, f::SingleDecision)
@@ -55,7 +70,12 @@ is_decision_type(::Type{VectorOfDecisions}) = true
 # ========================== #
 MOI.constant(f::SingleDecision, T::DataType) = zero(T)
 
-MOIU.eval_variables(varval::Function, f::SingleDecision) = varval(f.decision)
+function MOIU.eval_variables(varval::Function, f::SingleDecision)
+    return varval(f.decision)
+end
+function MOIU.eval_variables(varval::Function, f::VectorOfDecisions)
+    return varval.(f.decisions)
+end
 
 function MOIU.map_indices(index_map::Function, f::SingleDecision)
     return SingleDecision(index_map(f.decision))
@@ -72,6 +92,8 @@ function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorOfDecisions},
                        output_indices::AbstractVector)
     return VectorOfDecisions(it.f.decisions[output_indices])
 end
+
+Base.eltype(it::MOIU.ScalarFunctionIterator{VectorOfDecisions}) = SingleDecision
 
 MOIU.scalar_type(::Type{VectorOfDecisions}) = SingleDecision
 
@@ -91,7 +113,7 @@ end
 
 function MOIU.vectorize(funcs::AbstractVector{SingleDecision})
     decisions = MOI.VariableIndex[f.decision for f in funcs]
-    return VectorOfDecisions(vars)
+    return VectorOfDecisions(decisions)
 end
 
 function MOIU.scalarize(f::VectorOfDecisions, ignore_constants::Bool = false)

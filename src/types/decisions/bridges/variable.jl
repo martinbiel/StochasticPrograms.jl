@@ -138,6 +138,7 @@ function MOIB.bridged_function(bridge::DecisionBridge{T}) where T
 end
 
 function MOIB.Variable.unbridged_map(bridge::DecisionBridge, vi::MOI.VariableIndex)
+    return (bridge.variable => SingleDecision(vi),)
     return (bridge.variable => MOI.SingleVariable(vi),)
 end
 
@@ -316,7 +317,7 @@ function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionCoefficientChange)
     f = MOIB.bridged_variable_function(b, change.decision)
     # Continue modification with mapped variable
-    MOI.modify(b, obj, DecisionCoefficientChange(only(f.terms).variable_index, change.new_coefficient))
+    MOI.modify(b, obj, MOI.ScalarCoefficientChange(only(f.terms).variable_index, change.new_coefficient))
     return nothing
 end
 
@@ -324,6 +325,6 @@ function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionMultirowChange)
     f = MOIB.bridged_variable_function(b, change.decision)
     # Continue modification with mapped variable
-    MOI.modify(b, obj, DecisionMultirowChange(only(f.terms).variable_index, change.new_coefficients))
+    MOI.modify(b, obj, MOI.MultirowChange(only(f.terms).variable_index, change.new_coefficients))
     return nothing
 end

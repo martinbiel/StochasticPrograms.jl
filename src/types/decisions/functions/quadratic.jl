@@ -89,6 +89,24 @@ function Base.one(F::Type{QuadraticDecisionFunction{T}}) where T
     return convert(F, one(T))
 end
 
+function MOI._dicts(f::QuadraticDecisionFunction)
+    return (MOI.sum_dict(MOI.term_pair.(f.variable_part.affine_terms)),
+            MOI.sum_dict(MOI.term_pair.(f.variable_part.quadratic_terms)),
+            MOI.sum_dict(MOI.term_pair.(f.decision_part.affine_terms)),
+            MOI.sum_dict(MOI.term_pair.(f.decision_part.quadratic_terms)),
+            MOI.sum_dict(MOI.term_pair.(f.cross_terms.quadratic_terms)))
+end
+
+function Base.isapprox(f::QuadraticDecisionFunction, g::QuadraticDecisionFunction; kwargs...)
+    return isapprox(MOI.constant(f), MOI.constant(g); kwargs...) && all(
+        MOI.dict_compare.(
+            MOI._dicts(f),
+            MOI._dicts(g),
+            (α, β) -> isapprox(α, β; kwargs...),
+        ),
+    )
+end
+
 # JuMP overrides #
 # ========================== #
 function QuadraticDecisionFunction(quad::DQE)
@@ -197,41 +215,49 @@ function MOIU.substitute_variables(variable_map::Function, f::QuadraticDecisionF
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
     # Substitute variables
     for term in f.variable_part.affine_terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarQuadraticFunction{T}
+        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     for term in f.variable_part.quadratic_terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarQuadraticFunction{T}
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
+        coeff = term.coefficient
+        if term.variable_index_1 == term.variable_index_2
+            coeff /= 2
+        end
+        new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     # Substitute decisions
     for term in f.decision_part.affine_terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        mapped_term = only(new_term.terms)
-        if term != mapped_term
-            # Add mapped variable
-            MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarQuadraticFunction{T}
-        end
-        # Always keep the full term in order to properly unbridge and handle modifications
-        MOIU.operate!(+, T, g.decision_part, new_term)::MOI.ScalarQuadraticFunction{T}
+        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     for term in f.decision_part.quadratic_terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        mapped_term = only(new_term.quadratic_terms)
-        if term != mapped_term
-            # Add mapped variable
-            MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarQuadraticFunction{T}
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
+        coeff = term.coefficient
+        if term.variable_index_1 == term.variable_index_2
+            coeff /= 2
         end
-        # Always keep the full term in order to properly unbridge and handle modifications
-        MOIU.operate!(+, T, g.decision_part, new_term)::MOI.ScalarQuadraticFunction{T}
+        new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     # Substitute decisions in cross terms
     for term in f.cross_terms.quadratic_terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        # The decision in the cross term has been mapped to a variable
-        MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarQuadraticFunction{T}
-        # Always keep the cross terms in order to properly unbridge and handle modifications
-        MOIU.operate!(+, T, g.cross_terms, new_term)::MOI.ScalarQuadraticFunction{T}
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
+        coeff = term.coefficient
+        if term.variable_index_1 == term.variable_index_2
+            coeff /= 2
+        end
+        new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     return g
 end

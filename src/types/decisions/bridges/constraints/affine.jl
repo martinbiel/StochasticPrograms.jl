@@ -43,15 +43,7 @@ MOI.get(b::AffineDecisionConstraintBridge{T, S}, ::MOI.ListOfConstraintIndices{M
 
 function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintFunction,
                  bridge::AffineDecisionConstraintBridge{T}) where T
-    f = bridge.decision_function
-    # Remove mapped variables to properly unbridge
-    from_decision(v) = begin
-        result = any(t -> t.variable_index == v, f.decision_part.terms)
-    end
-    g = AffineDecisionFunction(
-        MOIU.filter_variables(v -> !from_decision(v), f.variable_part),
-        copy(f.decision_part))
-    return g
+    return bridge.decision_function
 end
 
 function MOI.get(model::MOI.ModelLike, attr::MOI.ConstraintSet,
@@ -114,14 +106,5 @@ function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge
     modify_coefficient!(f.variable_part.terms, change.variable, change.new_coefficient)
     # Modify the variable part of the constraint as usual
     MOI.modify(model, bridge.constraint, change)
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionConstraintBridge{T,S}, change::DecisionCoefficientChange) where {T,S}
-    f = bridge.decision_function
-    # Update coefficient in decision part
-    modify_coefficient!(f.decision_part.terms, change.decision, change.new_coefficient)
-    # Update mapped variable through ScalarCoefficientChange
-    MOI.modify(model, bridge, MOI.ScalarCoefficientChange(change.decision, change.new_coefficient))
     return nothing
 end

@@ -280,6 +280,16 @@ function JuMP.unfix(structure::HorizontalStructure{N}, index::MOI.VariableIndex,
     return nothing
 end
 
+function JuMP.set_objective_sense(structure::HorizontalStructure, stage::Integer, sense::MOI.OptimizationSense)
+    if stage == 1
+        # The first stage determines the sense of all subproblems
+        MOI.set(scenarioproblems(structure), MOI.ObjectiveSense(), sense)
+    else
+        # TODO: This can generate a sign flip.
+        MOI.set(scenarioproblems(structure), MOI.ObjectiveSense(), sense)
+    end
+    return nothing
+end
 function JuMP.objective_function_type(structure::HorizontalStructure)
     error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end

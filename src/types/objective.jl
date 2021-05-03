@@ -210,7 +210,7 @@ function JuMP.set_objective_sense(stochasticprogram::StochasticProgram{N}, stage
     # Modify proxy
     set_objective_sense(proxy(stochasticprogram, stage), sense)
     # Modify through structure
-    MOI.set(structure(stochasticprogram), MOI.ObjectiveSense(), stage, sense)
+    set_objective_sense(structure(stochasticprogram), stage, sense)
     return nothing
 end
 """

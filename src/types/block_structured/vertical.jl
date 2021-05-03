@@ -118,7 +118,7 @@ end
 function MOI.set(structure::VerticalStructure, attr::ScenarioDependentModelAttribute, value)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
-    MOI.set(scenarioproblems(subproblem, attr.stage), attr, value)
+    MOI.set(scenarioproblems(structure, attr.stage), attr, value)
     return nothing
 end
 function MOI.set(structure::VerticalStructure, attr::ScenarioDependentVariableAttribute,
@@ -232,6 +232,15 @@ function JuMP.unfix(structure::VerticalStructure{N}, index::MOI.VariableIndex, s
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     unfix(scenarioproblems(structure, stage), index, scenario_index)
+    return nothing
+end
+function JuMP.set_objective_sense(structure::VerticalStructure, stage::Integer, sense::MOI.OptimizationSense)
+    if stage == 1
+        MOI.set(structure, MOI.ObjectiveSense(), sense)
+    else
+        # Every sub-objective in the given stage should be changed
+        MOI.set(scenarioproblems(structure), MOI.ObjectiveSense(), sense)
+    end
     return nothing
 end
 function JuMP.objective_function_type(structure::VerticalStructure)

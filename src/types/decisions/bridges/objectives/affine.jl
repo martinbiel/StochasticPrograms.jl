@@ -59,15 +59,7 @@ end
 
 function MOI.get(model::MOI.ModelLike, attr::MOI.ObjectiveFunction{F},
                  bridge::AffineDecisionObjectiveBridge{T}) where {T, F <: AffineDecisionFunction{T}}
-    f = bridge.decision_function
-    # Remove mapped variables to properly unbridge
-    from_decision(v) = begin
-        result = any(t -> t.variable_index == v, f.decision_part.terms)
-    end
-    g = AffineDecisionFunction(
-        MOIU.filter_variables(v -> !from_decision(v), f.variable_part),
-        copy(f.decision_part))
-    return g
+    return bridge.decision_function
 end
 
 function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionObjectiveBridge{T}, change::MOI.ScalarConstantChange) where T
@@ -84,26 +76,5 @@ function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionObjectiveBridge{
     # Modify the variable part of the mapped objective as well
     F = MOI.ScalarAffineFunction{T}
     MOI.modify(model, MOI.ObjectiveFunction{F}(), change)
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionObjectiveBridge{T}, change::DecisionCoefficientChange) where T
-    f = bridge.decision_function
-    # Update the decision coefficient
-    modify_coefficient!(f.decision_part.terms, change.decision, change.new_coefficient)
-    # Update mapped variable through ScalarCoefficientChange
-    MOI.modify(model, bridge, MOI.ScalarCoefficientChange(change.decision, change.new_coefficient))
-    return nothing
-end
-
-function MOI.modify(model::MOI.ModelLike, bridge::AffineDecisionObjectiveBridge{T}, change::KnownValuesChange) where T
-    f = bridge.decision_function
-    # Update known value
-    known_val = zero(T)
-    for term in f.known_part.terms
-        known_val += term.coefficient * MOI.get(model, MOI.VariablePrimal(), term.variable_index)
-    end
-    # Update known part of objective constant
-    f.known_part.constant = known_val
     return nothing
 end

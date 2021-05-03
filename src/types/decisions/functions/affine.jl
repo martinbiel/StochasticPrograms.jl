@@ -124,7 +124,7 @@ end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}},
                       f::MOI.ScalarAffineFunction{T}) where T
-    variable_part = MOI.VectorAffineFunction{T}([MOI.VectorAffineTerm{T}(1, t) for t in f.part.terms],
+    variable_part = MOI.VectorAffineFunction{T}([MOI.VectorAffineTerm{T}(1, t) for t in f.terms],
                                                 [f.constant])
     return VectorAffineDecisionFunction(variable_part,
                                         MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]))
@@ -161,6 +161,30 @@ end
 
 function Base.one(F::Type{AffineDecisionFunction{T}}) where T
     return convert(F, one(T))
+end
+
+function MOI._dicts(f::Union{AffineDecisionFunction, VectorAffineDecisionFunction})
+    return (MOI.sum_dict(MOI.term_pair.(f.variable_part.terms)),
+            MOI.sum_dict(MOI.term_pair.(f.decision_part.terms)))
+end
+
+function Base.isapprox(f::F, g::G; kwargs...) where {
+    F<:Union{
+        AffineDecisionFunction,
+        VectorAffineDecisionFunction,
+    },
+    G<:Union{
+        AffineDecisionFunction,
+        VectorAffineDecisionFunction,
+    },
+}
+    return isapprox(MOI.constant(f), MOI.constant(g); kwargs...) && all(
+        MOI.dict_compare.(
+            MOI._dicts(f),
+            MOI._dicts(g),
+            (α, β) -> isapprox(α, β; kwargs...),
+        ),
+    )
 end
 
 # JuMP overrides #
@@ -316,20 +340,15 @@ function MOIU.substitute_variables(variable_map::Function, f::AffineDecisionFunc
                                convert(MOI.ScalarAffineFunction{T}, zero(T)))
     # Substitute variables
     for term in f.variable_part.terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        MOIU.operate!(+, T, g.variable_part, new_term)::MOI.ScalarAffineFunction{T}
+        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::AffineDecisionFunction{T}
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        new_term = MOIU.substitute_variables(variable_map, term)
-        mapped_term = only(new_term.terms)
-        mapped_variable = MOI.ScalarAffineFunction{T}([mapped_term], zero(T))
-        if term != mapped_term
-            # Add mapped variable
-            MOIU.operate!(+, T, g.variable_part, mapped_variable)::MOI.ScalarAffineFunction{T}
-        end
-        # Always keep the term as decision in order to properly unbridge and handle modifications
-        MOIU.operate!(+, T, g.decision_part, mapped_variable)::MOI.ScalarAffineFunction{T}
+        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
+        MOIU.operate!(+, T, g, new_term)::AffineDecisionFunction{T}
     end
     return g
 end
@@ -340,20 +359,15 @@ function MOIU.substitute_variables(variable_map::Function, f::VectorAffineDecisi
                                      MOI.VectorAffineFunction(MOI.VectorAffineTerm{T}[], zeros(T, n)))
     # Substitute variables
     for term in f.variable_part.terms
-        new_term = MOIU.substitute_variables(variable_map, term.scalar_term)
+        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable_index)
+        new_term = MOIU.operate(*, T, term.scalar_term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::typeof(g)
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        new_term = MOIU.substitute_variables(variable_map, term.scalar_term)
-        mapped_term = only(new_term.terms)
-        mapped_variable = MOI.ScalarAffineFunction{T}([mapped_term], zero(T))
-        if term.scalar_term != mapped_term
-            # Add mapped variable
-            MOIU.operate_output_index!(+, T, term.output_index, g.variable_part, mapped_variable)::MOI.VectorAffineFunction{T}
-        end
-        # Always keep the term as decision in order to properly unbridge and handle modifications
-        MOIU.operate_output_index!(+, T, term.output_index, g.decision_part, mapped_variable)::MOI.VectorAffineFunction{T}
+        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable_index)
+        new_term = MOIU.operate(*, T, term.scalar_term.coefficient, func)::AffineDecisionFunction{T}
+        MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::VectorAffineDecisionFunction{T}
     end
     return g
 end
