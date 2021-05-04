@@ -162,7 +162,7 @@ function MOI.optimize!(optimizer::Optimizer)
         optimizer.raw_status = "L-shaped procedure converged to optimal solution."
     end
     # Extract solve time
-    optimizer.solve_time = optimizer.lshaped.progress.tlast - optimizer.lshaped.progress.tfirst
+    optimizer.solve_time = optimizer.lshaped.progress.tlast - optimizer.lshaped.progress.tinit
     return nothing
 end
 

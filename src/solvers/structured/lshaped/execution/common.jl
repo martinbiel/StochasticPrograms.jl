@@ -132,7 +132,7 @@ function iterate!(lshaped::AbstractLShaped, ::AbstractLShapedExecution)
         return MOI.OPTIMAL
     end
     # Calculate time spent so far and check perform time limit check
-    time_spent = lshaped.progress.tlast - lshaped.progress.tfirst
+    time_spent = lshaped.progress.tlast - lshaped.progress.tinit
     if time_spent >= lshaped.parameters.time_limit
         log!(lshaped; status = MOI.TIME_LIMIT)
         return MOI.TIME_LIMIT

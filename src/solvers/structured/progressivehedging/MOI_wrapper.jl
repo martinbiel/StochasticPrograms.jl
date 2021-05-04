@@ -127,7 +127,7 @@ function MOI.optimize!(optimizer::Optimizer)
         optimizer.raw_status = "Progressive-hedging procedure converged to optimal solution."
     end
     # Extract solve time
-    optimizer.solve_time = optimizer.progressivehedging.progress.tlast - optimizer.progressivehedging.progress.tfirst
+    optimizer.solve_time = optimizer.progressivehedging.progress.tlast - optimizer.progressivehedging.progress.tinit
     return nothing
 end
 

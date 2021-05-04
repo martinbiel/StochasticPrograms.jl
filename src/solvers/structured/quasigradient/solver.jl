@@ -133,7 +133,7 @@ end
 
 function (quasigradient::QuasiGradientAlgorithm)()
     # Reset timer
-    quasigradient.progress.tfirst = quasigradient.progress.tlast = time()
+    quasigradient.progress.tinit = quasigradient.progress.tlast = time()
     # Start workers (if any)
     start_workers!(quasigradient)
     # Start procedure

@@ -154,7 +154,7 @@ end
 
 function (lshaped::LShapedAlgorithm)()
     # Reset timer
-    lshaped.progress.tfirst = lshaped.progress.tlast = time()
+    lshaped.progress.tinit = lshaped.progress.tlast = time()
     # Start workers (if any)
     start_workers!(lshaped)
     # Start procedure

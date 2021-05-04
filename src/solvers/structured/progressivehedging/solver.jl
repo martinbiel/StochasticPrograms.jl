@@ -108,7 +108,7 @@ end
 
 function (ph::ProgressiveHedgingAlgorithm)()
     # Reset timer
-    ph.progress.tfirst = ph.progress.tlast = time()
+    ph.progress.tinit = ph.progress.tlast = time()
     # Start workers (if any)
     start_workers!(ph)
     # Start procedure
