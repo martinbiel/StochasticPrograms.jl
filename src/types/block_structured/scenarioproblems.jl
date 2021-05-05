@@ -9,7 +9,7 @@ struct ScenarioProblems{S <: AbstractScenario} <: AbstractScenarioProblems{S}
     end
 end
 ScenarioProblemChannel{S} = RemoteChannel{Channel{ScenarioProblems{S}}}
-DecisionChannel = RemoteChannel{Channel{Decisions}}
+DecisionChannel = RemoteChannel{Channel{DecisionMap}}
 struct DistributedScenarioProblems{S <: AbstractScenario} <: AbstractScenarioProblems{S}
     scenario_distribution::Vector{Int}
     scenarioproblems::Vector{ScenarioProblemChannel{S}}
@@ -33,7 +33,7 @@ function DistributedScenarioProblems(_scenarios::Vector{S}) where S <: AbstractS
         for (i,w) in enumerate(workers())
             n = nscen + (extra > 0)
             scenarioproblems[i] = RemoteChannel(() -> Channel{ScenarioProblems{S}}(1), w)
-            decisions[i] = RemoteChannel(() -> Channel{Decisions}(1), w)
+            decisions[i] = RemoteChannel(() -> Channel{DecisionMap}(1), w)
             scenario_range = start:stop
             @async remotecall_fetch(
                 w,
@@ -44,7 +44,7 @@ function DistributedScenarioProblems(_scenarios::Vector{S}) where S <: AbstractS
             @async remotecall_fetch(
                 w,
                 decisions[i]) do channel
-                    put!(channel, Decisions())
+                    put!(channel, DecisionMap())
                 end
             scenario_distribution[i] = n
             start = stop + 1
@@ -778,7 +778,7 @@ function clear!(scenarioproblems::ScenarioProblems)
     map(scenarioproblems.problems) do subprob
         # Clear decisions
         if haskey(subprob.ext, :decisions)
-            map(clear!, subprob.ext[:decisions])
+            clear!(subprob.ext[:decisions])
         end
         # Clear model
         empty!(subprob)

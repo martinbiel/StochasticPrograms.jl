@@ -9,7 +9,7 @@ struct SerialExecution{T <: AbstractFloat,
                        F <: AbstractFeasibilityAlgorithm,
                        I <: AbstractIntegerAlgorithm} <: AbstractLShapedExecution
     subproblems::Vector{SubProblem{T,F,I}}
-    decisions::Decisions
+    decisions::DecisionMap
     subobjectives::A
     model_objectives::A
     metadata::MetaData

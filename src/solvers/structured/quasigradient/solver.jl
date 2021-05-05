@@ -40,7 +40,7 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
 
     # Master
     master::M
-    decisions::Decisions
+    decisions::DecisionMap
     x::A
     ξ::A
     c::A

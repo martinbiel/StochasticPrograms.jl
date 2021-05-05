@@ -6,7 +6,7 @@ Functor object for using serial execution in a quasi-gradient algorithm. Create 
 """
 struct SerialExecution{T <: AbstractFloat, S <: AbstractSubProblem{T}} <: AbstractQuasiGradientExecution
     subproblems::Vector{S}
-    decisions::Decisions
+    decisions::DecisionMap
 
     function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}}, x::AbstractVector, subproblems::Unaltered, ::Type{T}) where T <: AbstractFloat
         execution = new{T,SubProblem{T}}(Vector{SubProblem{T}}(), structure.decisions[2])
@@ -37,7 +37,7 @@ function initialize_subproblems!(execution::SerialExecution{T,SmoothSubProblem{T
                                  kw...) where T <: AbstractFloat
     for vi in all_known_decisions(execution.decisions)
         # Unfix first-stage decisions
-        execution.decisions.decisions[vi].state = NotTaken
+        execution.decisions[vi].state = NotTaken
     end
     # Load smooth subproblems (through Moreau envelope)
     for i in 1:num_subproblems(scenarioproblems)

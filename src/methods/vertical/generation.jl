@@ -21,8 +21,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
             end
         end
         # Prepare decisions
-        structure.first_stage.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
-        structure.first_stage.ext[:decisions] = (structure.decisions[1],)
+        structure.first_stage.ext[:decisions] = Decisions((structure.decisions[1],))
         add_decision_bridges!(structure.first_stage)
         # Generate first stage
         generator(stochasticprogram, :stage_1)(structure.first_stage, stage_parameters(stochasticprogram, 1))
@@ -56,23 +55,23 @@ function generate_vertical!(scenarioproblems::ScenarioProblems,
                             generator::Function,
                             decision_params::Any,
                             stage_params::Any,
-                            decisions::Decisions,
+                            decision_map::DecisionMap,
                             optimizer)
     for i in num_subproblems(scenarioproblems)+1:num_scenarios(scenarioproblems)
         # Create subproblem
         subproblem = optimizer == nothing ? Model() : Model(optimizer)
         # Prepare decisions
-        subproblem.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
-        subproblem.ext[:decisions] = ntuple(Val{stage}()) do s
+        decisions = ntuple(Val{stage}()) do s
             if s == stage - 1
                 # Known decisions from the previous stages are
                 # the same everywhere.
-                decisions
+                decision_map
             else
                 # Remaining decisions are unique to each subproblem
-                Decisions()
+                DecisionMap()
             end
         end
+        subproblem.ext[:decisions] = Decisions(decisions)
         add_decision_bridges!(subproblem)
         # Generate and return the stage model
         decision_generator(subproblem, decision_params)
@@ -87,7 +86,7 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
                             generator::Function,
                             decision_params::Any,
                             stage_params::Any,
-                            ::Decisions,
+                            ::DecisionMap,
                             optimizer)
     @sync begin
         for w in workers()
@@ -117,7 +116,7 @@ end
 
 function clear!(structure::VerticalStructure{N}) where N
     # Clear decisions
-    map(clear!, structure.decisions)
+    clear!(structure.decisions)
     # Clear all stages
     for stage in 1:N
         clear_stage!(structure, stage)

@@ -4,7 +4,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
     # Set the optimizer
     structure.model.moi_backend = optimizer(stochasticprogram)
     # Prepare decisions
-    structure.model.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
     structure.model.ext[:decisions] = structure.decisions
     add_decision_bridges!(structure.model)
     # Generate all stages
@@ -127,7 +126,7 @@ end
 
 function clear!(dep::DeterministicEquivalent)
     # Clear decisions
-    map(clear!, dep.decisions)
+    clear!(dep.decisions)
     # Clear subobjectives
     map(empty!, dep.sub_objectives)
     # Clear deterministic equivalent model

@@ -15,7 +15,7 @@ using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, VerticalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, set_master_optimizer!, set_subproblem_optimizer!
-using StochasticPrograms: all_decisions, set_decision!, SingleDecisionSet, NoSpecifiedConstraint
+using StochasticPrograms: DecisionMap, all_decisions, set_decision!, set_stage!, SingleDecisionSet, NoSpecifiedConstraint
 using StochasticPrograms: all_known_decisions, update_known_decisions!, KnownValuesChange, Known, KnownDecision
 using StochasticPrograms: add_subscript
 using StochasticPrograms: AbstractPenaltyTerm, Quadratic, InfNorm, ManhattanNorm, initialize_penaltyterm!, update_penaltyterm!, remove_penalty!, remove_penalty_variables!, remove_penalty_constraints!

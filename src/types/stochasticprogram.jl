@@ -1,6 +1,6 @@
 struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStructure{N}}
     stages::S
-    decisions::NTuple{N, Decisions}
+    decisions::Decisions{N}
     structure::ST
     generator::Dict{Symbol, Function}
     problemcache::Dict{Symbol, JuMP.Model}
@@ -14,9 +14,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         S = typeof(stages)
-        decisions = ntuple(Val(N)) do i
-            Decisions()
-        end
+        decisions = Decisions(Val(N))
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
         structure = StochasticStructure(decisions, scenario_types, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)
@@ -36,9 +34,7 @@ struct StochasticProgram{N, S <: NTuple{N, Stage}, ST <: AbstractStochasticStruc
         N >= 2 || error("Stochastic program needs at least two stages.")
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         S = typeof(stages)
-        decisions = ntuple(Val(N)) do i
-            Decisions()
-        end
+        decisions = Decisions(Val(N))
         optimizer = StochasticProgramOptimizer(optimizer_constructor)
         structure = StochasticStructure(decisions, scenarios, default_structure(instantiation, optimizer.optimizer))
         ST = typeof(structure)

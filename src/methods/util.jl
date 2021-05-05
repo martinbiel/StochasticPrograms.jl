@@ -206,7 +206,7 @@ end
 
 function decision_variables_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    return all_decisions(get_decisions(proxy(stochasticprogram, s), s))
+    return all_decisions(get_decisions(proxy(stochasticprogram, s)), s)
 end
 
 function decision_constraints_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N

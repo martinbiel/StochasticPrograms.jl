@@ -501,12 +501,12 @@ ordered by creation time.
 """
 function all_decision_variables(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    decisions::Decisions = if stage == 1
-        stochasticprogram.decisions[1]
+    decisions = if stage == 1
+        all_decisions(stochasticprogram.decisions, 1)
     else
-        proxy(stochasticprogram, stage).ext[:decisions][stage]
+        all_decisions(proxy(stochasticprogram, stage).ext[:decisions], stage)
     end
-    return map(all_decisions(decisions)) do index
+    return map(decisions) do index
         DecisionVariable(stochasticprogram, stage, index)
     end
 end

@@ -5,13 +5,13 @@ Deterministic equivalent memory structure. Stochastic program is stored as one l
 
 """
 struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStochasticStructure{N}
-    decisions::NTuple{N, Decisions}
+    decisions::Decisions{N}
     scenarios::S
     sub_objectives::NTuple{N, Vector{Tuple{MOI.OptimizationSense, MOI.AbstractScalarFunction}}}
     model::JuMP.Model
     proxy::NTuple{N,JuMP.Model}
 
-    function DeterministicEquivalent(decisions::NTuple{N, Decisions}, scenarios::NTuple{M, Scenarios}) where {N, M}
+    function DeterministicEquivalent(decisions::Decisions{N}, scenarios::NTuple{M, Scenarios}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         sub_objectives = ntuple(Val(N)) do i
             Vector{Tuple{MOI.ObjectiveSense, MOI.AbstractScalarFunction}}()
@@ -24,14 +24,14 @@ struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStoch
     end
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenario_types::ScenarioTypes{M}, ::Deterministic) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenario_types::ScenarioTypes{M}, ::Deterministic) where {N, M}
     scenarios = ntuple(Val(M)) do i
         Vector{scenario_types[i]}()
     end
     return DeterministicEquivalent(decisions, scenarios)
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, ::Deterministic) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, ::Deterministic) where {N, M}
     return DeterministicEquivalent(decisions, scenarios)
 end
 
@@ -625,14 +625,14 @@ function proxy(structure::DeterministicEquivalent{N}, stage::Integer) where N
 end
 function decision(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
-    return decision(structure.decisions[stage], index)
+    return decision(structure.decisions, stage, index)
 end
 function decision(structure::DeterministicEquivalent{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, index, scenario_index)
-    return decision(structure.decisions[stage], mapped_vi)
+    return decision(structure.decisions, stage, mapped_vi)
 end
 function scenario(structure::DeterministicEquivalent{N}, stage::Integer, scenario_index::Integer) where N
     return structure.scenarios[stage-1][scenario_index]

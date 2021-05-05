@@ -5,11 +5,11 @@ Horizontal memory structure. Decomposes stochastic program by scenario.
 
 """
 struct HorizontalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
-    decisions::NTuple{N, Decisions}
+    decisions::Decisions{N}
     scenarioproblems::SP
     proxy::NTuple{N,JuMP.Model}
 
-    function HorizontalStructure(decisions::NTuple{N, Decisions}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
+    function HorizontalStructure(decisions::Decisions{N}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         SP = typeof(scenarioproblems)
         proxy = ntuple(Val{N}()) do _
@@ -19,14 +19,14 @@ struct HorizontalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: A
     end
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenario_types::ScenarioTypes{M}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenario_types::ScenarioTypes{M}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end
     return HorizontalStructure(decisions, scenarioproblems)
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenarios[i], instantiation)
     end
@@ -420,7 +420,7 @@ end
 
 function decision(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
-    return decision(structure.decisions[stage], index)
+    return decision(structure.decisions, stage, index)
 end
 
 # Setters #

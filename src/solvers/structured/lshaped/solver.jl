@@ -49,7 +49,7 @@ struct LShapedAlgorithm{T <: AbstractFloat,
 
     # Master
     master::M
-    decisions::Decisions
+    decisions::DecisionMap
     x::A
     Q_history::A
 

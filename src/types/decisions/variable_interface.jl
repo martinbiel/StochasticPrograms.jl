@@ -11,21 +11,19 @@ is_decision_type(::Type{DecisionRef}) = true
 
 # Getters (model) #
 # ========================== #
-function get_decisions(model::JuMP.Model, s::Integer = 1)::Decisions
+function get_decisions(model::JuMP.Model)::Decisions
     !haskey(model.ext, :decisions) && return IgnoreDecisions()
-    N = length(model.ext[:decisions])
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    return model.ext[:decisions][s]
+    return model.ext[:decisions]
 end
 
-function all_decisions(model::JuMP.Model, s::Integer = 1)
-    decisions = get_decisions(model, s)::Decisions
-    return all_decisions(decisions)
+function all_decisions(model::JuMP.Model, stage::Integer = 1)
+    decisions = get_decisions(model)::Decisions
+    return all_decisions(decisions, stage)
 end
 
-function all_known_decisions(model::JuMP.Model, s::Integer = 2)
-    decisions = get_decisions(model, s)::Decisions
-    return all_known_decisions(decisions)
+function all_known_decisions(model::JuMP.Model, stage::Integer = 2)
+    decisions = get_decisions(model)::Decisions
+    return all_known_decisions(decisions, stage)
 end
 """
     all_decision_variables(model::JuMP.Model)
@@ -35,7 +33,7 @@ ordered by creation time.
 """
 function all_decision_variables(model::JuMP.Model)
     haskey(model.ext, :decisions) || error("No decisions in model.")
-    N = length(model.ext[:decisions])
+    N = stage(model)
     return ntuple(Val{N}()) do stage
         return all_decision_variables(model, stage)
     end
@@ -48,8 +46,8 @@ ordered by creation time.
 """
 function all_decision_variables(model::JuMP.Model, stage::Integer)
     haskey(model.ext, :decisions) || error("No decisions in model.")
-    decisions = get_decisions(model, stage)::Decisions
-    return map(all_decisions(decisions)) do index
+    decisions = get_decisions(model)::Decisions
+    return map(all_decisions(decisions, stage)) do index
         DecisionRef(model, index)
     end
 end
@@ -61,7 +59,7 @@ ordered by creation time.
 """
 function all_known_decision_variables(model::JuMP.Model)
     haskey(model.ext, :decisions) || error("No decisions in model.")
-    N = length(model.ext[:decisions])
+    N = stage(model)
     return ntuple(Val{N}()) do s
         return all_known_decision_variables(model, s)
     end
@@ -74,8 +72,8 @@ ordered by creation time.
 """
 function all_known_decision_variables(model::JuMP.Model, stage::Integer)
     haskey(model.ext, :decisions) || error("No decisions in model.")
-    decisions = get_decisions(model, stage)::Decisions
-    return map(all_known_decisions(decisions)) do index
+    decisions = get_decisions(model)::Decisions
+    return map(all_known_decisions(decisions, stage)) do index
         DecisionRef(model, index)
     end
 end
@@ -86,7 +84,7 @@ Returns a list of all auxiliary variables currently in the decision `model` thro
 """
 function all_auxiliary_variables(model::JuMP.Model)
     haskey(model.ext, :decisions) || error("No decisions in model. Use `all_variables` as usual.")
-    N = length(model.ext[:decisions])
+    N = stage(model)
     all_known = mapreduce(vcat, all_known_decision_variables(model)) do krefs
         index.(krefs)
     end
@@ -104,8 +102,8 @@ end
 Return the number of decisions in `model` at stage `stage`. Defaults to the first stage.
 """
 function num_decisions(model::JuMP.Model, stage::Integer = 1)
-    decisions = get_decisions(model, stage)::Decisions
-    return num_decisions(decisions)
+    decisions = get_decisions(model)::Decisions
+    return num_decisions(decisions, stage)
 end
 """
     num_known_decisions(model::JuMP.Model, stage::Integer = 2)
@@ -114,25 +112,23 @@ Return the number of known decisions in `model` at stage `stage`. Defaults to th
 """
 function num_known_decisions(model::JuMP.Model, stage::Integer = 2)
     stage > 1 || error("No decisions can be known in the first stage.")
-    decisions = get_decisions(model, stage - 1)::Decisions
-    return num_known_decisions(decisions)
+    decisions = get_decisions(model)::Decisions
+    return num_known_decisions(decisions, stage - 1)
 end
 
 # Getters (refs) #
 # ========================== #
 function stage(model::JuMP.Model)
     haskey(model.ext, :decisions) || error("No decisions in model.")
-    N = length(model.ext[:decisions])
+    return num_stages(get_decisions(model))
 end
 function stage(dref::DecisionRef)
-    haskey(dref.model.ext, :stage_map) || error("No decisions in model.")
-    return dref.model.ext[:stage_map][index(dref)]
+    haskey(dref.model.ext, :decisions) || error("No decisions in model.")
+    return stage(get_decisions(owner_model(dref)), index(dref))
 end
 
 function get_decisions(dref::DecisionRef)::Decisions
-    s = stage(dref)
-    s == 0 && return IgnoreDecisions()
-    return get_decisions(dref.model, s)
+    return get_decisions(owner_model(dref))
 end
 """
     decision(dref::DecisionRef)
@@ -582,16 +578,18 @@ end
 # JuMP copy interface #
 # ========================== #
 function JuMP.copy_extension_data(decisions::NTuple{N,Decisions}, dest::Model, src::Model) where N
-    new_decisions = ntuple(Val{N}()) do _
-        Decisions()
+    new_maps = ntuple(Val{N}()) do _
+        DecisionMap()
     end
+    new_decisions = Decisions(new_maps)
     for s in 1:N
         for dref in all_decision_variables(src, s)
-            set_decision!(new_decisions[s], index(dref), decision(dref))
+            set_stage!(new_decisions, index(dref), stage(dref))
+            set_decision!(new_decisions, index(dref), decision(dref))
         end
-        # TODO
         for kref in all_known_decision_variables(src, s)
-            set_known_decision!(new_decisions[s], index(kref), decision(kref))
+            set_stage!(new_decisions, index(kref), stage(kref))
+            set_decision!(new_decisions, index(kref), decision(kref))
         end
     end
     return new_decisions

@@ -4,7 +4,7 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
     optimizer::MOI.AbstractOptimizer
     objective::MOI.AbstractScalarFunction
 
-    decisions::Decisions
+    decisions::DecisionMap
     projection_targets::Vector{MOI.VariableIndex}
     ξ::Vector{Decision{T}}
 
@@ -34,12 +34,12 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
         MOI.optimize!(optimizer)
         status = MOI.get(optimizer, MOI.TerminationStatus())
         x₀ = if status in AcceptableTermination
-            x₀ = map(all_decisions(decisions)) do vi
+            x₀ = map(all_decisions(decisions, 1)) do vi
                 T(MOI.get(optimizer, MOI.VariablePrimal(), vi))
             end
         else
             # Fallback in case crash was unsuccessful
-            x₀ = rand(T, num_decisions(decisions))
+            x₀ = rand(T, num_decisions(decisions, 1))
         end
         A = typeof(x₀)
         ξ = map(x₀) do val
@@ -51,7 +51,7 @@ struct SubProblem{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenalty
                                  π,
                                  optimizer,
                                  objective,
-                                 decisions,
+                                 decisions[1],
                                  Vector{MOI.VariableIndex}(undef, length(x₀)),
                                  ξ,
                                  x₀,

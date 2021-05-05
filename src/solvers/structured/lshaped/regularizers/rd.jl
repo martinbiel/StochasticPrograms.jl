@@ -34,7 +34,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: A
     data::RDData{T}
     parameters::RDParameters{T}
 
-    decisions::Decisions
+    decisions::DecisionMap
     projection_targets::Vector{MOI.VariableIndex}
     ξ::Vector{Decision{T}}
 
@@ -44,7 +44,7 @@ struct RegularizedDecomposition{T <: AbstractFloat, A <: AbstractVector, PT <: A
 
     penaltyterm::PT
 
-    function RegularizedDecomposition(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
+    function RegularizedDecomposition(decisions::DecisionMap, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -186,7 +186,7 @@ function MOI.set(rd::RD, ::RegularizationPenaltyTerm, penaltyterm::AbstractPenal
     return rd.penaltyterm = penaltyterm
 end
 
-function (rd::RD)(decisions::Decisions, x::AbstractVector)
+function (rd::RD)(decisions::DecisionMap, x::AbstractVector)
     return RegularizedDecomposition(decisions, x, rd.penaltyterm; type2dict(rd.parameters)...)
 end
 

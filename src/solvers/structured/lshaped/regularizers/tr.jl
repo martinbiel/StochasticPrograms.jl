@@ -33,7 +33,7 @@ struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegulariz
     data::TRData{T}
     parameters::TRParameters{T}
 
-    decisions::Decisions
+    decisions::DecisionMap
     projection_targets::Vector{MOI.VariableIndex}
     ξ::Vector{Decision{T}}
 
@@ -41,7 +41,7 @@ struct TrustRegion{T <: AbstractFloat, A <: AbstractVector} <: AbstractRegulariz
     Δ_history::A
     incumbents::Vector{Int}
 
-    function TrustRegion(decisions::Decisions, ξ₀::AbstractVector; kw...)
+    function TrustRegion(decisions::DecisionMap, ξ₀::AbstractVector; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -255,7 +255,7 @@ WithTR(; kw...) = TR(TRParameters(; kw...))
 TrustRegion(; kw...) = TR(TRParameters(; kw...))
 WithTrustRegion(; kw...) = TR(TRParameters(; kw...))
 
-function (tr::TR)(decisions::Decisions, x::AbstractVector)
+function (tr::TR)(decisions::DecisionMap, x::AbstractVector)
     return TrustRegion(decisions, x; type2dict(tr.parameters)...)
 end
 

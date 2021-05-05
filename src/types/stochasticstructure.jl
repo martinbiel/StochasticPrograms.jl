@@ -154,7 +154,7 @@ function structure_name(structure::AbstractStochasticStructure)
 end
 function num_decisions(structure::AbstractStochasticStructure{N}, stage::Integer = 1) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    return num_decisions(structure.decisions[stage])
+    return num_decisions(structure.decisions, stage)
 end
 function scenario_type(structure::AbstractStochasticStructure, s::Integer = 2)
     return _scenario_type(scenarios(structure, s))

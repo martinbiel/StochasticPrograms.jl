@@ -19,8 +19,8 @@ function WS(stochasticprogram::StochasticProgram{2}, scenario::AbstractScenario;
                stage_parameters(stochasticprogram, 1),
                stage_parameters(stochasticprogram, 2),
                scenario,
-               Decisions(),
-               Decisions(),
+               DecisionMap(),
+               DecisionMap(),
                optimizer)
 end
 function _WS(stage_one_generator::Function,
@@ -28,13 +28,12 @@ function _WS(stage_one_generator::Function,
              stage_one_params::Any,
              stage_two_params::Any,
              scenario::AbstractScenario,
-             stage_one_decisions::Decisions,
-             stage_two_decisions::Decisions,
+             stage_one_decisions::DecisionMap,
+             stage_two_decisions::DecisionMap,
              optimizer_constructor)
     ws_model = optimizer_constructor == nothing ? Model() : Model(optimizer_constructor)
     # Prepare decisions
-    ws_model.ext[:stage_map] = Dict{MOI.VariableIndex, Int}()
-    ws_model.ext[:decisions] = (stage_one_decisions, stage_two_decisions)
+    ws_model.ext[:decisions] = Decisions((stage_one_decisions, stage_two_decisions))
     add_decision_bridges!(ws_model)
     # Generate first stage and cache objective
     stage_one_generator(ws_model, stage_one_params)
@@ -96,8 +95,8 @@ function EWS(stochasticprogram::StochasticProgram, structure::AbstractStochastic
                  stage_parameters(stochasticprogram, 1),
                  stage_parameters(stochasticprogram, 2),
                  scenario,
-                 Decisions(),
-                 Decisions(),
+                 DecisionMap(),
+                 DecisionMap(),
                  subproblem_optimizer(stochasticprogram))
         optimize!(ws)
         probability(scenario)*objective_value(ws)
@@ -140,8 +139,8 @@ function statistical_EWS(stochasticprogram::StochasticProgram, structure::Abstra
                  stage_parameters(stochasticprogram, 1),
                  stage_parameters(stochasticprogram, 2),
                  scenario,
-                 Decisions(),
-                 Decisions(),
+                 DecisionMap(),
+                 DecisionMap(),
                  subproblem_optimizer(stochasticprogram))
     end
     return welford(ws_models, probability.(scenarios(stochasticprogram)))

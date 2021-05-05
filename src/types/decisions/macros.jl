@@ -17,13 +17,13 @@ function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVa
 end
 
 function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:SingleDecisionSet}, name::String)
-    decisions = get_decisions(model, variable.set.stage)
+    decisions = get_decisions(model)
     if decisions isa IgnoreDecisions
         # Create a regular JuMP variable if decisions are not handled
         return JuMP.add_variable(model, variable.scalar_variable, name)
     end
     var_index, con_index = MOI.add_constrained_variable(backend(model), variable.set)
-    model.ext[:stage_map][var_index] = variable.set.stage
+    set_stage!(decisions, var_index, variable.set.stage)
     # Map to model decisions after indices are known
     if !has_decision(decisions, var_index)
         # Store decision if is seen for the first time
@@ -45,7 +45,7 @@ function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation
 end
 
 function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreation{<:MultipleDecisionSet}, names)
-    decisions = get_decisions(model, variable.set.stage)
+    decisions = get_decisions(model)
     if decisions isa IgnoreDecisions
         # Create regular JuMP variables if decisions are not handled
         var_refs = map(zip(variable.scalar_variables, names)) do (scalar_variable, name)
@@ -66,7 +66,7 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
         # Map to model decisions after indices are known
         seen_decisions = Vector{Decision{Float64}}()
         for (i, var_index) in enumerate(var_indices)
-            model.ext[:stage_map][var_index] = variable.set.stage
+            set_stage!(decisions, var_index, variable.set.stage)
             if !has_decision(decisions, var_index)
                 # Store decision if is seen for the first time
                 set_decision!(decisions, var_index, variable.set.decisions[i])

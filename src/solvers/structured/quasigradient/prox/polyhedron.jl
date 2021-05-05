@@ -26,12 +26,12 @@ end
 function initialize_prox!(quasigradient::AbstractQuasiGradient, polyhedron::PolyhedronProjection)
     # Add projection targets
     ξ = polyhedron.ξ
-    decisions = get_decisions(quasigradient.structure.first_stage, 1)
+    decisions = get_decisions(quasigradient.structure.first_stage)::Decisions
     for i in eachindex(ξ)
         name = add_subscript(:ξ, i)
         set = SingleDecisionSet(1, ξ[i], NoSpecifiedConstraint(), false)
         var_index, _ = MOI.add_constrained_variable(quasigradient.master, set)
-        set_decision!(decisions, var_index, ξ[i])
+        set_decision!(decisions[1], var_index, ξ[i])
         MOI.set(quasigradient.master, MOI.VariableName(), var_index, name)
         polyhedron.projection_targets[i] = var_index
     end
@@ -41,7 +41,7 @@ function initialize_prox!(quasigradient::AbstractQuasiGradient, polyhedron::Poly
     initialize_penaltyterm!(polyhedron.penaltyterm,
                             quasigradient.master,
                             1.0,
-                            all_decisions(decisions),
+                            all_decisions(decisions, 1),
                             polyhedron.projection_targets)
     return nothing
 end
@@ -58,7 +58,7 @@ function restore_proximal_master!(quasigradient::AbstractQuasiGradient, polyhedr
 end
 
 function prox!(quasigradient::AbstractQuasiGradient, polyhedron::PolyhedronProjection, x::AbstractVector, ∇f::AbstractVector, γ::AbstractFloat)
-    decisions = get_decisions(quasigradient.structure.first_stage, 1)
+    decisions = get_decisions(quasigradient.structure.first_stage)::Decisions
     # Update projection targets
     for i in eachindex(polyhedron.ξ)
         polyhedron.ξ[i].value = x[i] - γ * ∇f[i]
@@ -67,12 +67,12 @@ function prox!(quasigradient::AbstractQuasiGradient, polyhedron::PolyhedronProje
     update_penaltyterm!(polyhedron.penaltyterm,
                         quasigradient.master,
                         1.0,
-                        all_decisions(decisions),
+                        all_decisions(decisions, 1),
                         polyhedron.projection_targets)
     # Solve projection problem
     MOI.optimize!(quasigradient.master)
     # Get solution
-    x .= MOI.get.(quasigradient.master, MOI.VariablePrimal(), all_decisions(decisions))
+    x .= MOI.get.(quasigradient.master, MOI.VariablePrimal(), all_decisions(decisions, 1))
     return nothing
 end
 

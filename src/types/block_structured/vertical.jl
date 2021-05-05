@@ -5,12 +5,12 @@ Vertical memory structure. Decomposes stochastic program by stages.
 
 """
 struct VerticalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
-    decisions::NTuple{N, Decisions}
+    decisions::Decisions{N}
     first_stage::JuMP.Model
     scenarioproblems::SP
     proxy::NTuple{N,JuMP.Model}
 
-    function VerticalStructure(decisions::NTuple{N, Decisions}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
+    function VerticalStructure(decisions::Decisions{N}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         SP = typeof(scenarioproblems)
         proxy = ntuple(Val{N}()) do _
@@ -20,14 +20,14 @@ struct VerticalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: Abs
     end
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenario_types::ScenarioTypes{M}, instantiation::Union{Vertical, DistributedVertical}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenario_types::ScenarioTypes{M}, instantiation::Union{Vertical, DistributedVertical}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end
     return VerticalStructure(decisions, scenarioproblems)
 end
 
-function StochasticStructure(decisions::NTuple{N, Decisions}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Vertical, DistributedVertical}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Vertical, DistributedVertical}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenarios[i], instantiation)
     end
@@ -383,7 +383,7 @@ deferred_first_stage(structure::VerticalStructure, ::Val{1}) = num_variables(fir
 
 function decision(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
-    return decision(structure.decisions[stage], index)
+    return decision(structure.decisions, stage, index)
 end
 # ========================== #
 

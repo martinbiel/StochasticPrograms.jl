@@ -31,7 +31,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTe
     data::LVData{T}
     parameters::LVParameters{T}
 
-    decisions::Decisions
+    decisions::DecisionMap
     projection_targets::Vector{MOI.VariableIndex}
     ξ::Vector{Decision{T}}
 
@@ -41,7 +41,7 @@ struct LevelSet{T <: AbstractFloat, A <: AbstractVector, PT <: AbstractPenaltyTe
 
     penaltyterm::PT
 
-    function LevelSet(decisions::Decisions, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
+    function LevelSet(decisions::DecisionMap, ξ₀::AbstractVector, penaltyterm::AbstractPenaltyTerm; kw...)
         T = promote_type(eltype(ξ₀), Float32)
         A = Vector{T}
         ξ = map(ξ₀) do val
@@ -230,7 +230,7 @@ function MOI.set(lv::LV, ::RegularizationPenaltyTerm, penaltyterm::AbstractPenal
     return lv.penaltyterm = penaltyterm
 end
 
-function (lv::LV)(decisions::Decisions, x::AbstractVector)
+function (lv::LV)(decisions::DecisionMap, x::AbstractVector)
     return LevelSet(decisions, x, lv.penaltyterm; type2dict(lv.parameters)...)
 end
 

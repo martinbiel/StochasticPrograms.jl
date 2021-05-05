@@ -34,7 +34,7 @@ function generate_horizontal!(scenarioproblems::ScenarioProblems,
                               stage_two_generator::Function,
                               stage_one_params::Any,
                               stage_two_params::Any,
-                              decisions::Decisions,
+                              decision_map::DecisionMap,
                               optimizer)
     for i in num_subproblems(scenarioproblems)+1:num_scenarios(scenarioproblems)
         push!(scenarioproblems.problems, _WS(stage_one_generator,
@@ -42,8 +42,8 @@ function generate_horizontal!(scenarioproblems::ScenarioProblems,
                                              stage_one_params,
                                              stage_two_params,
                                              scenario(scenarioproblems,i),
-                                             decisions,
-                                             Decisions(),
+                                             decision_map,
+                                             DecisionMap(),
                                              optimizer))
     end
     return nothing
@@ -53,7 +53,7 @@ function generate_horizontal!(scenarioproblems::DistributedScenarioProblems,
                               stage_two_generator::Function,
                               stage_one_params::Any,
                               stage_two_params::Any,
-                              decisions::Decisions,
+                              ::DecisionMap,
                               optimizer)
     @sync begin
         for w in workers()
@@ -81,7 +81,7 @@ end
 
 function clear!(structure::HorizontalStructure{N}) where N
     # Clear decisions
-    map(clear!, structure.decisions)
+    clear!(structure.decisions)
     # Clear all stages
     for stage in 2:N
         clear_stage!(structure, stage)

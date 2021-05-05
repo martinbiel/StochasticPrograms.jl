@@ -38,7 +38,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
 
     # Estimate
     ξ::A
-    decisions::Decisions
+    decisions::DecisionMap
     Q_history::A
     primal_gaps::A
     dual_gaps::A
