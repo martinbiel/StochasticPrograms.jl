@@ -57,7 +57,7 @@ end
 function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
-function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
+function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
     error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
 function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentModelAttribute)
@@ -154,29 +154,6 @@ function MOI.is_valid(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex
     return MOI.is_valid(scenarioproblems(structure, stage), ci, scenario_index)
 end
 
-function MOI.add_constraint(structure::HorizontalStructure{2}, f::SingleDecision, s::MOI.AbstractSet)
-    # Constraints should be added to every subproblem
-    for scenario_index in 1:num_scenarios(structure)
-        MOI.add_constraint(scenarioproblems(structure), f, s, scenario_index)
-    end
-    return nothing
-end
-function MOI.add_constraint(structure::HorizontalStructure{2}, f::SingleDecision, s::MOI.AbstractSet, stage::Integer, scenario_index::Integer)
-    stage == 1 && error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, 2)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    new_ci = MOI.add_constraint(scenarioproblems(structure), f, s, scenario_index)
-    return nothing
-end
-
-function MOI.delete(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer)
-    stage == 1 || error("No scenario index specified.")
-    # First-stage decision should be removed from every subproblem
-    for scenario_index in 1:num_scenarios(structure)
-        MOI.delete(scenarioproblems(structure), index, scenario_index)
-    end
-    return nothing
-end
 function MOI.delete(structure::HorizontalStructure{2}, indices::Vector{MOI.VariableIndex}, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision should be removed from every subproblem
@@ -210,14 +187,6 @@ function MOI.delete(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex, 
     MOI.delete(scenarioproblems(structure, stage), mapped_ci, scenario_index)
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex{F,S}, stage::Integer, scenario_index::Integer) where {N, F <: SingleDecision, S}
-    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage > 1 || error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    MOI.delete(scenarioproblems(structure, stage), ci, scenario_index)
-    return nothing
-end
 function MOI.delete(structure::HorizontalStructure{N}, cis::Vector{<:MOI.ConstraintIndex}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
@@ -229,17 +198,34 @@ function MOI.delete(structure::HorizontalStructure{N}, cis::Vector{<:MOI.Constra
     MOI.delete(scenarioproblems(structure, stage), mapped_cis, scenario_index)
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{N}, cis::Vector{MOI.ConstraintIndex{F,S}}, stage::Integer, scenario_index::Integer) where {N, F <: SingleDecision, S}
-    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage > 1 || error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    MOI.delete(scenarioproblems(structure, stage), cis, scenario_index)
-    return nothing
-end
 
 # JuMP #
 # ========================== #
+function decision_dispatch(decision_function::Function,
+                           structure::HorizontalStructure{N},
+                           index::MOI.VariableIndex,
+                           stage::Integer,
+                           args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    proxy_ = structure.proxy[stage]
+    dref = DecisionRef(proxy_, index)
+    return decision_function(dref, args...)
+end
+function decision_dispatch!(decision_function!::Function,
+                            structure::HorizontalStructure{2},
+                            index::MOI.VariableIndex,
+                            stage::Integer,
+                            args...)
+    # First-stage decision mutators should be dispatched to every subproblem
+    for scenario_index in 1:num_scenarios(structure)
+        scenario_decision_dispatch!(decision_function!,
+                                    scenarioproblems(structure),
+                                    index,
+                                    scenario_index,
+                                    args...)
+    end
+    return nothing
+end
 function JuMP.fix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer, val::Number)
     d = decision(structure, index, stage)
     if state(d) == NotTaken
@@ -304,6 +290,11 @@ end
 
 function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI)
     return decision_index(backend(structure.proxy[1]), ci)
+end
+function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}) where {F <: SingleDecision, S}
+    inner = mapped_constraint(structure.decisions, ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
+    return decision_index(backend(structure.proxy[1]), inner)
 end
 function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}, scenario_index::Integer) where {F,S}
     mapped_ci = mapped_index(structure, ci, scenario_index)

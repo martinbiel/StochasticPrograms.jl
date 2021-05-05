@@ -76,21 +76,14 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Det
     # Cache scenario-dependent solutions
     variables = decision_variables_at_stage(stochasticprogram, 2)
     constraints = decision_constraints_at_stage(stochasticprogram, 2)
-    for i in 1:num_scenarios(stochasticprogram, 2)
-        key = Symbol(:node_solution_2_, i)
+    for scenario_index in 1:num_scenarios(stochasticprogram, 2)
+        key = Symbol(:node_solution_2_, scenario_index)
         cache[key] = SolutionCache(backend(structure.model))
+        # Model attributes are shared
         cache_model_attributes!(cache[key], backend(structure.model))
-        cache_variable_attributes!(cache[key], backend(structure.model), variables) do index
-            mapped_index(structure, index, i)
-        end
-        cache_constraint_attributes!(cache[key], backend(structure.model), constraints) do ci
-            if ci isa CI{SingleDecision}
-                mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), i)
-                return typeof(ci)(mapped_vi.value)
-            else
-                return mapped_index(structure, ci, i)
-            end
-        end
+        # Variables/constraints are scenario-dependent
+        cache_variable_attributes!(cache[key], backend(structure.model), variables, 2, scenario_index)
+        cache_constraint_attributes!(cache[key], backend(structure.model), constraints, 2, scenario_index)
         # Cache subobjective
         if cache[key].modattr[MOI.TerminationStatus()] == MOI.OPTIMAL
             Q = 0.0

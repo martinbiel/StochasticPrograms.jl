@@ -38,8 +38,10 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Ver
     # Cache first-stage solution
     cache[:node_solution_1] = SolutionCache(backend(structure.first_stage), variables, constraints)
     # Cache scenario-dependent solutions (Skip if more than 100 scenarios for performance)
-    if num_scenarios(stochasticprogram) <= 1e3
-        cache_solution!(cache, scenarioproblems(structure), optimizer, 2)
+    if num_scenarios(stochasticprogram) <= 1e2
+        variables = decision_variables_at_stage(stochasticprogram, 2)
+        constraints = decision_constraints_at_stage(stochasticprogram, 2)
+        cache_solution!(cache, scenarioproblems(structure), optimizer, 2, variables, constraints)
     end
     return nothing
 end

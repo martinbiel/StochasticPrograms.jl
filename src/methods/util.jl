@@ -97,6 +97,13 @@ end
 typename(dtype::UnionAll) = dtype.body.name.name
 typename(dtype::DataType) = dtype.name.name
 
+function _function_type(ci::CI{F,S}) where {F,S}
+    return F
+end
+function _set_type(ci::CI{F,S}) where {F,S}
+    return S
+end
+
 function add_subscript(src::AbstractString, subscript::Integer)
     return @sprintf("%s%s", src, unicode_subscript(subscript))
 end
@@ -211,11 +218,19 @@ end
 
 function decision_constraints_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    return mapreduce(vcat, MOI.get(proxy(stochasticprogram, s), MOI.ListOfConstraints())) do (F, S)
-        if F <: SingleDecision || F <: AffineDecisionFunction || F <: QuadraticDecisionFunction
-            return MOI.get(proxy(stochasticprogram, s), MOI.ListOfConstraintIndices{F,S}())
+    proxy_ = proxy(stochasticprogram, s)
+    return mapreduce(vcat, MOI.get(proxy_, MOI.ListOfConstraints())) do (F, S)
+        if F <: SingleDecision
+            return map(MOI.get(proxy_, MOI.ListOfConstraintIndices{F,S}())) do ci
+                # Change to correct index
+                f = MOI.get(backend(proxy_), MOI.ConstraintFunction(), ci)::SingleDecision
+                return ci = CI{SingleDecision, S}(f.decision.value)
+            end
+        elseif F <: AffineDecisionFunction || F <: QuadraticDecisionFunction
+            return MOI.get(proxy_, MOI.ListOfConstraintIndices{F,S}())
+        else
+            return CI[]
         end
-        return CI[]
     end
 end
 

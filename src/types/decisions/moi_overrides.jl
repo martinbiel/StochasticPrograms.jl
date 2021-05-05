@@ -86,42 +86,7 @@ function MOI.modify(model::MOI.ModelLike,
     return nothing
 end
 
-function MOI.add_constraint(uf::MOIU.UniversalFallback, f::SingleDecision, s::MOI.AbstractScalarSet)
-    F = typeof(f)
-    S = typeof(s)
-    # Add constraint as usual but force index
-    constraints = get!(uf.constraints, (F, S)) do
-        return MOIU.VectorOfConstraints{F,S}()
-    end::MOIU.VectorOfConstraints{F,S}
-    ci = CI{SingleDecision,S}(f.decision.value)
-    constraints.constraints[ci] = (f, s)
-    return ci
-end
-
 function MOI.modify(uf::MOIU.UniversalFallback, ::CI{F,S}, ::Union{DecisionStateChange,KnownValuesChange}) where {F, S}
-    return nothing
-end
-
-function MOI.delete(uf::MOIU.UniversalFallback, ci::CI{F, S}) where {F <: SingleDecision, S <: MOI.AbstractScalarSet}
-    decision_ci = CI{MOI.SingleVariable, SingleDecisionSet{Float64}}(ci.value)
-    if !MOI.is_valid(uf, ci) && MOI.is_valid(uf, decision_ci)
-        throw(MOI.InvalidIndex(ci))
-    end
-    # Delete constraint as usual
-    if MOI.is_valid(uf, ci)
-        MOI.delete(MOIU.constraints(uf, ci), ci)
-        delete!(uf.con_to_name, ci)
-        uf.name_to_con = nothing
-        for d in values(uf.conattr)
-            delete!(d, ci)
-        end
-    end
-    # Update SingleDecisionSet for printing
-    if MOI.is_valid(uf, decision_ci)
-        set = MOI.get(uf, MOI.ConstraintSet(), decision_ci)
-        new_set = SingleDecisionSet(set.stage, set.decision, NoSpecifiedConstraint(), set.is_recourse)
-        MOI.set(uf, MOI.ConstraintSet(), decision_ci, new_set)
-    end
     return nothing
 end
 

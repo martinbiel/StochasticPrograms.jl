@@ -75,8 +75,13 @@ end
 function MOI.get(structure::VerticalStructure, attr::Type{MOI.VariableIndex}, name::String)
     return MOI.get(backend(structure.first_stage), attr, name)
 end
-function MOI.get(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute, cindex::MOI.ConstraintIndex)
-    return MOI.get(backend(structure.first_stage), attr, cindex)
+function MOI.get(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
+    if _function_type(ci) <: SingleDecision
+        # Need to map constraint
+        con_ref = ConstraintRef(structure.first_stage, ci)
+        return MOI.get(structure.first_stage, attr, con_ref)
+    end
+    return MOI.get(backend(structure.first_stage), attr, ci)
 end
 function MOI.get(structure::VerticalStructure, attr::ScenarioDependentModelAttribute)
     n = num_scenarios(structure, attr.stage)
@@ -112,7 +117,8 @@ function MOI.set(structure::VerticalStructure, attr::MOI.AbstractVariableAttribu
 end
 function MOI.set(structure::VerticalStructure, attr::MOI.AbstractConstraintAttribute,
                  ci::MOI.ConstraintIndex, value)
-    MOI.set(backend(structure.first_stage), attr, ci, value)
+    con_ref = ConstraintRef(structure.first_stage, ci)
+    MOI.set(structure.first_stage, attr, con_ref, value)
     return nothing
 end
 function MOI.set(structure::VerticalStructure, attr::ScenarioDependentModelAttribute, value)
@@ -152,31 +158,12 @@ function MOI.is_valid(structure::VerticalStructure{N}, ci::MOI.ConstraintIndex, 
     return MOI.is_valid(scenarioproblems(structure, stage), ci, scenario_index)
 end
 
-function MOI.add_constraint(structure::VerticalStructure, f::SingleDecision, s::MOI.AbstractSet)
-    return MOI.add_constraint(backend(structure.first_stage), f, s)
-end
-function MOI.add_constraint(structure::VerticalStructure, f::SingleDecision, s::MOI.AbstractSet, stage::Integer, scenario_index::Integer)
-    stage == 1 && error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    return MOI.add_constraint(scenarioproblems(structure, stage), f, s, scenario_index)
-end
-
-function MOI.delete(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
-    stage == 1 || error("No scenario index specified.")
-    JuMP.delete(structure.first_stage, DecisionRef(structure.first_stage, index))
-    # Remove known decisions
-    for s in 2:N
-        JuMP.delete(scenarioproblems(structure, s), index)
-    end
-    return nothing
-end
 function MOI.delete(structure::VerticalStructure{N}, indices::Vector{MOI.VariableIndex}, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
     JuMP.delete(structure.first_stage, DecisionRef.(structure.first_stage, indices))
     # Remove known decisions
     for s in 2:N
-        JuMP.delete(scenarioproblems(structure, s), indices)
+        MOI.delete(scenarioproblems(structure, s), indices)
     end
     return nothing
 end
@@ -209,6 +196,27 @@ end
 
 # JuMP #
 # ========================== #
+function decision_dispatch(decision_function::Function,
+                           structure::VerticalStructure{N},
+                           index::MOI.VariableIndex,
+                           stage::Integer,
+                           args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage == 1 || error("No scenario index specified.")
+    dref = DecisionRef(structure.first_stage, index)
+    return decision_function(dref, args...)
+end
+function decision_dispatch!(decision_function!::Function,
+                            structure::VerticalStructure{N},
+                            index::MOI.VariableIndex,
+                            stage::Integer,
+                            args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage == 1 || error("No scenario index specified.")
+    dref = DecisionRef(structure.first_stage, index)
+    decision_function!(dref, args...)
+    return nothing
+end
 function JuMP.fix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, val::Number) where N
     dref = DecisionRef(structure.first_stage, index)
     fix(dref, val)

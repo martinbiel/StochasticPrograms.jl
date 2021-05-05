@@ -541,7 +541,7 @@ function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute,
     return MOI.set(optimizer.lshaped.structure, attr, index, value)
 end
 
-function MOI.set(optimizer::Optimizer, attr::ScenarioDependentVariableAttribute, ci::MOI.ConstraintIndex, value)
+function MOI.set(optimizer::Optimizer, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex, value)
     # Fallback to subproblem optimizer through structure
     if optimizer.lshaped === nothing
         throw(UnloadedStructure{Optimizer}())

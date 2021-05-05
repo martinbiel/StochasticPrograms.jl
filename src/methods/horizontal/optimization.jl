@@ -36,7 +36,9 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Hor
     cache[:node_solution_1] = SolutionCache(optimizer, variables, constraints)
     # Cache scenario-dependent solutions (Skip if more than 100 scenarios for performance)
     if num_scenarios(stochasticprogram) <= 100
-        cache_solution!(cache, scenarioproblems(structure), optimizer, 2)
+        variables = decision_variables_at_stage(stochasticprogram, 2)
+        constraints = decision_constraints_at_stage(stochasticprogram, 2)
+        cache_solution!(cache, scenarioproblems(structure), optimizer, 2, variables, constraints)
     end
     return nothing
 end

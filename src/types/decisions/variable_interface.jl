@@ -204,7 +204,9 @@ function MOI.set(model::Model, attr::MOI.AbstractVariableAttribute,
     return nothing
 end
 
-JuMP.name(dref::DecisionRef) = MOI.get(owner_model(dref), MOI.VariableName(), dref)::String
+function JuMP.name(dref::DecisionRef)
+    return MOI.get(owner_model(dref), MOI.VariableName(), dref)::String
+end
 
 function JuMP.set_name(dref::DecisionRef, name::String)
     return MOI.set(owner_model(dref), MOI.VariableName(), dref, name)
@@ -281,8 +283,9 @@ function JuMP.delete(model::JuMP.Model, dref::DecisionRef)
     # First delete any SingleDecision constraints
     for S in [MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}, MOI.ZeroOne, MOI.Integer]
         ci = CI{SingleDecision,S}(index(dref).value)
-        if MOI.is_valid(backend(model), ci)
-            MOI.delete(backend(model), ci)
+        inner = mapped_constraint(get_decisions(dref), ci)
+        if MOI.is_valid(backend(model), inner)
+            MOI.delete(backend(model), inner)
         end
     end
     # Remove SingleDecisionSet constraint
@@ -305,8 +308,9 @@ function JuMP.delete(model::JuMP.Model, drefs::Vector{DecisionRef})
     for dref in drefs
         for S in [MOI.GreaterThan{Float64}, MOI.LessThan{Float64}, MOI.EqualTo{Float64}, MOI.ZeroOne, MOI.Integer]
             ci = CI{SingleDecision,S}(index(dref).value)
-            if MOI.is_valid(backend(model), ci)
-                MOI.delete(backend(model), ci)
+            inner = mapped_constraint(get_decisions(dref), ci)
+            if MOI.is_valid(backend(model), inner)
+                MOI.delete(backend(model), inner)
             end
         end
     end
@@ -346,35 +350,50 @@ function JuMP.check_belongs_to_model(dref::DecisionRef, model::AbstractModel)
 end
 
 function JuMP.is_valid(model::Model, dref::DecisionRef)
-    return model === owner_model(dref)
+    return model === owner_model(dref) && MOI.is_valid(backend(model), index(dref))
 end
 
 function JuMP.has_lower_bound(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     if state(dref) == Known
         return false
     end
     ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), ci)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    if inner.value == 0
+        return false
+    end
+    return MOI.is_valid(backend(owner_model(dref)), inner)
 end
 function JuMP.LowerBoundRef(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     moi_lb =  MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}
     ci = moi_lb(index(dref).value)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
     return ConstraintRef{JuMP.Model, moi_lb, ScalarShape}(owner_model(dref),
-                                                          ci,
+                                                          inner,
                                                           ScalarShape())
 end
 function JuMP.set_lower_bound(dref::DecisionRef, lower::Number)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     new_set = MOI.GreaterThan(convert(Float64, lower))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
     if has_lower_bound(dref)
-        ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
-        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), ci, new_set)
+        inner = mapped_constraint(get_decisions(dref), ci)
+        inner.value == 0 && error("Constraint $ci not properly mapped.")
+        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), inner, new_set)
     else
-        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
+        inner = MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
+        map_constraint!(get_decisions(dref), ci, inner)
     end
     return nothing
 end
 function JuMP.delete_lower_bound(dref::DecisionRef)
     JuMP.delete(owner_model(dref), LowerBoundRef(dref))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.GreaterThan{Float64}}(index(dref).value)
+    remove_mapped_constraint!(get_decisions(dref), ci)
+    return nothing
 end
 function JuMP.lower_bound(dref::DecisionRef)
     if !has_lower_bound(dref)
@@ -390,27 +409,41 @@ function JuMP.has_upper_bound(dref::DecisionRef)
         return false
     end
     ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), ci)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    if inner.value == 0
+        return false
+    end
+    return MOI.is_valid(backend(owner_model(dref)), inner)
 end
 function JuMP.UpperBoundRef(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     moi_ub =  MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}
     ci = moi_ub(index(dref).value)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
     return ConstraintRef{JuMP.Model, moi_ub, ScalarShape}(owner_model(dref),
-                                                          ci,
+                                                          inner,
                                                           ScalarShape())
 end
 function JuMP.set_upper_bound(dref::DecisionRef, lower::Number)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     new_set = MOI.LessThan(convert(Float64, lower))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
     if has_upper_bound(dref)
-        ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
-        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), ci, new_set)
+        inner = mapped_constraint(get_decisions(dref), ci)
+        inner.value == 0 && error("Constraint $ci not properly mapped.")
+        MOI.set(backend(owner_model(dref)), MOI.ConstraintSet(), inner, new_set)
     else
-        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
+        inner = MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), new_set)
+        map_constraint!(get_decisions(dref), ci, inner)
     end
     return nothing
 end
 function JuMP.delete_upper_bound(dref::DecisionRef)
     JuMP.delete(owner_model(dref), UpperBoundRef(dref))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.LessThan{Float64}}(index(dref).value)
+    remove_mapped_constraint!(get_decisions(dref), ci)
+    return nothing
 end
 function JuMP.upper_bound(dref::DecisionRef)
     if !has_upper_bound(dref)
@@ -422,11 +455,16 @@ function JuMP.upper_bound(dref::DecisionRef)
 end
 
 function JuMP.is_integer(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     if state(dref) == Known
         return false
     end
     ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), ci)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    if inner.value == 0
+        return false
+    end
+    return MOI.is_valid(backend(owner_model(dref)), inner)
 end
 function JuMP.set_integer(dref::DecisionRef)
     if is_integer(dref)
@@ -434,27 +472,40 @@ function JuMP.set_integer(dref::DecisionRef)
     elseif is_binary(dref)
         error("Cannot set the decision $(dref) to integer as it is already binary.")
     else
-        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.Integer())
+        ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dref).value)
+        inner = MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.Integer())
+        map_constraint!(get_decisions(dref), ci, inner)
     end
+    return nothing
 end
 function JuMP.unset_integer(dref::DecisionRef)
     JuMP.delete(owner_model(dref), IntegerRef(dref))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.Integer}(index(dref).value)
+    remove_mapped_constraint!(get_decisions(dref), ci)
     return nothing
 end
 function JuMP.IntegerRef(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     moi_int =  MOI.ConstraintIndex{SingleDecision, MOI.Integer}
     ci = moi_int(index(dref).value)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
     return ConstraintRef{JuMP.Model, moi_int, ScalarShape}(owner_model(dref),
-                                                           ci,
+                                                           inner,
                                                            ScalarShape())
 end
 
 function JuMP.is_binary(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     if state(dref) == Known
         return false
     end
     ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dref).value)
-    return MOI.is_valid(backend(owner_model(dref)), ci)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    if inner.value == 0
+        return false
+    end
+    return MOI.is_valid(backend(owner_model(dref)), inner)
 end
 function JuMP.set_binary(dref::DecisionRef)
     if is_binary(dref)
@@ -462,18 +513,26 @@ function JuMP.set_binary(dref::DecisionRef)
     elseif is_integer(dref)
         error("Cannot set the decision $(dref) to binary as it is already integer.")
     else
-        MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.ZeroOne())
+        ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dref).value)
+        inner = MOI.add_constraint(backend(owner_model(dref)), SingleDecision(index(dref)), MOI.ZeroOne())
+        map_constraint!(get_decisions(dref), ci, inner)
     end
+    return nothing
 end
 function JuMP.unset_binary(dref::DecisionRef)
     JuMP.delete(owner_model(dref), BinaryRef(dref))
+    ci = MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}(index(dref).value)
+    remove_mapped_constraint!(get_decisions(dref), ci)
     return nothing
 end
 function JuMP.BinaryRef(dref::DecisionRef)
+    haskey(owner_model(dref).ext, :decisions) || error("No decisions in model.")
     moi_bin =  MOI.ConstraintIndex{SingleDecision, MOI.ZeroOne}
     ci = moi_bin(index(dref).value)
+    inner = mapped_constraint(get_decisions(dref), ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
     return ConstraintRef{JuMP.Model, moi_bin, ScalarShape}(owner_model(dref),
-                                                           ci,
+                                                           inner,
                                                            ScalarShape())
 end
 
@@ -482,6 +541,7 @@ function JuMP.start_value(dref::DecisionRef)
 end
 function JuMP.set_start_value(dref::DecisionRef, value::Number)
     MOI.set(owner_model(dref), MOI.VariablePrimalStart(), dref, Float64(value))
+    return nothing
 end
 
 function Base.hash(dref::DecisionRef, h::UInt)

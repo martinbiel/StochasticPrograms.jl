@@ -34,7 +34,7 @@ function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation
     end
     # Add any given decision constraints
     if state(variable.set.decision) != Known
-        _moi_constrain_decision(backend(model), var_index, variable.scalar_variable.info, variable.set)
+        _moi_constrain_decision(backend(model), decisions, var_index, variable.scalar_variable.info, variable.set)
     end
     # Finally, set any given name
     if !isempty(name)
@@ -84,7 +84,7 @@ function JuMP.add_variable(model::Model, variable::VariablesConstrainedOnCreatio
         # Add any given decision constraints
         for (index, scalar_variable, decision) in zip(var_indices, variable.scalar_variables, variable.set.decisions)
             if decision.state != Known
-                _moi_constrain_decision(backend(model), index, scalar_variable.info, variable.set)
+                _moi_constrain_decision(backend(model), decisions, index, scalar_variable.info, variable.set)
             end
         end
         # Finally, set any given names
@@ -159,6 +159,13 @@ end
 
 # Constraints #
 # ========================== #
+function JuMP._functionize(dref::DecisionRef)
+    return convert(DecisionAffExpr{Float64}, dref)
+end
+function JuMP._functionize(drefs::AbstractArray{DecisionRef})
+    return JuMP._functionize.(drefs)
+end
+
 function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, DecisionQuadExpr}, set::MOI.AbstractScalarSet)
     offset = constant(aff.variables)
     JuMP.add_to_expression!(aff.variables, -offset)
@@ -166,38 +173,65 @@ function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, Dec
     return JuMP.ScalarConstraint(aff, shifted_set)
 end
 
-function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, DecisionQuadExpr}, lb, ub)
+function JuMP.build_constraint(_error::Function, aff::Union{DecisionAffExpr, DecisionQuadExpr}, lb::Real, ub::Real)
     JuMP.build_constraint(_error, aff, MOI.Interval(lb, ub))
+end
+
+function JuMP.add_constraint(model::Model,
+                             constraint::ScalarConstraint{DecisionRef, S},
+                             name::String = "") where S <: MOI.AbstractScalarSet
+    decisions = get_decisions(model)::Decisions
+    check_belongs_to_model(constraint, model)
+    ci = CI{SingleDecision, S}(moi_function(constraint).decision.value)
+    inner = moi_add_constraint(backend(model), moi_function(constraint), moi_set(constraint))
+    map_constraint!(decisions, ci, inner)
+    con_ref = ConstraintRef(model, inner, shape(constraint))
+    if !isempty(name)
+        set_name(con_ref, name)
+    end
+    return con_ref
 end
 
 # Helper function #
 # ========================== #
-function _moi_constrain_decision(backend::MOI.ModelLike, index, info, set::Union{SingleDecisionSet, MultipleDecisionSet})
-    # We don't call the _moi* versions (e.g., _moi_set_lower_bound) because they
-    # have extra checks that are not necessary for newly created variables.
+function _moi_constrain_decision(backend::MOI.ModelLike,
+                                 decisions::Decisions,
+                                 index::MOI.VariableIndex,
+                                 info::VariableInfo,
+                                 set::Union{SingleDecisionSet, MultipleDecisionSet})
     nothing_added = true
     if info.has_lb
-        MOI.add_constraint(backend, SingleDecision(index),
-                           MOI.GreaterThan{Float64}(info.lower_bound))
+        ci = CI{SingleDecision, MOI.GreaterThan{Float64}}(index.value)
+        inner = MOI.add_constraint(backend, SingleDecision(index),
+                                   MOI.GreaterThan{Float64}(info.lower_bound))
+        map_constraint!(decisions, ci, inner)
         nothing_added &= false
     end
     if info.has_ub
-        MOI.add_constraint(backend, SingleDecision(index),
-                           MOI.LessThan{Float64}(info.upper_bound))
+        ci = CI{SingleDecision, MOI.LessThan{Float64}}(index.value)
+        inner = MOI.add_constraint(backend, SingleDecision(index),
+                                   MOI.LessThan{Float64}(info.upper_bound))
+        map_constraint!(decisions, ci, inner)
         nothing_added &= false
     end
     if info.has_fix
-        MOI.add_constraint(backend, SingleDecision(index),
-                           MOI.EqualTo{Float64}(info.fixed_value))
+        ci = CI{SingleDecision, MOI.EqualTo{Float64}}(index.value)
+        inner = MOI.add_constraint(backend, SingleDecision(index),
+                                   MOI.EqualTo{Float64}(info.fixed_value))
+        map_constraint!(decisions, ci, inner)
         nothing_added &= false
     end
     if info.binary
-        MOI.add_constraint(backend, SingleDecision(index),
-                           MOI.ZeroOne())
+        ci = CI{SingleDecision, MOI.ZeroOne}(index.value)
+        inner = MOI.add_constraint(backend, SingleDecision(index),
+                                   MOI.ZeroOne())
+        map_constraint!(decisions, ci, inner)
         nothing_added &= false
     end
     if info.integer
-        MOI.add_constraint(backend, SingleDecision(index), MOI.Integer())
+        ci = CI{SingleDecision, MOI.Integer}(index.value)
+        inner = MOI.add_constraint(backend, SingleDecision(index), MOI.Integer())
+        map_constraint!(decisions, ci, inner)
         nothing_added &= false
     end
     if info.has_start
@@ -205,4 +239,5 @@ function _moi_constrain_decision(backend::MOI.ModelLike, index, info, set::Union
                 Float64(info.start))
         nothing_added &= false
     end
+    return nothing
 end

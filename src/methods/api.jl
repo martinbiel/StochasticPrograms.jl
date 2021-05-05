@@ -544,10 +544,10 @@ function Base.getindex(stochasticprogram::StochasticProgram, stage::Integer, nam
                 return DecisionVariable(stochasticprogram, stage, index(dvar))
             end
         elseif obj isa ConstraintRef{Model, <:CI{<:DecisionLike}}
-            return SPConstraintRef(stochasticprogram, stage, index(obj), obj.shape)
+            return SPConstraintRef(stochasticprogram, stage, obj)
         elseif obj isa AbstractArray{<:ConstraintRef{Model, <:CI{<:DecisionLike}}}
             return map(obj) do cref
-                return SPConstraintRef(stochasticprogram, stage, index(cref), cref.shape)
+                return SPConstraintRef(stochasticprogram, stage, cref)
             end
         else
             error("Only decisions and decision constraints can be queried using this syntax. For regular variables and constraints, either annotate the relevant variable with @decision or first query the relevant JuMP subproblem and use the regular `[]` syntax.")

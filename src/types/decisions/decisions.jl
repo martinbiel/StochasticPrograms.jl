@@ -155,6 +155,23 @@ function remove_decision!(decisions::Decisions{N}, index::MOI.VariableIndex) whe
     return nothing
 end
 
+function mapped_constraint(decisions::Decisions, ci::MOI.ConstraintIndex)
+    if haskey(decisions.constraint_map, ci)
+        return decisions.constraint_map[ci]
+    else
+        return typeof(ci)(0)
+    end
+end
+function map_constraint!(decisions::Decisions, ci::MOI.ConstraintIndex, inner::MOI.ConstraintIndex)
+    decisions.constraint_map[ci] = inner
+    return nothing
+end
+function remove_mapped_constraint!(decisions::Decisions, ci::MOI.ConstraintIndex)
+    haskey(decisions.constraint_map, ci) || error("Constraint $ci not properly mapped.")
+    delete!(decisions.constraint_map, ci)
+    return nothing
+end
+
 function clear!(decisions::Decisions)
     map(decisions.decisions) do decisions
         empty!(decisions)

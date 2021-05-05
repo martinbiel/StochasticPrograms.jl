@@ -9,6 +9,16 @@ struct SPConstraintRef{C, Shape <: AbstractShape}
     index::C
     shape::Shape
 end
+
+function SPConstraintRef(stochasticprogram::StochasticProgram, stage::Integer, cref::ConstraintRef{Model, <:CI{<:DecisionLike}})
+    return SPConstraintRef(stochasticprogram, stage, index(cref), cref.shape)
+end
+function SPConstraintRef(stochasticprogram::StochasticProgram, stage::Integer, cref::ConstraintRef{Model, CI{SingleDecision, S}}) where S
+    f = MOI.get(cref.model, MOI.ConstraintFunction(), cref)::SingleDecision
+    ci = CI{SingleDecision,S}(f.decision.value)
+    return SPConstraintRef(stochasticprogram, stage, ci, cref.shape)
+end
+
 """
     stage(sp_cref::SPConstraintRef)
 
@@ -54,7 +64,15 @@ function MOI.get(stochasticprogram::StochasticProgram, attr::MOI.AbstractConstra
         end
         return MOI.get(optimizer(stochasticprogram), attr, index(sp_cref))
     else
-        return MOI.get(backend(proxy(stochasticprogram, stage(sp_cref))), attr, index(sp_cref))
+        # Default to proxy for other constraints
+        proxy_ = proxy(stochasticprogram, stage(sp_cref))
+        if _function_type(index(sp_cref)) <: SingleDecision
+            # Need to map SingleDecision constraints
+            con_ref = ConstraintRef(proxy_, index(sp_cref))
+            return MOI.get(proxy_, attr, con_ref)
+        else
+            return MOI.get(backend(proxy_), attr, index(sp_cref))
+        end
     end
 end
 function MOI.get(stochasticprogram::StochasticProgram, attr::ScenarioDependentConstraintAttribute,
@@ -94,6 +112,13 @@ end
 
 # JuMP constraint interface #
 # ========================== #
+function JuMP.ConstraintRef(model::AbstractModel, ci::MOI.ConstraintIndex{F,S}) where {F <: SingleDecision, S}
+    decisions = get_decisions(model)::Decisions
+    inner = mapped_constraint(decisions, ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
+    return ConstraintRef(model, inner, ScalarShape())
+end
+
 JuMP.owner_model(sp_cref::SPConstraintRef) = sp_cref.stochasticprogram
 
 function JuMP.check_belongs_to_model(sp_cref::SPConstraintRef, stochasticprogram::StochasticProgram)
@@ -192,7 +217,13 @@ function JuMP.constraint_by_name(stochasticprogram::StochasticProgram{N}, stage:
     if index isa Nothing
         return nothing
     else
-        return constraint_ref_with_index(stochasticprogram, stage, index)
+        if _function_type(index) <: SingleDecision
+            f = MOI.get(backend(proxy(stochasticprogram, stage)), MOI.ConstraintFunction(), index)::SingleDecision
+            ci = CI{SingleDecision, _set_type(index)}(f.decision.value)
+            return constraint_ref_with_index(stochasticprogram, stage, ci)
+        else
+            return constraint_ref_with_index(stochasticprogram, stage, index)
+        end
     end
 end
 function JuMP.constraint_by_name(stochasticprogram::StochasticProgram{N},
@@ -205,7 +236,13 @@ function JuMP.constraint_by_name(stochasticprogram::StochasticProgram{N},
     if index isa Nothing
         return nothing
     else
-        return constraint_ref_with_index(stochasticprogram, stage, index)
+        if F <: SingleDecision
+            f = MOI.get(backend(proxy(stochasticprogram, stage)), MOI.ConstraintFunction(), index)::SingleDecision
+            ci = CI{SingleDecision,S}(f.decision.value)
+            return constraint_ref_with_index(stochasticprogram, stage, ci)
+        else
+            return constraint_ref_with_index(stochasticprogram, stage, index)
+        end
     end
 end
 function JuMP.constraint_by_name(stochasticprogram::StochasticProgram,
@@ -800,6 +837,11 @@ function JuMP.all_constraints(stochasticprogram::StochasticProgram{N},
     m = proxy(stochasticprogram, stage)
     result = constraint_ref_type[]
     for ci in MOI.get(m, MOI.ListOfConstraintIndices{f_type, set_type}())
+        if f_type <: SingleDecision
+            # Change to correct index
+            f = MOI.get(backend(m), MOI.ConstraintFunction(), ci)::SingleDecision
+            ci = CI{SingleDecision, set_type}(f.decision.value)
+        end
         push!(result, constraint_ref_with_index(stochasticprogram, stage, ci))
     end
     # Add any constraints specified at creation

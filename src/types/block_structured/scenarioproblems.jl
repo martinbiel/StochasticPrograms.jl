@@ -137,9 +137,21 @@ end
 function MOI.get(scenarioproblems::ScenarioProblems, attr::ScenarioDependentConstraintAttribute, ci::CI)
     MOI.get(backend(subproblem(scenarioproblems, attr.scenario_index)), attr.attr, ci)
 end
+function MOI.get(scenarioproblems::ScenarioProblems, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: SingleDecision, S}
+    subprob = subproblem(scenarioproblems, attr.scenario_index)
+    con_ref = ConstraintRef(subprob, ci)
+    MOI.get(subprob, attr.attr, con_ref)
+end
 function MOI.get(scenarioproblems::DistributedScenarioProblems, attr::ScenarioDependentConstraintAttribute, ci::CI)
     return get_from_scenarioproblem(scenarioproblems, attr.scenario_index, attr.attr, ci) do sp, i, attr, ci
-        MOI.get(backend(fetch(sp).problems[i]), attr, ci)
+        return MOI.get(backend(fetch(sp).problems[i]), attr, ci)
+    end
+end
+function MOI.get(scenarioproblems::DistributedScenarioProblems, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: SingleDecision, S}
+    return get_from_scenarioproblem(scenarioproblems, attr.scenario_index, attr.attr, ci) do sp, i, attr, ci
+        subprob = fetch(sp).problems[i]
+        con_ref = ConstraintRef(subprob, ci)
+        return MOI.get(subprob, attr, con_ref)
     end
 end
 function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractModelAttribute, value)
@@ -207,28 +219,51 @@ function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::ScenarioDe
     end
     return nothing
 end
-function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex, value)
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractConstraintAttribute, ci::CI, value)
     for problem in subproblems(scenarioproblems)
-        MOI.set(backend(problem), attr, ci, value)
+        MOI.set(backend(subproblem(scenarioproblems, attr.scenario_index)), attr.attr, ci, value)
+    end
+    return nothing
+end
+function MOI.set(scenarioproblems::ScenarioProblems, attr::MOI.AbstractConstraintAttribute, ci::CI{F,S}, value) where {F <: SingleDecision, S}
+    for problem in subproblems(scenarioproblems)
+        subprob = subproblem(scenarioproblems, attr.scenario_index)
+        con_ref = ConstraintRef(subprob, ci)
+        MOI.set(subprob, attr.attr, con_ref, value)
     end
     return nothing
 end
 function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractConstraintAttribute,
-                 ci::MOI.ConstraintIndex, value)
+                 ci::CI, value)
     set_in_scenarioproblems!(scenarioproblems, attr, ci, value) do sp, attr, ci, value
-        MOI.set(fetch(sp), attr, ci, value)
+        MOI.set(backend(fetch(sp).problems[i]), attr.attr, ci, value)
+        return nothing
+    end
+    return nothing
+end
+function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractConstraintAttribute,
+                 ci::CI{F,S}, value) where {F <: SingleDecision, S}
+    set_in_scenarioproblems!(scenarioproblems, attr, ci, value) do sp, attr, ci, value
+        subprob = fetch(sp).problems[i]
+        con_ref = ConstraintRef(subprob, ci)
+        MOI.set(subprob, attr.attr, con_ref, value)
+        return nothing
     end
     return nothing
 end
 function MOI.set(scenarioproblems::ScenarioProblems, attr::ScenarioDependentConstraintAttribute,
                  ci::MOI.ConstraintIndex, value)
-    MOI.set(backend(subproblem(scenarioproblems, attr.scenario_index)), attr.attr, ci, value)
+    subprob = subproblem(scenarioproblems, attr.scenario_index)
+    con_ref = ConstraintRef(subprob, ci)
+    MOI.set(subprob, attr.attr, con_ref, value)
     return nothing
 end
 function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::ScenarioDependentConstraintAttribute,
                  ci::MOI.ConstraintIndex, value)
     set_in_scenarioproblem!(scenarioproblems, attr.scenario_index, attr.attr, ci, value) do sp, i, attr, ci, value
-        MOI.set(backend(fetch(sp).problems[i]), attr, ci, value)
+        subprob = fetch(sp).problems[i]
+        con_ref = ConstraintRef(subprob, ci)
+        MOI.set(subprob, attr, con_ref, value)
         return nothing
     end
     return nothing
@@ -261,15 +296,19 @@ function MOI.add_constraint(scenarioproblems::DistributedScenarioProblems, f::Si
     end
 end
 
-function MOI.delete(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
-    subprob = subproblem(scenarioproblems, scenario_index)
-    JuMP.delete(subprob, DecisionRef(subprob, index))
+function MOI.delete(scenarioproblems::ScenarioProblems, indices::Vector{MOI.VariableIndex})
+    for subprob in subproblems(scenarioproblems)
+        drefs = DecisionRef.(subprob, indices)
+        delete(subprob, drefs)
+    end
     return nothing
 end
-function MOI.delete(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
-    set_in_scenarioproblem!(scenarioproblems, scenario_index, index) do sp, i, index
-        subprob = fetch(sp).problems[i]
-        JuMP.delete(subprob, DecisionRef(subprob, index))
+function MOI.delete(scenarioproblems::DistributedScenarioProblems, indices::Vector{MOI.VariableIndex})
+    set_in_scenarioproblems!(scenarioproblems, indices) do sp, indices
+        for subprob in fetch(sp).problems
+            dref = DecisionRef.(subprob, indices)
+            delete(subprob, dref)
+        end
         return nothing
     end
     return nothing
@@ -312,6 +351,47 @@ end
 
 # JuMP #
 # ========================== #
+function scenario_decision_dispatch(decision_function::Function,
+                                    scenarioproblems::ScenarioProblems,
+                                    index::MOI.VariableIndex,
+                                    scenario_index::Integer,
+                                    args...) where N
+    dref = DecisionRef(subproblem(scenarioproblems, scenario_index), index)
+    return decision_function(dref, args...)
+end
+function scenario_decision_dispatch(decision_function::Function,
+                                    scenarioproblems::DistributedScenarioProblems,
+                                    index::MOI.VariableIndex,
+                                    scenario_index::Integer,
+                                    args...) where N
+    return get_from_scenarioproblem(scenarioproblems, scenario_index, decision_function, index, args...) do sp, i, decision_function, index, args...
+        subprob = fetch(sp).problems[i]
+        dref = DecisionRef(subprob, index)
+        return decision_function(dref, args...)
+    end
+end
+function scenario_decision_dispatch!(decision_function!::Function,
+                                     scenarioproblems::ScenarioProblems,
+                                     index::MOI.VariableIndex,
+                                     scenario_index::Integer,
+                                     args...) where N
+    dref = DecisionRef(subproblem(scenarioproblems, scenario_index), index)
+    decision_function!(dref, args...)
+    return nothing
+end
+function scenario_decision_dispatch!(decision_function!::Function,
+                                     scenarioproblems::DistributedScenarioProblems,
+                                     index::MOI.VariableIndex,
+                                     scenario_index::Integer,
+                                     args...) where N
+    set_in_scenarioproblem!(scenarioproblems, scenario_index, decision_function!, index, args...) do sp, i, decision_function!, index, args...
+        subprob = fetch(sp).problems[i]
+        dref = DecisionRef(subprob, index)
+        decision_function!(dref, args...)
+        return nothing
+    end
+    return nothing
+end
 function JuMP.fix(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer, val::Number)
     subprob = scenarioproblems.problems[scenario_index]
     dref = DecisionRef(subprob, index)
@@ -382,6 +462,13 @@ end
 
 function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, ci::CI, scenario_index::Integer)
     return decision_index(backend(subproblem(scenarioproblems, scenario_index)), ci)
+end
+function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
+    subprob = subproblem(scenarioproblems, scenario_index)
+    decisions = get_decisions(subprob)::Decisions
+    inner = mapped_constraint(decisions, ci)
+    inner.value == 0 && error("Constraint $ci not properly mapped.")
+    return decision_index(backend(subprob), inner)
 end
 
 function JuMP.set_objective_coefficient(scenarioproblems::ScenarioProblems, index::VI, scenario_index::Integer, coeff::Real)
@@ -461,41 +548,6 @@ function JuMP.set_normalized_rhs(scenarioproblems::DistributedScenarioProblems,
                                                S <: MOIU.ScalarLinearSet{T}}
     set_in_scenarioproblem!(scenarioproblems, scenario_index, ci, S(convert(T, value))) do sp, i, ci, value
         MOI.set(backend(fetch(sp).problems[i]), MOI.ConstraintSet(), ci, value)
-        return nothing
-    end
-    return nothing
-end
-
-function JuMP.delete(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex)
-    for subprob in subproblems(scenarioproblems)
-        dref = DecisionRef(subprob, index)
-        delete(subprob, dref)
-    end
-    return nothing
-end
-function JuMP.delete(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex)
-    set_in_scenarioproblems!(scenarioproblems, index) do sp, index
-        for subprob in fetch(sp).problems
-            dref = DecisionRef(subprob, index)
-            delete(subprob, dref)
-        end
-        return nothing
-    end
-    return nothing
-end
-function JuMP.delete(scenarioproblems::ScenarioProblems, indices::Vector{MOI.VariableIndex})
-    for subprob in subproblems(scenarioproblems)
-        drefs = DecisionRef.(subprob, indices)
-        delete(subprob, drefs)
-    end
-    return nothing
-end
-function JuMP.delete(scenarioproblems::DistributedScenarioProblems, indices::Vector{MOI.VariableIndex})
-    set_in_scenarioproblems!(scenarioproblems, indices) do sp, indices
-        for subprob in fetch(sp).problems
-            dref = DecisionRef.(subprob, indices)
-            delete(subprob, dref)
-        end
         return nothing
     end
     return nothing
@@ -794,25 +846,30 @@ function clear!(scenarioproblems::DistributedScenarioProblems)
     return nothing
 end
 
-function cache_solution!(cache::Dict{Symbol,SolutionCache}, scenarioproblems::ScenarioProblems, optimizer::MOI.AbstractOptimizer, stage::Integer)
-    for i in 1:num_scenarios(scenarioproblems)
-        key = Symbol(:node_solution_, stage, :_, i)
-        subprob = subproblem(scenarioproblems, i)
-        cache[key] = SolutionCache(backend(subprob))
-        cache_model_attributes!(cache[key], optimizer, stage, i)
-        variables = MOI.get(backend(subprob), MOI.ListOfVariableIndices())
-        cache_variable_attributes!(cache[key], optimizer, variables, stage, i)
-        ctypes = filter(t -> is_decision_type(t[1]), MOI.get(backend(subprob), MOI.ListOfConstraints()))
-        constraints = mapreduce(vcat, ctypes) do (F, S)
-            return MOI.get(backend(subprob), MOI.ListOfConstraintIndices{F,S}())
-        end
-        cache_constraint_attributes!(cache[key], optimizer, constraints, stage, i)
-    end
-end
-function cache_solution!(cache::Dict{Symbol,SolutionCache}, scenarioproblems::DistributedScenarioProblems, optimizer::MOI.AbstractOptimizer, stage::Integer)
+function cache_solution!(cache::Dict{Symbol,SolutionCache},
+                         scenarioproblems::ScenarioProblems,
+                         optimizer::MOI.AbstractOptimizer,
+                         stage::Integer,
+                         variables::Vector{<:VI},
+                         constraints::Vector{<:CI})
     for scenario_index in 1:num_scenarios(scenarioproblems)
         key = Symbol(:node_solution_, stage, :_, scenario_index)
-        cache[key], variables, constraints = _prepare_subproblem_cache(scenarioproblems, scenario_index)
+        subprob = subproblem(scenarioproblems, scenario_index)
+        cache[key] = SolutionCache(backend(subprob))
+        cache_model_attributes!(cache[key], optimizer, stage, scenario_index)
+        cache_variable_attributes!(cache[key], optimizer, variables, stage, scenario_index)
+        cache_constraint_attributes!(cache[key], optimizer, constraints, stage, scenario_index)
+    end
+end
+function cache_solution!(cache::Dict{Symbol,SolutionCache},
+                         scenarioproblems::DistributedScenarioProblems,
+                         optimizer::MOI.AbstractOptimizer,
+                         stage::Integer,
+                         variables::Vector{<:VI},
+                         constraints::Vector{<:CI})
+    for scenario_index in 1:num_scenarios(scenarioproblems)
+        key = Symbol(:node_solution_, stage, :_, scenario_index)
+        cache[key] = _prepare_subproblem_cache(scenarioproblems, scenario_index)
         cache_model_attributes!(cache[key], optimizer, stage, scenario_index)
         cache_variable_attributes!(cache[key], optimizer, variables, stage, scenario_index)
         cache_constraint_attributes!(cache[key], optimizer, constraints, stage, scenario_index)
@@ -822,12 +879,7 @@ function _prepare_subproblem_cache(scenarioproblems::DistributedScenarioProblems
     return get_from_scenarioproblem(scenarioproblems, scenario_index) do sp, i
         subprob = fetch(sp).problems[i]
         subcache = SolutionCache(backend(subprob))
-        variables = MOI.get(backend(subprob), MOI.ListOfVariableIndices())
-        ctypes = filter(t -> is_decision_type(t[1]), MOI.get(backend(subprob), MOI.ListOfConstraints()))
-        constraints = mapreduce(vcat, ctypes) do (F, S)
-            return MOI.get(backend(subprob), MOI.ListOfConstraintIndices{F,S}())
-        end
-        return subcache, variables, constraints
+        return subcache
     end
 end
 # ========================== #

@@ -81,7 +81,7 @@ function initialize_subproblems!(execution::SynchronousExecution{T, SmoothSubPro
                 params) do sw, decisions, sp_, x, start_id, params
                     for vi in all_known_decisions(fetch(decisions))
                         # Unfix first-stage decisions
-                        fetch(decisions).decisions[vi].state = NotTaken
+                        fetch(decisions)[vi].state = NotTaken
                     end
                     sp = fetch(sp_)
                     subproblems = Vector{SmoothSubProblem{T}}(undef, num_subproblems(sp))

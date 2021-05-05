@@ -11,14 +11,6 @@ function MOI.is_valid(structure::AbstractBlockStructure, index::MOI.VariableInde
     return MOI.is_valid(scenarioproblems(structure, stage), index, scenario_index)
 end
 
-function MOI.delete(structure::AbstractBlockStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
-    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage > 1 || error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, stage)
-    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    MOI.delete(scenarioproblems(structure, stage), index, scenario_index)
-    return nothing
-end
 function MOI.delete(structure::AbstractBlockStructure{N}, indices::Vector{MOI.VariableIndex}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
@@ -30,6 +22,39 @@ end
 
 # JuMP #
 # ========================== #
+function scenario_decision_dispatch(decision_function::Function,
+                                    structure::AbstractBlockStructure{N},
+                                    index::MOI.VariableIndex,
+                                    stage::Integer,
+                                    scenario_index::Integer,
+                                    args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return scenario_decision_dispatch(decision_function,
+                                      scenarioproblems(structure, stage),
+                                      index,
+                                      scenario_index,
+                                      args...)
+end
+function scenario_decision_dispatch!(decision_function!::Function,
+                                     structure::AbstractBlockStructure{N},
+                                     index::MOI.VariableIndex,
+                                     stage::Integer,
+                                     scenario_index::Integer,
+                                     args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    scenario_decision_dispatch!(decision_function!,
+                                scenarioproblems(structure, stage),
+                                index,
+                                scenario_index,
+                                args...)
+    return nothing
+end
 function JuMP.objective_function_type(structure::AbstractBlockStructure{N}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")

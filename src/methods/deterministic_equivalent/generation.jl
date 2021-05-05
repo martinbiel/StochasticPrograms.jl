@@ -71,10 +71,8 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                     else
                         arrayname = add_subscript(objkey, i)
                     end
-                    # Get common indices from proxy
-                    proxy_var = proxy(stochasticprogram, stage)[objkey]
                     # Handle each individual variable in array
-                    for (var, proxy) in zip(obj, proxy_var)
+                    for var in obj
                         # Update variable name to reflect stage and scenario
                         splitname = split(name(var), "[")
                         varname = if N > 2
@@ -86,8 +84,17 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                     end
                     # Return new key
                     newkey = Symbol(arrayname)
-                elseif isa(obj, JuMP.ConstraintRef) ||
-                       isa(obj, AbstractArray{<:ConstraintRef}) ||
+                elseif isa(obj, JuMP.ConstraintRef)
+                    # Update constraint name to reflect stage and scenario
+                    conname = if N > 2
+                        conname = add_subscript(add_subscript(JuMP.name(obj), stage), i)
+                    else
+                        conname = add_subscript(JuMP.name(obj), i)
+                    end
+                    set_name(obj, conname)
+                    # Return new key
+                    newkey = Symbol(conname)
+                elseif isa(obj, AbstractArray{<:ConstraintRef}) ||
                        isa(obj, AbstractArray{<:GenericAffExpr}) ||
                        isa(obj, AbstractArray{<:DecisionAffExpr})
                     # Update obj name to reflect stage and scenario
@@ -95,6 +102,21 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                         arrayname = add_subscript(add_subscript(objkey, stage), i)
                     else
                         arrayname = add_subscript(objkey, i)
+                    end
+                    # Handle each individual constraint/expression in array
+                    for con in obj
+                        # Update constraint/expression name to reflect stage and scenario
+                        if name(con) == ""
+                            # Do not need update unnamed constraints
+                            continue
+                        end
+                        splitname = split(name(con), "[")
+                        conname = if N > 2
+                            conname = add_subscript(splitname[1], stage)
+                        else
+                            conname = splitname[1]
+                        end
+                        set_name(con, @sprintf("%s[%s", add_subscript(conname,i), splitname[2]))
                     end
                     # Return new key
                     newkey = Symbol(arrayname)

@@ -17,8 +17,8 @@ struct SolutionCache{M <: MOI.ModelLike} <: MOI.ModelLike
                        Dict{MOI.AbstractVariableAttribute, Dict{VI, Any}}(),
                        Dict{MOI.AbstractConstraintAttribute, Dict{CI, Any}}())
         cache_model_attributes!(cache, model)
-        cache_variable_attributes!(identity, cache, model, variables)
-        cache_constraint_attributes!(identity, cache, model, constraints)
+        cache_variable_attributes!(cache, model, variables)
+        cache_constraint_attributes!(cache, model, constraints)
         return cache
     end
 end
@@ -69,11 +69,11 @@ function cache_model_attributes!(cache::SolutionCache, src::MOI.ModelLike, stage
     return nothing
 end
 
-function cache_variable_attributes!(index_map::Function, cache::SolutionCache, src::MOI.ModelLike, variables::Vector{<:VI})
+function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, variables::Vector{<:VI})
     attr = MOI.VariablePrimal()
     for vi in variables
         try
-            value = MOI.get(src, attr, index_map(vi))
+            value = MOI.get(src, attr, vi)
             MOI.set(cache, attr, vi, value)
         catch
         end
@@ -82,7 +82,7 @@ function cache_variable_attributes!(index_map::Function, cache::SolutionCache, s
 end
 function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike)
     variables = MOI.get(src, MOI.ListOfVariableIndices())
-    cache_variable_attributes!(identity, cache, src, variables)
+    cache_variable_attributes!(cache, src, variables)
     return nothing
 end
 function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, variables::Vector{<:VI}, stage::Integer, scenario_index::Integer)
@@ -96,18 +96,13 @@ function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, va
     end
     return nothing
 end
-function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, stage::Integer, scenario_index::Integer)
-    variables = MOI.get(src, ScenarioDependentModelAttribute(stage, scenario_index, MOI.ListOfVariableIndices()))
-    cache_variable_attributes!(cache, src, variables, stage, scenario_index)
-    return nothing
-end
 
-function cache_constraint_attributes!(index_map::Function, cache::SolutionCache, src::MOI.ModelLike, constraints::Vector{<:CI})
+function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, constraints::Vector{<:CI})
     conattrs = [MOI.ConstraintPrimal(), MOI.ConstraintDual(), MOI.ConstraintBasisStatus()]
     for ci in constraints
         for attr in conattrs
             try
-                value = MOI.get(src, attr, index_map(ci))
+                value = MOI.get(src, attr, ci)
                 MOI.set(cache, attr, ci, value)
             catch
             end
@@ -120,7 +115,7 @@ function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike)
     constraints = mapreduce(vcat, ctypes) do (F, S)
         return MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
     end
-    cache_constraint_attributes!(identity, cache, src, constraints)
+    cache_constraint_attributes!(cache, src, constraints)
     return nothing
 end
 function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, constraints::Vector{<:CI}, stage::Integer, scenario_index::Integer)
@@ -134,14 +129,6 @@ function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, 
             end
         end
     end
-    return nothing
-end
-function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, stage::Integer, scenario_index::Integer)
-    ctypes = MOI.get(src, ScenarioDependentModelAttribute(stage, scenario_index, MOI.ListOfConstraints()))
-    constraints = mapreduce(vcat, filter(t -> is_decision_type(t[1]), ctypes)) do (F, S)
-        return MOI.get(src, ScenarioDependentModelAttribute(stage, scenario_index, MOI.ListOfConstraintIndices{F,S}()))
-    end
-    cache_constraint_attributes!(cache, src, constraints, stage, scenario_index)
     return nothing
 end
 
