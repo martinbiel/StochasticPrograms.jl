@@ -99,18 +99,18 @@ Subject to
  w₃[beets] ≥ 0.0
  w₃[extra_beets] ≥ 0.0
  x[wheat] + x[corn] + x[beets] ≤ 500.0
- beets_quota : w₁[beets] ≤ 6000.0
- beets_quota : w₂[beets] ≤ 6000.0
- beets_quota : w₃[beets] ≤ 6000.0
- minimum_requirement[wheat] : 3 x[wheat] + y₁[wheat] - w₁[wheat] ≥ 200.0
- minimum_requirement[corn] : 3.6 x[corn] + y₁[corn] - w₁[corn] ≥ 240.0
- minimum_requirement_beets : 24 x[beets] - w₁[beets] - w₁[extra_beets] ≥ 0.0
- minimum_requirement[wheat] : 2.5 x[wheat] + y₂[wheat] - w₂[wheat] ≥ 200.0
- minimum_requirement[corn] : 3 x[corn] + y₂[corn] - w₂[corn] ≥ 240.0
- minimum_requirement_beets : 20 x[beets] - w₂[beets] - w₂[extra_beets] ≥ 0.0
- minimum_requirement[wheat] : 2 x[wheat] + y₃[wheat] - w₃[wheat] ≥ 200.0
- minimum_requirement[corn] : 2.4 x[corn] + y₃[corn] - w₃[corn] ≥ 240.0
- minimum_requirement_beets : 16 x[beets] - w₃[beets] - w₃[extra_beets] ≥ 0.0
+ beets_quota₁ : w₁[beets] ≤ 6000.0
+ beets_quota₂ : w₂[beets] ≤ 6000.0
+ beets_quota₃ : w₃[beets] ≤ 6000.0
+ minimum_requirement₁[wheat] : 3 x[wheat] + y₁[wheat] - w₁[wheat] ≥ 200.0
+ minimum_requirement₁[corn] : 3.6 x[corn] + y₁[corn] - w₁[corn] ≥ 240.0
+ minimum_requirement_beets₁ : 24 x[beets] - w₁[beets] - w₁[extra_beets] ≥ 0.0
+ minimum_requirement₂[wheat] : 2.5 x[wheat] + y₂[wheat] - w₂[wheat] ≥ 200.0
+ minimum_requirement₂[corn] : 3 x[corn] + y₂[corn] - w₂[corn] ≥ 240.0
+ minimum_requirement_beets₂ : 20 x[beets] - w₂[beets] - w₂[extra_beets] ≥ 0.0
+ minimum_requirement₃[wheat] : 2 x[wheat] + y₃[wheat] - w₃[wheat] ≥ 200.0
+ minimum_requirement₃[corn] : 2.4 x[corn] + y₃[corn] - w₃[corn] ≥ 240.0
+ minimum_requirement_beets₃ : 16 x[beets] - w₃[beets] - w₃[extra_beets] ≥ 0.0
 Solver name: GLPK</pre><p>We can now optimize the model:</p><pre><code class="language-julia">optimize!(farmer)
 x = optimal_decision(farmer)
 x = farmer[1,:x]
@@ -192,4 +192,4 @@ println(&quot;Optimal decision: $(optimal_decision(sp))&quot;)
 println(&quot;Optimal value: $(objective_value(sp))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.0397762891884894]
 Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;Expected value decision: $(expected_value_decision(sp)&quot;)
 println(&quot;VSS: $(VSS(sp))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
-VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Tuesday 4 May 2021 19:53">Tuesday 4 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Saturday 8 May 2021 16:07">Saturday 8 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
