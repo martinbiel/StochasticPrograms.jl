@@ -1,4 +1,6 @@
 include("decision_functions.jl")
+include("decision_expressions.jl")
+include("decision_operators.jl")
 include("decision_variable.jl")
 include("decision_constraint.jl")
 include("decision_objective.jl")

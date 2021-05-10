@@ -22,9 +22,33 @@ mutable struct DecisionQuadExpr{C} <: JuMP.AbstractJuMPScalar
 end
 const DQE = DecisionQuadExpr{Float64}
 
-DQE() = zero(DQE{Float64})
+DQE() = zero(DQE)
 
 is_decision_type(::Type{<:DecisionQuadExpr}) = true
+
+function DecisionQuadExpr(aff::_VariableAffExpr{C}) where C
+    return DecisionQuadExpr(
+        GenericQuadExpr{C,VariableRef}(aff),
+        zero(GenericQuadExpr{C,DecisionRef}),
+        OrderedDict{DecisionCrossTerm, C}(),
+    )
+end
+
+function DecisionQuadExpr(aff::_DecisionAffExpr{C}) where C
+    return DecisionQuadExpr(
+        zero(GenericQuadExpr{C,VariableRef}),
+        GenericQuadExpr{C,DecisionRef}(aff),
+        OrderedDict{DecisionCrossTerm, C}(),
+    )
+end
+
+function DecisionQuadExpr(aff::DecisionAffExpr{C}) where C
+    return DecisionQuadExpr(
+        GenericQuadExpr{C,VariableRef}(aff.variables),
+        GenericQuadExpr{C,DecisionRef}(aff.decisions),
+        OrderedDict{DecisionCrossTerm, C}(),
+    )
+end
 
 # Base overrides #
 # ========================== #
@@ -92,15 +116,26 @@ function Base.isequal(quad::DecisionQuadExpr{C}, other::DecisionQuadExpr{C}) whe
 end
 
 function JuMP.isequal_canonical(quad::DecisionQuadExpr{C}, other::DecisionQuadExpr{C}) where {C}
+    dropzeros!(terms) = begin
+        for (key, value) in terms
+            if iszero(value)
+                delete!(terms, key)
+            end
+        end
+    end
+    cross_terms = copy(quad.cross_terms)
+    dropzeros!(cross_terms)
+    other_cross_terms = copy(other.cross_terms)
+    dropzeros!(other_cross_terms)
     return isequal_canonical(quad.variables, other.variables) &&
         isequal_canonical(quad.decisions, other.decisions) &&
-        isequal(quad.cross_terms, other.cross_terms)
+        isequal(cross_terms, other_cross_terms)
 end
 
 function Base.hash(quad::DecisionQuadExpr, h::UInt)
-    return hash(hash(quad.variables, h),
-                hash(quad.decisions, h),
-                hash(quad.cross_terms, h))
+    return hash(quad.variables,
+                hash(quad.decisions,
+                     hash(quad.cross_terms)))
 end
 
 function sizehint!(quad::DecisionQuadExpr, n::Int, ::Type{_VAE})
@@ -279,7 +314,8 @@ function JuMP.function_string(mode, quad::DecisionQuadExpr, show_constant=true)
         end
     else
         if ret == ""
-            return variable_terms
+            # Default to printing zero if expression is empty
+            return "0"
         end
     end
     return ret
@@ -311,8 +347,8 @@ function _cross_terms_function_string(mode, terms)
 end
 
 # With one factor.
-function JuMP.add_to_expression!(quad::DQE, other::Number)
-    JuMP.add_to_expression!(quad.variables, other)
+function JuMP.add_to_expression!(quad::DQE, other::_Constant)
+    JuMP.add_to_expression!(quad.variables, JuMP._constant_to_number(other))
     return quad
 end
 function JuMP.add_to_expression!(quad::DQE, new_var::VariableRef)
@@ -387,6 +423,16 @@ function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_dae::_DAE)
 end
 function JuMP.add_to_expression!(quad::DQE, new_dae::_DAE, new_coef::_Constant)
     JuMP.add_to_expression!(quad.decisions, new_coef, new_dae)
+    return quad
+end
+function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_dae::DAE)
+    JuMP.add_to_expression!(quad.variables, new_coef, new_dae.variables)
+    JuMP.add_to_expression!(quad.decisions, new_coef, new_dae.decisions)
+    return quad
+end
+function JuMP.add_to_expression!(quad::DQE, new_dae::DAE, new_coef::_Constant)
+    JuMP.add_to_expression!(quad.variables, new_coef, new_dae.variables)
+    JuMP.add_to_expression!(quad.decisions, new_coef, new_dae.decisions)
     return quad
 end
 function JuMP.add_to_expression!(quad::DQE, new_coef::_Constant, new_vqe::_VQE)
@@ -553,11 +599,9 @@ function JuMP.add_to_expression!(quad::DQE,
     # Variables
     JuMP.add_to_expression!(quad, lhs.variables, rhs.variables)
     JuMP.add_to_expression!(quad, lhs.variables, rhs.decisions)
-    JuMP.add_to_expression!(quad, lhs.variables, rhs.knowns)
     # Decisions
     JuMP.add_to_expression!(quad, lhs.decisions, rhs.variables)
     JuMP.add_to_expression!(quad, lhs.decisions, rhs.decisions)
-    JuMP.add_to_expression!(quad, lhs.decisions, rhs.knowns)
     return quad
 end
 

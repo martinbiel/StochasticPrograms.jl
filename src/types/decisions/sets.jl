@@ -100,6 +100,23 @@ function decision_set(variables::Vector{<:JuMP.ScalarVariable}, set::DecisionSet
     end
 end
 
+function decision_set(variables::Matrix{<:JuMP.ScalarVariable}, set::DecisionSet)
+    decisions = map(variables) do variable
+        Decision(variable.info, Float64)
+    end
+    if set.constraint isa JuMP.AbstractVectorSet
+        return MultipleDecisionSet(set.stage,
+                                   decisions,
+                                   JuMP.moi_set(set.constraint, length(variables)),
+                                   set.is_recourse)
+    else
+        return MultipleDecisionSet(set.stage,
+                                   decisions,
+                                   set.constraint,
+                                   set.is_recourse)
+    end
+end
+
 function decision_set(variable::JuMP.ScalarVariable, set::KnownSet)
     return SingleDecisionSet(set.stage, KnownDecision(variable.info, Float64), NoSpecifiedConstraint(), false)
 end

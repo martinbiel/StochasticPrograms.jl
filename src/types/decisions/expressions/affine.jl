@@ -10,7 +10,7 @@ mutable struct DecisionAffExpr{C} <: JuMP.AbstractJuMPScalar
 end
 const DAE = DecisionAffExpr{Float64}
 
-DAE() = zero(DAE{Float64})
+DAE() = zero(DAE)
 
 is_decision_type(::Type{<:DecisionAffExpr}) = true
 
@@ -18,6 +18,9 @@ is_decision_type(::Type{<:DecisionAffExpr}) = true
 # ========================== #
 function Base.iszero(aff::DecisionAffExpr)
     return iszero(aff.variables) && iszero(aff.decisions)
+end
+function Base.zero(::Type{DecisionRef})
+    return zero(DecisionAffExpr{Float64})
 end
 function Base.zero(::Type{DecisionAffExpr{C}}) where C
     return DecisionAffExpr{C}(
@@ -79,8 +82,7 @@ function JuMP.isequal_canonical(aff::DecisionAffExpr{C}, other::DecisionAffExpr{
 end
 
 function Base.hash(aff::DecisionAffExpr, h::UInt)
-    return hash(aff.variables.constant,
-                hash(aff.variables.terms, h),
+    return hash(aff.variables,
                 hash(aff.decisions.terms, h))
 end
 
@@ -167,10 +169,14 @@ function JuMP.function_string(mode, aff::DecisionAffExpr, show_constant=true)
     # Variables
     variable_terms = JuMP.function_string(mode, aff.variables, false)
     ret = _add_terms(ret, variable_terms)
+    if ret == ""
+        # Default to printing zero if expression is empty
+        return "0"
+    end
     # Constant
     if !JuMP._is_zero_for_printing(aff.variables.constant) && show_constant
-        ret = string(ret, JuMP._sign_string(aff.variables.constant),
-
+        ret = string(ret,
+                     JuMP._sign_string(aff.variables.constant),
                      JuMP._string_round(abs(aff.variables.constant)))
     end
     return ret
@@ -195,8 +201,8 @@ function _add_terms(ret::String, terms::String)
 end
 
 # With one factor.
-function JuMP.add_to_expression!(aff::DAE, other::Number)
-    JuMP.add_to_expression!(aff.variables, other)
+function JuMP.add_to_expression!(aff::DAE, other::_Constant)
+    JuMP.add_to_expression!(aff.variables, JuMP._constant_to_number(other))
     return aff
 end
 function JuMP.add_to_expression!(aff::DAE, new_var::VariableRef)

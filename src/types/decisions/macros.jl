@@ -16,6 +16,13 @@ function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVa
     return VariablesConstrainedOnCreation(variables, decision_set(variables, set))
 end
 
+# function JuMP.build_variable(_error::Function, variables::Matrix{<:ScalarVariable}, set::DecisionSet)
+#     n = _square_side(_error, variables)
+#     set = MOI.Reals(MOI.dimension(MOI.PositiveSemidefiniteConeTriangle(n)))
+#     shape = SymmetricMatrixShape(n)
+#     return VariablesConstrainedOnCreation(JuMP._vectorize_variables(_error, variables), decision_set(variables, set))
+# end
+
 function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:SingleDecisionSet}, name::String)
     decisions = get_decisions(model)
     if decisions isa IgnoreDecisions
@@ -103,6 +110,17 @@ end
 
 # Containers #
 # ========================== #
+struct DecisionArray{A <: AbstractArray, S <: Union{DecisionSet, KnownSet}}
+    array::A
+    set::S
+
+    function DecisionArray(array::AbstractArray, set::Union{DecisionSet, KnownSet})
+        A = typeof(array)
+        S = typeof(set)
+        return new{A, S}(array, set)
+    end
+end
+
 struct DecisionDenseAxisArray{A <: DenseAxisArray, S <: Union{DecisionSet, KnownSet}}
     array::A
     set::S
@@ -125,12 +143,28 @@ struct DecisionSparseAxisArray{A <: SparseAxisArray, S <: Union{DecisionSet, Kno
     end
 end
 
+function JuMP.build_variable(_error::Function, variables::AbstractArray{<:JuMP.ScalarVariable}, set::Union{DecisionSet,KnownSet})
+    return DecisionArray(variables, set)
+end
+
 function JuMP.build_variable(_error::Function, variables::DenseAxisArray{<:JuMP.ScalarVariable}, set::Union{DecisionSet,KnownSet})
     return DecisionDenseAxisArray(variables, set)
 end
 
 function JuMP.build_variable(_error::Function, variables::SparseAxisArray{<:JuMP.ScalarVariable}, set::Union{DecisionSet,KnownSet})
     return DecisionSparseAxisArray(variables, set)
+end
+
+function JuMP.add_variable(model::Model, variable::DecisionArray, names::AbstractArray{String})
+    array = variable.array
+    refs = Array{DecisionRef}(undef, size(array))
+    for idx in eachindex(array)
+        var = array[idx]
+        refs[idx] = JuMP.add_variable(model,
+                                      VariableConstrainedOnCreation(var, decision_set(var, variable.set)),
+                                      names[idx])
+    end
+    return refs
 end
 
 function JuMP.add_variable(model::Model, variable::DecisionDenseAxisArray, names::DenseAxisArray{String})

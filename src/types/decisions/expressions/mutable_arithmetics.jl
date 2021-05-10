@@ -169,7 +169,7 @@ function MA.mutable_operate!(::typeof(+), expr::_DecisionAffOrQuadExpr, x)
     return JuMP.add_to_expression!(expr, x)
 end
 function MA.mutable_operate!(::typeof(-), expr::_DecisionAffOrQuadExpr, x)
-    return JuMP.add_to_expression!(expr, -1, x)
+    return JuMP.add_to_expression!(expr, -1.0, x)
 end
 # add/sub_mul #
 function MA.mutable_operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
