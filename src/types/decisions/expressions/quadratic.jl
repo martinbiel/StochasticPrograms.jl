@@ -126,6 +126,26 @@ function JuMP.drop_zeros!(quad::DecisionQuadExpr)
     return nothing
 end
 
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, v1::VariableRef, v2::VariableRef) where C
+    return JuMP.coefficient(quad.variables, v1, v2)
+end
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, v1::DecisionRef, v2::DecisionRef) where C
+    return JuMP.coefficient(quad.decisions, v1, v2)
+end
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, v1::VariableRef, v2::DecisionRef) where C
+    return get(quad.cross_terms, DecisionCrossTerm(v2, v1), zero(C))
+end
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, v1::DecisionRef, v2::VariableRef) where C
+    return get(quad.cross_terms, DecisionCrossTerm(v1, v2), zero(C))
+end
+
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, var::VariableRef) where C
+    return JuMP.coefficient(quad.variables, var)
+end
+function JuMP.coefficient(quad::DecisionQuadExpr{C}, dvar::DecisionRef) where C
+    return JuMP.coefficient(quad.decisions, dvar)
+end
+
 function JuMP._affine_coefficient(f::DecisionQuadExpr, variable::VariableRef)
     return JuMP._affine_coefficient(f.variables, variable)
 end
@@ -402,7 +422,7 @@ function JuMP.add_to_expression!(quad::DQE, other::DQE, coef::_Constant)
 end
 function JuMP.add_to_expression!(quad::DQE,
                                  var_1::VariableRef,
-                                 var_2::DecisionRef)
+                                 var_2::Union{VariableRef,DecisionRef})
     return JuMP.add_to_expression!(quad, 1.0, var_1, var_2)
 end
 function JuMP.add_to_expression!(quad::DQE,

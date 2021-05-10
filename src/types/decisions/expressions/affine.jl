@@ -92,6 +92,16 @@ function JuMP.drop_zeros!(aff::DecisionAffExpr)
     return nothing
 end
 
+function JuMP.coefficient(aff::DecisionAffExpr{C}, var::VariableRef) where {C}
+    return JuMP.coefficient(aff.variables, var)
+end
+function JuMP.coefficient(aff::DecisionAffExpr{C}, dvar::DecisionRef) where {C}
+    return JuMP.coefficient(aff.decisions, dvar)
+end
+function JuMP.coefficient(aff::DecisionAffExpr{C}, var1::V1, var2::V2) where {C, V1 <: Union{VariableRef,DecisionRef}, V2 <: Union{VariableRef,DecisionRef}}
+    return zero(C)
+end
+
 function JuMP._affine_coefficient(f::DecisionAffExpr, variable::VariableRef)
     return JuMP._affine_coefficient(f.variables, variable)
 end
