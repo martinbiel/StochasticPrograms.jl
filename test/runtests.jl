@@ -12,6 +12,8 @@ import StochasticPrograms: probability, expected
 
 include("decisions/decisions.jl")
 TestDecisionFunctions.runtests()
+TestDecisionExpressions.runtests()
+TestDecisionOperators.runtests()
 TestDecisionVariable.runtests()
 TestDecisionConstraint.runtests()
 TestDecisionObjective.runtests()
