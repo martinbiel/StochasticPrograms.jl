@@ -436,11 +436,6 @@ function test_higher_level()
     @testset "sum(::DenseAxisArray{DecisionRef})" begin
         @test_expression_with_string sum(dense_matrix) "dense_matrix[1,a] + dense_matrix[2,a] + dense_matrix[3,a] + dense_matrix[1,b] + dense_matrix[2,b] + dense_matrix[3,b]"
     end
-
-    @decision_variable(model, 0 ≤ sparse_matrix[i in 1:3, j in 1:3; i <= j] ≤ 1, start = 1)
-    @testset "sum(::SparseAxisArray{DecisionRef})" begin
-        @test_expression_with_string sum(sparse_matrix) "sparse_matrix[1,2] + sparse_matrix[1,1] + sparse_matrix[3,3] + sparse_matrix[1,3] + sparse_matrix[2,2] + sparse_matrix[2,3]"
-    end
 end
 
 function runtests()
