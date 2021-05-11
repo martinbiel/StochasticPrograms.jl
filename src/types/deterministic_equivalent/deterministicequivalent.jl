@@ -421,7 +421,7 @@ function JuMP.objective_function(structure::DeterministicEquivalent, FunType::Ty
     MOIFunType = moi_function_type(FunType)
     func = MOI.get(structure,
                    MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
-    return jump_function(structure.model, func)
+    return JuMP.jump_function(structure, 1, func)
 end
 function JuMP.objective_function(structure::DeterministicEquivalent, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
     if stage == 1
@@ -442,7 +442,7 @@ function JuMP.objective_function(structure::DeterministicEquivalent{N},
     MOIFunType = moi_function_type(FunType)
     attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.ObjectiveFunction{MOIFunType}())
     func = MOI.get(structure, attr)::MOIFunType
-    return jump_function(structure.model, func)
+    return JuMP.jump_function(structure, stage, scenario_index, func)
 end
 
 function JuMP._moi_optimizer_index(structure::DeterministicEquivalent, index::VI)
@@ -547,6 +547,7 @@ end
 function JuMP.set_normalized_coefficient(structure::DeterministicEquivalent{N},
                                          ci::CI{F,S},
                                          index::VI,
+                                         var_stage::Integer,
                                          stage::Integer,
                                          scenario_index::Integer,
                                          value) where {N, T, F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}, S}
@@ -554,7 +555,11 @@ function JuMP.set_normalized_coefficient(structure::DeterministicEquivalent{N},
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    mapped_vi = mapped_index(structure, index, scenario_index)
+    mapped_vi = if var_stage == 1
+        mapped_vi = index
+    else
+        mapped_vi = mapped_index(structure, index, scenario_index)
+    end
     mapped_ci = mapped_index(structure, ci, scenario_index)
     MOI.modify(backend(structure.model), mapped_ci,
                DecisionCoefficientChange(mapped_vi, convert(T, value)))
@@ -564,6 +569,7 @@ end
 function JuMP.normalized_coefficient(structure::DeterministicEquivalent{N},
                                      ci::CI{F,S},
                                      index::VI,
+                                     var_stage::Integer,
                                      stage::Integer,
                                      scenario_index::Integer) where {N, T, F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}, S}
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
@@ -572,8 +578,12 @@ function JuMP.normalized_coefficient(structure::DeterministicEquivalent{N},
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     mapped_ci = mapped_index(structure, ci, scenario_index)
     f = MOI.get(structure, MOI.ConstraintFunction(), mapped_ci)::F
-    mapped_vi = mapped_index(structure, index, scenario_index)
-    dref = DecisionRef(structure.model, mapped_vi)
+    dref = if var_stage == 1
+        dref = DecisionRef(structure.model, index)
+    else
+        mapped_vi = mapped_index(structure, index, scenario_index)
+        dref = DecisionRef(structure.model, mapped_vi)
+    end
     return JuMP._affine_coefficient(jump_function(structure.model, f), dref)
 end
 
@@ -613,14 +623,25 @@ function DecisionRef(structure::DeterministicEquivalent, index::VI, stage::Integ
 end
 function DecisionRef(structure::DeterministicEquivalent{N}, index::VI, at_stage::Integer, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage > 1 || error("There are no scenarios in the first stage.")
-    n = num_scenarios(structure, stage)
+    at_stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, at_stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     return DecisionRef(structure.model, index)
 end
 
 function JuMP.jump_function(structure::DeterministicEquivalent{N},
                             stage::Integer,
+                            f::MOI.AbstractFunction) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    if stage == 1
+        return JuMP.jump_function(structure.model, f)
+    else
+        return JuMP.jump_function(structure.proxy[stage], f)
+    end
+end
+function JuMP.jump_function(structure::DeterministicEquivalent{N},
+                            stage::Integer,
+                            scenario_index::Integer,
                             f::MOI.AbstractFunction) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     return JuMP.jump_function(structure.model, f)
@@ -735,9 +756,15 @@ end
 # Indices
 # ========================== #
 function mapped_index(structure::DeterministicEquivalent{2}, index::MOI.VariableIndex, scenario_index::Integer)
-    first_stage_offset = -(scenario_index - 1) * MOI.get(structure.proxy[1], MOI.NumberOfVariables())
+    # The initial number of first-stage decisions is always given by
+    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
+    # Calculate offset from first-stage auxilliary variables (first-stage decisions are included in second-stage proxy, so deduct them)
+    first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfVariables()) - num_first_stage_decisions
+    # Calculate offset from extra counts of first-stage decisions from second-stage proxy
+    first_stage_decision_offset = -(scenario_index - 1) * num_first_stage_decisions
+    # Calculate offset from second-stage variables
     scenario_offset = (scenario_index - 1) * MOI.get(structure.proxy[2], MOI.NumberOfVariables())
-    return MOI.VariableIndex(index.value + first_stage_offset + scenario_offset)
+    return MOI.VariableIndex(index.value + first_stage_offset + first_stage_decision_offset + scenario_offset)
 end
 function mapped_index(structure::DeterministicEquivalent{2}, ci::CI{F,S}, scenario_index::Integer) where {F,S}
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{F,S}())

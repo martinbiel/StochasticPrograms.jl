@@ -1323,8 +1323,8 @@ end
 function DecisionRef(dvar::DecisionVariable, at_stage::Integer, scenario_index::Integer)
     at_stage > stage(dvar) || error("$dvar can only be known after stage $(stage(dvar)).")
     sp = owner_model(dvar)
-    return DecisionRef(structure(sp), index(dvar), at_stage, scenario_index)
--end
+    return DecisionRef(structure(sp), index(dvar), at_stage, stage(dvar), scenario_index)
+end
 
 is_decision_type(::Type{DecisionVariable}) = true
 

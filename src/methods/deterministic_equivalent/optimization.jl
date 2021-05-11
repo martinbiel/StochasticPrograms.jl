@@ -82,8 +82,8 @@ function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::Det
         # Model attributes are shared
         cache_model_attributes!(cache[key], backend(structure.model))
         # Variables/constraints are scenario-dependent
-        cache_variable_attributes!(cache[key], backend(structure.model), variables, 2, scenario_index)
-        cache_constraint_attributes!(cache[key], backend(structure.model), constraints, 2, scenario_index)
+        cache_variable_attributes!(cache[key], structure, variables, 2, scenario_index)
+        cache_constraint_attributes!(cache[key], structure, constraints, 2, scenario_index)
         # Cache subobjective
         if cache[key].modattr[MOI.TerminationStatus()] == MOI.OPTIMAL
             Q = 0.0

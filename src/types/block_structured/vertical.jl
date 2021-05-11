@@ -146,6 +146,12 @@ function MOI.is_valid(structure::VerticalStructure, index::MOI.VariableIndex, st
     stage == 1 || error("No scenario index specified.")
     return MOI.is_valid(backend(structure.first_stage), index)
 end
+function MOI.is_valid(structure::VerticalStructure, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer)
+    stage == 1 && error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return MOI.is_valid(scenarioproblems(structure, stage), index, scenario_index)
+end
 function MOI.is_valid(structure::VerticalStructure, ci::MOI.ConstraintIndex, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     return MOI.is_valid(backend(structure.first_stage), ci)
@@ -165,6 +171,14 @@ function MOI.delete(structure::VerticalStructure{N}, indices::Vector{MOI.Variabl
     for s in 2:N
         MOI.delete(scenarioproblems(structure, s), indices)
     end
+    return nothing
+end
+function MOI.delete(structure::VerticalStructure{N}, indices::Vector{MOI.VariableIndex}, stage::Integer, scenario_index::Integer) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    MOI.delete(scenarioproblems(structure, stage), indices, scenario_index)
     return nothing
 end
 function MOI.delete(structure::VerticalStructure, ci::MOI.ConstraintIndex, stage::Integer)
@@ -217,6 +231,39 @@ function decision_dispatch!(decision_function!::Function,
     decision_function!(dref, args...)
     return nothing
 end
+function scenario_decision_dispatch(decision_function::Function,
+                                    structure::VerticalStructure{N},
+                                    index::MOI.VariableIndex,
+                                    stage::Integer,
+                                    scenario_index::Integer,
+                                    args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return scenario_decision_dispatch(decision_function,
+                                      scenarioproblems(structure, stage),
+                                      index,
+                                      scenario_index,
+                                      args...)
+end
+function scenario_decision_dispatch!(decision_function!::Function,
+                                     structure::VerticalStructure{N},
+                                     index::MOI.VariableIndex,
+                                     stage::Integer,
+                                     scenario_index::Integer,
+                                     args...) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    scenario_decision_dispatch!(decision_function!,
+                                scenarioproblems(structure, stage),
+                                index,
+                                scenario_index,
+                                args...)
+    return nothing
+end
 function JuMP.fix(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, val::Number) where N
     dref = DecisionRef(structure.first_stage, index)
     fix(dref, val)
@@ -260,7 +307,7 @@ function JuMP.objective_function(structure::VerticalStructure, FunType::Type{<:A
     MOIFunType = moi_function_type(FunType)
     func = MOI.get(structure.first_stage,
                    MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
-    return jump_function(structure.first_stage, func)
+    return JuMP.jump_function(structure, 1, func)
 end
 
 function JuMP.objective_function(structure::AbstractBlockStructure, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
@@ -273,6 +320,9 @@ end
 
 function JuMP._moi_optimizer_index(structure::VerticalStructure, index::VI)
     return decision_index(backend(structure.first_stage), index)
+end
+function JuMP._moi_optimizer_index(structure::VerticalStructure, index::VI, scenario_index::Integer)
+    return JuMP._moi_optimizer_index(scenarioproblems(structure), index, scenario_index)
 end
 function JuMP._moi_optimizer_index(structure::VerticalStructure, ci::CI)
     return decision_index(backend(structure.first_stage), ci)
@@ -318,6 +368,7 @@ end
 function JuMP.set_normalized_coefficient(structure::VerticalStructure{N},
                                          ci::CI{F,S},
                                          index::VI,
+                                         var_stage::Integer,
                                          stage::Integer,
                                          scenario_index::Integer,
                                          value) where {N, T, F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}, S}
@@ -332,6 +383,7 @@ end
 function JuMP.normalized_coefficient(structure::VerticalStructure{N},
                                      ci::CI{F,S},
                                      index::VI,
+                                     var_stage::Integer,
                                      stage::Integer,
                                      scenario_index::Integer) where {N, T, F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}, S}
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
@@ -380,6 +432,13 @@ function JuMP.jump_function(structure::VerticalStructure{N},
         return JuMP.jump_function(structure.proxy[stage], f)
     end
 end
+function JuMP.jump_function(structure::VerticalStructure{N},
+                            stage::Integer,
+                            scenario_index::Integer,
+                            f::MOI.AbstractFunction) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    return JuMP.jump_function(structure.proxy[stage], f)
+end
 
 # Getters #
 # ========================== #
@@ -392,6 +451,12 @@ deferred_first_stage(structure::VerticalStructure, ::Val{1}) = num_variables(fir
 function decision(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
     return decision(structure.decisions, stage, index)
+end
+function decision(structure::VerticalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
+    stage > 1 || error("There are no scenarios in the first stage.")
+    n = num_scenarios(structure, stage)
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return decision(scenarioproblems(structure, stage), index, scenario_index)
 end
 # ========================== #
 

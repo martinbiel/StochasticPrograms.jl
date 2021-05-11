@@ -435,16 +435,18 @@ function JuMP.objective_function_type(scenarioproblems::DistributedScenarioProbl
 end
 
 function JuMP.objective_function(scenarioproblems::ScenarioProblems,
-                                 proxy::JuMP.Model,
+                                 structure::AbstractBlockStructure,
+                                 stage::Integer,
                                  scenario_index::Integer,
                                  FunType::Type{<:AbstractJuMPScalar})
     MOIFunType = moi_function_type(FunType)
     subprob = subproblem(scenarioproblems, scenario_index)
     func = MOI.get(subprob, MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
-    return jump_function(proxy, func)
+    return JuMP.jump_function(structure, stage, scenario_index, func)
 end
 function JuMP.objective_function(scenarioproblems::DistributedScenarioProblems,
-                                 proxy::JuMP.Model,
+                                 structure::AbstractBlockStructure,
+                                 stage::Integer,
                                  scenario_index::Integer,
                                  FunType::Type{<:AbstractJuMPScalar})
     f = get_from_scenarioproblem(scenarioproblems, scenario_index, FunType) do sp, i, FunType
@@ -453,7 +455,7 @@ function JuMP.objective_function(scenarioproblems::DistributedScenarioProblems,
         func = MOI.get(subprob, MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
         return func
     end
-    return jump_function(proxy, f)
+    return JuMP.jump_function(structure, stage, scenario_index, f)
 end
 
 function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)

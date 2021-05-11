@@ -9,9 +9,11 @@ function test_SingleDecision_objective(Structure)
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Min, x)
     end
     @second_stage sp = begin
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Min, y)
     end
@@ -121,10 +123,12 @@ function test_DecisionAffExpr_objective(Structure)
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Min, 2x)
     end
     @second_stage sp = begin
         @uncertain a
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Min, a*y)
     end
@@ -177,11 +181,13 @@ function test_DecisionAffExpr_objective(Structure)
     end
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Max, x + 3x + 1)
     end
     @second_stage sp = begin
         @known x
         @uncertain a
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Max, x + a*x + 1 + y + 3y + 1)
     end
@@ -243,11 +249,13 @@ function test_DecisionQuadExpr_objective(Structure)
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Min, x^2 + 2x)
     end
     @second_stage sp = begin
         @known x
         @uncertain a
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Min, y^2 + a*y + x^2 + 2x)
     end
@@ -310,10 +318,12 @@ function test_decision_objective_coefficient_modifiction(Structure)
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Min, x)
     end
     @second_stage sp = begin
         @known x
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Min, y)
     end
@@ -368,10 +378,12 @@ function test_decision_objective_coefficient_modifiction(Structure)
     end
     @first_stage sp = begin
         @decision(model, x)
+        @variable(model, w)
         @objective(model, Min, x^2 + x)
     end
     @second_stage sp = begin
         @known x
+        @variable(model, z)
         @recourse(model, y)
         @objective(model, Min, x^2 + y^2 + y)
     end
