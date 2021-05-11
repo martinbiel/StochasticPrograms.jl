@@ -35,7 +35,7 @@ function stage_one_model(stochasticprogram::StochasticProgram; optimizer = nothi
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     model = optimizer == nothing ? Model() : Model(optimizer)
     # Prepare decisions
-    model.ext[:decisions] = Decisions(1)
+    model.ext[:decisions] = Decisions(Val{1}())
     add_decision_bridges!(model)
     # Generate and cache first-stage model
     generator(stochasticprogram, :stage_1)(model, stage_parameters(stochasticprogram, 1))
@@ -156,15 +156,15 @@ function _outcome_model!(outcome_model::JuMP.Model,
                          decisions::AbstractVector,
                          scenario::AbstractScenario)
     # Prepare decisions
-    outcome_model.ext[:decisions] = Decisions(2)
+    outcome_model.ext[:decisions] = Decisions(Val{2}())
     add_decision_bridges!(outcome_model)
     # Generate the outcome model
     decision_generator(outcome_model, decision_params)
     generator(outcome_model, stage_params, scenario)
     # Copy first-stage objective
-    # copy_decision_objective!(stage_one_model,
-    #                          outcome_model,
-    #                          all_known_decision_variables(outcome_model)[1])
+    copy_decision_objective!(stage_one_model,
+                             outcome_model,
+                             all_known_decision_variables(outcome_model, 1))
     # Update the known decision values
     update_known_decisions!(outcome_model.ext[:decisions][1], decisions)
     update_known_decisions!(outcome_model)
