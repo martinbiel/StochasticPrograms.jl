@@ -433,10 +433,12 @@ In the above, the probability space consists of only two scenarios and the stoch
 ### Instantiation
 To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the [`@sampler`](@ref) macro:
 ```@example simple
-@sampler SimpleSampler = begin
-    N::StochasticPrograms.MvNormal
+using Distributions
 
-    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
+@sampler SimpleSampler = begin
+    N::MvNormal
+
+    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
 
     @sample Scenario begin
         x = rand(sampler.N)

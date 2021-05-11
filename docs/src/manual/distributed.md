@@ -9,11 +9,12 @@ using Distributed
 addprocs(3)
 
 @everywhere using StochasticPrograms
+@everywhere using Distributions
 
 @sampler SimpleSampler = begin
-    N::StochasticPrograms.MvNormal
+    N::MvNormal
 
-    SimpleSampler(μ, Σ) = new(StochasticPrograms.MvNormal(μ, Σ))
+    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
 
     @sample Scenario begin
         x = rand(sampler.N)
