@@ -317,6 +317,42 @@ Moreover, we can evaluate the result of the decision in a given scenario, i.e. s
 evaluate_decision(sp, x, ξ₁)
 ```
 
+### Solution caching
+
+StochasticPrograms minimizes memory usage by reusing the same underlying structure when optimizing the model as when evaluating a decision. As a consequence, calls to for example [`evaluate_decision`](@ref) replaces any previosly found optimal solution. Hence,
+```@example simple
+objective_value(sp)
+```
+and
+```@example simple
+optimal_decision(sp)
+```
+returns values consistent with above call to [`evaluate_decision`](@ref). Optionally, the solution obtained from calling [`optimize!`](@ref) can be cached by setting a `cache` flag during the call:
+```@example simple
+optimize!(sp; cache = true)
+```
+By re-optimizing, we again obtain
+```@example simple
+objective_value(sp)
+```
+and
+```@example simple
+optimal_decision(sp)
+```
+However, if we now also re-run decision evaluation:
+```@example simple
+evaluate_decision(sp, x)
+```
+, the solution stays consistent with the optimization call:
+```@example simple
+objective_value(sp)
+```
+and
+```@example simple
+optimal_decision(sp)
+```
+The caching procedure attempts to save as many MathOptInterface attributes as possible, so for example dual values of the constraints should stay consistent with the optimized model as well. For larger models, the caching procedure can be time consuming and is therefore not enabled by default. For the same reason, the subproblem solutions are only cached for models with fewer than 100 scenarios. The first-stage solution is always cached if caching is enabled.
+
 ### Stochastic performance
 
 Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:

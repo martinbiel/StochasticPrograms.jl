@@ -58,6 +58,10 @@ Values supplied to [`instantiate`](@ref) are always used, and otherwise the defa
 
 The [`@decision`](@ref) blocks are used to annotate linking variables between stages. Their usage is identical syntax-wise to JuMP's `@variable` macros. Internally, they create specialized JuMP variables with context-dependent behaviour.
 
+## [`@recourse`](@ref) blocks
+
+The [`@recourse`](@ref) macro functions like the [`@decision`](@ref) macro, but is only used to annotate recourse decisions in the final stage.
+
 ## [`@known`](@ref) blocks
 
 A [`@known`](@ref) annotation is used in subsequent stages to bring a decision defined in a previous stage into scope. Any decision defined by [`@decision`](@ref) inside a [`@stochastic_model`](@ref) automatically annotates subsequent stages with appropriate [`@known`](@ref) lines.

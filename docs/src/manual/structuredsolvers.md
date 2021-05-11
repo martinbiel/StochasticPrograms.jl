@@ -61,6 +61,7 @@ The following [`Crash`](@ref) methods are available in StochasticPrograms:
 - [`Crash.None`](@ref) (default)
 - [`Crash.EVP`](@ref)
 - [`Crash.Scenario`](@ref)
+- [`Crash.PreSolve`](@ref)
 - [`Crash.Custom`](@ref)
 
 To use a Crash procedure, set the `crash` keyword in the call to [`optimize!`](@ref).

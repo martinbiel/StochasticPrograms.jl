@@ -161,9 +161,9 @@ function instantiate(stochasticmodel::StochasticModel{2},
     return sp
 end
 """
-    optimize!(stochasticprogram::StochasticProgram; crash::AbstractCrash = Crash.None(); kw...)
+    optimize!(stochasticprogram::StochasticProgram; crash::AbstractCrash = Crash.None(), cache::Bool = false; kw...)
 
-Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown. An optional crash procedure can be set to warm-start.
+Optimize the `stochasticprogram` in expectation. If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimizer` error is thrown. An optional crash procedure can be set to warm-start. Setting the `cache` flag to true will, upon sucessful termination, try to cache the solution values for all relevant attributes in the model. The values will then persist after future `evaluate` calls that would otherwise overwrite the optimal solution.
 
 ## Examples
 
