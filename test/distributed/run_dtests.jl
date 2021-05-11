@@ -1,8 +1,15 @@
 using Test
 using Distributed
 include(joinpath(Sys.BINDIR, "..", "share", "julia", "test", "testenv.jl"))
-addprocs_with_testenv(3)
-@test nworkers() == 3
+
+if Sys.iswindows()
+    # Test fewer workers on windows to avoid memory issues
+    addprocs_with_testenv(2)
+    @test nworkers() == 2
+else
+    addprocs_with_testenv(3)
+    @test nworkers() == 3
+end
 
 @everywhere using Logging
 for w in workers()
