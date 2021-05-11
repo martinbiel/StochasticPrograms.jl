@@ -4,8 +4,8 @@ include(joinpath(Sys.BINDIR, "..", "share", "julia", "test", "testenv.jl"))
 
 if Sys.iswindows()
     # Test fewer workers on windows to avoid memory issues
-    addprocs_with_testenv(2)
-    @test nworkers() == 2
+    addprocs_with_testenv(1)
+    @test nworkers() == 1
 else
     addprocs_with_testenv(3)
     @test nworkers() == 3
