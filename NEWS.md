@@ -1,6 +1,33 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.6.0 (May 12, 2021)
+-----------------------------
+
+Apart from performance improvements and various bugfixes, v0.6 introduces the following breaking changes and new features:
+
+## Breaking changes
+
+- A few attributes were not properly camel cased in previus versions, but now are. These are as follows:
+    - `SubproblemOptimizer` -> `SubProblemOptimizer`
+    - `SubproblemOptimizerAttribute` -> `SubProblemOptimizerAttribute`
+    - `RawSubproblemOptimizerParameter` -> `RawSubProblemOptimizerParameter`
+    - `Penaltyterm` -> `PenaltyTerm`
+    - `AbstractPenaltyterm` -> `AbstractPenaltyTerm`
+    - `RegularizationPenaltyterm` -> `RegularizationPenaltyTerm`
+- Solution caching, introduced in v0.5, is no longer enabled by default since it can be time consuming for large models. Caching is only run if `cache = true` is supplied as a keyword argument to `optimize!`, or by running the new `cache_solution!` function after optimizing. This is documented in the "Quick start" section of the manual.
+
+## New features
+
+- A new structured solver suite, based on quasi-gradient algorithms, has been added. The solvers are accessed through `QuasiGradient.Optimizer` and operate on vertical structures. See the documentation for more details.
+- The L-shaped solver suite has been extended with experimental strategies for problems with integer recourse. These strategies are activated by setting the `IntegerStrategy` attribute. See the documentation for more details.
+- The structured solvers now implement `TimeLimit` functionality.
+- Integer/binary variables are now supported by the SMPS reader. In the `.cor` file's `BOUNDS` section, a variable bound annotated by `BV` is binary, `I` is integer, and `LI` and `UI` can be used to annotate an integer variable with a lower/upper bound.
+- The `SCENARIOS` format is now supported by the SMPS reader for two-stage models.
+- The crash start option `PreSolve` has been added, which runs a supplied optimization procedure (preferrably suboptimal or with early termination), to determine a suitable starting point.
+- Added `cache_solution!` which tries to save all solution attributes that are queryable after a successful call to `optimize!`.
+
+
 Version 0.5.0 (December 29, 2020)
 -----------------------------
 
@@ -79,6 +106,7 @@ dual(con, 2) # -0.25, dual value of con in scenario 1
 - The new function `recourse_decision(sp, x, scenario)` can be used to obtain the optimal recourse decision in scenario `scenario` if `x` is the first-stage decision.
 - A granulated aggregation procedure has been added to the L-shaped suite
 - The function `lower_bound` becomes `lower_confidence_interval` and the function `upper_bound` becomes `upper_confidence_interval` to avoid name clashes with JuMP
+- Solution attributes queryable after optimizing are now automatically cached and are therefore not lost if a decision is evaluated after optimizing.
 - Various bugfixes
 
 Version 0.4.0 (July 14, 2020)
