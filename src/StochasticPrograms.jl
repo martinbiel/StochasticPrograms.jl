@@ -88,6 +88,7 @@ export
     optimizer_name,
     optimizer,
     optimizer_constructor,
+    cache_solution!,
     AbstractStochasticStructure,
     StochasticInstantiation,
     UnspecifiedInstantiation,

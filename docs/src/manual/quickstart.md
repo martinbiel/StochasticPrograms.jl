@@ -331,7 +331,11 @@ returns values consistent with above call to [`evaluate_decision`](@ref). Option
 ```@example simple
 optimize!(sp; cache = true)
 ```
-By re-optimizing, we again obtain
+or by directly calling [`cache_solution!`](@ref):
+```@example simple
+cache_solution!(sp)
+```
+after optimizing. Now, we again obtain
 ```@example simple
 objective_value(sp)
 ```
@@ -343,7 +347,7 @@ However, if we now also re-run decision evaluation:
 ```@example simple
 evaluate_decision(sp, x)
 ```
-, the solution stays consistent with the optimization call:
+the solution stays consistent with the optimization call:
 ```@example simple
 objective_value(sp)
 ```

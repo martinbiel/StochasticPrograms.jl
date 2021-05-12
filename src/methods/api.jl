@@ -214,6 +214,22 @@ function JuMP.optimize!(stochasticprogram::TwoStageStochasticProgram; crash::Abs
     return nothing
 end
 """
+    cache_solution!(stochasticprogram::StochasticProgram)
+
+Cache the optimal solution, including as many model/variable/constraints attributes as possible, after a call to [`optimize!`](@ref)
+"""
+function cache_solution!(stochasticprogram::StochasticProgram)
+    # Throw NoOptimizer error if no recognized optimizer has been provided
+    check_provided_optimizer(stochasticprogram.optimizer)
+    # Throw if optimize! has not been called
+    if MOI.get(stochasticprogram, MOI.TerminationStatus()) == MOI.OPTIMIZE_NOT_CALLED
+        throw(OptimizeNotCalled())
+    end
+    # Defer to structure
+    cache_solution!(stochasticprogram, structure(stochasticprogram), optimizer(stochasticprogram))
+    return nothing
+end
+"""
     termination_status(stochasticprogram::StochasticProgram)
 
 Return the reason why the solver of the `stochasticprogram` stopped.
