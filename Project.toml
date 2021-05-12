@@ -24,7 +24,7 @@ SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 [compat]
 Clustering = "0.14"
 Compat = "2.2, 3"
-Distributions = "0.24.8"
+Distributions = "0.25.0"
 JuMP = "0.21"
 MacroTools = "0.5.3"
 MathOptInterface = "0.9.1"
@@ -32,7 +32,7 @@ MutableArithmetics = "0.2.2"
 OrderedCollections = "1.2.0"
 Parameters = "0.12"
 ProgressMeter = "1.4.1"
-Reexport = "0.2"
+Reexport = "1.0.0"
 julia = "1"
 
 [extras]
