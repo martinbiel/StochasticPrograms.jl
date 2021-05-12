@@ -26,6 +26,23 @@ LShaped.SynchronousExecution
 LShaped.AsynchronousExecution
 ```
 
+## Feasibility
+
+```@docs
+LShaped.NoFeasibilityAlgorithm
+LShaped.IgnoreFeasibility
+LShaped.FeasibilityCutsMaster
+LShaped.FeasibilityCutsWorker
+LShaped.FeasibilityCuts
+```
+
+## Integers
+
+```@autodocs
+Modules = [LShaped]
+Pages   = ["integer.jl", "ignore_integers.jl", "combinatorial_cuts.jl", "convexification.jl"]
+```
+
 ## Regularization
 
 ```@docs

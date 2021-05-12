@@ -1,7 +1,7 @@
 """
     PolyhedronProjection
 
-Functor object for using polyhedral projection in the prox step of a quasigradient algorithm. Create by supplying a [`Polyhedral`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+Functor object for using polyhedral projection in the prox step of a quasigradient algorithm. Create by supplying a [`Polyhedron`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
 
 ...
 # Parameters

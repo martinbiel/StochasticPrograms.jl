@@ -1,3 +1,5 @@
+const CachableModel = Union{MOI.ModelLike, AbstractStochasticStructure}
+
 struct SolutionCache{M <: MOI.ModelLike} <: MOI.ModelLike
     modattr::Dict{MOI.AbstractModelAttribute, Any}
     varattr::Dict{MOI.AbstractVariableAttribute, Dict{VI, Any}}
@@ -23,7 +25,7 @@ struct SolutionCache{M <: MOI.ModelLike} <: MOI.ModelLike
     end
 end
 
-function cache_model_attributes!(cache::SolutionCache, src::MOI.ModelLike)
+function cache_model_attributes!(cache::SolutionCache, src::CachableModel)
     attributes = [MOI.ObjectiveValue(),
                   MOI.DualObjectiveValue(),
                   MOI.ObjectiveBound(),
@@ -46,7 +48,7 @@ function cache_model_attributes!(cache::SolutionCache, src::MOI.ModelLike)
     return nothing
 end
 
-function cache_model_attributes!(cache::SolutionCache, src::MOI.ModelLike, stage::Integer, scenario_index::Integer)
+function cache_model_attributes!(cache::SolutionCache, src::CachableModel, stage::Integer, scenario_index::Integer)
     attributes = [MOI.ObjectiveValue(),
                   MOI.DualObjectiveValue(),
                   MOI.ObjectiveBound(),
@@ -69,7 +71,7 @@ function cache_model_attributes!(cache::SolutionCache, src::MOI.ModelLike, stage
     return nothing
 end
 
-function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, variables::Vector{<:VI})
+function cache_variable_attributes!(cache::SolutionCache, src::CachableModel, variables::Vector{<:VI})
     attr = MOI.VariablePrimal()
     for vi in variables
         try
@@ -80,12 +82,12 @@ function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, va
     end
     return nothing
 end
-function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike)
+function cache_variable_attributes!(cache::SolutionCache, src::CachableModel)
     variables = MOI.get(src, MOI.ListOfVariableIndices())
     cache_variable_attributes!(cache, src, variables)
     return nothing
 end
-function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, variables::Vector{<:VI}, stage::Integer, scenario_index::Integer)
+function cache_variable_attributes!(cache::SolutionCache, src::CachableModel, variables::Vector{<:VI}, stage::Integer, scenario_index::Integer)
     attr = MOI.VariablePrimal()
     for vi in variables
         try
@@ -97,7 +99,7 @@ function cache_variable_attributes!(cache::SolutionCache, src::MOI.ModelLike, va
     return nothing
 end
 
-function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, constraints::Vector{<:CI})
+function cache_constraint_attributes!(cache::SolutionCache, src::CachableModel, constraints::Vector{<:CI})
     conattrs = [MOI.ConstraintPrimal(), MOI.ConstraintDual(), MOI.ConstraintBasisStatus()]
     for ci in constraints
         for attr in conattrs
@@ -110,7 +112,7 @@ function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, 
     end
     return nothing
 end
-function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike)
+function cache_constraint_attributes!(cache::SolutionCache, src::CachableModel)
     ctypes = filter(t -> is_decision_type(t[1]), MOI.get(src, MOI.ListOfConstraints()))
     constraints = mapreduce(vcat, ctypes) do (F, S)
         return MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
@@ -118,7 +120,7 @@ function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike)
     cache_constraint_attributes!(cache, src, constraints)
     return nothing
 end
-function cache_constraint_attributes!(cache::SolutionCache, src::MOI.ModelLike, constraints::Vector{<:CI}, stage::Integer, scenario_index::Integer)
+function cache_constraint_attributes!(cache::SolutionCache, src::CachableModel, constraints::Vector{<:CI}, stage::Integer, scenario_index::Integer)
     conattrs = [MOI.ConstraintPrimal(), MOI.ConstraintDual(), MOI.ConstraintBasisStatus()]
     for ci in constraints
         for attr in conattrs

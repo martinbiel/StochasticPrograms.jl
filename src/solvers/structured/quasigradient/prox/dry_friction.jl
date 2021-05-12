@@ -6,7 +6,7 @@ end
 """
     DryFrictionProximal
 
-Functor object for using dry-friction acceleration in the prox step of a quasigradient algorithm. Create by supplying a [`Dryfriction`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
+Functor object for using dry-friction acceleration in the prox step of a quasigradient algorithm. Create by supplying a [`DryFriction`](@ref) object through `prox ` to `QuasiGradient.Optimizer` or by setting the [`Prox`](@ref) attribute.
 
 ...
 # Parameters

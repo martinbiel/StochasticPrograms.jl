@@ -65,7 +65,7 @@ function subproblem_optimizer end
 
 Return the number of iterations ran by the structured optimizer
 
-See also: [`optimize`](@ref)
+See also: [`optimize!`](@ref)
 """
 function num_iterations end
 # Sample-based solver interface

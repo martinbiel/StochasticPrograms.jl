@@ -16,13 +16,6 @@ function JuMP.build_variable(_error::Function, variables::Vector{<:JuMP.ScalarVa
     return VariablesConstrainedOnCreation(variables, decision_set(variables, set))
 end
 
-# function JuMP.build_variable(_error::Function, variables::Matrix{<:ScalarVariable}, set::DecisionSet)
-#     n = _square_side(_error, variables)
-#     set = MOI.Reals(MOI.dimension(MOI.PositiveSemidefiniteConeTriangle(n)))
-#     shape = SymmetricMatrixShape(n)
-#     return VariablesConstrainedOnCreation(JuMP._vectorize_variables(_error, variables), decision_set(variables, set))
-# end
-
 function JuMP.add_variable(model::Model, variable::VariableConstrainedOnCreation{<:SingleDecisionSet}, name::String)
     decisions = get_decisions(model)
     if decisions isa IgnoreDecisions

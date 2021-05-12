@@ -18,7 +18,8 @@ makedocs(sitename = "StochasticPrograms.jl",
                  "Solver interface" => "library/solverinterface.md",
                  "Crash" => "library/crash.md",
                  "L-shaped solvers" => "library/lshaped.md",
-                 "Progressive-hedging solvers" => "library/progressivehedging.md"
+                 "Progressive-hedging solvers" => "library/progressivehedging.md",
+                 "Quasi-gradient solvers" => "library/quasigradient.md"
              ]
          ])
 

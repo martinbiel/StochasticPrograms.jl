@@ -185,6 +185,12 @@ function worker_type(::IgnoreFeasibility)
     return NoFeasibilityAlgorithm
 end
 
+"""
+    IgnoreFeasibility
+
+Factory object for using feasibility cuts in an L-shaped algorithm.
+
+"""
 struct FeasibilityCuts <: AbstractFeasibilityStrategy end
 
 function master(::FeasibilityCuts, ::Type{T}) where T <: AbstractFloat

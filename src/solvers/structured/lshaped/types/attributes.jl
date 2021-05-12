@@ -12,7 +12,7 @@ abstract type AbstractLShapedAttribute <: AbstractStructuredOptimizerAttribute e
 An optimizer attribute for specifying a strategy for dealing with second-stage feasibility the L-shaped algorithm. Options are:
 
 - [`IgnoreFeasibility`](@ref) (default)
-- [`UseFeasibilityCuts`](@ref)
+- [`FeasibilityCuts`](@ref)
 """
 struct FeasibilityStrategy <: AbstractLShapedAttribute end
 """
@@ -21,7 +21,8 @@ struct FeasibilityStrategy <: AbstractLShapedAttribute end
 An optimizer attribute for specifying a strategy for dealing with integers the L-shaped algorithm. Options are:
 
 - [`IgnoreIntegers`](@ref) (default)
-- [`UseWeakCuts`](@ref)
+- [`CombinatorialCuts`](@ref)
+- [`Convexification`](@ref)
 """
 struct IntegerStrategy <: AbstractLShapedAttribute end
 """

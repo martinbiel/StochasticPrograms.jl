@@ -1,3 +1,9 @@
+"""
+    NoProximal
+
+Empty functor object for running a quasi-gradient algorithm without a prox step.
+
+"""
 struct NoProximal <: AbstractProximal end
 
 function initialize_prox!(::AbstractQuasiGradient, ::NoProximal)
@@ -15,6 +21,12 @@ end
 
 # API
 # ------------------------------------------------------------
+"""
+    NoProx
+
+Factory object for [`NoProximal`](@ref). Passed by default to `prox` in `QuasiGradient.Optimizer`.
+
+"""
 struct NoProx <: AbstractProx end
 
 function (::NoProx)(::VerticalStructure, ::AbstractVector, ::Type{T}) where T <: AbstractFloat

@@ -15,6 +15,12 @@ end
 SparseGradient{T <: AbstractFloat} = Gradient{T, SparseVector{T,Int64}}
 DenseGradient{T <: AbstractFloat} = Gradient{T, Vector{T}}
 
+"""
+    SubProblem
+
+Quasi-gradient subproblem.
+
+"""
 struct SubProblem{T <: AbstractFloat} <: AbstractSubProblem{T}
     id::Int
     probability::T

@@ -112,11 +112,13 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
     sp = StochasticProgram([ξ₁,ξ₂], Structure, () -> mockoptimizer)
     @first_stage sp = begin
         @decision(model, x >= 2.)
+        @variable(model, w)
         @objective(model, Min, x)
     end
     @second_stage sp = begin
         @uncertain a
         @known x
+        @variable(model, z)
         @recourse(model, y >= a)
         @objective(model, Max, y)
         @constraint(model, con, y <= 2)
