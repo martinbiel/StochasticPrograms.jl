@@ -4,9 +4,9 @@ StochasticPrograms release notes
 Version 0.6.0 (May 12, 2021)
 -----------------------------
 
-Apart from performance improvements and various bugfixes, v0.6 introduces the following breaking changes and new features:
+Apart from performance improvements and various bugfixes, v0.6 introduces the following breaking changes and features:
 
-## Breaking changes
+### Breaking changes
 
 - A few attributes were not properly camel cased in previus versions, but now are. These are as follows:
     - `SubproblemOptimizer` -> `SubProblemOptimizer`
@@ -17,7 +17,7 @@ Apart from performance improvements and various bugfixes, v0.6 introduces the fo
     - `RegularizationPenaltyterm` -> `RegularizationPenaltyTerm`
 - Solution caching, introduced in v0.5, is no longer enabled by default since it can be time consuming for large models. Caching is only run if `cache = true` is supplied as a keyword argument to `optimize!`, or by running the new `cache_solution!` function after optimizing. This is documented in the "Quick start" section of the manual.
 
-## New features
+### New features
 
 - A new structured solver suite, based on quasi-gradient algorithms, has been added. The solvers are accessed through `QuasiGradient.Optimizer` and operate on vertical structures. See the documentation for more details.
 - The L-shaped solver suite has been extended with experimental strategies for problems with integer recourse. These strategies are activated by setting the `IntegerStrategy` attribute. See the documentation for more details.
