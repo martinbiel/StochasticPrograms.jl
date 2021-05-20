@@ -118,7 +118,7 @@ function restore_subproblems!(::AbstractQuasiGradient, execution::SynchronousExe
                 end
                 for vi in all_decisions(fetch(decisions))
                     # Re-fix first-stage decisions
-                    fetch(decisions).decisions[vi].state = Known
+                    fetch(decisions)[vi].state = Known
                 end
             end
         end

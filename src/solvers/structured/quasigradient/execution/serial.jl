@@ -104,7 +104,7 @@ function restore_subproblems!(::AbstractQuasiGradient, execution::SerialExecutio
     end
     for vi in all_decisions(execution.decisions)
         # Re-fix first-stage decisions
-        execution.decisions.decisions[vi].state = Known
+        execution.decisions[vi].state = Known
     end
     return nothing
 end
