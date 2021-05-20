@@ -88,12 +88,16 @@ end
 function load_structure!(optimizer::Optimizer, structure::HorizontalStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
-    # Set subproblem optimizers
-    set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
     # Restore structure if optimization has been run before
     restore_structure!(optimizer)
     # Ensure that execution policy is compatible
     ensure_compatible_execution!(optimizer, structure)
+    # Set subproblem optimizers
+    set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
+    # Set subproblem optimizer attributes
+    for (attr, value) in optimizer.sub_params
+        MOI.set(scenarioproblems(structure), attr, value)
+    end
     # Create new progressive-hedging algorithm
     optimizer.progressivehedging = ProgressiveHedgingAlgorithm(structure,
                                                                x₀,
@@ -101,9 +105,6 @@ function load_structure!(optimizer::Optimizer, structure::HorizontalStructure, x
                                                                optimizer.penalizer,
                                                                optimizer.penaltyterm;
                                                                type2dict(optimizer.parameters)...)
-    for (attr, value) in optimizer.sub_params
-        MOI.set(scenarioproblems(optimizer.progressivehedging.structure), attr, value)
-    end
     return nothing
 end
 

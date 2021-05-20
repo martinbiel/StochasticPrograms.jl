@@ -104,6 +104,10 @@ end
 function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚€::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
+    # Restore structure if optimization has been run before
+    restore_structure!(optimizer)
+    # Ensure that execution policy is compatible
+    ensure_compatible_execution!(optimizer, structure)
     # Set master optimizer
     set_master_optimizer!(structure, optimizer.master_optimizer)
     # Default subproblem optimizer to master optimizer if
@@ -117,10 +121,13 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
     if optimizer.integer_strategy isa Convexification && optimizer.integer_strategy.parameters.optimizer === nothing
         optimizer.integer_strategy.parameters.optimizer = MOI.OptimizerWithAttributes(optimizer.subproblem_optimizer, collect(optimizer.sub_params))
     end
-    # Restore structure if optimization has been run before
-    restore_structure!(optimizer)
-    # Ensure that execution policy is compatible
-    ensure_compatible_execution!(optimizer, structure)
+    # Set any given master/sub optimizer attributes
+    for (attr, value) in optimizer.master_params
+        MOI.set(backend(structure.first_stage), attr, value)
+    end
+    for (attr, value) in optimizer.sub_params
+        MOI.set(scenarioproblems(structure), attr, value)
+    end
     # Create new L-shaped algorithm
     optimizer.lshaped = LShapedAlgorithm(structure,
                                          xâ‚€,
@@ -131,13 +138,6 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
                                          optimizer.aggregator,
                                          optimizer.consolidator;
                                          type2dict(optimizer.parameters)...)
-    # Set any given master/sub optimizer attributes
-    for (attr, value) in optimizer.master_params
-        MOI.set(optimizer.lshaped.master, attr, value)
-    end
-    for (attr, value) in optimizer.sub_params
-        MOI.set(scenarioproblems(optimizer.lshaped.structure), attr, value)
-    end
     return nothing
 end
 

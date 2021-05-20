@@ -110,6 +110,13 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
     set_master_optimizer!(structure, optimizer.master_optimizer)
     # Set subproblem optimizers
     set_subproblem_optimizer!(structure, optimizer.subproblem_optimizer)
+    # Set any given prox/sub optimizer attributes
+    for (attr, value) in optimizer.master_params
+        MOI.set(backend(structure.first_stage), attr, value)
+    end
+    for (attr, value) in optimizer.sub_params
+        MOI.set(scenarioproblems(structure), attr, value)
+    end
     # Create new L-shaped algorithm
     optimizer.quasigradient = QuasiGradientAlgorithm(structure,
                                                      xâ‚€,
@@ -119,13 +126,6 @@ function load_structure!(optimizer::Optimizer, structure::VerticalStructure, xâ‚
                                                      optimizer.step,
                                                      optimizer.termination;
                                                      type2dict(optimizer.parameters)...)
-    # Set any given prox/sub optimizer attributes
-    for (attr, value) in optimizer.master_params
-        MOI.set(optimizer.quasigradient.master, attr, value)
-    end
-    for (attr, value) in optimizer.sub_params
-        MOI.set(scenarioproblems(optimizer.quasigradient.structure), attr, value)
-    end
     return nothing
 end
 
