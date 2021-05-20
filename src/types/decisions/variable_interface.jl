@@ -575,7 +575,7 @@ function JuMP._info_from_variable(dref::DecisionRef)
 end
 
 function relax_decision_integrality(model::JuMP.Model)
-    N = length(model.ext[:decisions])
+    N = num_stages(model.ext[:decisions])
     all_known = mapreduce(vcat, 1:N-1) do s
         index.(all_known_decision_variables(model, s))
     end

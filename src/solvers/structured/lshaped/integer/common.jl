@@ -18,7 +18,7 @@ end
 
 function gather_integer_variables(subproblem::SubProblem)
     model = subproblem.model
-    N = length(model.ext[:decisions])
+    N = num_stages(model.ext[:decisions])
     all_known = mapreduce(vcat, 1:N-1) do s
         index.(all_known_decision_variables(model, s))
     end
