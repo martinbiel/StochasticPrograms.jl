@@ -703,7 +703,7 @@ end
 Return the shadow price of the first-stage decision constraint `sp_cref`
 associated with result index `result` of the most-recent solution returned by the solver.
 """
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.LessThan}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.LessThan}
     stage(sp_cref) > 1 && error("$sp_cref is scenario dependent, consider `shadow_price(sp_cref, scenario_index)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp)
@@ -719,7 +719,7 @@ Return the shadow price of the scenario-dependent decision constraint `sp_cref`
 in scenario `scenario_index` associated with result index `result` of the
 most-recent solution returned by the solver.
 """
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.LessThan}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.LessThan}
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `shadow_price(sp_cref)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp, scenario_index)
@@ -729,7 +729,7 @@ function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_ind
     return JuMP.shadow_price_less_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.GreaterThan}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.GreaterThan}
     stage(sp_cref) > 1 && error("$sp_cref is scenario dependent, consider `shadow_price(sp_cref, scenario_index)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp)
@@ -738,7 +738,7 @@ function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S 
     end
     return JuMP.shadow_price_greater_than_(dual(sp_cref), objective_sense(sp))
 end
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.GreaterThan}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.GreaterThan}
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `shadow_price(sp_cref)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp, scenario_index)
@@ -748,7 +748,7 @@ function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_ind
     return JuMP.shadow_price_greater_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.EqualTo}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.EqualTo}
     stage(sp_cref) > 1 && error("$sp_cref is scenario dependent, consider `shadow_price(sp_cref, scenario_index)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp)
@@ -763,7 +763,7 @@ function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S 
         return JuMP.shadow_price_less_than_(dual_val, sense)
     end
 end
-function shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.EqualTo}
+function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.EqualTo}
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `shadow_price(sp_cref)`.")
     sp = owner_model(sp_cref)
     if !has_duals(sp, scenario_index)

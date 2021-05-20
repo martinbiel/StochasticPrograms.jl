@@ -866,7 +866,7 @@ Return the value associated with the solver-specific attribute named `name` in `
 
 See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
-function get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
+function JuMP.get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
     return get_optimizer_attribute(stochasticprogram, MOI.RawParameter(name))
 end
 """
@@ -876,7 +876,7 @@ Return the value of the solver-specific attribute `attr` in `stochasticprogram`.
 
 See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
-function get_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
+function JuMP.get_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
     return MOI.get(stochasticprogram, attr)
 end
 # ========================== #

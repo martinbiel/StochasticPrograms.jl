@@ -373,7 +373,7 @@ end
 Return `true` if the solver has a primal solution in scenario `scenario_index`
 in result index `result` available to query, otherwise return `false`.
 """
-function has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
+function JuMP.has_values(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer; result::Int = 1)
     return has_values(stochasticprogram, 2, scenario_index; result = result)
 end
 """
