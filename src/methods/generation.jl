@@ -10,9 +10,9 @@ function _check_generators(stochasticprogram::StochasticProgram, ::Val{1})
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     return nothing
 end
-function _check_stage_generator(stochasticprogram::StochasticProgram{N}, s::Integer) where N
-    1 <= s <= N || error("Stage $s not in range 1 to $N.")
-    stage_key = Symbol(:stage_, s)
+function _check_stage_generator(stochasticprogram::StochasticProgram{N}, stage::Integer) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    stage_key = Symbol(:stage_, stage)
     has_generator(stochasticprogram, stage_key) || error("Stage problem $stage not defined in stochastic program. Consider @stage $stage.")
     return nothing
 end
