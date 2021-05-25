@@ -8,14 +8,14 @@ function test_SingleDecision_objective(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Min, x)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, x)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Min, y)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, y)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -63,12 +63,12 @@ function test_SingleDecision_objective(Structure)
         @test_throws ErrorException JuMP.objective_function(sp)
     end
     @first_stage sp = begin
-        @decision(model, x)
-        @objective(model, Max, x)
+        @decision(sp, x)
+        @objective(sp, Max, x)
     end
     @second_stage sp = begin
-        @recourse(model, y)
-        @objective(model, Max, y)
+        @recourse(sp, y)
+        @objective(sp, Max, y)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -122,15 +122,15 @@ function test_DecisionAffExpr_objective(Structure)
     ξ₂ = @scenario a = 4 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Min, 2x)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, 2x)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Min, a*y)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, a*y)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -180,16 +180,16 @@ function test_DecisionAffExpr_objective(Structure)
         @test_throws ErrorException JuMP.objective_function(sp)
     end
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Max, x + 3x + 1)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Max, x + 3x + 1)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Max, x + a*x + 1 + y + 3y + 1)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Max, x + a*x + 1 + y + 3y + 1)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -248,16 +248,16 @@ function test_DecisionQuadExpr_objective(Structure)
     ξ₂ = @scenario a = 4 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Min, x^2 + 2x)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, x^2 + 2x)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Min, y^2 + a*y + x^2 + 2x)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, y^2 + a*y + x^2 + 2x)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -317,15 +317,15 @@ function test_decision_objective_coefficient_modifiction(Structure)
     ξ₂ = @scenario a = 4 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Min, x)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, x)
     end
     @second_stage sp = begin
-        @known x
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Min, y)
+        @known(sp, x)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, y)
     end
     # First-stage
     x = sp[1,:x]
@@ -377,15 +377,15 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test_throws ErrorException JuMP.objective_function(sp)
     end
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @objective(model, Min, x^2 + x)
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, x^2 + x)
     end
     @second_stage sp = begin
-        @known x
-        @variable(model, z)
-        @recourse(model, y)
-        @objective(model, Min, x^2 + y^2 + y)
+        @known(sp, x)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, x^2 + y^2 + y)
     end
     # First-stage
     x = sp[1,:x]

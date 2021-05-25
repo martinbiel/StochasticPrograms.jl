@@ -8,12 +8,12 @@ function test_decision_no_bound(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
+        @decision(sp, x)
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y)
+        @variable(sp, z)
+        @recourse(sp, y)
     end
     # First-stage
     x = sp[1,:x]
@@ -50,13 +50,13 @@ function test_decision_lower_bound(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x >= 0, Bin)
-        @variable(model, w)
+        @decision(sp, x >= 0, Bin)
+        @variable(sp, w)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y >= a, Bin)
+        @variable(sp, z)
+        @recourse(sp, y >= a, Bin)
     end
     # First-stage
     x = sp[1,:x]
@@ -93,13 +93,13 @@ function test_decision_upper_bound(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x <= 1.0, Int)
-        @variable(model, w)
+        @decision(sp, x <= 1.0, Int)
+        @variable(sp, w)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y <= a, Int)
+        @variable(sp, z)
+        @recourse(sp, y <= a, Int)
     end
     # First-stage
     x = sp[1,:x]
@@ -136,13 +136,13 @@ function test_decision_fix(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x == 1)
-        @variable(model, w)
+        @decision(sp, x == 1)
+        @variable(sp, w)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y == a)
+        @variable(sp, z)
+        @recourse(sp, y == a)
     end
     # First-stage
     x = sp[1,:x]
@@ -190,13 +190,13 @@ function test_decision_custom_index_sets(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x[0:1, 10:20, 1:1] >= 2)
-        @variable(model, w)
+        @decision(sp, x[0:1, 10:20, 1:1] >= 2)
+        @variable(sp, w)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y[0:1, 10:20, 1:1] >= a)
+        @variable(sp, z)
+        @recourse(sp, y[0:1, 10:20, 1:1] >= a)
     end
     # First-stage
     x = sp[1,:x]
@@ -204,8 +204,8 @@ function test_decision_custom_index_sets(Structure)
     @test 2 == @inferred JuMP.lower_bound(x[0, 15, 1])
     @test !JuMP.has_upper_bound(x[0, 15, 1])
     @first_stage sp = begin
-        @decision(model, x[i in -10:10, s in [:a,:b]] <= 5.5, Int)
-        @variable(model, w)
+        @decision(sp, x[i in -10:10, s in [:a,:b]] <= 5.5, Int)
+        @variable(sp, w)
     end
     generate!(sp)
     x = sp[1,:x]
@@ -221,8 +221,8 @@ function test_decision_custom_index_sets(Structure)
     @test !JuMP.has_upper_bound(y[0, 15, 1], 1)
     @test !JuMP.has_upper_bound(y[0, 15, 1], 2)
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y[i in -10:10, s in [:a,:b]] <= 5.5, Int)
+        @variable(sp, z)
+        @recourse(sp, y[i in -10:10, s in [:a,:b]] <= 5.5, Int)
     end
     y = sp[2,:y]
     @test 5.5 == @inferred JuMP.upper_bound(y[-4, :a], 1)
@@ -237,12 +237,12 @@ function test_variable_is_valid_delete(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
+        @decision(sp, x)
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y)
+        @variable(sp, z)
+        @recourse(sp, y)
     end
     # First-stage
     x = sp[1,:x]
@@ -263,12 +263,12 @@ function test_variable_is_valid_delete(Structure)
     @test !JuMP.is_valid(sp, y, 2)
     @test_throws Exception JuMP.delete(sp, y, 1)
     @first_stage sp = begin
-        @decision(model, x[1:3] >= 1)
-        @variable(model, w)
+        @decision(sp, x[1:3] >= 1)
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y[1:3] >= 1)
+        @variable(sp, z)
+        @recourse(sp, y[1:3] >= 1)
     end
     # First-stage
     x = sp[1,:x]
@@ -296,13 +296,13 @@ function test_variable_bounds_set_get(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, 0 <= x <= 2)
-        @variable(model, w)
+        @decision(sp, 0 <= x <= 2)
+        @variable(sp, w)
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, z)
-        @recourse(model, 0 <= y <= a)
+        @variable(sp, z)
+        @recourse(sp, 0 <= y <= a)
     end
     # First-stage
     x = sp[1,:x]
@@ -341,12 +341,12 @@ function test_variable_starts_set_get(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x[1:3])
-        @variable(model, w)
+        @decision(sp, x[1:3])
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y[1:3])
+        @variable(sp, z)
+        @recourse(sp, y[1:3])
     end
     # First-stage
     x = sp[1,:x]
@@ -372,12 +372,12 @@ function test_variable_integrality_set_get(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x[1:3])
-        @variable(model, w)
+        @decision(sp, x[1:3])
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y[1:3])
+        @variable(sp, z)
+        @recourse(sp, y[1:3])
     end
     # First-stage
     x = sp[1,:x]
@@ -430,12 +430,12 @@ function test_variables_constrained_on_creation(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x[1:2] in SecondOrderCone())
-        @variable(model, w)
+        @decision(sp, x[1:2] in SecondOrderCone())
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, r)
-        @recourse(model, y[1:2] in SecondOrderCone())
+        @variable(sp, r)
+        @recourse(sp, y[1:2] in SecondOrderCone())
     end
     x = sp[1,:x]
     y = sp[2,:y]
@@ -446,46 +446,46 @@ function test_variables_constrained_on_creation(Structure)
     @test name(y[1]) == "y[1]"
     @test name(y[2]) == "y[2]"
     @first_stage sp = begin
-        @decision(model, x[1:2] in SecondOrderCone())
-        @decision(model, [1:2] in SecondOrderCone())
-        @variable(model, w)
+        @decision(sp, x[1:2] in SecondOrderCone())
+        @decision(sp, [1:2] in SecondOrderCone())
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, r)
-        @recourse(model, y[1:2] in SecondOrderCone())
-        @recourse(model, [1:2] in SecondOrderCone())
+        @variable(sp, r)
+        @recourse(sp, y[1:2] in SecondOrderCone())
+        @recourse(sp, [1:2] in SecondOrderCone())
     end
     x = sp[1,:x]
     y = sp[2,:y]
     @test num_constraints(sp, 1, typeof(x), MOI.SecondOrderCone) == 2
     @test num_constraints(sp, 2, typeof(y), MOI.SecondOrderCone) == 2
     @first_stage sp = begin
-        @decision(model, x[1:2] in SecondOrderCone())
-        @decision(model, [1:2] in SecondOrderCone())
-        @decision(model, [1:3] in SecondOrderCone())
-        @variable(model, w)
+        @decision(sp, x[1:2] in SecondOrderCone())
+        @decision(sp, [1:2] in SecondOrderCone())
+        @decision(sp, [1:3] in SecondOrderCone())
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, r)
-        @recourse(model, y[1:2] in SecondOrderCone())
-        @recourse(model, [1:2] in SecondOrderCone())
-        @recourse(model, [1:3] in SecondOrderCone())
+        @variable(sp, r)
+        @recourse(sp, y[1:2] in SecondOrderCone())
+        @recourse(sp, [1:2] in SecondOrderCone())
+        @recourse(sp, [1:3] in SecondOrderCone())
     end
     x = sp[1,:x]
     y = sp[2,:y]
     @test num_constraints(sp, 1, typeof(x), MOI.SecondOrderCone) == 3
     @test num_constraints(sp, 2, typeof(y), MOI.SecondOrderCone) == 3
     @first_stage sp = begin
-        @decision(model, z in MOI.Semiinteger(1.0, 2.0))
-        @variable(model, w)
+        @decision(sp, z in MOI.Semiinteger(1.0, 2.0))
+        @variable(sp, w)
     end
     generate!(sp)
     z = sp[1,:z]
     @test num_constraints(sp, 1, typeof(z), MOI.Semiinteger{Float64}) == 1
     @first_stage sp = begin
-        @variable(model, w)
-        @decision(model, z in MOI.Semiinteger(1.0, 2.0))
-        @decision(model, set = MOI.Semiinteger(1.0, 2.0))
+        @variable(sp, w)
+        @decision(sp, z in MOI.Semiinteger(1.0, 2.0))
+        @decision(sp, set = MOI.Semiinteger(1.0, 2.0))
     end
     generate!(sp)
     z = sp[1,:z]
@@ -497,14 +497,14 @@ function test_all_decision_variables(Structure)
     ξ₂ = @scenario a = 2 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x₁)
-        @decision(model, x₂)
-        @variable(model, w)
+        @decision(sp, x₁)
+        @decision(sp, x₂)
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y₁)
-        @recourse(model, y₂)
+        @variable(sp, z)
+        @recourse(sp, y₁)
+        @recourse(sp, y₂)
     end
     # First-stage
     x₁ = sp[1,:x₁]

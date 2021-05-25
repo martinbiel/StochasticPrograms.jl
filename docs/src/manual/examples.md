@@ -11,16 +11,16 @@ using GLPK
 An example implementation of the farmer problem is given by:
 ```@example farmer
 Crops = [:wheat, :corn, :beets]
-farmer_model = @stochastic_model begin
+@stochastic_model farmer_model begin
     @stage 1 begin
         @parameters begin
             Crops = Crops
             Cost = Dict(:wheat=>150, :corn=>230, :beets=>260)
             Budget = 500
         end
-        @decision(model, x[c in Crops] >= 0)
-        @objective(model, Min, sum(Cost[c]*x[c] for c in Crops))
-        @constraint(model, sum(x[c] for c in Crops) <= Budget)
+        @decision(farmer_model, x[c in Crops] >= 0)
+        @objective(farmer_model, Min, sum(Cost[c]*x[c] for c in Crops))
+        @constraint(farmer_model, sum(x[c] for c in Crops) <= Budget)
     end
     @stage 2 begin
         @parameters begin
@@ -30,15 +30,15 @@ farmer_model = @stochastic_model begin
             SellPrice = Dict(:wheat=>170, :corn=>150, :beets=>36, :extra_beets=>10)
         end
         @uncertain ξ[c in Crops]
-        @recourse(model, y[p in setdiff(Crops, [:beets])] >= 0)
-        @recourse(model, w[s in Crops ∪ [:extra_beets]] >= 0)
-        @objective(model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
+        @recourse(farmer_model, y[p in setdiff(Crops, [:beets])] >= 0)
+        @recourse(farmer_model, w[s in Crops ∪ [:extra_beets]] >= 0)
+        @objective(farmer_model, Min, sum(PurchasePrice[p] * y[p] for p in setdiff(Crops, [:beets]))
                    - sum(SellPrice[s] * w[s] for s in Crops ∪ [:extra_beets]))
-        @constraint(model, minimum_requirement[p in setdiff(Crops, [:beets])],
+        @constraint(farmer_model, minimum_requirement[p in setdiff(Crops, [:beets])],
             ξ[p] * x[p] + y[p] - w[p] >= Required[p])
-        @constraint(model, minimum_requirement_beets,
+        @constraint(farmer_model, minimum_requirement_beets,
             ξ[:beets] * x[:beets] - w[:beets] - w[:extra_beets] >= Required[:beets])
-        @constraint(model, beets_quota, w[:beets] <= 6000)
+        @constraint(farmer_model, beets_quota, w[:beets] <= 6000)
     end
 end
 ```
@@ -48,7 +48,7 @@ The three yield scenarios can be defined through:
 ξ₂ = @scenario ξ[c in Crops] = [2.5, 3.0, 20.0] probability = 1/3
 ξ₃ = @scenario ξ[c in Crops] = [2.0, 2.4, 16.0] probability = 1/3
 ```
-We can now instantiate the farmer problem using the defined stochastic model and the three yield scenarios:
+We can now instantiate the farmer problem using the defined stochastic farmer_model and the three yield scenarios:
 ```@example farmer
 farmer = instantiate(farmer_model, [ξ₁,ξ₂,ξ₃], optimizer = GLPK.Optimizer)
 ```
@@ -56,7 +56,7 @@ Printing:
 ```@example farmer
 print(farmer)
 ```
-We can now optimize the model:
+We can now optimize the farmer_model:
 ```@example farmer
 optimize!(farmer)
 x = optimal_decision(farmer)
@@ -78,7 +78,7 @@ println("Sold beets: $(value(w[:extra_beets], 1))")
 println("Profit: $(objective_value(farmer, 1))")
 ```
 
-Finally, we calculate the stochastic performance of the model:
+Finally, we calculate the stochastic performance of the farmer_model:
 ```@example farmer
 println("EVPI: $(EVPI(farmer))")
 println("VSS: $(VSS(farmer))")
@@ -92,7 +92,7 @@ As an example, consider the following generalized stochastic program:
  \operatorname*{minimize}_{x \in \mathbb{R}} & \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
 \end{aligned}
 ```
-where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that models a stochastic variable with a continuous probability distribution. Consider the following implementation:
+where ``\xi(\omega)`` is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that farmer_models a stochastic variable with a continuous probability distribution. Consider the following implementation:
 ```julia
 using StochasticPrograms
 using Distributions
@@ -128,11 +128,11 @@ function (sampler::ExponentialSampler)()
     return DistributionScenario(sampler.distribution, ξ)
 end
 ```
-Now, lets attempt to define the generalized stochastic program using the available modeling tools:
+Now, lets attempt to define the generalized stochastic program using the available farmer_modeling tools:
 ```julia
 using Ipopt
 
-sm = @stochastic_model begin
+sm = @stochastic begin
     @stage 1 begin
         @decision(model, x)
     end
@@ -153,11 +153,11 @@ where
 f(x,ξ) = min  f(y; x, ξ)
               y ∈ 𝒴 (x, ξ)
 ```
-The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite sampled model of 1000 exponentially distributed numbers:
+The mean of the given exponential distribution is ``2.0``, which is the optimal solution to the general problem. Now, lets create a finite sampled farmer_model of 1000 exponentially distributed numbers:
 ```julia
 sampler = ExponentialSampler(2.) # Create a sampler
 
-sp = instantiate(sm, sampler, 1000, optimizer = Ipopt.Optimizer) # Sample 1000 exponentially distributed scenarios and create a sampled model
+sp = instantiate(sm, sampler, 1000, optimizer = Ipopt.Optimizer) # Sample 1000 exponentially distributed scenarios and create a sampled farmer_model
 ```
 ```julia
 Stochastic program with:

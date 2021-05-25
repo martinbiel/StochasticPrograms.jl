@@ -178,7 +178,7 @@ end
 """
     VRP(stochasticprogram::StochasticProgram)
 
-Calculate the **value of the recouse problem** (`VRP`) in `stochasticprogram`.
+Calculate the **value of the recourse problem** (`VRP`) in `stochasticprogram`.
 
 In other words, optimize the stochastic program and return the optimal value.
 

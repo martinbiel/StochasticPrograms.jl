@@ -1,11 +1,11 @@
-vec_infeasible = @stochastic_model begin
+@stochastic_model vec_infeasible begin
     @stage 1 begin
         @parameters begin
             lb = zeros(2)
             c  = [3., 2.]
         end
-        @decision(model, x[i in 1:2] >= lb[i])
-        @objective(model, Min, dot(c, x))
+        @decision(vec_infeasible, x[i in 1:2] >= lb[i])
+        @objective(vec_infeasible, Min, dot(c, x))
     end
     @stage 2 begin
         @parameters begin
@@ -16,9 +16,9 @@ vec_infeasible = @stochastic_model begin
                  2. 5.]
         end
         @uncertain ξ[1:2]
-        @recourse(model, 0.8 * ξ[i] <= y[i in 1:2] <= ξ[i])
-        @objective(model, Min, dot(q, y))
-        @constraint(model, T * x + W * y in MOI.Nonpositives(2))
+        @recourse(vec_infeasible, 0.8 * ξ[i] <= y[i in 1:2] <= ξ[i])
+        @objective(vec_infeasible, Min, dot(q, y))
+        @constraint(vec_infeasible, T * x + W * y in MOI.Nonpositives(2))
     end
 end
 

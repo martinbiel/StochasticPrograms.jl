@@ -20,4 +20,3 @@ include("horizontal/optimization.jl")
 include("horizontal/spconstructs.jl")
 
 include("util.jl")
-include("creation.jl")

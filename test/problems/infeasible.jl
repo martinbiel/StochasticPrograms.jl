@@ -1,16 +1,16 @@
-infeasible = @stochastic_model begin
+@stochastic_model infeasible begin
     @stage 1 begin
-        @decision(model, x₁ >= 0)
-        @decision(model, x₂ >= 0)
-        @objective(model, Min, 3*x₁ + 2*x₂)
+        @decision(infeasible, x₁ >= 0)
+        @decision(infeasible, x₂ >= 0)
+        @objective(infeasible, Min, 3*x₁ + 2*x₂)
     end
     @stage 2 begin
         @uncertain ξ₁ ξ₂
-        @recourse(model, 0.8*ξ₁ <= y₁ <= ξ₁)
-        @recourse(model, 0.8*ξ₂ <= y₂ <= ξ₂)
-        @objective(model, Min, -15*y₁ - 12*y₂)
-        @constraint(model, 3*y₁ + 2*y₂ <= x₁)
-        @constraint(model, 2*y₁ + 5*y₂ <= x₂)
+        @recourse(infeasible, 0.8*ξ₁ <= y₁ <= ξ₁)
+        @recourse(infeasible, 0.8*ξ₂ <= y₂ <= ξ₂)
+        @objective(infeasible, Min, -15*y₁ - 12*y₂)
+        @constraint(infeasible, 3*y₁ + 2*y₂ <= x₁)
+        @constraint(infeasible, 2*y₁ + 5*y₂ <= x₂)
     end
 end
 

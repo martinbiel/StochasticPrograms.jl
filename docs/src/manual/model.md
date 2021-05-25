@@ -2,6 +2,26 @@
 
 The [`@stochastic_model`](@ref) command is now introduced in more detail. The discussion will as before revolve around the simple example introduced in the [Quick start](@ref):
 ```julia
+@stochastic_model simple_model begin
+    @stage 1 begin
+        @decision(simple_model, x₁ >= 40)
+        @decision(simple_model, x₂ >= 20)
+        @objective(simple_model, Min, 100*x₁ + 150*x₂)
+        @constraint(simple_model, x₁ + x₂ <= 120)
+    end
+    @stage 2 begin
+        @known(simple_model, x₁, x₂)
+        @uncertain q₁ q₂ d₁ d₂
+        @recourse(simple_model, 0 <= y₁ <= d₁)
+        @recourse(simple_model, 0 <= y₂ <= d₂)
+        @objective(simple_model, Max, q₁*y₁ + q₂*y₂)
+        @constraint(simple_model, 6*y₁ + 10*y₂ <= 60*x₁)
+        @constraint(simple_model, 8*y₁ + 5*y₂ <= 80*x₂)
+    end
+end
+```
+Note, that the resulting model object is stored in `simple_model`, and that the same name is used to reference the stochastic program in the [`@stage`](@ref) blocks. The following anonymous syntax is also supported:
+```julia
 simple_model = @stochastic_model begin
     @stage 1 begin
         @decision(model, x₁ >= 40)
@@ -10,7 +30,7 @@ simple_model = @stochastic_model begin
         @constraint(model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
-        @known x₁ x₂
+        @known(model, x₁, x₂)
         @uncertain q₁ q₂ d₁ d₂
         @recourse(model, 0 <= y₁ <= d₁)
         @recourse(model, 0 <= y₂ <= d₂)
@@ -20,6 +40,7 @@ simple_model = @stochastic_model begin
     end
 end
 ```
+where the reserved keyword `model` is used in the [`@stage`](@ref) blocks.
 
 ## [`@stage`](@ref) blocks
 
@@ -68,7 +89,7 @@ A [`@known`](@ref) annotation is used in subsequent stages to bring a decision d
 
 The [`@known`](@ref) block in the simple example above is given by
 ```julia
-@known x₁ x₂
+@known(simple_moel, x₁, x₂)
 ```
 This states that the second stage of the stochastic model depends on the decisions `x₁` and `x₂` taken in the previous stage. Note again that this lines is implicitly added by [`@stochastic_model`](@ref) and is not required.
 
@@ -204,35 +225,35 @@ sp = StochasticProgram([ξ₁, ξ₂], Deterministic())
 Note that we must provide the instantiation type explicitly as well. A slightly diferrent modeling syntax is now used to define the stage models of `sp`:
 ```@example instant
 @first_stage sp = begin
-    @decision(model, x₁ >= 40)
-    @decision(model, x₂ >= 20)
-    @objective(model, Min, 100*x₁ + 150*x₂)
-    @constraint(model, x₁ + x₂ <= 120)
+    @decision(sp, x₁ >= 40)
+    @decision(sp, x₂ >= 20)
+    @objective(sp, Min, 100*x₁ + 150*x₂)
+    @constraint(sp, x₁ + x₂ <= 120)
 end
 @second_stage sp = begin
-    @known x₁ x₂
+    @known(sp, x₁, x₂)
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-    @recourse(model, 0 <= y₁ <= d₁)
-    @recourse(model, 0 <= y₂ <= d₂)
-    @objective(model, Min, q₁*y₁ + q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+    @recourse(sp, 0 <= y₁ <= d₁)
+    @recourse(sp, 0 <= y₂ <= d₂)
+    @objective(sp, Min, q₁*y₁ + q₂*y₂)
+    @constraint(sp, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(sp, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 ```
-Here, `@first_stage` and `@second_stage` are just syntactic sugar for `@stage 1` and `@stage 2`. This is is the definition syntax used internally by `StochasticModel` objects when instantiating stochastic programs. Note, that we must explicitly add the `@known` annotations to the second stage with this approach. We can verify that this approach yields the same stochastic program by printing and comparing to the [Quick start](@ref):
+Here, `@first_stage` and `@second_stage` are just syntactic sugar for `@stage 1` and `@stage 2`. Note, that the model name `sp` must be used internally in the [`@stage`](@ref) blocks when referencing the model. This is is the definition syntax used internally by `StochasticModel` objects when instantiating stochastic programs. Note, that we must explicitly add the `@known` annotations to the second stage with this approach, while models created using [`@stochastic_model`](@ref) does this automatically. We can verify that this approach yields the same stochastic program by printing and comparing to the [Quick start](@ref):
 ```@example instant
 print(sp)
 ```
 As a side note, it is possible to run stage definition macros on programs with existing models. This overwrites the previous model and upon regeneration all internal problems. For example, the following increases the lower bound on the second stage variables to 2:
 ```@example instant
 @stage 2 sp = begin
-    @known x₁ x₂
+    @known(sp, x₁, x₂)
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-    @recourse(model, 2 <= y₁ <= d₁)
-    @recourse(model, 2 <= y₂ <= d₂)
-    @objective(model, Min, q₁*y₁ + q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+    @recourse(sp, 2 <= y₁ <= d₁)
+    @recourse(sp, 2 <= y₂ <= d₂)
+    @objective(sp, Min, q₁*y₁ + q₂*y₂)
+    @constraint(sp, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(sp, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 
 generate!(sp)

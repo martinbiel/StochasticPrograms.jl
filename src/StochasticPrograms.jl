@@ -231,6 +231,7 @@ end
 
 include("types/types.jl")
 include("methods/methods.jl")
+include("macros/macros.jl")
 include("optimizer_interface.jl")
 include("crash.jl")
 include("solvers/solvers.jl")

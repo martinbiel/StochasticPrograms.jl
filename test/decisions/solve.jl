@@ -111,17 +111,17 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
     ξ₂ = @scenario a = 4 probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure, () -> mockoptimizer)
     @first_stage sp = begin
-        @decision(model, x >= 2.)
-        @variable(model, w)
-        @objective(model, Min, x)
+        @decision(sp, x >= 2.)
+        @variable(sp, w)
+        @objective(sp, Min, x)
     end
     @second_stage sp = begin
         @uncertain a
-        @known x
-        @variable(model, z)
-        @recourse(model, y >= a)
-        @objective(model, Max, y)
-        @constraint(model, con, y <= 2)
+        @known(sp, x)
+        @variable(sp, z)
+        @recourse(sp, y >= a)
+        @objective(sp, Max, y)
+        @constraint(sp, con, y <= 2)
     end
     StochasticPrograms.load_structure!(mockoptimizer, sp.structure, [0.0])
     StochasticPrograms.attach_mocks!(sp.structure)

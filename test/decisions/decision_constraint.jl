@@ -8,19 +8,19 @@ function test_SingleDecision_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @decision(model, z[1:2])
-        @variable(model, t)
-        @constraint(model, con11, x in MOI.LessThan(10.0))
-        @constraint(model, con12[i in 1:2], z[i] in MOI.LessThan(float(i)))
+        @decision(sp, x)
+        @decision(sp, z[1:2])
+        @variable(sp, t)
+        @constraint(sp, con11, x in MOI.LessThan(10.0))
+        @constraint(sp, con12[i in 1:2], z[i] in MOI.LessThan(float(i)))
     end
     @second_stage sp = begin
         @uncertain a
-        @variable(model, r)
-        @recourse(model, y)
-        @recourse(model, w[1:2])
-        @constraint(model, con21, y in MOI.LessThan(a))
-        @constraint(model, con22[i in 1:2], w[i] in MOI.LessThan(float(i)))
+        @variable(sp, r)
+        @recourse(sp, y)
+        @recourse(sp, w[1:2])
+        @constraint(sp, con21, y in MOI.LessThan(a))
+        @constraint(sp, con22[i in 1:2], w[i] in MOI.LessThan(float(i)))
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -66,16 +66,16 @@ function test_VectorOfDecisions_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x[1:2])
-        @variable(model, w)
-        @constraint(model, con11, x in MOI.Zeros(2))
-        @constraint(model, con12, [x[2],x[1]] in MOI.Zeros(2))
+        @decision(sp, x[1:2])
+        @variable(sp, w)
+        @constraint(sp, con11, x in MOI.Zeros(2))
+        @constraint(sp, con12, [x[2],x[1]] in MOI.Zeros(2))
     end
     @second_stage sp = begin
-        @variable(model, z)
-        @recourse(model, y[1:2])
-        @constraint(model, con21, y in MOI.Zeros(2))
-        @constraint(model, con22, [y[2],y[1]] in MOI.Zeros(2))
+        @variable(sp, z)
+        @recourse(sp, y[1:2])
+        @constraint(sp, con21, y in MOI.Zeros(2))
+        @constraint(sp, con22, [y[2],y[1]] in MOI.Zeros(2))
     end
     # First-stage
     x = DecisionRef.(sp[1,:x])
@@ -104,24 +104,24 @@ function test_DecisionAffExpr_scalar_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con11, x >= 1.)
-        @constraint(model, con12, 2x <= 10)
-        @constraint(model, con13, 3x + 1 >= 10)
-        @constraint(model, con14, 1 == -x)
-        @constraint(model, con15, 2 == 1)
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con11, x >= 1.)
+        @constraint(sp, con12, 2x <= 10)
+        @constraint(sp, con13, 3x + 1 >= 10)
+        @constraint(sp, con14, 1 == -x)
+        @constraint(sp, con15, 2 == 1)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con21, y >= a)
-        @constraint(model, con22, 2x + a*y <= 10)
-        @constraint(model, con23, a*x + 3y + 1 >= 10)
-        @constraint(model, con24, 1 == -y - x)
-        @constraint(model, con25, 2 == 1)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con21, y >= a)
+        @constraint(sp, con22, 2x + a*y <= 10)
+        @constraint(sp, con23, a*x + 3y + 1 >= 10)
+        @constraint(sp, con24, 1 == -y - x)
+        @constraint(sp, con25, 2 == 1)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -174,16 +174,16 @@ function test_DecisionAffExpr_vectorized_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con1, [x, 2x] .== [1-x, 3])
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con1, [x, 2x] .== [1-x, 3])
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con2, [a*x + y, 2x + a*y] .== [1-x-y, 3])
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con2, [a*x + y, 2x + a*y] .== [1-x-y, 3])
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -213,16 +213,16 @@ function test_delete_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con1, 2x <= 1)
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con1, 2x <= 1)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con2, a*x + 2y <= 1)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con2, a*x + 2y <= 1)
     end
     # First-stage
     sp_cref = sp[1,:con1]
@@ -243,19 +243,19 @@ function test_delete_constraints(Structure)
     JuMP.delete(sp, sp_cref, 2)
     @test !JuMP.is_valid(sp, sp_cref, 2)
     @first_stage sp = begin
-        @decision(model, x[1:9])
-        @variable(model, w)
-        @constraint(model, con11, sum(x[1:2:9]) <= 3)
-        @constraint(model, con12, sum(x[2:2:8]) <= 2)
-        @constraint(model, con13, sum(x[1:3:9]) <= 1)
+        @decision(sp, x[1:9])
+        @variable(sp, w)
+        @constraint(sp, con11, sum(x[1:2:9]) <= 3)
+        @constraint(sp, con12, sum(x[2:2:8]) <= 2)
+        @constraint(sp, con13, sum(x[1:3:9]) <= 1)
     end
     @second_stage sp = begin
-        @known x
-        @variable(model, z)
-        @recourse(model, y[1:9])
-        @constraint(model, con21, sum(x[1:2:9]) + sum(y[1:2:9]) <= 3)
-        @constraint(model, con22, sum(x[2:2:8]) + sum(y[2:2:8]) <= 2)
-        @constraint(model, con23, sum(x[1:3:9]) + sum(y[1:3:9]) <= 1)
+        @known(sp, x)
+        @variable(sp, z)
+        @recourse(sp, y[1:9])
+        @constraint(sp, con21, sum(x[1:2:9]) + sum(y[1:2:9]) <= 3)
+        @constraint(sp, con22, sum(x[2:2:8]) + sum(y[2:2:8]) <= 2)
+        @constraint(sp, con23, sum(x[1:3:9]) + sum(y[1:3:9]) <= 1)
     end
     # First-stage
     cons = all_constraints(sp, 1, DecisionAffExpr{Float64}, MOI.LessThan{Float64})
@@ -283,16 +283,16 @@ function test_DecisionQuadrExpr_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con1, x^2 + x <= 1)
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con1, x^2 + x <= 1)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con2, y^2 + a*y*x - 1.0 == 0.0)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con2, y^2 + a*y*x - 1.0 == 0.0)
     end
     # First-stage
     x = DecisionRef(sp[1,:x])
@@ -323,15 +323,15 @@ function test_all_decision_constraints(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x >= 0)
-        @variable(model, w)
+        @decision(sp, x >= 0)
+        @variable(sp, w)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y >= 0)
-        @constraint(model, x + a*y >= 0)
+        @variable(sp, z)
+        @recourse(sp, y >= 0)
+        @constraint(sp, x + a*y >= 0)
     end
     # First-stage
     x = sp[1,:x]
@@ -365,20 +365,20 @@ function test_list_of_constraint_types(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x >= 0, Bin)
-        @variable(model, w)
-        @constraint(model, 2x <= 1)
-        @constraint(model, [x, x] in SecondOrderCone())
-        @constraint(model, x^2- x <= 2)
+        @decision(sp, x >= 0, Bin)
+        @variable(sp, w)
+        @constraint(sp, 2x <= 1)
+        @constraint(sp, [x, x] in SecondOrderCone())
+        @constraint(sp, x^2- x <= 2)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y >= 0, Bin)
-        @constraint(model, 2x + 2y <= a)
-        @constraint(model, [x + y, x] in SecondOrderCone())
-        @constraint(model, x^2+y^2 - x*y <= 1)
+        @variable(sp, z)
+        @recourse(sp, y >= 0, Bin)
+        @constraint(sp, 2x + 2y <= a)
+        @constraint(sp, [x + y, x] in SecondOrderCone())
+        @constraint(sp, x^2+y^2 - x*y <= 1)
     end
     # First-stage
     constraint_types = @inferred list_of_constraint_types(sp, 1)
@@ -411,18 +411,18 @@ function test_change_decision_coefficient(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con1, 2 * x == -1)
-        @constraint(model, quadcon1, x^2 == 0)
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con1, 2 * x == -1)
+        @constraint(sp, quadcon1, x^2 == 0)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con2, 2x + a*y == 0)
-        @constraint(model, quadcon2, y^2 + a*x == 0)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con2, 2x + a*y == 0)
+        @constraint(sp, quadcon2, y^2 + a*x == 0)
     end
     # First-stage
     x = sp[1,:x]
@@ -478,16 +478,16 @@ function test_change_decision_rhs(Structure)
     ξ₂ = @scenario a = 2. probability = 0.5
     sp = StochasticProgram([ξ₁,ξ₂], Structure...)
     @first_stage sp = begin
-        @decision(model, x)
-        @variable(model, w)
-        @constraint(model, con1, 2 * x <= 1)
+        @decision(sp, x)
+        @variable(sp, w)
+        @constraint(sp, con1, 2 * x <= 1)
     end
     @second_stage sp = begin
-        @known x
+        @known(sp, x)
         @uncertain a
-        @variable(model, z)
-        @recourse(model, y)
-        @constraint(model, con2, 2x + y <= a)
+        @variable(sp, z)
+        @recourse(sp, y)
+        @constraint(sp, con2, 2x + y <= a)
     end
     # First-stage
     sp_cref = sp[1,:con1]

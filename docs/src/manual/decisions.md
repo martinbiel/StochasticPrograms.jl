@@ -11,16 +11,16 @@ using GLPK
 
 sp = StochasticProgram([ξ₁,ξ₂], Deterministic())
 @first_stage sp = begin
-    @decision(model, x >= 2)
-    @variable(model, w)
-    @objective(model, Min, x)
+    @decision(sp, x >= 2)
+    @variable(sp, w)
+    @objective(sp, Min, x)
 end
 @second_stage sp = begin
-    @known x
+    @known(sp, x)
     @uncertain a
-    @recourse(model, y >= 1/a)
-    @objective(model, Max, y)
-    @constraint(model, con, a*y <= x)
+    @recourse(sp, y >= 1/a)
+    @objective(sp, Max, y)
+    @constraint(sp, con, a*y <= x)
 end
 ```
 A first-stage decision and a second-stage recourse decision has been identified. We include a printout of the stochastic program for reference:
@@ -181,16 +181,16 @@ This is more apparent in a vertical structure:
 ```@example decision
 vertical_sp = StochasticProgram([ξ₁,ξ₂], Vertical())
 @first_stage vertical_sp = begin
-    @decision(model, x >= 2)
-    @variable(model, w)
-    @objective(model, Min, x)
+    @decision(vertical_sp, x >= 2)
+    @variable(vertical_sp, w)
+    @objective(vertical_sp, Min, x)
 end
 @second_stage vertical_sp = begin
-    @known x
+    @known(vertical_sp, x)
     @uncertain a
-    @recourse(model, y >= 1/a)
-    @objective(model, Max, y)
-    @constraint(model, con, a*y <= x)
+    @recourse(vertical_sp, y >= 1/a)
+    @objective(vertical_sp, Max, y)
+    @constraint(vertical_sp, con, a*y <= x)
 end
 
 x = vertical_sp[1,:x]

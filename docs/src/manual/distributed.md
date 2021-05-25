@@ -32,20 +32,20 @@ sampler = SimpleSampler(μ, Σ)
 ```
 [`@scenario`](@ref) and [`@sampler`](@ref) automatically ensures that the introduced scenario and sampler types are available on all processes. Define the stochastic model in the usual way:
 ```julia
-simple_model = @stochastic_model begin
+@stochastic_model simple_model begin
     @stage 1 begin
-        @decision(model, x₁ >= 40)
-        @decision(model, x₂ >= 20)
-        @objective(model, Min, 100*x₁ + 150*x₂)
-        @constraint(model, x₁ + x₂ <= 120)
+        @decision(simple_model, x₁ >= 40)
+        @decision(simple_model, x₂ >= 20)
+        @objective(simple_model, Min, 100*x₁ + 150*x₂)
+        @constraint(simple_model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
         @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-        @recourse(model, 0 <= y₁ <= d₁)
-        @recourse(model, 0 <= y₂ <= d₂)
-        @objective(model, Min, q₁*y₁ + q₂*y₂)
-        @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-        @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+        @recourse(simple_model, 0 <= y₁ <= d₁)
+        @recourse(simple_model, 0 <= y₂ <= d₂)
+        @objective(simple_model, Min, q₁*y₁ + q₂*y₂)
+        @constraint(simple_model, 6*y₁ + 10*y₂ <= 60*x₁)
+        @constraint(simple_model, 8*y₁ + 5*y₂ <= 80*x₂)
     end
 end
 ```

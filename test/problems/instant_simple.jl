@@ -11,18 +11,18 @@ end
 simple_sp = StochasticProgram([ξ₁, ξ₂], Deterministic(), GLPK.Optimizer)
 
 @first_stage simple_sp = begin
-    @decision(model, x₁ >= 40)
-    @decision(model, x₂ >= 20)
-    @objective(model, Min, 100*x₁ + 150*x₂)
-    @constraint(model, x₁ + x₂ <= 120)
+    @decision(simple_sp, x₁ >= 40)
+    @decision(simple_sp, x₂ >= 20)
+    @objective(simple_sp, Min, 100*x₁ + 150*x₂)
+    @constraint(simple_sp, x₁ + x₂ <= 120)
 end
 
 @second_stage simple_sp = begin
-    @known x₁ x₂
+    @known(simple_sp, x₁, x₂)
     @uncertain q₁ q₂ d₁ d₂ from SimpleScenario
-    @recourse(model, 0 <= y₁ <= d₁)
-    @recourse(model, 0 <= y₂ <= d₂)
-    @objective(model, Max, q₁*y₁ + q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+    @recourse(simple_sp, 0 <= y₁ <= d₁)
+    @recourse(simple_sp, 0 <= y₂ <= d₂)
+    @objective(simple_sp, Max, q₁*y₁ + q₂*y₂)
+    @constraint(simple_sp, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(simple_sp, 8*y₁ + 5*y₂ <= 80*x₂)
 end
