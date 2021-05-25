@@ -214,7 +214,7 @@ function solve_unrelaxed(subproblem::SubProblem, metadata, worker::Convexificati
     # Solve subproblem with integer restrictions
     MOI.optimize!(subproblem.optimizer)
     status = MOI.get(subproblem.optimizer, MOI.TerminationStatus())
-    if status ∈ AcceptableTermination
+    cut = if status ∈ AcceptableTermination
         # Integer restrictions are satisfied if optimal
         set_metadata!(metadata,
                       subproblem.id,
@@ -224,15 +224,20 @@ function solve_unrelaxed(subproblem::SubProblem, metadata, worker::Convexificati
         sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
         correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0
         # Create sense-corrected optimality cut
-        Q = correction * MOI.get(subproblem.optimizer, MOI.ObjectiveValue())
-        return OptimalityCut(spzeros(length(x)), Q, subproblem.id)
+        π = subproblem.probability
+        Q = correction * π * MOI.get(subproblem.optimizer, MOI.ObjectiveValue())
+        cut = OptimalityCut(spzeros(length(x)), Q, subproblem.id)
     elseif status == MOI.INFEASIBLE
-        return Infeasible(subproblem)
+        cut = Infeasible(subproblem)
     elseif status == MOI.DUAL_INFEASIBLE
-        return Unbounded(subproblem)
+        cut = Unbounded(subproblem)
     else
         error("Subproblem $(subproblem.id) was not solved properly, returned status code: $status")
     end
+    # Relax integer restrictions again
+    worker.data.unrelax = relax_decision_integrality(subproblem.model)
+    # Return resulting cut
+    return cut
 end
 
 function moi_constraint(subproblem::SubProblem{T}, πx::AbstractVector, πy::AbstractVector, g::AbstractFloat) where T <: AbstractFloat
