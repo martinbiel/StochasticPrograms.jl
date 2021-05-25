@@ -401,7 +401,7 @@ associated with result index `result` at `scenario_index` of the
 most-recent returned by the solver.
 """
 function JuMP.value(dvar::DecisionVariable, scenario_index::Integer; result::Int = 1)::Float64
-    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `is_fixed(dvar)`.")
+    stage(dvar) == 1 && error("$dvar is not scenario dependent, consider `value(dvar)`.")
     d = decision(dvar, scenario_index)
     if d.state == Taken
         # If decision has been fixed the value can be fetched
