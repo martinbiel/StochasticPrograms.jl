@@ -1,4 +1,4 @@
-# Multi-stage decisions
+# Decision API
 
 StochasticPrograms provides an extended version of JuMPs API for decision variables/constraints/objectives with stage and scenario dependence. Consider the following problem:
 
