@@ -41,7 +41,6 @@ where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ``.
         @constraint(sm, x₁ + x₂ <= 120)
     end
     @stage 2 begin
-        @decision x₁ x₂
         @uncertain q₁ q₂ d₁ d₂
         @variable(sm, 0 <= y₁ <= d₁)
         @variable(sm, 0 <= y₂ <= d₂)
@@ -61,7 +60,6 @@ sm = @stochastic_model begin
         @constraint(model, x₁ + x₂ <= 120)
     end
     @stage 2 begin
-        @decision x₁ x₂
         @uncertain q₁ q₂ d₁ d₂
         @variable(model, 0 <= y₁ <= d₁)
         @variable(model, 0 <= y₂ <= d₂)

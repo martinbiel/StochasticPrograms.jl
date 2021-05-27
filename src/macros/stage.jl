@@ -66,12 +66,12 @@ Solver is default solver
 See also: [`@parameters`](@ref), [`@decision`](@ref), [`@uncertain`](@ref)
 """
 macro stage(stage, args)
-    @capture(args, sp_Symbol = def_) || error("Invalid syntax. Expected @stage stage sp = begin ... end")
-    model_name = sp
     _error(x, str...) = begin
         macroname = Symbol(String(x.args[1])[2:end])
         JuMP._macro_error(macroname, prettify.(x.args[3:end]), x.args[2], str...)
     end
+    @capture(args, sp_Symbol = def_) || _error(args, "Invalid syntax. Expected @stage stage sp = begin ... end")
+    model_name = sp
     # Flags for error checking
     seen_decision = :(false)
     seen_recourse = :(false)
@@ -209,8 +209,8 @@ macro stage(stage, args)
             scenvar = first(args.args)
             reference = :(Containers.@container $args "uncertain value")
             code = @q begin
-                typeof(scenario) <: Scenario{D} where D <: Union{Array, StochasticPrograms.DenseAxisArray} || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...]` only support scenarios of type `Scenario` with Array or DenseAxisArray as underlying data. Consider declaring a custom scenario type.")
-                size(scenario.data) == size($reference) || error("Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
+                typeof(scenario) <: Scenario{D} where D <: Union{Array, StochasticPrograms.DenseAxisArray} || $_error($(Meta.quot(x)), "@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...]` only support scenarios of type `Scenario` with Array or DenseAxisArray as underlying data, given scenario is: \n $scenario.\n Use a matching `@scenario` call to generate scenarios or consider declaring a custom scenario type.")
+                size(scenario.data) == size($reference) || $_error($(Meta.quot(x)), "Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
                 $scenvar = scenario.data
             end
             return code
@@ -219,15 +219,15 @@ macro stage(stage, args)
             scenvar = first(args.args)
             reference = :(Containers.@container $args "uncertain value")
             code = @q begin
-                typeof(scenario) <: Scenario{D} where D <: StochasticPrograms.SparseAxisArray || error("@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...; ...]` only support scenarios of type `Scenario` with SparseAxisArray as underlying data. Consider declaring a custom scenario type.")
-                keys(scenario.data.data) == keys($reference.data) || error("Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
+                typeof(scenario) <: Scenario{D} where D <: StochasticPrograms.SparseAxisArray || $_error($(Meta.quot(x)), "@uncertain declarations of type `@uncertain ξ[i = ..., j = ..., ...; ...]` only support scenarios of type `Scenario` with SparseAxisArray as underlying data, given scenario is: \n $scenario.\n Use a matching `@scenario` call to generate scenarios or consider declaring a custom scenario type.")
+                keys(scenario.data.data) == keys($reference.data) || $_error($(Meta.quot(x)), "Given scenario \n\n$scenario \n\ndoes not match @uncertain declaration \n\n$($reference).")
                 $scenvar = scenario.data
             end
             return code
         elseif @capture(x, @uncertain args__)
             stage == 1 && _error(x, "@uncertain declarations cannot be used in the first stage.")
             code = @q begin
-                typeof(scenario) <: Scenario || error("@uncertain declarations of type `@uncertain var1, var2, ...` only support scenarios of type `Scenario`. Consider declaring a custom scenario type.")
+                typeof(scenario) <: Scenario || $_error($(Meta.quot(x)), "@uncertain declarations of type `@uncertain var1, var2, ...` only support scenarios of type `Scenario`, given scenario is:\n$scenario.\n Use a matching `@scenario` call to generate scenarios or consider declaring a custom scenario type.")
             end
             for var in args
                 varkey = Meta.quot(var)
@@ -236,7 +236,7 @@ macro stage(stage, args)
                     $var = try
                         $var = scenario.data[$varkey]
                     catch err
-                        error("Given scenario $scenario does not match @uncertain declaration.")
+                        $_error($(Meta.quot(x)), "Given scenario $scenario does not match @uncertain declaration.")
                     end
                 end
             end
@@ -299,7 +299,7 @@ Add a first stage model generation recipe to `stochasticprogram` using the synta
     ...
 end [defer]
 ```
-where JuMP syntax is used inside the block to define the first stage model. During definition, the first stage model is referenced through the reserved keyword `model`.
+where JuMP syntax is used inside the block to define the first stage model. During definition, the first stage model is referenced through the reserved keyword matching the name of `stochasticprogram`.
 
 ## Examples
 
@@ -314,10 +314,10 @@ The following defines the first stage model given by:
 
 ```julia
 @first_stage sp = begin
-    @decision(model, x₁ >= 40)
-    @decision(model, x₂ >= 20)
-    @objective(model, Min, 100*x₁ + 150*x₂)
-    @constraint(model, x₁ + x₂ <= 120)
+    @decision(sp, x₁ >= 40)
+    @decision(sp, x₂ >= 20)
+    @objective(sp, Min, 100*x₁ + 150*x₂)
+    @constraint(sp, x₁ + x₂ <= 120)
 end
 ```
 
@@ -337,7 +337,7 @@ Add a second stage model generation recipe to `stochasticprogram` using the synt
     ...
 end
 ```
-where JuMP syntax is used inside the block to define the second stage model. During definition, the second stage model is referenced through the reserved keyword `model`.
+where JuMP syntax is used inside the block to define the second stage model. During definition, the second stage model is referenced through the reserved keyword matching the name of `stochasticprogram`.
 
 ## Examples
 
@@ -353,13 +353,13 @@ where ``q₁(ξ), q₂(ξ), d₁(ξ), d₂(ξ)`` depend on the scenario ``ξ`` a
 
 ```julia
 @second_stage sp = begin
-    @known x₁ x₂
+    @known(sp, x₁, x₂)
     @uncertain q₁ q₂ d₁ d₂
-    @variable(model, 0 <= y₁ <= d₁)
-    @variable(model, 0 <= y₂ <= d₂)
-    @objective(model, Min, q₁*y₁ + q₂*y₂)
-    @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
-    @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+    @variable(sp, 0 <= y₁ <= d₁)
+    @variable(sp, 0 <= y₂ <= d₂)
+    @objective(sp, Min, q₁*y₁ + q₂*y₂)
+    @constraint(sp, 6*y₁ + 10*y₂ <= 60*x₁)
+    @constraint(sp, 8*y₁ + 5*y₂ <= 80*x₂)
 end
 ```
 
