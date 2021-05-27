@@ -9,7 +9,10 @@ function JuMP.objective_function_type(structure::AbstractBlockStructure{N}, stag
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    return objective_function_type(scenarioproblems(structure, stage), scenario_index)
+    return get_from_scenarioproblem(scenarioproblems(structure, stage), scenario_index) do sp, i
+        s = fetch(sp).problems[i]
+        return jump_function_type(s, MOI.get(backend(s), MOI.ObjectiveFunctionType()))
+    end
 end
 
 function JuMP.objective_function(structure::AbstractBlockStructure{N},
@@ -20,7 +23,13 @@ function JuMP.objective_function(structure::AbstractBlockStructure{N},
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
-    objective::FunType = objective_function(scenarioproblems(structure, stage), structure, stage, scenario_index, FunType)
+    obj = get_from_scenarioproblem(scenarioproblems(structure, stage), scenario_index, FunType) do sp, i, FunType
+        MOIFunType = moi_function_type(FunType)
+        subprob = fetch(sp).problems[i]
+        obj = MOI.get(subprob, MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
+        return obj
+    end
+    objective = jump_function(structure, stage, scenario_index, obj)::FunType
     return objective
 end
 

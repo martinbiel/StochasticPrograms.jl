@@ -68,6 +68,9 @@ end
 
 # Distributed helper functions #
 # ========================== #
+function get_from_scenarioproblem(getter::Function, scenarioproblems::ScenarioProblems, scenario_index::Integer, args...)
+    return getter(scenarioproblems, scenario_index, args...)
+end
 function get_from_scenarioproblem(getter::Function, scenarioproblems::DistributedScenarioProblems, scenario_index::Integer, args...)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     j = 0
@@ -80,6 +83,9 @@ function get_from_scenarioproblem(getter::Function, scenarioproblems::Distribute
     end
     throw(BoundsError(scenarioproblems, scenario_index))
 end
+function get_from_scenarioproblems(getter::Function, scenarioproblems::ScenarioProblems, op::Function, partial_values, args...)
+    return reduce(op, getter(scenarioproblems, args...))
+end
 function get_from_scenarioproblems(getter::Function, scenarioproblems::DistributedScenarioProblems, op::Function, partial_values, args...)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
     @sync begin
@@ -88,6 +94,10 @@ function get_from_scenarioproblems(getter::Function, scenarioproblems::Distribut
         end
     end
     return reduce(op, partial_values)
+end
+function set_in_scenarioproblem!(setter::Function, scenarioproblems::ScenarioProblems, scenario_index::Integer, args...)
+    setter(scenarioproblems, scenario_index, args...)
+    return nothing
 end
 function set_in_scenarioproblem!(setter::Function, scenarioproblems::DistributedScenarioProblems, scenario_index::Integer, args...)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
@@ -100,6 +110,10 @@ function set_in_scenarioproblem!(setter::Function, scenarioproblems::Distributed
         j += n
     end
     throw(BoundsError(scenarioproblems, scenario_index))
+end
+function set_in_scenarioproblems!(setter::Function, scenarioproblems::ScenarioProblems, args...)
+    setter(scenarioproblems, args...)
+    return nothing
 end
 function set_in_scenarioproblems!(setter::Function, scenarioproblems::DistributedScenarioProblems, args...)
     isempty(scenarioproblems.scenarioproblems) && error("No remote scenario problems.")
@@ -236,7 +250,7 @@ end
 function MOI.set(scenarioproblems::DistributedScenarioProblems, attr::MOI.AbstractConstraintAttribute,
                  ci::CI, value)
     set_in_scenarioproblems!(scenarioproblems, attr, ci, value) do sp, attr, ci, value
-        MOI.set(backend(fetch(sp).problems[i]), attr.attr, ci, value)
+        MOI.set(fetch(sp), attr.attr, ci, value)
         return nothing
     end
     return nothing
@@ -421,41 +435,6 @@ function JuMP.unfix(scenarioproblems::DistributedScenarioProblems, index::MOI.Va
         return nothing
     end
     return nothing
-end
-
-function JuMP.objective_function_type(scenarioproblems::ScenarioProblems, scenario_index::Integer)
-    subprob = subproblem(scenarioproblems, scenario_index)
-    return jump_function_type(subprob, MOI.get(backend(subprob), MOI.ObjectiveFunctionType()))
-end
-function JuMP.objective_function_type(scenarioproblems::DistributedScenarioProblems, scenario_index::Integer)
-    return get_from_scenarioproblem(scenarioproblems, scenario_index) do sp, i
-        s = fetch(sp).problems[i]
-        return jump_function_type(s, MOI.get(backend(s), MOI.ObjectiveFunctionType()))
-    end
-end
-
-function JuMP.objective_function(scenarioproblems::ScenarioProblems,
-                                 structure::AbstractBlockStructure,
-                                 stage::Integer,
-                                 scenario_index::Integer,
-                                 FunType::Type{<:AbstractJuMPScalar})
-    MOIFunType = moi_function_type(FunType)
-    subprob = subproblem(scenarioproblems, scenario_index)
-    func = MOI.get(subprob, MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
-    return JuMP.jump_function(structure, stage, scenario_index, func)
-end
-function JuMP.objective_function(scenarioproblems::DistributedScenarioProblems,
-                                 structure::AbstractBlockStructure,
-                                 stage::Integer,
-                                 scenario_index::Integer,
-                                 FunType::Type{<:AbstractJuMPScalar})
-    f = get_from_scenarioproblem(scenarioproblems, scenario_index, FunType) do sp, i, FunType
-        MOIFunType = moi_function_type(FunType)
-        subprob = fetch(sp).problems[i]
-        func = MOI.get(subprob, MOI.ObjectiveFunction{MOIFunType}())::MOIFunType
-        return func
-    end
-    return JuMP.jump_function(structure, stage, scenario_index, f)
 end
 
 function JuMP._moi_optimizer_index(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)

@@ -49,8 +49,8 @@ end
 # ========================== #
 function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractModelAttribute)
     if attr isa Union{MOI.ObjectiveFunctionType, MOI.ObjectiveSense}
-        # Should be the same in all subproblems, query the first
-        return MOI.get(structure, ScenarioDependentModelAttribute(2, 1, attr))
+        # Can defer to proxy here
+        return MOI.get(backend(structure.proxy[1]), attr)
     end
     error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
@@ -63,7 +63,27 @@ end
 function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentModelAttribute)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
-    return MOI.get(scenarioproblems(structure, attr.stage), attr)
+    if attr.attr isa MOI.ObjectiveFunction
+        return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
+            subprob = fetch(sp).problems[i]
+            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            return obj
+        end
+    elseif attr.attr isa MOI.ObjectiveFunctionType
+        return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
+            subprob = fetch(sp).problems[i]
+            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            return typeof(moi_function(obj))
+        end
+    elseif attr.attr isa MOI.ObjectiveSense
+        return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
+            subprob = fetch(sp).problems[i]
+            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            return sense
+        end
+    else
+        return MOI.get(scenarioproblems(structure, attr.stage), attr)
+    end
 end
 function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
     n = num_scenarios(structure, attr.stage)
@@ -86,25 +106,106 @@ function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentConstrai
 end
 
 function MOI.set(structure::HorizontalStructure{2}, attr::Union{MOI.AbstractModelAttribute, MOI.Silent}, value)
-    # All subproblems should be updated
-    MOI.set(scenarioproblems(structure), attr, value)
+    if attr isa MOI.ObjectiveFunction
+        set_in_scenarioproblems!(scenarioproblems(structure), value) do sp, new_obj
+            for (i,subprob) in enumerate(subproblems(fetch(sp)))
+                # Get first-stage objective+sense
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                # Get second_stage objective+sense
+                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                # Update first-stage objective
+                set_stage_objective!(subprob, 1, new_sense, moi_function(new_obj))
+                # Update sub objective
+                sub_obj = if sense == first_stage_sense
+                    sub_obj = new_obj + obj
+                else
+                    sub_obj = new_obj - obj
+                end
+                set_objective_function(subprob, sub_obj)
+            end
+            return nothing
+        end
+    elseif attr isa MOI.ObjectiveSense
+        set_in_scenarioproblems!(scenarioproblems(structure), value) do sp, new_sense
+            for (i,subprob) in enumerate(subproblems(fetch(sp)))
+                # Get first-stage objective+sense
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                if first_stage_sense == new_sense
+                    # Nothing to do
+                    return nothing
+                end
+                # Get second_stage objective+sense
+                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                # Update first-stage objective
+                set_stage_objective!(subprob, 1, new_sense, moi_function(first_stage_obj))
+                # Update sub objective
+                sub_obj = if sense == new_sense
+                    sub_obj = first_stage_obj + obj
+                else
+                    sub_obj = first_stage_obj - obj
+                end
+                set_objective_function(subprob, sub_obj)
+            end
+            return nothing
+        end
+    else
+        # All subproblems should be updated
+        MOI.set(scenarioproblems(structure), attr, value)
+    end
+end
+function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentModelAttribute, value)
+    n = num_scenarios(structure, attr.stage)
+    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
+    if attr.attr isa MOI.ObjectiveFunction
+        set_in_scenarioproblem!(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage, value) do sp, i, stage, value
+            subprob = fetch(sp).problems[i]
+            # Get first-stage objective+sense
+            (sense, obj) = get_stage_objective(subprob, 1)
+            # Update subobjective
+            (sub_sense, prev_obj) = get_stage_objective(subprob, stage, 1)
+            set_stage_objective!(subprob, stage, 1, sub_sense, value)
+            new_obj = jump_function(structure.model, value)
+            # Update main objective
+            sub_obj = if sense == sub_sense
+                sub_obj = obj + new_obj
+            else
+                sub_obj = obj - new_obj
+            end
+            set_objective_function(subprob, sub_obj)
+            return nothing
+        end
+    elseif attr.attr isa MOI.ObjectiveSense
+        set_in_scenarioproblem!(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage, value) do sp, i, stage, value
+            subprob = fetch(sp).problems[i]
+            # Get current objective+sense
+            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            if sense == value
+                # Nothing to do
+                return nothing
+            end
+            # Get first-stage objective+sense
+            (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+            # Update node sense
+            set_stage_objective!(subprob, stage, 1, value, moi_function(obj))
+            # Update sub objective
+            sub_obj = if value == first_stage_sense
+                sub_obj = first_stage_obj + obj
+            else
+                sub_obj = first_stage_obj - obj
+            end
+            set_objective_function(subprob, sub_obj)
+            return nothing
+        end
+    else
+        # Most attributes are set through the scenarioproblems
+        MOI.set(scenarioproblems(structure, attr.stage), attr, value)
+    end
+    return nothing
 end
 function MOI.set(structure::HorizontalStructure{2}, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     # All subproblems should be updated
     MOI.set(scenarioproblems(structure), attr, index, value)
-    return nothing
-end
-function MOI.set(structure::HorizontalStructure{2}, attr::MOI.AbstractConstraintAttribute,
-                 ci::MOI.ConstraintIndex, value)
-    # All subproblems should be updated
-    MOI.set(scenarioproblems(structure), attr, ci, value)
-    return nothing
-end
-function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentModelAttribute, value)
-    n = num_scenarios(structure, attr.stage)
-    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
-    MOI.set(scenarioproblems(subproblem, attr.stage), attr, value)
     return nothing
 end
 function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentVariableAttribute,
@@ -113,6 +214,12 @@ function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentVaria
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, index, attr.scenario_index)
     MOI.set(scenarioproblems(structure, attr.stage), attr, mapped_vi, value)
+    return nothing
+end
+function MOI.set(structure::HorizontalStructure{2}, attr::MOI.AbstractConstraintAttribute,
+                 ci::MOI.ConstraintIndex, value)
+    # All subproblems should be updated
+    MOI.set(scenarioproblems(structure), attr, ci, value)
     return nothing
 end
 function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentConstraintAttribute,
@@ -328,11 +435,30 @@ end
 
 function JuMP.set_objective_sense(structure::HorizontalStructure, stage::Integer, sense::MOI.OptimizationSense)
     if stage == 1
-        # The first stage determines the sense of all subproblems
-        MOI.set(scenarioproblems(structure), MOI.ObjectiveSense(), sense)
+        MOI.set(structure, MOI.ObjectiveSense(), sense)
     else
-        # TODO: This can generate a sign flip.
-        MOI.set(scenarioproblems(structure), MOI.ObjectiveSense(), sense)
+        set_in_scenarioproblems!(scenarioproblems(structure), sense) do sp, new_sense
+            for (i,subprob) in enumerate(subproblems(fetch(sp)))
+                # Get first-stage objective+sense
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                # Get current objective+sense
+                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                if sense == new_sense
+                    # Nothing to do
+                    return nothing
+                end
+                # Update node sense
+                set_stage_objective!(subprob, 2, 1, new_sense, moi_function(obj))
+                # Update sub objective
+                sub_obj = if new_sense == first_stage_sense
+                    sub_obj = first_stage_obj + obj
+                else
+                    sub_obj = first_stage_obj - obj
+                end
+                set_objective_function(subprob, sub_obj)
+            end
+            return nothing
+        end
     end
     return nothing
 end

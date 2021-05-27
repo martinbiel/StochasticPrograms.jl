@@ -116,6 +116,25 @@ function num_known_decisions(model::JuMP.Model, stage::Integer = 2)
     return num_known_decisions(decisions, stage - 1)
 end
 
+function get_stage_objective(model::JuMP.Model, stage::Integer)
+    stage > 1 && error("The objective at stage $stage is scenario dependent, consider `get_stage_objective(model, stage, scenario_index)`.")
+    decisions = get_decisions(model)::Decisions
+    if decisions.is_node
+        return (objective_sense(model), objective_function(model))
+    end
+    (sense, obj) = get_stage_objective(decisions, stage, 1)
+    return (sense, jump_function(model, obj))
+end
+function get_stage_objective(model::JuMP.Model, stage::Integer, scenario_index::Integer)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `get_stage_objective(model, stage)`.")
+    decisions = get_decisions(model)::Decisions
+    if decisions.is_node
+        return (objective_sense(model), objective_function(model))
+    end
+    (sense, obj) = get_stage_objective(decisions, stage, scenario_index)
+    return (sense, jump_function(model, obj))
+end
+
 # Getters (refs) #
 # ========================== #
 function stage(model::JuMP.Model)
@@ -182,6 +201,35 @@ function untake_decisions!(model::JuMP.Model, drefs::Vector{DecisionRef})
             update_decision_state!(dref, NotTaken)
         end
     end
+    return nothing
+end
+
+function set_stage_objective!(model::JuMP.Model,
+                              stage::Integer,
+                              sense::MOI.OptimizationSense,
+                              objective::MOI.AbstractScalarFunction)
+    stage > 1 && error("The objective at stage $stage is scenario dependent, consider `set_stage_objective!(model, stage, scenario_index, sense, objective)`.")
+    decisions = get_decisions(model)::Decisions
+    set_stage_objective!(decisions, stage, 1, sense, objective)
+    return nothing
+end
+function set_stage_objective!(model::JuMP.Model,
+                              stage::Integer,
+                              scenario_index::Integer,
+                              sense::MOI.OptimizationSense,
+                              objective::MOI.AbstractScalarFunction)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `set_stage_objective!(model, stage, sense, objective)`.")
+    decisions = get_decisions(model)::Decisions
+    set_stage_objective!(decisions, stage, scenario_index, sense, objective)
+    return nothing
+end
+
+function add_stage_objective!(model::JuMP.Model,
+                              stage::Integer,
+                              sense::MOI.OptimizationSense,
+                              objective::MOI.AbstractScalarFunction)
+    decisions = get_decisions(model)::Decisions
+    add_stage_objective!(decisions, stage, sense, objective)
     return nothing
 end
 

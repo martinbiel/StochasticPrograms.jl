@@ -19,10 +19,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
     if stage == 1
         # Define first-stage problem
         generator(stochasticprogram, :stage_1)(dep_model, stage_parameters(stochasticprogram, 1))
-        # Cache first-stage objective
-        obj = objective_function(dep_model)
-        sense = objective_sense(dep_model)
-        push!(structure.sub_objectives[1], (sense, moi_function(obj)))
     else
         # Sanity check on scenario probabilities
         if num_scenarios(stochasticprogram, stage) > 0
@@ -44,14 +40,12 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
             stage_key = Symbol(:stage_, stage)
             generator(stochasticprogram, stage_key)(dep_model, stage_parameters(stochasticprogram, stage), scenario)
             # Update objective and cache the subobjective function for scenario i
-            sub_sense = objective_sense(dep_model)
-            sub_obj = objective_function(dep_model)
+            (sub_sense, sub_obj) = get_stage_objective(dep_model, 2, i)
             if obj_sense == sub_sense
-                dep_obj += probability(scenario) * objective_function(dep_model)
+                dep_obj += probability(scenario) * sub_obj
             else
-                dep_obj -= probability(scenario) * objective_function(dep_model)
+                dep_obj -= probability(scenario) * sub_obj
             end
-            push!(structure.sub_objectives[stage], (sub_sense, moi_function(sub_obj)))
             # Bookkeeping for objects added in scenario i
             for (objkey,obj) in filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
                 newkey = if isa(obj, VariableRef) || isa(obj, DecisionRef)
@@ -149,8 +143,6 @@ end
 function clear!(dep::DeterministicEquivalent)
     # Clear decisions
     clear!(dep.decisions)
-    # Clear subobjectives
-    map(empty!, dep.sub_objectives)
     # Clear deterministic equivalent model
     empty!(dep.model)
     return nothing

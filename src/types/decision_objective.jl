@@ -188,6 +188,7 @@ end
 Return the objective sense in the node at stage `stage` and scenario `scenario_index`.
 """
 function JuMP.objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `objective_sense(stochasticprogram, 1)`.")
     attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.ObjectiveSense())
     return MOI.get(stochasticprogram, attr)::MOI.OptimizationSense
 end
@@ -197,6 +198,13 @@ end
 Sets the objective sense of the `stochasticprogram` to `sense`.
 """
 function JuMP.set_objective_sense(stochasticprogram::StochasticProgram, sense::MOI.OptimizationSense)
+    if objective_sense(stochasticprogram) == sense
+        # Nothing to do
+        return nothing
+    end
+    # Modify proxy
+    set_objective_sense(proxy(stochasticprogram, 1), sense)
+    # Modify through structure
     MOI.set(structure(stochasticprogram), MOI.ObjectiveSense(), sense)
     return nothing
 end
@@ -207,6 +215,10 @@ Sets the objective sense of the `stochasticprogram` at stage `stage` to `sense`.
 """
 function JuMP.set_objective_sense(stochasticprogram::StochasticProgram{N}, stage::Integer, sense::MOI.OptimizationSense) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    if objective_sense(stochasticprogram, stage) == sense
+        # Nothing to do
+        return nothing
+    end
     # Modify proxy
     set_objective_sense(proxy(stochasticprogram, stage), sense)
     # Modify through structure
@@ -220,6 +232,7 @@ Sets the objective sense of the stochasticprogram node at stage `stage`
 and scenario `scenario_index` to the given `sense`.
 """
 function JuMP.set_objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer, sense::MOI.OptimizationSense)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `set_objective_sense(stochasticprogram, 1, sense)`.")
     attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.ObjectiveSense())
     MOI.set(structure(stochasticprogram), attr, sense)
     return nothing
@@ -247,6 +260,7 @@ end
 Return the type of the objective function in the node at stage `stage` and scenario `scenario_index`.
 """
 function JuMP.objective_function_type(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `objective_function_type(stochasticprogram, 1)`.")
     return objective_function_type(structure(stochasticprogram), stage, scenario_index)
 end
 """
@@ -284,6 +298,7 @@ function JuMP.objective_function(stochasticprogram::StochasticProgram,
                                  stage::Integer,
                                  scenario_index::Integer,
                                  FunType::Type{<:AbstractJuMPScalar} = objective_function_type(stochasticprogram, stage, scenario_index))
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `objective_function(stochasticprogram, 1)`.")
     return objective_function(structure(stochasticprogram), stage, scenario_index, FunType)
 end
 """
@@ -305,6 +320,7 @@ end
 Set the scenario-dependent linear objective coefficient at `scenario_index` associated with `dvar` to `coefficient` in stage `stage`.
 """
 function JuMP.set_objective_coefficient(stochasticprogram::StochasticProgram, dvar::DecisionVariable, stage::Integer, scenario_index::Integer, coeff::Real)
+    stage == 1 && error("The first-stage objective is not scenario dependent, consider `set_objective_coefficient(stochasticprogram, dvar, 1, coeff)`.")
     # Modify objective through structure
     set_objective_coefficient(structure(stochasticprogram), index(dvar), StochasticPrograms.stage(dvar), stage, scenario_index, coeff)
 end

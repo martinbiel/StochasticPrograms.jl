@@ -456,6 +456,143 @@ function test_decision_objective_coefficient_modifiction(Structure)
     end
 end
 
+function test_decision_objective_sense_modification(Structure)
+    ξ₁ = @scenario a = 2. probability = 0.5
+    ξ₂ = @scenario a = 4 probability = 0.5
+    sp = StochasticProgram([ξ₁,ξ₂], Structure...)
+    @first_stage sp = begin
+        @decision(sp, x)
+        @variable(sp, w)
+        @objective(sp, Min, x)
+    end
+    @second_stage sp = begin
+        @variable(sp, z)
+        @recourse(sp, y)
+        @objective(sp, Min, y)
+    end
+    # First-stage
+    x = DecisionRef(sp[1,:x])
+    @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+    # Second-stage
+    y1 = DecisionRef(sp[2,:y], 1)
+    y2 = DecisionRef(sp[2,:y], 2)
+    @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2)
+    @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+    @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+    # Structure specific
+    if sp.structure isa StochasticPrograms.DeterministicEquivalent
+        @test JuMP.isequal_canonical(x + 0.5*y1 + 0.5*y2, JuMP.objective_function(sp))
+        set_objective_sense(sp, 2, MOI.MAX_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(x - 0.5*y1 - 0.5*y2, JuMP.objective_function(sp))
+        set_objective_sense(sp, 1, MOI.MAX_SENSE)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(x + 0.5*y1 + 0.5*y2, JuMP.objective_function(sp))
+        set_objective_sense(sp, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(x - 0.5*y1 - 0.5*y2, JuMP.objective_function(sp))
+        set_objective_sense(sp, 2, 1, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(x + 0.5*y1 - 0.5*y2, JuMP.objective_function(sp))
+    end
+    if sp.structure isa StochasticPrograms.VerticalStructure
+        @test JuMP.objective_function(sp) == x
+        @test JuMP.objective_function(sp, 1) == x
+        @test JuMP.objective_function(sp, 2, 1) == y1
+        @test JuMP.objective_function(sp, 2, 2) == y2
+        set_objective_sense(sp, 2, MOI.MAX_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.objective_function(sp) == x
+        @test JuMP.objective_function(sp, 2, 1) == y1
+        @test JuMP.objective_function(sp, 2, 2) == y2
+        set_objective_sense(sp, 1, MOI.MAX_SENSE)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.objective_function(sp) == x
+        @test JuMP.objective_function(sp, 2, 1) == y1
+        @test JuMP.objective_function(sp, 2, 2) == y2
+        set_objective_sense(sp, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.objective_function(sp) == x
+        @test JuMP.objective_function(sp, 2, 1) == y1
+        @test JuMP.objective_function(sp, 2, 2) == y2
+        set_objective_sense(sp, 2, 1, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.objective_function(sp) == x
+        @test JuMP.objective_function(sp, 2, 1) == y1
+        @test JuMP.objective_function(sp, 2, 2) == y2
+    end
+    if sp.structure isa StochasticPrograms.HorizontalStructure
+        x1 = DecisionRef(sp[1,:x], 2, 1)
+        x2 = DecisionRef(sp[1,:x], 2, 2)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x2 + y2)
+        set_objective_sense(sp, 2, MOI.MAX_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 - y1)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x2 - y2)
+        set_objective_sense(sp, 1, MOI.MAX_SENSE)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x2 + y2)
+        set_objective_sense(sp, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 - y1)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x2 - y2)
+        set_objective_sense(sp, 2, 1, MOI.MIN_SENSE)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2)
+        @test MOI.MIN_SENSE == @inferred JuMP.objective_sense(sp, 2, 1)
+        @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
+        @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), x2 - y2)
+    end
+end
+
 function runtests()
     @testset "DecisionObjective" begin
         for structure in [(Deterministic(),),

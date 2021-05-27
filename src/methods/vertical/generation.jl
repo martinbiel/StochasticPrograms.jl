@@ -71,7 +71,7 @@ function generate_vertical!(scenarioproblems::ScenarioProblems,
                 DecisionMap()
             end
         end
-        subproblem.ext[:decisions] = Decisions(decisions)
+        subproblem.ext[:decisions] = Decisions(decisions; is_node = true)
         add_decision_bridges!(subproblem)
         # Generate and return the stage model
         decision_generator(subproblem, decision_params)

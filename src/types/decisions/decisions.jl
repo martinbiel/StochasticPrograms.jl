@@ -53,18 +53,26 @@ const ConstraintMap = MOIU.DoubleDicts.MainIndexDoubleDict
 
 struct Decisions{N}
     decisions::NTuple{N, DecisionMap}
+    stage_objectives::NTuple{N, Vector{Tuple{MOI.OptimizationSense, MOI.AbstractScalarFunction}}}
     stage_map::StageMap
     constraint_map::ConstraintMap
+    is_node::Bool
 
-    function Decisions(::Val{N}) where N
+    function Decisions(::Val{N}; is_node::Bool = false) where N
         decisions = ntuple(Val(N)) do i
             DecisionMap()
         end
-        return new{N}(decisions, StageMap(), MOIU.DoubleDicts.IndexDoubleDict())
+        stage_objectives = ntuple(Val(N)) do i
+            Vector{Tuple{MOI.ObjectiveSense, MOI.AbstractScalarFunction}}()
+        end
+        return new{N}(decisions, stage_objectives, StageMap(), MOIU.DoubleDicts.IndexDoubleDict(), is_node)
     end
 
-    function Decisions(decisions::NTuple{N, DecisionMap}) where N
-        return new{N}(decisions, StageMap(), MOIU.DoubleDicts.IndexDoubleDict())
+    function Decisions(decisions::NTuple{N, DecisionMap}; is_node::Bool = false) where N
+        stage_objectives = ntuple(Val(N)) do i
+            Vector{Tuple{MOI.ObjectiveSense, MOI.AbstractScalarFunction}}()
+        end
+        return new{N}(decisions, stage_objectives, StageMap(), MOIU.DoubleDicts.IndexDoubleDict(), is_node)
     end
 end
 
@@ -155,6 +163,37 @@ function remove_decision!(decisions::Decisions{N}, index::MOI.VariableIndex) whe
     return nothing
 end
 
+function get_stage_objective(decisions::Decisions{N}, stage::Integer, scenario_index::Integer) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    n = length(decisions.stage_objectives[stage])
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    return decisions.stage_objectives[stage][scenario_index]
+end
+function set_stage_objective!(decisions::Decisions{N},
+                              stage::Integer,
+                              scenario_index::Integer,
+                              sense::MOI.OptimizationSense,
+                              objective::MOI.AbstractScalarFunction) where N
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    n = length(decisions.stage_objectives[stage])
+    1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
+    decisions.stage_objectives[stage][scenario_index] = (sense, objective)
+    return nothing
+end
+
+function add_stage_objective!(decisions::Decisions{N},
+                              stage::Integer,
+                              sense::MOI.OptimizationSense,
+                              objective::MOI.AbstractScalarFunction) where N
+    if decisions.is_node
+        # No need to cache objective if model is a node problem
+        return nothing
+    end
+    1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
+    push!(decisions.stage_objectives[stage], (sense, objective))
+    return nothing
+end
+
 function mapped_constraint(decisions::Decisions, ci::MOI.ConstraintIndex)
     if haskey(decisions.constraint_map, ci)
         return decisions.constraint_map[ci]
@@ -176,6 +215,7 @@ function clear!(decisions::Decisions)
     map(decisions.decisions) do decisions
         empty!(decisions)
     end
+    map(empty!, decisions.stage_objectives)
     empty!(decisions.stage_map)
     empty!(decisions.constraint_map)
     return nothing

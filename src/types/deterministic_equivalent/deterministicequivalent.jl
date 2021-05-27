@@ -7,20 +7,16 @@ Deterministic equivalent memory structure. Stochastic program is stored as one l
 struct DeterministicEquivalent{N, M, S <: NTuple{M, Scenarios}} <: AbstractStochasticStructure{N}
     decisions::Decisions{N}
     scenarios::S
-    sub_objectives::NTuple{N, Vector{Tuple{MOI.OptimizationSense, MOI.AbstractScalarFunction}}}
     model::JuMP.Model
     proxy::NTuple{N,JuMP.Model}
 
     function DeterministicEquivalent(decisions::Decisions{N}, scenarios::NTuple{M, Scenarios}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
-        sub_objectives = ntuple(Val(N)) do i
-            Vector{Tuple{MOI.ObjectiveSense, MOI.AbstractScalarFunction}}()
-        end
         proxy = ntuple(Val{N}()) do _
             Model()
         end
         S = typeof(scenarios)
-        return new{N,M,S}(decisions, scenarios, sub_objectives, Model(), proxy)
+        return new{N,M,S}(decisions, scenarios, Model(), proxy)
     end
 end
 
@@ -48,32 +44,8 @@ end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttribute)
     return MOI.get(backend(structure.model), attr)
 end
-function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentModelAttribute)
-    n = num_scenarios(structure, attr.stage)
-    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
-    if attr.attr isa MOI.ObjectiveFunction
-        return structure.sub_objectives[attr.stage][attr.scenario_index][2]
-    elseif attr.attr isa MOI.ObjectiveFunctionType
-        return typeof(structure.sub_objectives[attr.stage][attr.scenario_index][2])
-    elseif attr.attr isa MOI.ObjectiveSense
-        return structure.sub_objectives[attr.stage][attr.scenario_index][1]
-    elseif attr.attr isa MOI.ObjectiveValue || attr.attr isa MOI.DualObjectiveValue
-        return MOIU.eval_variables(structure.sub_objectives[attr.stage][attr.scenario_index][2]) do idx
-            return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
-        end
-    else
-        # Most attributes are shared with the deterministic equivalent
-        return MOI.get(backend(structure.model), attr.attr)
-    end
-end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
     return MOI.get(backend(structure.model), attr, index)
-end
-function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
-    n = num_scenarios(structure, attr.stage)
-    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
-    mapped_vi = mapped_index(structure, index, attr.scenario_index)
-    return MOI.get(backend(structure.model), attr.attr, mapped_vi)
 end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute, ci::CI)
     return MOI.get(backend(structure.model), attr, ci)
@@ -81,6 +53,30 @@ end
 function MOI.get(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute, ci::CI{F,S}) where {F <: SingleDecision, S}
     con_ref = ConstraintRef(structure.model, ci)
     return MOI.get(structure.model, attr, con_ref)
+end
+function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentModelAttribute)
+    n = num_scenarios(structure, attr.stage)
+    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
+    if attr.attr isa MOI.ObjectiveFunction
+        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2]
+    elseif attr.attr isa MOI.ObjectiveFunctionType
+        return typeof(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2])
+    elseif attr.attr isa MOI.ObjectiveSense
+        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[1]
+    elseif attr.attr isa MOI.ObjectiveValue || attr.attr isa MOI.DualObjectiveValue
+        return MOIU.eval_variables(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2]) do idx
+            return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
+        end
+    else
+        # Most attributes are shared with the deterministic equivalent
+        return MOI.get(backend(structure.model), attr.attr)
+    end
+end
+function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
+    n = num_scenarios(structure, attr.stage)
+    1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
+    mapped_vi = mapped_index(structure, index, attr.scenario_index)
+    return MOI.get(backend(structure.model), attr.attr, mapped_vi)
 end
 function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentConstraintAttribute, ci::CI)
     n = num_scenarios(structure, attr.stage)
@@ -114,9 +110,9 @@ function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttr
         dep_obj = copy(value)
         obj_sense = objective_sense(structure.model)
         # Update first-stage objective
-        structure.sub_objectives[1][1] = (obj_sense, value)
+        set_stage_objective!(structure.decisions, 1, 1, obj_sense, value)
         # Update main objective
-        for (i, sub_objective) in enumerate(structure.sub_objectives[2])
+        for (i, sub_objective) in enumerate(structure.decisions.stage_objectives[2])
             (sense, func) = sub_objective
             if obj_sense == sense
                 dep_obj += probability(structure, 2, i) * func
@@ -127,12 +123,12 @@ function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttr
         MOI.set(backend(structure.model), attr, dep_obj)
     elseif attr isa MOI.ObjectiveSense
         # Get full objective+sense
-        prev_sense, dep_obj = structure.sub_objectives[1][1]
+        prev_sense, dep_obj = get_stage_objective(structure.decisions, 1, 1)
         # Update first-stage objective
-        structure.sub_objectives[1][1] = (value, dep_obj)
+        set_stage_objective!(structure.decisions, 1, 1, value, dep_obj)
         # Update main objective (if necessary)
         if value != prev_sense
-            for (i, sub_objective) in enumerate(structure.sub_objectives[2])
+            for (i, sub_objective) in enumerate(structure.decisions.stage_objectives[2])
                 (sense, func) = sub_objective
                 if value == sense
                     dep_obj += probability(structure, 2, i) * func
@@ -149,48 +145,56 @@ function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractModelAttr
     end
     return nothing
 end
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute,
+                 index::MOI.VariableIndex, value)
+    MOI.set(backend(structure.model), attr, index, value)
+    return nothing
+end
+function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute,
+                 ci::MOI.ConstraintIndex, value)
+    con_ref = ConstraintRef(structure.model, mapped_ci)
+    MOI.set(structure.model, attr.attr, con_ref, value)
+    return nothing
+end
 function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentModelAttribute, value)
     if attr.attr isa MOI.ObjectiveFunction
         # Get full objective+sense
         obj_sense = objective_sense(structure.model)
         dep_obj = objective_function(structure.model)
         # Update subobjective
-        (sub_sense, prev_func) = structure.sub_objectives[attr.stage][attr.scenario_index]
-        structure.sub_objectives[attr.stage][attr.scenario_index] = (sub_sense, value)
-        prev_sub_obj = jump_function(structure.model, prev_func)
+        (sub_sense, prev_func) = get_stage_objective(structure.model, attr.stage, attr.scenario_index)
+        set_stage_objective!(structure.decisions, attr.stage, attr.scenario_index, sub_sense, value)
         sub_obj = jump_function(structure.model, value)
         # Update main objective
         if obj_sense == sub_sense
-            dep_obj += probability(structure, attr.stage, attr.scenario_index) * (sub_obj - prev_sub_obj)
+            dep_obj += probability(structure, attr.stage, attr.scenario_index) * (sub_obj - prev_func)
         else
-            dep_obj -= probability(structure, attr.stage, attr.scenario_index) * (sub_obj - prev_sub_obj)
+            dep_obj -= probability(structure, attr.stage, attr.scenario_index) * (sub_obj - prev_func)
         end
-        MOI.set(backend(structure.model), attr.attr, moi_function(dep_obj))
+        set_objective_function(structure.model, dep_obj)
     elseif attr.attr isa MOI.ObjectiveSense
+        # Get current
+        (prev_sense, func) = get_stage_objective(structure.model, attr.stage, attr.scenario_index)
+        if value == prev_sense
+            # Nothing to do
+            return nothing
+        end
         # Get full objective+sense
         obj_sense = objective_sense(structure.model)
-        dep_obj = moi_function(objective_function(structure.model))
+        dep_obj = objective_function(structure.model)
         # Update subobjective sense
-        (prev_sense, func) = structure.sub_objectives[attr.stage][attr.scenario_index]
-        structure.sub_objectives[attr.stage][attr.scenario_index] = (value, func)
-        # Update main objective (if necessary)
-        if value != prev_sense
-            if value == obj_sense
-                dep_obj += 2 * probability(structure, attr.stage, attr.scenario_index) * func
-            else
-                dep_obj -= 2 * probability(structure, attr.stage, attr.scenario_index) * func
-            end
-            MOI.set(backend(structure.model), MOI.ObjectiveFunction{typeof(dep_obj)}(), dep_obj)
+        set_stage_objective!(structure.decisions, attr.stage, attr.scenario_index, value, moi_function(func))
+        # Update main objective
+        if value == obj_sense
+            dep_obj += 2 * probability(structure, attr.stage, attr.scenario_index) * func
+        else
+            dep_obj -= 2 * probability(structure, attr.stage, attr.scenario_index) * func
         end
+        set_objective_function(structure.model, dep_obj)
     else
         # Most attributes are shared with the deterministic equivalent
         MOI.set(backend(structure.model), attr.attr, value)
     end
-    return nothing
-end
-function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractVariableAttribute,
-                 index::MOI.VariableIndex, value)
-    MOI.set(backend(structure.model), attr, index, value)
     return nothing
 end
 function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentVariableAttribute,
@@ -199,12 +203,6 @@ function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentVari
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, index, attr.scenario_index)
     MOI.set(backend(structure.model), attr.attr, mapped_vi, value)
-    return nothing
-end
-function MOI.set(structure::DeterministicEquivalent, attr::MOI.AbstractConstraintAttribute,
-                 ci::MOI.ConstraintIndex, value)
-    con_ref = ConstraintRef(structure.model, mapped_ci)
-    MOI.set(structure.model, attr.attr, con_ref, value)
     return nothing
 end
 function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentConstraintAttribute,
@@ -390,12 +388,11 @@ end
 
 function JuMP.set_objective_sense(structure::DeterministicEquivalent, stage::Integer, sense::MOI.OptimizationSense)
     if stage == 1
-        # Changes the first-stage sense modifies the whole objective as usual
+        # Changing the first-stage sense modifies the whole objective as usual
         MOI.set(structure, MOI.ObjectiveSense(), sense)
     else
         # Every sub-objective in the given stage should be changed
         for scenario_index in 1:num_scenarios(structure, stage)
-            # Use temporary model to apply modification
             attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.ObjectiveSense())
             MOI.set(structure, attr, sense)
         end
@@ -425,7 +422,7 @@ function JuMP.objective_function(structure::DeterministicEquivalent, FunType::Ty
 end
 function JuMP.objective_function(structure::DeterministicEquivalent, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
     if stage == 1
-        obj::FunType = jump_function(structure.model, structure.sub_objectives[stage][1][2])
+        (sense, obj::FunType) = get_stage_objective(structure.model, 1)
         return obj
     else
         return objective_function(structure.proxy, FunType)
@@ -477,9 +474,10 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
     var_stage <= stage || error("Can only modify coefficient in current stage of decision or subsequent stages from where decision is taken.")
     if var_stage == 1 && stage == 1
         # Use temporary model to apply modification
-        obj = structure.sub_objectives[1][1][2]
+        obj = get_stage_objective(structure.model, 1)[2]
+        moi_obj = moi_function(obj)
         m = Model()
-        MOI.set(backend(m), MOI.ObjectiveFunction{typeof(obj)}(), obj)
+        MOI.set(backend(m), MOI.ObjectiveFunction{typeof(moi_obj)}(), moi_obj)
         dref = DecisionRef(m, index)
         set_objective_coefficient(m, dref, coeff)
         obj = objective_function(m)
@@ -489,10 +487,10 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
     elseif (var_stage == 1 && stage > 1) || var_stage > 1
         for scenario_index in 1:num_scenarios(structure, stage)
             # Use temporary model to apply modification
-            obj = structure.sub_objectives[stage][scenario_index][2]
+            obj = get_stage_objective(structure.model, stage, scenario_index)[2]
+            moi_obj = moi_function(obj)
             m = Model()
-            F = moi_function_type(typeof(obj))
-            MOI.set(backend(m), MOI.ObjectiveFunction{F}(), obj)
+            MOI.set(backend(m), MOI.ObjectiveFunction{typeof(moi_obj)}(), moi_obj)
             dref = DecisionRef(m, index)
             set_objective_coefficient(m, dref, coeff)
             obj = objective_function(m)
@@ -509,9 +507,10 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     if var_stage == 1
         # Use temporary model to apply modification
-        obj = structure.sub_objectives[stage][scenario_index][2]
+        obj = get_stage_objective(structure.model, stage, scenario_index)[2]
+        moi_obj = moi_function(obj)
         m = Model()
-        MOI.set(backend(m), MOI.ObjectiveFunction{typeof(obj)}(), obj)
+        MOI.set(backend(m), MOI.ObjectiveFunction{typeof(moi_obj)}(), moi_obj)
         dref = DecisionRef(m, index)
         set_objective_coefficient(m, dref, coeff)
         obj = objective_function(m)
@@ -520,15 +519,15 @@ function JuMP.set_objective_coefficient(structure::DeterministicEquivalent{N}, i
         MOI.set(structure, attr, moi_function(obj))
     else
         # Use temporary model to apply modification
-        sense, obj = structure.sub_objectives[stage][scenario_index]
+        sense, obj = get_stage_objective(structure.model, stage, scenario_index)
+        moi_obj = moi_function(obj)
         m = Model()
-        F = typeof(obj)
-        MOI.set(backend(m), MOI.ObjectiveFunction{F}(), obj)
+        MOI.set(backend(m), MOI.ObjectiveFunction{typeof(moi_obj)}(), moi_obj)
         mapped_vi = mapped_index(structure, index, scenario_index)
         dref = DecisionRef(m, mapped_vi)
         set_objective_coefficient(m, dref, coeff)
         obj = objective_function(m)
-        structure.sub_objectives[stage][scenario_index] = (sense, moi_function(obj))
+        set_stage_objective!(structure.decisions, stage, scenario_index, sense, moi_function(obj))
         # Set coefficient of mapped second-stage variable
         dref = DecisionRef(structure.model, mapped_vi)
         set_objective_coefficient(structure.model, dref, probability(structure, stage, scenario_index) * coeff)

@@ -44,7 +44,7 @@ function statistically_evaluate_decision(structure::DeterministicEquivalent{2}, 
     N = num_scenarios(structure)
     Q = Vector{Float64}(undef, N)
     obj_sense = objective_sense(structure.model)
-    for (i, sub_objective) in enumerate(structure.sub_objectives[2])
+    for (i, sub_objective) in enumerate(structure.decisions.stage_objectives[2])
         (sub_sense, sub_obj) = sub_objective
         Qᵢ = MOIU.eval_variables(sub_obj) do idx
             return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)

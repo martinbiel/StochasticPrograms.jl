@@ -250,6 +250,10 @@ macro stage(stage, args)
         @q begin
             $(esc(sp)).generator[:stage_1] = ($(esc(model_name))::JuMP.Model, $(esc(:stage))) -> begin
                 $(esc(def))
+                # Cache sense and objective function
+                sense = objective_sense($(esc(model_name)))
+                obj = moi_function(objective_function($(esc(model_name))))
+                add_stage_objective!($(esc(model_name)), 1, sense, obj)
 	            return $(esc(model_name))
             end
         end
@@ -257,6 +261,10 @@ macro stage(stage, args)
         @q begin
             $(esc(sp)).generator[Symbol(:stage_,$stage)] = ($(esc(model_name))::JuMP.Model, $(esc(:stage)), $(esc(:scenario))::AbstractScenario) -> begin
                 $(esc(def))
+                # Cache sense and objective function
+                sense = objective_sense($(esc(model_name)))
+                obj = moi_function(objective_function($(esc(model_name))))
+                add_stage_objective!($(esc(model_name)), $stage, sense, obj)
 	            return $(esc(model_name))
             end
         end
@@ -276,6 +284,7 @@ macro stage(stage, args)
         end
         # Stage model generation code
         $generatordefs
+        # Return stochastic program
         $(esc(sp))
     end
     # Return code

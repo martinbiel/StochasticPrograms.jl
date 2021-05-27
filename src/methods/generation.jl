@@ -35,7 +35,7 @@ function stage_one_model(stochasticprogram::StochasticProgram; optimizer = nothi
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     model = optimizer == nothing ? Model() : Model(optimizer)
     # Prepare decisions
-    model.ext[:decisions] = Decisions(Val{1}())
+    model.ext[:decisions] = Decisions(Val{1}(); is_node = true)
     add_decision_bridges!(model)
     # Generate and cache first-stage model
     generator(stochasticprogram, :stage_1)(model, stage_parameters(stochasticprogram, 1))
@@ -61,7 +61,7 @@ function stage_model(stochasticprogram::StochasticProgram{N},
     # Create stage model
     stage_model = optimizer == nothing ? Model() : Model(optimizer)
     # Prepare decisions
-    stage_model.ext[:decisions] = Decisions(stage)
+    stage_model.ext[:decisions] = Decisions(stage; is_node = true)
     add_decision_bridges!(stage_model)
     # Generate and return the stage model
     generator(stochasticprogram, decision_key)(stage_model, decision_params)
@@ -78,7 +78,7 @@ end
 
 function generate_proxy!(stochasticprogram::StochasticProgram{N}) where N
     # First-stage decisions are unique (reuse)
-    proxy(stochasticprogram, 1).ext[:decisions] = Decisions((stochasticprogram.decisions[1],))
+    proxy(stochasticprogram, 1).ext[:decisions] = Decisions((stochasticprogram.decisions[1],); is_node = true)
     # Generate first stage
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
     generator(stochasticprogram, :stage_1)(proxy(stochasticprogram, 1), stage_parameters(stochasticprogram, 1))
@@ -156,7 +156,7 @@ function _outcome_model!(outcome_model::JuMP.Model,
                          decisions::AbstractVector,
                          scenario::AbstractScenario)
     # Prepare decisions
-    outcome_model.ext[:decisions] = Decisions(Val{2}())
+    outcome_model.ext[:decisions] = Decisions(Val{2}(); is_node = true)
     add_decision_bridges!(outcome_model)
     # Generate the outcome model
     decision_generator(outcome_model, decision_params)
