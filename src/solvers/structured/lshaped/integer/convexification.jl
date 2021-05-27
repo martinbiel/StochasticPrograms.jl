@@ -92,6 +92,7 @@ function restore!(model::MOI.ModelLike, worker::ConvexificationWorker)
     end
     # Restore integral restrictions
     worker.data.unrelax()
+    worker.data.unrelax = () -> nothing
     return nothing
 end
 
