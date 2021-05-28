@@ -1,6 +1,54 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.6.1 (May 28, 2021)
+-----------------------------
+
+Apart from bugfixes, v0.6.1 introduces the following new features:
+
+### New features
+
+- `@stochastic_model` now allows the following syntax:
+```julia
+@stochastic_model simple begin
+    @stage 1 begin
+        @decision(simple, x₁ >= 40)
+        @decision(simple, x₂ >= 20)
+        @objective(simple, Min, 100*x₁ + 150*x₂)
+        @constraint(simple, x₁ + x₂ <= 120)
+    end
+    @stage 2 begin
+        @uncertain q₁ q₂ d₁ d₂
+        @recourse(simple, 0 <= y₁ <= d₁)
+        @recourse(simple, 0 <= y₂ <= d₂)
+        @objective(simple, Max, q₁*y₁ + q₂*y₂)
+        @constraint(simple, 6*y₁ + 10*y₂ <= 60*x₁)
+        @constraint(simple, 8*y₁ + 5*y₂ <= 80*x₂)
+    end
+end
+```
+where the resuling model object is stored in `simple`. Note that the old restriction to use the reserved keyword `model` to refer to the inner JuMP model in the `@stage` blocks is removed. Instead the name should now match the name `simple` given as the first argument to `@stochastic_model`. The previous anonymous syntax is kept to avoid breaking:
+```julia
+simple = @stochastic_model begin
+    @stage 1 begin
+        @decision(model, x₁ >= 40)
+        @decision(model, x₂ >= 20)
+        @objective(model, Min, 100*x₁ + 150*x₂)
+        @constraint(model, x₁ + x₂ <= 120)
+    end
+    @stage 2 begin
+        @uncertain q₁ q₂ d₁ d₂
+        @recourse(model, 0 <= y₁ <= d₁)
+        @recourse(model, 0 <= y₂ <= d₂)
+        @objective(model, Max, q₁*y₁ + q₂*y₂)
+        @constraint(model, 6*y₁ + 10*y₂ <= 60*x₁)
+        @constraint(model, 8*y₁ + 5*y₂ <= 80*x₂)
+    end
+end
+```
+where `model` must still be used to refer to the JuMP model. Regardless of syntax used, the model name is now properly checked and enforced in the `@stage` blocks. If there are any typoes or discrepancies with the required name an error message with the relevant line number will be thrown .
+- Improved error messages in creation macros. Now include line numbers and more information about what went wrong.
+
 Version 0.6.0 (May 12, 2021)
 -----------------------------
 
