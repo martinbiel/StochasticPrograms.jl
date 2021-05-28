@@ -1,3 +1,5 @@
+# Deterministic equivalent evaluation #
+# =================================== #
 function evaluate_decision(structure::DeterministicEquivalent{2}, decision::AbstractVector)
     # Update decisions (checks handled by structure model)
     take_decisions!(structure.model, all_decision_variables(structure.model, 1), decision)

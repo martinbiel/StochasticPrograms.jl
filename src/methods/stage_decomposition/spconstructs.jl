@@ -1,5 +1,7 @@
+# Stage-decomposition spconstructs #
+# ================================ #
 function EWS(stochasticprogram::StochasticProgram,
-             structure::VerticalStructure{2,1,Tuple{SP}}) where SP <: DistributedScenarioProblems
+             structure::StageDecompositionStructure{2,1,Tuple{SP}}) where SP <: DistributedScenarioProblems
     partial_ews = Vector{Float64}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())
@@ -32,7 +34,7 @@ function EWS(stochasticprogram::StochasticProgram,
 end
 
 function statistical_EWS(stochasticprogram::StochasticProgram,
-                         structure::VerticalStructure{2,1,Tuple{SP}}) where SP <: DistributedScenarioProblems
+                         structure::StageDecompositionStructure{2,1,Tuple{SP}}) where SP <: DistributedScenarioProblems
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())
     @sync begin
         for (i,w) in enumerate(workers())

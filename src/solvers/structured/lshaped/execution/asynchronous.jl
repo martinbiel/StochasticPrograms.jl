@@ -32,7 +32,7 @@ struct AsynchronousExecution{T <: AbstractFloat,
     max_active::Int
     κ::T
 
-    function AsynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+    function AsynchronousExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                    max_active::Int, κ::T,
                                    feasibility_strategy::AbstractFeasibilityStrategy,
                                    integer_strategy::AbstractIntegerStrategy,
@@ -360,7 +360,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Asynchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+function (execution::Asynchronous)(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                    feasibility_strategy::AbstractFeasibilityStrategy,
                                    integer_strategy::AbstractIntegerStrategy,
                                    ::Type{T},

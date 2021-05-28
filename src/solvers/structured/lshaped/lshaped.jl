@@ -12,7 +12,7 @@ using JuMP
 using MathOptInterface
 using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
-using StochasticPrograms: UnspecifiedInstantiation, VerticalStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
+using StochasticPrograms: UnspecifiedInstantiation, StageDecompositionStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
 using StochasticPrograms: AbstractExecution, Serial, Synchronous, Asynchronous
 using StochasticPrograms: AbstractStructuredOptimizer, set_master_optimizer!, set_subproblem_optimizer!
 using StochasticPrograms: DecisionMap, all_decisions, set_decision!, set_stage!, SingleDecisionSet, NoSpecifiedConstraint

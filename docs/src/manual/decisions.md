@@ -80,7 +80,7 @@ println("y has lower bound in scenario 2: $(has_lower_bound(y, 2))")
 println("y has upper bound in scenario 2: $(has_upper_bound(y, 2))")
 println("lower_bound(y, 2) = $(lower_bound(y, 2))")
 ```
-The lower bound of ``y`` is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a [`Vertical`](@ref) or [`Horizontal`](@ref) structure. Auxiliary variables created with the standard `@variable` are not available through this API. To access them, either annotate them with [`@decision`](@ref) (or [`@recourse`](@ref) in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:
+The lower bound of ``y`` is as expected different in the two scenarios. Some attributes, such as the variable name, are structure dependent and may vary in a [`StageDecomposition`](@ref) or [`ScenarioDecomposition`](@ref) structure. Auxiliary variables created with the standard `@variable` are not available through this API. To access them, either annotate them with [`@decision`](@ref) (or [`@recourse`](@ref) in the final stage), or access the relevant JuMP subproblem and query the variable as usual. For example:
 ```@example decision
 w = DEP(sp)[:w]
 println(w)
@@ -134,7 +134,7 @@ println("Objective in stage 2, scenario 1: $(objective_function(sp, 2, 1))")
 println("Full objective: $(objective_function(sp))")
 set_objective_coefficient(sp, y, 2, 1, 1.);
 ```
-The stochastic program objective is structure dependent and will appear different if the stochastic program is instantiated with [`Vertical`](@ref) or [`Horizontal`](@ref) instead.
+The stochastic program objective is structure dependent and will appear different if the stochastic program is instead instantiated with [`StageDecomposition`](@ref) or [`ScenarioDecomposition`](@ref).
 
 ## Solved problem
 
@@ -177,9 +177,9 @@ This not only fixes ``x`` in the first-stage, but also in all occurances in subs
 ```@example decision
 print(sp)
 ```
-This is more apparent in a vertical structure:
+This is more apparent in a stage-decomposition structure:
 ```@example decision
-vertical_sp = StochasticProgram([ξ₁,ξ₂], Vertical())
+vertical_sp = StochasticProgram([ξ₁,ξ₂], StageDecomposition())
 @first_stage vertical_sp = begin
     @decision(vertical_sp, x >= 2)
     @variable(vertical_sp, w)

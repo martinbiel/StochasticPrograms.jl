@@ -10,13 +10,13 @@ StochasticPrograms provides multiple alternatives for how finite stochastic prog
 
 The [`DeterministicEquivalent`](@ref), instantiated using [`Deterministic`](@ref), is the default structure in StochasticPrograms. A stochastic program instance is represented by one large optimization problem that considers all scenarios at once. This structure is supported by any standard third-party `MathOptInterface` solver. Moreover, it is the most efficient choice for smaller problem sizes.
 
-### Vertical block-decomposition
+### Stage-decomposition
 
-The [`VerticalStructure`](@ref), instantiated using [`Vertical`](@ref), decomposes the stochastic program into stages. It is the structure induced by the L-shaped algorithm and is efficient for larger instances. It is especially efficient for decision evaluation problem, such as when calculating [`VSS`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed vertical structure is instantiated using [`DistributedVertical`](@ref).
+The [`StageDecompositionStructure`](@ref), instantiated using [`StageDecomposition`](@ref) or [`Vertical`](@ref), decomposes the stochastic program into stages. It is the structure induced by the L-shaped and quasi-gradient algorithms and is more efficient for larger instances. It is especially efficient for decision evaluation problems, such as when calculating [`VSS`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed stage-decomposition structure is instantiated using either [`DistributedStageDecomposition`](@ref) or [`DistributedVertical`](@ref).
 
-### Horizontal block-decomposition
+### Scenario-decomposition
 
-The [`HorizontalStructure`](@ref), instantiated using [`Horizontal`](@ref), decomposes the stochastic program by scenarios. It is the structure induced by the progressive-hedging algorithm and is efficient for larger instances. It is especially efficient for solving wait-and-see type problems, such as when calculating [`EVPI`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed vertical structure is instantiated using [`DistributedVertical`](@ref).
+The [`ScenarioDecompositionStructure`](@ref), instantiated using [`ScenarioDecomposition`](@ref) or [`Horizontal`](@ref), decomposes the stochastic program by scenarios. It is the structure induced by the progressive-hedging algorithm and is more efficient for larger instances. It is especially efficient for solving wait-and-see type problems, such as when calculating [`EVPI`](@ref). In a distributed environment, the subproblems in later stages can be distributed on worker nodes. This distributed scenario-decomposition structure is instantiated using either [`DistributedScenarioDecomposition`](@ref) or [`DistributedHorizontal`](@ref).
 
 ## Solver interface
 

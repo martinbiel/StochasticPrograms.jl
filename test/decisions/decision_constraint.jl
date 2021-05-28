@@ -515,8 +515,8 @@ end
 function runtests()
     @testset "DecisionConstraint" begin
         for structure in [(Deterministic(),),
-                          (Vertical(),),
-                          (Horizontal(),),
+                          (StageDecomposition(),),
+                          (ScenarioDecomposition(),),
                           (Deterministic(), () -> MOIU.MockOptimizer(MOIU.Model{Float64}()))]
             @testset "$(structure)" begin
                 for name in names(@__MODULE__; all = true)
@@ -535,9 +535,8 @@ end
 
 function run_dtests()
     @testset "DecisionConstraint" begin
-        for structure in [(DistributedVertical(),), (DistributedHorizontal(),)]
-            name = length(structure) == 1 ? "$(structure[1])" : "$(structure[1]) with decision bridges"
-            @testset "$name" begin
+        for structure in [(DistributedStageDecomposition(),), (DistributedScenarioDecomposition(),)]
+            @testset "$(structure)" begin
                 for name in names(@__MODULE__; all = true)
                     if !startswith("$(name)", "test_")
                         continue

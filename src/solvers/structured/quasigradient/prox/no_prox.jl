@@ -29,7 +29,7 @@ Factory object for [`NoProximal`](@ref). Passed by default to `prox` in `QuasiGr
 """
 struct NoProx <: AbstractProx end
 
-function (::NoProx)(::VerticalStructure, ::AbstractVector, ::Type{T}) where T <: AbstractFloat
+function (::NoProx)(::StageDecompositionStructure, ::AbstractVector, ::Type{T}) where T <: AbstractFloat
     return NoProximal()
 end
 

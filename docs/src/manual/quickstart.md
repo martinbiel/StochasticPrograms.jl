@@ -161,7 +161,7 @@ Alternatively, we can solve the problem with a structure-exploiting solver. The 
 ```@example simple
 sp_lshaped = instantiate(simple_model, [ξ₁, ξ₂], optimizer = LShaped.Optimizer)
 ```
-It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program in a vertical block form that decomposes the problem into stages:
+It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program according to a stage-decomposition structure:
 ```@example simple
 print(sp_lshaped)
 ```
@@ -201,12 +201,12 @@ Likewise, we can solve the problem with progressive-hedging. Consider:
 ```julia
 sp_progressivehedging = instantiate(simple_model, [ξ₁, ξ₂], optimizer = ProgressiveHedging.Optimizer)
 ```
-Now, the induced structure is the horizontal structure that decomposes the stochastic program completely into subproblems over the scenarios. Consider the printout:
+Now, the induced structure is the scenario-decomposition that decomposes the stochastic program completely into subproblems over the scenarios. Consider the printout:
 ```julia
 print(sp_progressivehedging)
 ```
 ```julia
-Horizontal scenario problems
+Scenario problems
 ==============
 Subproblem 1 (p = 0.40):
 Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
@@ -308,7 +308,7 @@ evaluate_decision(sp_progressivehedging, x)
 ```julia
 -470.40000522896185
 ```
-In a vertical structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:
+In a stage-decomposition structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:
 ```@example simple
 print(outcome_model(sp, x, ξ₁))
 ```
@@ -411,7 +411,7 @@ EVPI(sp_progressivehedging)
 ```julia
 663.165763660815
 ```
-We can also compute EWS directly using [`EWS`](@ref). Note, that the horizontal structure is ideal for solving wait-and-see type problems.
+We can also compute EWS directly using [`EWS`](@ref). Note, that the scenario-decomposition structure is ideal for solving wait-and-see type problems.
 
 If the expectation in the original model is instead taken inside the second-stage objective function ``Q``, we obtain the expected-value-problem:
 ```math
@@ -451,7 +451,7 @@ VSS(sp_progressivehedging)
 ```julia
 286.6675823650668
 ```
-We can also compute EEV directly using [`EEV`](@ref). Note, that the vertical structure is ideal for solving VSS type problems.
+We can also compute EEV directly using [`EEV`](@ref). Note, that the stage-decomposition structure is ideal for solving VSS type problems.
 
 ## Infinite sample space
 

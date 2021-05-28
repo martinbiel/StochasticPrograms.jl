@@ -34,7 +34,7 @@ Functor object for the L-shaped algorithm.
 """
 struct LShapedAlgorithm{T <: AbstractFloat,
                         A <: AbstractVector,
-                        ST <: VerticalStructure,
+                        ST <: StageDecompositionStructure,
                         M <: MOI.AbstractOptimizer,
                         E <: AbstractLShapedExecution,
                         F <: AbstractFeasibilityAlgorithm,
@@ -75,7 +75,7 @@ struct LShapedAlgorithm{T <: AbstractFloat,
 
     progress::ProgressThresh{T}
 
-    function LShapedAlgorithm(structure::VerticalStructure,
+    function LShapedAlgorithm(structure::StageDecompositionStructure,
                               x₀::AbstractVector,
                               feasibility_strategy::AbstractFeasibilityStrategy,
                               integer_strategy::AbstractIntegerStrategy,

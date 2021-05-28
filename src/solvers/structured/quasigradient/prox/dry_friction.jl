@@ -78,7 +78,7 @@ mutable struct DryFriction <: AbstractProx
 end
 DryFriction(; prox::AbstractProx = Polyhedron(), kw...) = DryFriction(prox, DryFrictionParameters(; kw...))
 
-function (dryfriction::DryFriction)(structure::VerticalStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
+function (dryfriction::DryFriction)(structure::StageDecompositionStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
     proximal = dryfriction.prox(structure, x₀, T)
     return DryFrictionProximal(proximal, T; type2dict(dryfriction.parameters)...)
 end

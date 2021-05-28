@@ -16,7 +16,7 @@ struct SynchronousExecution{T <: AbstractFloat,
     remote_metadata::Vector{MetaDataChannel}
     cutqueue::CutQueue{T}
 
-    function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+    function SynchronousExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                   feasibility_strategy::AbstractFeasibilityStrategy,
                                   integer_strategy::AbstractIntegerStrategy,
                                   ::Type{T},
@@ -93,7 +93,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+function (execution::Synchronous)(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                   feasibility_strategy::AbstractFeasibilityStrategy,
                                   integer_strategy::AbstractIntegerStrategy,
                                   ::Type{T},

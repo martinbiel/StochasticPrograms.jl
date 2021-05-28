@@ -49,43 +49,43 @@ end
 
 # Interface #
 # ========================== #
-function supports_structure(optimizer::Optimizer, ::HorizontalStructure)
+function supports_structure(optimizer::Optimizer, ::ScenarioDecompositionStructure)
     return true
 end
 
 function default_structure(::UnspecifiedInstantiation, optimizer::Optimizer)
     if optimizer.execution isa Serial && nworkers() == 1
-        return Horizontal()
+        return ScenarioDecomposition()
     else
-        return DistributedHorizontal()
+        return DistributedScenarioDecomposition()
     end
 end
 
-function check_loadable(optimizer::Optimizer, ::HorizontalStructure)
+function check_loadable(optimizer::Optimizer, ::ScenarioDecompositionStructure)
     if optimizer.subproblem_optimizer === nothing
         msg = "Subproblem optimizer not set. Consider setting `SubProblemOptimizer` attribute."
-        throw(UnloadableStructure{Optimizer, HorizontalStructure}(msg))
+        throw(UnloadableStructure{Optimizer, ScenarioDecompositionStructure}(msg))
     end
     return nothing
 end
 
-function ensure_compatible_execution!(optimizer::Optimizer, ::HorizontalStructure{2, 1, <:Tuple{ScenarioProblems}})
+function ensure_compatible_execution!(optimizer::Optimizer, ::ScenarioDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}})
     if !(optimizer.execution isa Serial)
-        @warn "Distributed execution policies are not compatible with a single-core horizontal structure. Switching to `Serial` execution by default."
+        @warn "Distributed execution policies are not compatible with a single-core scenario-decomposition structure. Switching to `Serial` execution by default."
         MOI.set(optimizer, Execution(), Serial())
     end
     return nothing
 end
 
-function ensure_compatible_execution!(optimizer::Optimizer, ::HorizontalStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
+function ensure_compatible_execution!(optimizer::Optimizer, ::ScenarioDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
     if optimizer.execution isa Serial
-        @warn "Serial execution not compatible with distributed horizontal structure. Switching to `Synchronous` execution by default."
+        @warn "Serial execution not compatible with distributed scenario-decomposition structure. Switching to `Synchronous` execution by default."
         MOI.set(optimizer, Execution(), Synchronous())
     end
     return nothing
 end
 
-function load_structure!(optimizer::Optimizer, structure::HorizontalStructure, x₀::AbstractVector)
+function load_structure!(optimizer::Optimizer, structure::ScenarioDecompositionStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
     # Restore structure if optimization has been run before

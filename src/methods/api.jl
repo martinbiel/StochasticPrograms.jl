@@ -449,7 +449,7 @@ end
 """
     objective_value(stochasticmodel::StochasticModel; result::Int = 1)
 
-Returns the value of the recourse problem after a call to `optimize!(stochasticmodel)`.
+Returns a confidence interval around the value of the recourse problem after a call to `optimize!(stochasticmodel)`.
 """
 function JuMP.objective_value(stochasticmodel::StochasticModel; result::Int = 1)
     # Throw NoOptimizer error if no recognized optimizer has been provided

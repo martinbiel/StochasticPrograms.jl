@@ -65,43 +65,43 @@ end
 
 # Interface #
 # ========================== #
-function supports_structure(optimizer::Optimizer, ::VerticalStructure)
+function supports_structure(optimizer::Optimizer, ::StageDecompositionStructure)
     return true
 end
 
 function default_structure(::UnspecifiedInstantiation, optimizer::Optimizer)
     if optimizer.execution isa Serial && nworkers() == 1
-        return Vertical()
+        return StageDecomposition()
     else
-        return DistributedVertical()
+        return DistributedStageDecomposition()
     end
 end
 
-function check_loadable(optimizer::Optimizer, ::VerticalStructure)
+function check_loadable(optimizer::Optimizer, ::StageDecompositionStructure)
     if optimizer.master_optimizer === nothing
         msg = "Master optimizer not set. Consider setting `MasterOptimizer` attribute."
-        throw(UnloadableStructure{Optimizer, VerticalStructure}(msg))
+        throw(UnloadableStructure{Optimizer, StageDecompositionStructure}(msg))
     end
     return nothing
 end
 
-function ensure_compatible_execution!(optimizer::Optimizer, ::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}})
+function ensure_compatible_execution!(optimizer::Optimizer, ::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}})
     if !(optimizer.execution isa Serial)
-        @warn "Distributed execution policies are not compatible with a single-core vertical structure. Switching to `Serial` execution by default."
+        @warn "Distributed execution policies are not compatible with a single-core stage-decomposition structure. Switching to `Serial` execution by default."
         MOI.set(optimizer, Execution(), Serial())
     end
     return nothing
 end
 
-function ensure_compatible_execution!(optimizer::Optimizer, ::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
+function ensure_compatible_execution!(optimizer::Optimizer, ::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}})
     if optimizer.execution isa Serial
-        @warn "Serial execution not compatible with distributed vertical structure. Switching to `Synchronous` execution by default."
+        @warn "Serial execution not compatible with distributed stage-decomposition structure. Switching to `Synchronous` execution by default."
         MOI.set(optimizer, Execution(), Synchronous())
     end
     return nothing
 end
 
-function load_structure!(optimizer::Optimizer, structure::VerticalStructure, x₀::AbstractVector)
+function load_structure!(optimizer::Optimizer, structure::StageDecompositionStructure, x₀::AbstractVector)
     # Sanity check
     check_loadable(optimizer, structure)
     # Restore structure if optimization has been run before

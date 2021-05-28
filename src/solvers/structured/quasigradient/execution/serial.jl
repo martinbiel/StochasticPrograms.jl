@@ -8,13 +8,13 @@ struct SerialExecution{T <: AbstractFloat, S <: AbstractSubProblem{T}} <: Abstra
     subproblems::Vector{S}
     decisions::DecisionMap
 
-    function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}}, x::AbstractVector, subproblems::Unaltered, ::Type{T}) where T <: AbstractFloat
+    function SerialExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}}, x::AbstractVector, subproblems::Unaltered, ::Type{T}) where T <: AbstractFloat
         execution = new{T,SubProblem{T}}(Vector{SubProblem{T}}(), structure.decisions[2])
         initialize_subproblems!(execution, scenarioproblems(structure, 2))
         return execution
     end
 
-    function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}}, x::AbstractVector, subproblems::Smoothed, ::Type{T}) where T <: AbstractFloat
+    function SerialExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}}, x::AbstractVector, subproblems::Smoothed, ::Type{T}) where T <: AbstractFloat
         execution = new{T,SmoothSubProblem{T}}(Vector{SmoothSubProblem{T}}(), structure.decisions[2])
         initialize_subproblems!(execution, scenarioproblems(structure, 2), x; type2dict(subproblems.parameters)...)
         return execution
@@ -111,7 +111,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
+function (execution::Serial)(structure::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}},
                              x::AbstractVector,
                              subproblems::AbstractSubProblemState,
                              ::Type{T}) where T <: AbstractFloat

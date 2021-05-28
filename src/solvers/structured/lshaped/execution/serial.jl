@@ -14,7 +14,7 @@ struct SerialExecution{T <: AbstractFloat,
     model_objectives::A
     metadata::MetaData
 
-    function SerialExecution(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
+    function SerialExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}},
                              feasibility_strategy::AbstractFeasibilityStrategy,
                              integer_strategy::AbstractIntegerStrategy,
                              ::Type{T},
@@ -93,7 +93,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Serial)(structure::VerticalStructure{2, 1, <:Tuple{ScenarioProblems}},
+function (execution::Serial)(structure::StageDecompositionStructure{2, 1, <:Tuple{ScenarioProblems}},
                              feasibility_strategy::AbstractFeasibilityStrategy,
                              integer_strategy::AbstractIntegerStrategy,
                              ::Type{T},

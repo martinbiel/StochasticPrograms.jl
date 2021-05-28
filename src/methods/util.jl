@@ -239,7 +239,7 @@ function attach_mocks!(structure::DeterministicEquivalent)
     return nothing
 end
 
-function attach_mocks!(structure::VerticalStructure)
+function attach_mocks!(structure::StageDecompositionStructure)
     MOIU.attach_optimizer(structure.first_stage)
     for s in subproblems(structure, 2)
         MOIU.attach_optimizer(s)
@@ -247,7 +247,7 @@ function attach_mocks!(structure::VerticalStructure)
     return nothing
 end
 
-function attach_mocks!(structure::HorizontalStructure)
+function attach_mocks!(structure::ScenarioDecompositionStructure)
     return nothing
 end
 

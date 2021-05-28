@@ -26,7 +26,7 @@ Functor object for the quasi-gradient algorithm.
 """
 struct QuasiGradientAlgorithm{T <: AbstractFloat,
                               A <: AbstractVector,
-                              ST <: VerticalStructure,
+                              ST <: StageDecompositionStructure,
                               M <: MOI.AbstractOptimizer,
                               E <: AbstractQuasiGradientExecution,
                               P <: AbstractProximal,
@@ -61,7 +61,7 @@ struct QuasiGradientAlgorithm{T <: AbstractFloat,
 
     progress::Pr
 
-    function QuasiGradientAlgorithm(structure::VerticalStructure,
+    function QuasiGradientAlgorithm(structure::StageDecompositionStructure,
                                     x₀::AbstractVector,
                                     _execution::AbstractExecution,
                                     subproblems::AbstractSubProblemState,

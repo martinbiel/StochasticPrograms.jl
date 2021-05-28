@@ -1,4 +1,6 @@
-function optimize!(structure::VerticalStructure, optimizer::AbstractStructuredOptimizer, x₀::AbstractVector)
+# Stage-decomposition optimization #
+# ================================ #
+function optimize!(structure::StageDecompositionStructure, optimizer::AbstractStructuredOptimizer, x₀::AbstractVector)
     # Sanity checks
     supports_structure(optimizer, structure) || throw(UnsupportedStructure{typeof(optimizer), typeof(structure)}())
     check_loadable(optimizer, structure)
@@ -9,27 +11,27 @@ function optimize!(structure::VerticalStructure, optimizer::AbstractStructuredOp
     return nothing
 end
 
-function set_master_optimizer!(structure::VerticalStructure, optimizer)
+function set_master_optimizer!(structure::StageDecompositionStructure, optimizer)
     set_optimizer(structure.first_stage, optimizer)
     return nothing
 end
 
-function set_master_optimizer_attribute!(structure::VerticalStructure, attr::MOI.AbstractOptimizerAttribute, value)
+function set_master_optimizer_attribute!(structure::StageDecompositionStructure, attr::MOI.AbstractOptimizerAttribute, value)
     MOI.set(backend(structure.first_stage), attr, value)
     return nothing
 end
 
-function set_subproblem_optimizer!(structure::VerticalStructure, optimizer)
+function set_subproblem_optimizer!(structure::StageDecompositionStructure, optimizer)
     set_optimizer!(scenarioproblems(structure), optimizer)
     return nothing
 end
 
-function set_subproblem_optimizer_attribute!(structure::VerticalStructure, attr::MOI.AbstractOptimizerAttribute, value)
+function set_subproblem_optimizer_attribute!(structure::StageDecompositionStructure, attr::MOI.AbstractOptimizerAttribute, value)
     MOI.set(scenarioproblems(structure), attr, value)
     return nothing
 end
 
-function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::VerticalStructure{2}, optimizer::MOI.AbstractOptimizer)
+function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::StageDecompositionStructure{2}, optimizer::MOI.AbstractOptimizer)
     cache = solutioncache(stochasticprogram)
     # Cache main solution
     variables = decision_variables_at_stage(stochasticprogram, 1)

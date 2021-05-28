@@ -27,7 +27,7 @@
             @test isapprox(EEV(sp), res.EEV, rtol = tol)
         end
         @testset "Distributed Sanity Check: $name" begin
-            sp_nondist = copy(sp, instantiation = Vertical())
+            sp_nondist = copy(sp, instantiation = StageDecomposition())
             add_scenarios!(sp_nondist, scenarios(sp))
             set_optimizer(sp_nondist, LShaped.Optimizer)
             set_silent(sp_nondist)

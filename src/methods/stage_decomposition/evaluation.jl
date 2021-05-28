@@ -1,4 +1,6 @@
-function evaluate_decision(structure::VerticalStructure, decision::AbstractVector)
+# Stage-decomposition evaluation #
+# ============================== #
+function evaluate_decision(structure::StageDecompositionStructure, decision::AbstractVector)
     # Evalaute decision stage-wise
     cᵀx = _eval_first_stage(structure, decision)
     𝔼Q = _eval_second_stages(structure, decision, objective_sense(structure.first_stage))
@@ -6,14 +8,14 @@ function evaluate_decision(structure::VerticalStructure, decision::AbstractVecto
     return cᵀx + 𝔼Q
 end
 
-function statistically_evaluate_decision(structure::VerticalStructure, decision::AbstractVector)
+function statistically_evaluate_decision(structure::StageDecompositionStructure, decision::AbstractVector)
     # Evalaute decision stage-wise
     cᵀx = _eval_first_stage(structure, decision)
     𝔼Q, σ² = _stat_eval_second_stages(structure, decision, objective_sense(structure.first_stage))
     return cᵀx + 𝔼Q, sqrt(σ²)
 end
 
-function _eval_first_stage(structure::VerticalStructure, decision::AbstractVector)
+function _eval_first_stage(structure::StageDecompositionStructure, decision::AbstractVector)
     # Update decisions (checks handled by first-stage model)
     take_decisions!(structure.first_stage,
                     all_decision_variables(structure.first_stage, 1),
@@ -39,14 +41,14 @@ function _eval_first_stage(structure::VerticalStructure, decision::AbstractVecto
     return result
 end
 
-function _eval_second_stages(structure::VerticalStructure{2,1,Tuple{SP}},
+function _eval_second_stages(structure::StageDecompositionStructure{2,1,Tuple{SP}},
                              decision::AbstractVector,
                              sense::MOI.OptimizationSense) where SP <: ScenarioProblems
     update_known_decisions!(structure.decisions[2], decision)
     map(subprob -> update_known_decisions!(subprob), subproblems(structure))
     return outcome_mean(subproblems(structure), probability.(scenarios(structure)), sense)
 end
-function _eval_second_stages(structure::VerticalStructure{2,1,Tuple{SP}},
+function _eval_second_stages(structure::StageDecompositionStructure{2,1,Tuple{SP}},
                              decision::AbstractVector,
                              sense::MOI.OptimizationSense) where SP <: DistributedScenarioProblems
     Qs = Vector{Float64}(undef, nworkers())
@@ -73,14 +75,14 @@ function _eval_second_stages(structure::VerticalStructure{2,1,Tuple{SP}},
     return sum(Qs)
 end
 
-function _stat_eval_second_stages(structure::VerticalStructure{2,1,Tuple{SP}},
+function _stat_eval_second_stages(structure::StageDecompositionStructure{2,1,Tuple{SP}},
                                   decision::AbstractVector,
                                   sense::MOI.OptimizationSense) where SP <: ScenarioProblems
     update_known_decisions!(structure.decisions[2], decision)
     map(subprob -> update_known_decisions!(subprob), subproblems(structure))
     return welford(subproblems(structure), probability.(scenarios(structure)), sense)
 end
-function _stat_eval_second_stages(structure::VerticalStructure{2,1,Tuple{SP}},
+function _stat_eval_second_stages(structure::StageDecompositionStructure{2,1,Tuple{SP}},
                                   decision::AbstractVector,
                                   sense::MOI.OptimizationSense) where SP <: DistributedScenarioProblems
     partial_welfords = Vector{Tuple{Float64,Float64,Float64,Int}}(undef, nworkers())

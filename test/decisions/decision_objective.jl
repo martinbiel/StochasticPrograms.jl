@@ -39,7 +39,7 @@ function test_SingleDecision_objective(Structure)
         @test JuMP.isequal_canonical(x + 0.5*y1 + 0.5*y2,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionRef
         @test JuMP.objective_function_type(sp, 2, 2) == DecisionRef
         @test JuMP.objective_function(sp, 2, 1) == y1
@@ -49,7 +49,7 @@ function test_SingleDecision_objective(Structure)
         @test JuMP.objective_function(sp) == x
         @test x == @inferred JuMP.objective_function(sp, DecisionRef)
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionAffExpr{Float64}
@@ -92,7 +92,7 @@ function test_SingleDecision_objective(Structure)
         @test JuMP.isequal_canonical(x + 0.5*y1 + 0.5*y2,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionRef
         @test JuMP.objective_function_type(sp, 2, 2) == DecisionRef
         @test JuMP.objective_function(sp, 2, 1) == y1
@@ -102,7 +102,7 @@ function test_SingleDecision_objective(Structure)
         @test JuMP.objective_function(sp) == x
         @test x == @inferred JuMP.objective_function(sp, DecisionRef)
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.objective_function_type(sp, 2, 1) == DecisionAffExpr{Float64}
@@ -157,7 +157,7 @@ function test_DecisionAffExpr_objective(Structure)
         @test JuMP.isequal_canonical(2x + y1 + 2y2,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4y2)
         @test JuMP.isequal_canonical(
@@ -168,7 +168,7 @@ function test_DecisionAffExpr_objective(Structure)
         @test JuMP.isequal_canonical(2x,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x1 + 2y1)
@@ -217,7 +217,7 @@ function test_DecisionAffExpr_objective(Structure)
         @test JuMP.isequal_canonical(8x + 2y1 + 2y2 + 3,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 3x + 4y1 + 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 5x + 4y2 + 2)
@@ -230,7 +230,7 @@ function test_DecisionAffExpr_objective(Structure)
         @test JuMP.isequal_canonical(4x + 1,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 7x1 + 4y1 + 3)
@@ -286,7 +286,7 @@ function test_DecisionQuadExpr_objective(Structure)
         @test JuMP.isequal_canonical(2x^2 + 4x + 0.5*y1^2 + y1 + 0.5*y2^2 + 2y2,
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), y1^2 + 2y1 + x^2 + 2x)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), y2^2 + 4y2 + x^2 + 2x)
@@ -299,7 +299,7 @@ function test_DecisionQuadExpr_objective(Structure)
         @test JuMP.isequal_canonical(x^2 + 2x,
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 2x1^2 + 4x1 + y1^2 + 2y1)
@@ -353,7 +353,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(7x + 2y1 + 2y2,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4y2)
         JuMP.set_objective_coefficient(sp, x, 2, 1, 2.0)
@@ -366,7 +366,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(4x,
                                      @inferred JuMP.objective_function(sp, DecisionAffExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x = DecisionRef(sp[1,:x], 2, 1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), 4x + 4y1)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 2), 4x + 4y2)
@@ -415,7 +415,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(2x^2 + 7x + 0.5*y1^2 + 2y1 + 0.5*y2^2 + 2y2,
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         x = DecisionRef(x, 2, 1)
         y1 = DecisionRef(y, 1)
         y2 = DecisionRef(y, 2)
@@ -432,7 +432,7 @@ function test_decision_objective_coefficient_modifiction(Structure)
         @test JuMP.isequal_canonical(x^2 + 4x,
                                      @inferred JuMP.objective_function(sp, DecisionQuadExpr{Float64}))
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x = DecisionRef(x, 2, 1)
         y1 = DecisionRef(y, 1)
         y2 = DecisionRef(y, 2)
@@ -511,7 +511,7 @@ function test_decision_objective_sense_modification(Structure)
         @test MOI.MAX_SENSE == @inferred JuMP.objective_sense(sp, 2, 2)
         @test JuMP.isequal_canonical(x + 0.5*y1 - 0.5*y2, JuMP.objective_function(sp))
     end
-    if sp.structure isa StochasticPrograms.VerticalStructure
+    if sp.structure isa StochasticPrograms.StageDecompositionStructure
         @test JuMP.objective_function(sp) == x
         @test JuMP.objective_function(sp, 1) == x
         @test JuMP.objective_function(sp, 2, 1) == y1
@@ -553,7 +553,7 @@ function test_decision_objective_sense_modification(Structure)
         @test JuMP.objective_function(sp, 2, 1) == y1
         @test JuMP.objective_function(sp, 2, 2) == y2
     end
-    if sp.structure isa StochasticPrograms.HorizontalStructure
+    if sp.structure isa StochasticPrograms.ScenarioDecompositionStructure
         x1 = DecisionRef(sp[1,:x], 2, 1)
         x2 = DecisionRef(sp[1,:x], 2, 2)
         @test JuMP.isequal_canonical(JuMP.objective_function(sp, 2, 1), x1 + y1)
@@ -596,8 +596,8 @@ end
 function runtests()
     @testset "DecisionObjective" begin
         for structure in [(Deterministic(),),
-                          (Vertical(),),
-                          (Horizontal(),),
+                          (StageDecomposition(),),
+                          (ScenarioDecomposition(),),
                           (Deterministic(), () -> MOIU.MockOptimizer(MOIU.Model{Float64}()))]
             name = length(structure) == 1 ? "$(structure[1])" : "$(structure[1]) with decision bridges"
             @testset "$name" begin
@@ -617,7 +617,7 @@ end
 
 function run_dtests()
     @testset "DecisionObjective" begin
-        for structure in [(DistributedVertical(),), (DistributedHorizontal(),)]
+        for structure in [(DistributedStageDecomposition(),), (DistributedScenarioDecomposition(),)]
             @testset "$(structure[1])" begin
                 for name in names(@__MODULE__; all = true)
                     if !startswith("$(name)", "test_")

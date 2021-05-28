@@ -28,7 +28,7 @@ Functor object for the progressive-hedging algorithm. Create using the `Progress
 """
 struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
                                    A <: AbstractVector,
-                                   ST <: HorizontalStructure,
+                                   ST <: ScenarioDecompositionStructure,
                                    E <: AbstractProgressiveHedgingExecution,
                                    P <: AbstractPenalization,
                                    PT <: AbstractPenaltyTerm} <: AbstractProgressiveHedging
@@ -51,7 +51,7 @@ struct ProgressiveHedgingAlgorithm{T <: AbstractFloat,
     # Params
     progress::ProgressThresh{T}
 
-    function ProgressiveHedgingAlgorithm(structure::HorizontalStructure,
+    function ProgressiveHedgingAlgorithm(structure::ScenarioDecompositionStructure,
                                          x₀::AbstractVector,
                                          executer::AbstractExecution,
                                          penalizer::AbstractPenalizer,

@@ -10,7 +10,7 @@ function DeterministicOptimizer()
     return mockoptimizer, mockoptimizer, mockoptimizer
 end
 
-function VerticalOptimizer()
+function StageDecompositionOptimizer()
     master = MOIU.MockOptimizer(
         MOIU.Model{Float64}(), eval_objective_value = false, eval_dual_objective_value = false, eval_variable_constraint_dual = false
     )
@@ -23,7 +23,7 @@ function VerticalOptimizer()
     return opt, master, sub
 end
 
-function HorizontalOptimizer()
+function ScenarioDecompositionOptimizer()
     sub = MOIU.MockOptimizer(
         MOIU.Model{Float64}(), eval_objective_value = false, eval_variable_constraint_dual = false
     )
@@ -180,8 +180,8 @@ end
 function runtests()
     @testset "Solve" begin
         for config in [(Deterministic(), DeterministicOptimizer()),
-                       (Vertical(), VerticalOptimizer()),
-                       (Horizontal(), HorizontalOptimizer())]
+                       (StageDecomposition(), StageDecompositionOptimizer()),
+                       (ScenarioDecomposition(), ScenarioDecompositionOptimizer())]
             @testset "$(config[1])" begin
                 for name in names(@__MODULE__; all = true)
                     if !startswith("$(name)", "test_")

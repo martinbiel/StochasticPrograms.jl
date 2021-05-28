@@ -37,8 +37,8 @@ Pages   = ["stochasticstructure.jl"]
 ```
 ```@docs
 DeterministicEquivalent
-VerticalStructure
-HorizontalStructure
+StageDecompositionStructure
+ScenarioDecompositionStructure
 ```
 
 ## Decisions

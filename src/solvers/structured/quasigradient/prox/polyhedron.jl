@@ -89,7 +89,7 @@ mutable struct Polyhedron <: AbstractProx
 end
 Polyhedron(; penaltyterm = Quadratic()) = Polyhedron(penaltyterm)
 
-function (polyhedron::Polyhedron)(structure::VerticalStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
+function (polyhedron::Polyhedron)(structure::StageDecompositionStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
     return PolyhedronProjection(polyhedron.penaltyterm, x₀, T)
 end
 

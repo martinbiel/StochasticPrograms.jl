@@ -1,4 +1,6 @@
-function optimize!(structure::HorizontalStructure, optimizer::AbstractStructuredOptimizer, x₀::AbstractVector)
+# Scenario-decomposition optimization #
+# =================================== #
+function optimize!(structure::ScenarioDecompositionStructure, optimizer::AbstractStructuredOptimizer, x₀::AbstractVector)
     # Sanity check
     supports_structure(optimizer, structure) || throw(UnsupportedStructure{typeof(optimizer), typeof(structure)}())
     # Load structure
@@ -8,25 +10,25 @@ function optimize!(structure::HorizontalStructure, optimizer::AbstractStructured
     return nothing
 end
 
-function set_master_optimizer!(structure::HorizontalStructure, optimizer)
+function set_master_optimizer!(structure::ScenarioDecompositionStructure, optimizer)
     return nothing
 end
 
-function set_master_optimizer_attribute!(::HorizontalStructure, ::MOI.AbstractOptimizerAttribute, value)
+function set_master_optimizer_attribute!(::ScenarioDecompositionStructure, ::MOI.AbstractOptimizerAttribute, value)
     return nothing
 end
 
-function set_subproblem_optimizer!(structure::HorizontalStructure, optimizer)
+function set_subproblem_optimizer!(structure::ScenarioDecompositionStructure, optimizer)
     set_optimizer!(scenarioproblems(structure), optimizer)
     return nothing
 end
 
-function set_subproblem_optimizer_attribute!(structure::HorizontalStructure, attr::MOI.AbstractOptimizerAttribute, value)
+function set_subproblem_optimizer_attribute!(structure::ScenarioDecompositionStructure, attr::MOI.AbstractOptimizerAttribute, value)
     MOI.set(scenarioproblems(structure), attr, value)
     return nothing
 end
 
-function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::HorizontalStructure{2}, optimizer::MOI.AbstractOptimizer)
+function cache_solution!(stochasticprogram::StochasticProgram{2}, structure::ScenarioDecompositionStructure{2}, optimizer::MOI.AbstractOptimizer)
     cache = solutioncache(stochasticprogram)
     # Cache main solution
     variables = decision_variables_at_stage(stochasticprogram, 1)

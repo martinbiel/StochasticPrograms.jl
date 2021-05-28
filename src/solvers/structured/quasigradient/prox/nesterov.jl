@@ -84,7 +84,7 @@ mutable struct Nesterov <: AbstractProx
 end
 Nesterov(; prox::AbstractProx = Polyhedron(), kw...) = Nesterov(prox, NesterovParameters(; kw...))
 
-function (nesterov::Nesterov)(structure::VerticalStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
+function (nesterov::Nesterov)(structure::StageDecompositionStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
     proximal = nesterov.prox(structure, x₀, T)
     return NesterovProximal(proximal, T; type2dict(nesterov.parameters)...)
 end

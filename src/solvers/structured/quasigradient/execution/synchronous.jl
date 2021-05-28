@@ -13,14 +13,14 @@ struct SynchronousExecution{T <: AbstractFloat, S <: AbstractSubProblem{T}} <: A
     subworkers::Vector{SubWorker{S}}
     decisions::Vector{DecisionChannel}
 
-    function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}}, x::AbstractVector, subproblems::Unaltered, ::Type{T}) where T <: AbstractFloat
+    function SynchronousExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}}, x::AbstractVector, subproblems::Unaltered, ::Type{T}) where T <: AbstractFloat
         execution = new{T, SubProblem{T}}(Vector{NonSmoothSubWorker{T}}(undef, nworkers()),
                            scenarioproblems(structure).decisions)
         initialize_subproblems!(execution, scenarioproblems(structure, 2))
         return execution
     end
 
-    function SynchronousExecution(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}}, x::AbstractVector, subproblems::Smoothed, ::Type{T}) where T <: AbstractFloat
+    function SynchronousExecution(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}}, x::AbstractVector, subproblems::Smoothed, ::Type{T}) where T <: AbstractFloat
         execution = new{T, SmoothSubProblem{T}}(Vector{SmoothSubWorker{T}}(undef, nworkers()),
                                                 scenarioproblems(structure).decisions)
         initialize_subproblems!(execution, scenarioproblems(structure, 2), x, subproblems.parameters)
@@ -214,7 +214,7 @@ end
 
 # API
 # ------------------------------------------------------------
-function (execution::Synchronous)(structure::VerticalStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
+function (execution::Synchronous)(structure::StageDecompositionStructure{2, 1, <:Tuple{DistributedScenarioProblems}},
                                   x::AbstractVector,
                                   subproblems::AbstractSubProblemState,
                                   ::Type{T}) where {T <: AbstractFloat}

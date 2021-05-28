@@ -143,7 +143,7 @@ mutable struct AndersonAcceleration <: AbstractProx
 end
 AndersonAcceleration(; prox::AbstractProx = Polyhedron(), kw...) = AndersonAcceleration(prox, AndersonAccelerationParameters(; kw...))
 
-function (anderson::AndersonAcceleration)(structure::VerticalStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
+function (anderson::AndersonAcceleration)(structure::StageDecompositionStructure, x₀::AbstractVector, ::Type{T}) where T <: AbstractFloat
     proximal = anderson.prox(structure, x₀, T)
     return AndersonAcceleratedProximal(proximal, T; type2dict(anderson.parameters)...)
 end

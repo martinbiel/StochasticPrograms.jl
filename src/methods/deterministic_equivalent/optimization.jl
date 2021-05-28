@@ -1,3 +1,5 @@
+# Deterministic equivalent optimization #
+# ===================================== #
 function optimize!(structure::DeterministicEquivalent, optimizer::MOI.AbstractOptimizer, x₀::AbstractVector)
     # Sanity check
     backend(structure.model) === optimizer || error("Stochastic program optimizer has not been connected to the deterministically equivalent problem.")

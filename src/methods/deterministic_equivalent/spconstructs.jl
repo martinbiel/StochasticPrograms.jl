@@ -1,3 +1,5 @@
+# Deterministic equivalent spconstructs #
+# ===================================== #
 function DEP(stochasticprogram::StochasticProgram{2}, structure::DeterministicEquivalent; optimizer = nothing)
     # Ensure stochastic program has been generated at this point
     if deferred(stochasticprogram)

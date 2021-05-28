@@ -1,5 +1,5 @@
 # Deterministic equivalent generation #
-# ========================== #
+# =================================== #
 function generate!(stochasticprogram::StochasticProgram{N}, structure::DeterministicEquivalent{N}) where N
     # Set the optimizer
     structure.model.moi_backend = optimizer(stochasticprogram)

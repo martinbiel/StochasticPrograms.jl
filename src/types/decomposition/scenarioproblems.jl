@@ -58,11 +58,11 @@ end
 
 ScenarioProblems(::Type{S}, instantiation) where S <: AbstractScenario = ScenarioProblems(Vector{S}(), instantiation)
 
-function ScenarioProblems(scenarios::Vector{S}, ::Union{Vertical, Horizontal}) where S <: AbstractScenario
+function ScenarioProblems(scenarios::Vector{S}, ::Union{StageDecomposition, Vertical, ScenarioDecomposition, Horizontal}) where S <: AbstractScenario
     ScenarioProblems(scenarios)
 end
 
-function ScenarioProblems(scenarios::Vector{S}, ::Union{DistributedVertical, DistributedHorizontal}) where S <: AbstractScenario
+function ScenarioProblems(scenarios::Vector{S}, ::Union{DistributedStageDecomposition, DistributedVertical, DistributedScenarioDecomposition, DistributedHorizontal}) where S <: AbstractScenario
     DistributedScenarioProblems(scenarios)
 end
 

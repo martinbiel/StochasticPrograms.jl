@@ -1,15 +1,15 @@
 """
-    HorizontalStructure
+    ScenarioDecompositionStructure
 
 Horizontal memory structure. Decomposes stochastic program by scenario.
 
 """
-struct HorizontalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractBlockStructure{N}
+struct ScenarioDecompositionStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: AbstractDecompositionStructure{N}
     decisions::Decisions{N}
     scenarioproblems::SP
     proxy::NTuple{N,JuMP.Model}
 
-    function HorizontalStructure(decisions::Decisions{N}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
+    function ScenarioDecompositionStructure(decisions::Decisions{N}, scenarioproblems::NTuple{M,AbstractScenarioProblems}) where {N, M}
         M == N - 1 || error("Inconsistent number of stages $N and number of scenario types $M")
         SP = typeof(scenarioproblems)
         proxy = ntuple(Val{N}()) do _
@@ -19,24 +19,24 @@ struct HorizontalStructure{N, M, SP <: NTuple{M, AbstractScenarioProblems}} <: A
     end
 end
 
-function StochasticStructure(decisions::Decisions{N}, scenario_types::ScenarioTypes{M}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenario_types::ScenarioTypes{M}, instantiation::Union{ScenarioDecomposition, DistributedScenarioDecomposition}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenario_types[i], instantiation)
     end
-    return HorizontalStructure(decisions, scenarioproblems)
+    return ScenarioDecompositionStructure(decisions, scenarioproblems)
 end
 
-function StochasticStructure(decisions::Decisions{N}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{Horizontal, DistributedHorizontal}) where {N, M}
+function StochasticStructure(decisions::Decisions{N}, scenarios::NTuple{M, Vector{<:AbstractScenario}}, instantiation::Union{ScenarioDecomposition, DistributedScenarioDecomposition}) where {N, M}
     scenarioproblems = ntuple(Val(M)) do i
         ScenarioProblems(scenarios[i], instantiation)
     end
-    return HorizontalStructure(decisions, scenarioproblems)
+    return ScenarioDecompositionStructure(decisions, scenarioproblems)
 end
 
 # Base overloads #
 # ========================== #
-function Base.print(io::IO, structure::HorizontalStructure{2})
-    print(io, "Horizontal scenario problems \n")
+function Base.print(io::IO, structure::ScenarioDecompositionStructure{2})
+    print(io, "Scenario problems \n")
     print(io, "============== \n")
     for (id, subproblem) in enumerate(subproblems(structure, 2))
         @printf(io, "Subproblem %d (p = %.2f):\n", id, probability(scenario(structure, 2, id)))
@@ -47,20 +47,20 @@ end
 
 # MOI #
 # ========================== #
-function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractModelAttribute)
+function MOI.get(structure::ScenarioDecompositionStructure, attr::MOI.AbstractModelAttribute)
     if attr isa Union{MOI.ObjectiveFunctionType, MOI.ObjectiveSense}
         # Can defer to proxy here
         return MOI.get(backend(structure.proxy[1]), attr)
     end
-    error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
+    error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
-function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
-    error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
+function MOI.get(structure::ScenarioDecompositionStructure, attr::MOI.AbstractVariableAttribute, index::MOI.VariableIndex)
+    error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
-function MOI.get(structure::HorizontalStructure, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
-    error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
+function MOI.get(structure::ScenarioDecompositionStructure, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
+    error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
-function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentModelAttribute)
+function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentModelAttribute)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     if attr.attr isa MOI.ObjectiveFunction
@@ -85,19 +85,19 @@ function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentModelAtt
         return MOI.get(scenarioproblems(structure, attr.stage), attr)
     end
 end
-function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
+function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentVariableAttribute, index::MOI.VariableIndex)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, index, attr.scenario_index)
     return MOI.get(scenarioproblems(structure, attr.stage), attr, mapped_vi)
 end
-function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex)
+function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentConstraintAttribute, ci::MOI.ConstraintIndex)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_ci = mapped_index(structure, ci, attr.scenario_index)
     return MOI.get(scenarioproblems(structure, attr.stage), attr, mapped_ci)
 end
-function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: Union{MOI.SingleVariable, SingleDecision}, S}
+function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: Union{MOI.SingleVariable, SingleDecision}, S}
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), attr.scenario_index)
@@ -105,7 +105,7 @@ function MOI.get(structure::HorizontalStructure, attr::ScenarioDependentConstrai
     return MOI.get(scenarioproblems(structure, attr.stage), attr, mapped_ci)
 end
 
-function MOI.set(structure::HorizontalStructure{2}, attr::Union{MOI.AbstractModelAttribute, MOI.Silent}, value)
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::Union{MOI.AbstractModelAttribute, MOI.Silent}, value)
     if attr isa MOI.ObjectiveFunction
         set_in_scenarioproblems!(scenarioproblems(structure), value) do sp, new_obj
             for (i,subprob) in enumerate(subproblems(fetch(sp)))
@@ -153,7 +153,7 @@ function MOI.set(structure::HorizontalStructure{2}, attr::Union{MOI.AbstractMode
         MOI.set(scenarioproblems(structure), attr, value)
     end
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentModelAttribute, value)
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDependentModelAttribute, value)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     if attr.attr isa MOI.ObjectiveFunction
@@ -202,13 +202,13 @@ function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentModel
     end
     return nothing
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::MOI.AbstractVariableAttribute,
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::MOI.AbstractVariableAttribute,
                  index::MOI.VariableIndex, value)
     # All subproblems should be updated
     MOI.set(scenarioproblems(structure), attr, index, value)
     return nothing
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentVariableAttribute,
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDependentVariableAttribute,
                  index::MOI.VariableIndex, value)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
@@ -216,13 +216,13 @@ function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentVaria
     MOI.set(scenarioproblems(structure, attr.stage), attr, mapped_vi, value)
     return nothing
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::MOI.AbstractConstraintAttribute,
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::MOI.AbstractConstraintAttribute,
                  ci::MOI.ConstraintIndex, value)
     # All subproblems should be updated
     MOI.set(scenarioproblems(structure), attr, ci, value)
     return nothing
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentConstraintAttribute,
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDependentConstraintAttribute,
                  ci::MOI.ConstraintIndex, value)
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
@@ -230,7 +230,7 @@ function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentConst
     MOI.set(scenarioproblems(structure, attr.stage), attr, mapped_ci, value)
     return nothing
 end
-function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentConstraintAttribute,
+function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDependentConstraintAttribute,
                  ci::MOI.ConstraintIndex{F,S}, value) where {F <: SingleDecision, S}
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
@@ -240,24 +240,24 @@ function MOI.set(structure::HorizontalStructure{2}, attr::ScenarioDependentConst
     return nothing
 end
 
-function MOI.is_valid(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer)
+function MOI.is_valid(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision should be valid in all subproblems
     return all(MOI.is_valid(scenarioproblems(structure), index, scenario_index) for scenario_index in num_scenarios(structure))
 end
-function MOI.is_valid(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer)
+function MOI.is_valid(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer)
     stage == 1 && error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, index, scenario_index)
     return MOI.is_valid(scenarioproblems(structure, stage), mapped_vi, scenario_index)
 end
-function MOI.is_valid(structure::HorizontalStructure{2}, ci::MOI.ConstraintIndex, stage::Integer)
+function MOI.is_valid(structure::ScenarioDecompositionStructure{2}, ci::MOI.ConstraintIndex, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision constraint should be valid in all subproblems
     return all(MOI.is_valid(scenarioproblems(structure), ci, scenario_index) for scenario_index in num_scenarios(structure))
 end
-function MOI.is_valid(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex, stage::Integer, scenario_index::Integer) where N
+function MOI.is_valid(structure::ScenarioDecompositionStructure{N}, ci::MOI.ConstraintIndex, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -265,7 +265,7 @@ function MOI.is_valid(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex
     mapped_ci = mapped_index(structure, ci, scenario_index)
     return MOI.is_valid(scenarioproblems(structure, stage), mapped_ci, scenario_index)
 end
-function MOI.is_valid(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex{F,S}, stage::Integer, scenario_index::Integer) where {N, F <: SingleDecision, S}
+function MOI.is_valid(structure::ScenarioDecompositionStructure{N}, ci::MOI.ConstraintIndex{F,S}, stage::Integer, scenario_index::Integer) where {N, F <: SingleDecision, S}
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -273,7 +273,7 @@ function MOI.is_valid(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex
     return MOI.is_valid(scenarioproblems(structure, stage), ci, scenario_index)
 end
 
-function MOI.delete(structure::HorizontalStructure{2}, indices::Vector{MOI.VariableIndex}, stage::Integer)
+function MOI.delete(structure::ScenarioDecompositionStructure{2}, indices::Vector{MOI.VariableIndex}, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision should be removed from every subproblem
     for scenario_index in 1:num_scenarios(structure)
@@ -281,7 +281,7 @@ function MOI.delete(structure::HorizontalStructure{2}, indices::Vector{MOI.Varia
     end
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{N}, indices::Vector{MOI.VariableIndex}, stage::Integer, scenario_index::Integer) where N
+function MOI.delete(structure::ScenarioDecompositionStructure{N}, indices::Vector{MOI.VariableIndex}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -292,7 +292,7 @@ function MOI.delete(structure::HorizontalStructure{N}, indices::Vector{MOI.Varia
     MOI.delete(scenarioproblems(structure, stage), mapped_indices, scenario_index)
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{2}, ci::MOI.ConstraintIndex, stage::Integer)
+function MOI.delete(structure::ScenarioDecompositionStructure{2}, ci::MOI.ConstraintIndex, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision constraints should be removed from every subproblem
     for scenario_index in 1:num_scenarios(structure)
@@ -300,7 +300,7 @@ function MOI.delete(structure::HorizontalStructure{2}, ci::MOI.ConstraintIndex, 
     end
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{2}, cis::Vector{<:MOI.ConstraintIndex}, stage::Integer)
+function MOI.delete(structure::ScenarioDecompositionStructure{2}, cis::Vector{<:MOI.ConstraintIndex}, stage::Integer)
     stage == 1 || error("No scenario index specified.")
     # First-stage decision constraints should be removed from every subproblem
     for scenario_index in 1:num_scenarios(structure)
@@ -308,7 +308,7 @@ function MOI.delete(structure::HorizontalStructure{2}, cis::Vector{<:MOI.Constra
     end
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex, stage::Integer, scenario_index::Integer) where N
+function MOI.delete(structure::ScenarioDecompositionStructure{N}, ci::MOI.ConstraintIndex, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -317,7 +317,7 @@ function MOI.delete(structure::HorizontalStructure{N}, ci::MOI.ConstraintIndex, 
     MOI.delete(scenarioproblems(structure, stage), mapped_ci, scenario_index)
     return nothing
 end
-function MOI.delete(structure::HorizontalStructure{N}, cis::Vector{<:MOI.ConstraintIndex}, stage::Integer, scenario_index::Integer) where N
+function MOI.delete(structure::ScenarioDecompositionStructure{N}, cis::Vector{<:MOI.ConstraintIndex}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -332,7 +332,7 @@ end
 # JuMP #
 # ========================== #
 function decision_dispatch(decision_function::Function,
-                           structure::HorizontalStructure{N},
+                           structure::ScenarioDecompositionStructure{N},
                            index::MOI.VariableIndex,
                            stage::Integer,
                            args...) where N
@@ -342,7 +342,7 @@ function decision_dispatch(decision_function::Function,
     return decision_function(dref, args...)
 end
 function decision_dispatch!(decision_function!::Function,
-                            structure::HorizontalStructure{2},
+                            structure::ScenarioDecompositionStructure{2},
                             index::MOI.VariableIndex,
                             stage::Integer,
                             args...)
@@ -357,7 +357,7 @@ function decision_dispatch!(decision_function!::Function,
     return nothing
 end
 function scenario_decision_dispatch(decision_function::Function,
-                                    structure::HorizontalStructure{N},
+                                    structure::ScenarioDecompositionStructure{N},
                                     index::MOI.VariableIndex,
                                     stage::Integer,
                                     scenario_index::Integer,
@@ -374,7 +374,7 @@ function scenario_decision_dispatch(decision_function::Function,
                                       args...)
 end
 function scenario_decision_dispatch!(decision_function!::Function,
-                                     structure::HorizontalStructure{N},
+                                     structure::ScenarioDecompositionStructure{N},
                                      index::MOI.VariableIndex,
                                      stage::Integer,
                                      scenario_index::Integer,
@@ -391,7 +391,7 @@ function scenario_decision_dispatch!(decision_function!::Function,
                                 args...)
     return nothing
 end
-function JuMP.fix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer, val::Number)
+function JuMP.fix(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, stage::Integer, val::Number)
     d = decision(structure, index, stage)
     if state(d) == NotTaken
         # Update state
@@ -405,7 +405,7 @@ function JuMP.fix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, s
     update_decision_state!(scenarioproblems(structure), index, Taken)
     return nothing
 end
-function JuMP.fix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer, val::Number) where N
+function JuMP.fix(structure::ScenarioDecompositionStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer, val::Number) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
@@ -413,7 +413,7 @@ function JuMP.fix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, s
     fix(scenarioproblems(structure, stage), mapped_vi, scenario_index, val)
     return nothing
 end
-function JuMP.unfix(structure::HorizontalStructure{2}, index::MOI.VariableIndex, stage::Integer)
+function JuMP.unfix(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, stage::Integer)
     d = decision(structure, index, stage)
     if state(d) == NotTaken
         # Nothing to do, just return
@@ -424,7 +424,7 @@ function JuMP.unfix(structure::HorizontalStructure{2}, index::MOI.VariableIndex,
     update_decision_state!(scenarioproblems(structure), index, NotTaken)
     return nothing
 end
-function JuMP.unfix(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
+function JuMP.unfix(structure::ScenarioDecompositionStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
@@ -433,7 +433,7 @@ function JuMP.unfix(structure::HorizontalStructure{N}, index::MOI.VariableIndex,
     return nothing
 end
 
-function JuMP.set_objective_sense(structure::HorizontalStructure, stage::Integer, sense::MOI.OptimizationSense)
+function JuMP.set_objective_sense(structure::ScenarioDecompositionStructure, stage::Integer, sense::MOI.OptimizationSense)
     if stage == 1
         MOI.set(structure, MOI.ObjectiveSense(), sense)
     else
@@ -462,31 +462,31 @@ function JuMP.set_objective_sense(structure::HorizontalStructure, stage::Integer
     end
     return nothing
 end
-function JuMP.objective_function_type(structure::HorizontalStructure)
-    error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
+function JuMP.objective_function_type(structure::ScenarioDecompositionStructure)
+    error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
 
-function JuMP.objective_function(structure::HorizontalStructure, FunType::Type{<:AbstractJuMPScalar})
-    error("The horizontal structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
+function JuMP.objective_function(structure::ScenarioDecompositionStructure, FunType::Type{<:AbstractJuMPScalar})
+    error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
 
-function JuMP.objective_function(structure::HorizontalStructure, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
+function JuMP.objective_function(structure::ScenarioDecompositionStructure, stage::Integer, FunType::Type{<:AbstractJuMPScalar})
     return objective_function(structure.proxy[stage], FunType)
 end
 
-function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI)
+function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, ci::CI)
     return decision_index(backend(structure.proxy[1]), ci)
 end
-function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}) where {F <: SingleDecision, S}
+function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, ci::CI{F,S}) where {F <: SingleDecision, S}
     inner = mapped_constraint(structure.decisions, ci)
     inner.value == 0 && error("Constraint $ci not properly mapped.")
     return decision_index(backend(structure.proxy[1]), inner)
 end
-function JuMP._moi_optimizer_index(structure::HorizontalStructure, index::VI, scenario_index::Integer)
+function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, index::VI, scenario_index::Integer)
     mapped_vi = mapped_index(structure, index, scenario_index)
     return JuMP._moi_optimizer_index(scenarioproblems(structure), mapped_vi, scenario_index)
 end
-function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
+function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
     num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
     if ci.value <= num_first_stage_decisions
         return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
@@ -497,7 +497,7 @@ function JuMP._moi_optimizer_index(structure::HorizontalStructure, ci::CI{F,S}, 
     end
 end
 
-function JuMP.set_objective_coefficient(structure::HorizontalStructure{2}, index::VI, var_stage::Integer, stage::Integer, coeff::Real)
+function JuMP.set_objective_coefficient(structure::ScenarioDecompositionStructure{2}, index::VI, var_stage::Integer, stage::Integer, coeff::Real)
     if var_stage == 1
         if stage == 1
             # Modification should be applied in every subproblem
@@ -505,14 +505,14 @@ function JuMP.set_objective_coefficient(structure::HorizontalStructure{2}, index
                 set_objective_coefficient(scenarioproblems(structure), index, scenario_index, coeff)
             end
         else
-            error("The horizontal structure is completely decomposed into subproblems. Can only modify first-stage part of objective for first-stage.")
+            error("The scenario-decomposition structure is completely decomposed into subproblems. Can only modify first-stage part of objective for first-stage.")
         end
     else
         error("Decision is scenario dependent, consider `set_objective_coefficient(sp, dvar, stage, scenario_index, coeff)`.")
     end
     return nothing
 end
-function JuMP.set_objective_coefficient(structure::HorizontalStructure{N}, index::VI, var_stage::Integer, stage::Integer, scenario_index::Integer, coeff::Real) where N
+function JuMP.set_objective_coefficient(structure::ScenarioDecompositionStructure{N}, index::VI, var_stage::Integer, stage::Integer, scenario_index::Integer, coeff::Real) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
@@ -526,7 +526,7 @@ function JuMP.set_objective_coefficient(structure::HorizontalStructure{N}, index
     return nothing
 end
 
-function JuMP.set_normalized_coefficient(structure::HorizontalStructure,
+function JuMP.set_normalized_coefficient(structure::ScenarioDecompositionStructure,
                                          ci::CI{F,S},
                                          index::VI,
                                          value) where {T, F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}}, S}
@@ -536,7 +536,7 @@ function JuMP.set_normalized_coefficient(structure::HorizontalStructure,
     end
     return nothing
 end
-function JuMP.set_normalized_coefficient(structure::HorizontalStructure{N},
+function JuMP.set_normalized_coefficient(structure::ScenarioDecompositionStructure{N},
                                          ci::CI{F,S},
                                          index::VI,
                                          var_stage::Integer,
@@ -554,7 +554,7 @@ function JuMP.set_normalized_coefficient(structure::HorizontalStructure{N},
 end
 
 
-function JuMP.normalized_coefficient(structure::HorizontalStructure{N},
+function JuMP.normalized_coefficient(structure::ScenarioDecompositionStructure{N},
                                      ci::CI{F,S},
                                      index::VI,
                                      var_stage::Integer,
@@ -569,7 +569,7 @@ function JuMP.normalized_coefficient(structure::HorizontalStructure{N},
     return normalized_coefficient(scenarioproblems(structure, stage), mapped_ci, mapped_vi, scenario_index)
 end
 
-function JuMP.set_normalized_rhs(structure::HorizontalStructure,
+function JuMP.set_normalized_rhs(structure::ScenarioDecompositionStructure,
                                  ci::CI{F,S},
                                  value) where {T,
                                                F <: Union{AffineDecisionFunction{T}, QuadraticDecisionFunction{T}},
@@ -580,7 +580,7 @@ function JuMP.set_normalized_rhs(structure::HorizontalStructure,
     end
     return nothing
 end
-function JuMP.set_normalized_rhs(structure::HorizontalStructure{N},
+function JuMP.set_normalized_rhs(structure::ScenarioDecompositionStructure{N},
                                  ci::CI{F,S},
                                  stage::Integer,
                                  scenario_index::Integer,
@@ -597,17 +597,17 @@ function JuMP.set_normalized_rhs(structure::HorizontalStructure{N},
     return nothing
 end
 
-function DecisionRef(structure::HorizontalStructure, index::VI)
+function DecisionRef(structure::ScenarioDecompositionStructure, index::VI)
     return DecisionRef(structure.proxy[1], index)
 end
 
-function JuMP.jump_function(structure::HorizontalStructure{N},
+function JuMP.jump_function(structure::ScenarioDecompositionStructure{N},
                             stage::Integer,
                             f::MOI.AbstractFunction) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     return JuMP.jump_function(structure.proxy[stage], f)
 end
-function JuMP.jump_function(structure::HorizontalStructure{N},
+function JuMP.jump_function(structure::ScenarioDecompositionStructure{N},
                             stage::Integer,
                             scenario_index::Integer,
                             f::MOI.AbstractFunction) where N
@@ -627,15 +627,15 @@ end
 
 # Getters #
 # ========================== #
-function structure_name(structure::HorizontalStructure)
-    return "Horizontal"
+function structure_name(structure::ScenarioDecompositionStructure)
+    return "Scenario-decomposition"
 end
 
-function decision(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
+function decision(structure::ScenarioDecompositionStructure{N}, index::MOI.VariableIndex, stage::Integer) where N
     stage == 1 || error("No scenario index specified.")
     return decision(structure.decisions, stage, index)
 end
-function decision(structure::HorizontalStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
+function decision(structure::ScenarioDecompositionStructure{N}, index::MOI.VariableIndex, stage::Integer, scenario_index::Integer) where N
     stage > 1 || error("There are no scenarios in the first stage.")
     n = num_scenarios(structure, stage)
     1 <= scenario_index <= n || error("Scenario index $scenario_index not in range 1 to $n.")
@@ -645,7 +645,7 @@ end
 
 # Setters #
 # ========================== #
-function update_known_decisions!(structure::HorizontalStructure{2})
+function update_known_decisions!(structure::ScenarioDecompositionStructure{2})
     # Modification should be applied in every subproblem
     for scenario_index in 1:num_scenarios(structure)
         update_known_decisions!(scenarioproblems(structure), scenario_index)
@@ -653,13 +653,13 @@ function update_known_decisions!(structure::HorizontalStructure{2})
     return nothing
 end
 
-function untake_decisions!(structure::HorizontalStructure{2,1,NTuple{1,SP}}) where SP <: ScenarioProblems
+function untake_decisions!(structure::ScenarioDecompositionStructure{2,1,NTuple{1,SP}}) where SP <: ScenarioProblems
     if untake_decisions!(structure.decisions[1])
         update_decisions!(scenarioproblems(structure), DecisionsStateChange())
     end
     return nothing
 end
-function untake_decisions!(structure::HorizontalStructure{2,1,NTuple{1,SP}}) where SP <: DistributedScenarioProblems
+function untake_decisions!(structure::ScenarioDecompositionStructure{2,1,NTuple{1,SP}}) where SP <: DistributedScenarioProblems
     sp = scenarioproblems(structure)
     @sync begin
         for (i,w) in enumerate(workers())
@@ -676,14 +676,14 @@ end
 
 # Indices
 # ========================== #
-function mapped_index(structure::HorizontalStructure{2}, index::MOI.VariableIndex, scenario_index::Integer)
+function mapped_index(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, scenario_index::Integer)
     # The initial number of first-stage decisions is always given by
     num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
     # Calculate offset from first-stage auxilliary variables (first-stage decisions are included in second-stage proxy, so deduct them)
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfVariables()) - num_first_stage_decisions
     return MOI.VariableIndex(index.value + first_stage_offset)
 end
-function mapped_index(structure::HorizontalStructure{2}, ci::CI{F,S}, scenario_index::Integer) where {F,S}
+function mapped_index(structure::ScenarioDecompositionStructure{2}, ci::CI{F,S}, scenario_index::Integer) where {F,S}
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{F,S}())
     return CI{F,S}(ci.value + first_stage_offset)
 end

@@ -1,6 +1,6 @@
-# Horizontal generation #
-# ========================== #
-function generate!(stochasticprogram::StochasticProgram{N}, structure::HorizontalStructure{N}) where N
+# Scenario-decomposition generation #
+# ================================= #
+function generate!(stochasticprogram::StochasticProgram{N}, structure::ScenarioDecompositionStructure{N}) where N
     # Generate all stages
     for stage in 2:N
         generate!(stochasticprogram, structure, stage)
@@ -8,7 +8,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Horizonta
     return nothing
 end
 
-function generate!(stochasticprogram::TwoStageStochasticProgram, structure::HorizontalStructure{2}, stage::Integer)
+function generate!(stochasticprogram::TwoStageStochasticProgram, structure::ScenarioDecompositionStructure{2}, stage::Integer)
     stage == 2 || error("Stage $stage not available in two-stage model.")
     # Check generators
     has_generator(stochasticprogram, :stage_1) || error("First-stage problem not defined in stochastic program. Consider @stage 1.")
@@ -79,7 +79,7 @@ function generate_horizontal!(scenarioproblems::DistributedScenarioProblems,
     return nothing
 end
 
-function clear!(structure::HorizontalStructure{N}) where N
+function clear!(structure::ScenarioDecompositionStructure{N}) where N
     # Clear decisions
     clear!(structure.decisions)
     # Clear all stages
@@ -89,7 +89,7 @@ function clear!(structure::HorizontalStructure{N}) where N
     return nothing
 end
 
-function clear_stage!(structure::HorizontalStructure{N}, s::Integer) where N
+function clear_stage!(structure::ScenarioDecompositionStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     clear!(scenarioproblems(structure, s))
     return nothing

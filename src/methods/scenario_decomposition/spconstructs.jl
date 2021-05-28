@@ -1,4 +1,6 @@
-function EWS(stochasticprogram::StochasticProgram, structure::HorizontalStructure)
+# Scenario-decomposition spconstructs #
+# =================================== #
+function EWS(stochasticprogram::StochasticProgram, structure::ScenarioDecompositionStructure)
     # Restore structure if optimization has been run before
     restore_structure!(optimizer(stochasticprogram))
     # Dispatch on scenarioproblems
@@ -24,7 +26,7 @@ function EWS_horizontal(scenarioproblems::DistributedScenarioProblems)
     return sum(partial_ews)
 end
 
-function statistical_EWS(::StochasticProgram, structure::HorizontalStructure)
+function statistical_EWS(::StochasticProgram, structure::ScenarioDecompositionStructure)
     return statistical_EWS_horizontal(scenarioproblems(structure))
 end
 function statistical_EWS_horizontal(scenarioproblems::ScenarioProblems)

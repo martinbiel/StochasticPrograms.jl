@@ -1,6 +1,6 @@
-# Vertical generation #
-# ========================== #
-function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalStructure{N}) where N
+# Stage-decomposition generation #
+# ============================== #
+function generate!(stochasticprogram::StochasticProgram{N}, structure::StageDecompositionStructure{N}) where N
     # Generate all stages
     for stage in 1:N
         generate!(stochasticprogram, structure, stage)
@@ -8,7 +8,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalS
     return nothing
 end
 
-function generate!(stochasticprogram::StochasticProgram{N}, structure::VerticalStructure{N}, stage::Integer) where N
+function generate!(stochasticprogram::StochasticProgram{N}, structure::StageDecompositionStructure{N}, stage::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     if stage == 1
         # Check generators
@@ -114,7 +114,7 @@ function generate_vertical!(scenarioproblems::DistributedScenarioProblems,
     return nothing
 end
 
-function clear!(structure::VerticalStructure{N}) where N
+function clear!(structure::StageDecompositionStructure{N}) where N
     # Clear decisions
     clear!(structure.decisions)
     # Clear all stages
@@ -124,7 +124,7 @@ function clear!(structure::VerticalStructure{N}) where N
     return nothing
 end
 
-function clear_stage!(structure::VerticalStructure{N}, s::Integer) where N
+function clear_stage!(structure::StageDecompositionStructure{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     if s == 1
         empty!(structure.first_stage)
@@ -136,7 +136,7 @@ end
 
 # Getters #
 # ========================== #
-function first_stage(stochasticprogram::StochasticProgram, structure::VerticalStructure; optimizer = nothing)
+function first_stage(stochasticprogram::StochasticProgram, structure::StageDecompositionStructure; optimizer = nothing)
     if optimizer == nothing
         return structure.first_stage
     end
