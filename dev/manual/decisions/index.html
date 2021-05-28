@@ -113,7 +113,9 @@ println(&quot;value(y, 2) = $(value(y, 2))&quot;)
 println(&quot;reduced_cost(y, 2) = $(reduced_cost(y, 2))&quot;)
 println(&quot;dual(con, 2) = $(dual(con, 2))&quot;)
 println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
-println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)</code></pre><pre class="documenter-example-output">*     0: obj =   2.250000000e+00 inf =   0.000e+00 (1)
+*     1: obj =   2.000000000e+00 inf =   0.000e+00 (0)
+Termination status: OPTIMAL
 Objective value: 2.0
 Optimal decision: [2.0]
 value(x) = 2.0
@@ -206,7 +208,9 @@ println(&quot;Objective value in scenario 2: $(objective_value(sp, 2))&quot;)
 println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2))&quot;)
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">      1: obj =   2.000000000e+00 inf =   1.000e+00 (1)
+      2: obj =   2.750000000e+00 inf =   0.000e+00 (0)
+Termination status: OPTIMAL
 Objective value: 2.75
 Optimal decision: [3.0]
 value(x) = 3.0
@@ -220,6 +224,7 @@ reduced_cost(y, 2) = 0.0
 dual(con, 2) = -0.25
 Objective value in scenario 2: 1.5
 Optimal recourse in scenario 2: [1.5]
+*     2: obj =   2.750000000e+00 inf =   0.000e+00 (0)
 Equivalent decision evaluation: 2.75</pre><p>We can also fix the value of <span>$y$</span> in a specific scenario:</p><pre><code class="language-julia">fix(y, 1, 2.)
 optimize!(sp)
 
@@ -246,7 +251,10 @@ println(&quot;Optimal recourse in scenario 2: $(optimal_recourse_decision(sp, 2)
 println(evaluate_decision(sp, [3.]))
 
 # Evaluating x = 3 should give the same answer:
-println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">Termination status: OPTIMAL
+println(&quot;Equivalent decision evaluation: $(evaluate_decision(sp, [3.]))&quot;)</code></pre><pre class="documenter-example-output">      2: obj =   2.250000000e+00 inf =   1.000e+00 (1)
+      3: obj =   2.750000000e+00 inf =   0.000e+00 (0)
+*     5: obj =   2.500000000e+00 inf =   0.000e+00 (0)
+Termination status: OPTIMAL
 Objective value: 2.5
 Optimal decision: [2.0]
 value(x) = 3.0
@@ -256,5 +264,10 @@ Optimal recourse in scenario 1: [2.0]
 value(y, 2) = 1.0
 Objective value in scenario 2: 1.0
 Optimal recourse in scenario 2: [1.0]
+      5: obj =   2.500000000e+00 inf =   1.000e+00 (1)
+      6: obj =   3.250000000e+00 inf =   0.000e+00 (0)
 3.25
-Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 27 May 2021 19:55">Thursday 27 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+      6: obj =   2.250000000e+00 inf =   2.000e+00 (2)
+      8: obj =   3.750000000e+00 inf =   0.000e+00 (0)
+*     9: obj =   3.250000000e+00 inf =   0.000e+00 (0)
+Equivalent decision evaluation: 3.25</pre></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../model/">« Stochastic models</a><a class="docs-footer-nextpage" href="../distributed/">Distributed stochastic programs »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 28 May 2021 07:55">Friday 28 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

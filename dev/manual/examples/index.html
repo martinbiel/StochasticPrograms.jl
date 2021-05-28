@@ -117,7 +117,10 @@ x = farmer[1,:x]
 println(&quot;Wheat: $(value(x[:wheat]))&quot;)
 println(&quot;Corn: $(value(x[:corn]))&quot;)
 println(&quot;Beets: $(value(x[:beets]))&quot;)
-println(&quot;Profit: $(objective_value(farmer))&quot;)</code></pre><pre class="documenter-example-output">Wheat: 170.00000000000006
+println(&quot;Profit: $(objective_value(farmer))&quot;)</code></pre><pre class="documenter-example-output">      0: obj =   0.000000000e+00 inf =   1.320e+03 (6)
+      6: obj =   3.800000000e+04 inf =   0.000e+00 (0)
+*    15: obj =  -1.083900000e+05 inf =   0.000e+00 (0)
+Wheat: 170.00000000000006
 Corn: 80.00000000000001
 Beets: 250.0
 Profit: -108390.00000000001</pre><p>We can also check results for a specific scenario:</p><pre><code class="language-julia">y = farmer[2,:y]
@@ -133,7 +136,26 @@ Sold wheat: 310.00000000000017
 Sold corn: 48.000000000000036
 Sold beets: 0.0
 Profit: -275900.00000000006</pre><p>Finally, we calculate the stochastic performance of the farmer_model:</p><pre><code class="language-julia">println(&quot;EVPI: $(EVPI(farmer))&quot;)
-println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre class="documenter-example-output">EVPI: 7015.555555555533
+println(&quot;VSS: $(VSS(farmer))&quot;)</code></pre><pre class="documenter-example-output">*    15: obj =  -1.083900000e+05 inf =   0.000e+00 (0)
+      0: obj =   0.000000000e+00 inf =   4.400e+02 (2)
+      2: obj =   2.533333333e+04 inf =   0.000e+00 (0)
+*     5: obj =  -1.676666667e+05 inf =   0.000e+00 (0)
+      0: obj =   0.000000000e+00 inf =   4.400e+02 (2)
+      2: obj =   3.040000000e+04 inf =   0.000e+00 (0)
+*     5: obj =  -1.186000000e+05 inf =   0.000e+00 (0)
+      0: obj =   0.000000000e+00 inf =   4.400e+02 (2)
+      2: obj =   3.800000000e+04 inf =   0.000e+00 (0)
+*     6: obj =  -5.995000000e+04 inf =   0.000e+00 (0)
+EVPI: 7015.555555555533
+      0: obj =   0.000000000e+00 inf =   4.400e+02 (2)
+      2: obj =   3.040000000e+04 inf =   0.000e+00 (0)
+*     5: obj =  -1.186000000e+05 inf =   0.000e+00 (0)
+     15: obj =  -1.083900000e+05 inf =   1.000e+02 (2)
+     17: obj =  -1.032400000e+05 inf =   0.000e+00 (0)
+*    20: obj =  -1.072400000e+05 inf =   0.000e+00 (0)
+     20: obj =   0.000000000e+00 inf =   1.320e+03 (6)
+     26: obj =   3.800000000e+04 inf =   0.000e+00 (0)
+*    35: obj =  -1.083900000e+05 inf =   0.000e+00 (0)
 VSS: 1150.0000000000146</pre><h2 id="Continuous-scenario-distribution"><a class="docs-heading-anchor" href="#Continuous-scenario-distribution">Continuous scenario distribution</a><a id="Continuous-scenario-distribution-1"></a><a class="docs-heading-anchor-permalink" href="#Continuous-scenario-distribution" title="Permalink"></a></h2><p>As an example, consider the following generalized stochastic program:</p><p class="math-container">\[\begin{aligned}
  \operatorname*{minimize}_{x \in \mathbb{R}} &amp; \quad \operatorname{\mathbb{E}}_{\omega} \left[(x - \xi(\omega))^2\right] \\
 \end{aligned}\]</p><p>where <span>$\xi(\omega)$</span> is exponentially distributed. We will skip the mathematical details here and just take for granted that the optimizer to the above problem is the mean of the exponential distribution. We will try to approximately solve this problem using sample average approximation. First, lets try to introduce a custom discrete scenario type that farmer_models a stochastic variable with a continuous probability distribution. Consider the following implementation:</p><pre><code class="language-julia">using StochasticPrograms
@@ -192,4 +214,4 @@ println(&quot;Optimal decision: $(optimal_decision(sp))&quot;)
 println(&quot;Optimal value: $(objective_value(sp))&quot;)</code></pre><pre><code class="language-julia">Optimal decision: [2.0397762891884894]
 Optimal value: 4.00553678799426</code></pre><p>Now, due to the special implementation of the <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> function, it actually holds that the expected value solution solves the generalized problem. Consider:</p><pre><code class="language-julia">println(&quot;Expected value decision: $(expected_value_decision(sp)&quot;)
 println(&quot;VSS: $(VSS(sp))&quot;)</code></pre><pre><code class="language-julia">EVP decision: [2.0]
-VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Thursday 27 May 2021 19:55">Thursday 27 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+VSS: 0.00022773669794418083</code></pre><p>Accordingly, the VSS is small.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../structuredsolvers/">« Structured solvers</a><a class="docs-footer-nextpage" href="../../library/public/">Public interface »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> on <span class="colophon-date" title="Friday 28 May 2021 07:55">Friday 28 May 2021</span>. Using Julia version 1.6.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
