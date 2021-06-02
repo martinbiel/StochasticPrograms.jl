@@ -54,11 +54,11 @@ macro scenario(args...)
                 return @q begin
                     ξ = Scenario($code; probability = $(esc(probability)))
                     if ξ.data isa Array
-                        size(ξ.data) == size($val) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
+                        size(ξ.data) == size($(esc(val))) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
                     elseif ξ.data isa DenseAxisArray
-                        ξ.data.data .= $val
+                        ξ.data.data .= $(esc(val))
                     elseif ξ.data isa SparseAxisArray
-                        length(ξ.data.data) == length($val) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
+                        length(ξ.data.data) == length($(esc(val))) || error("Dimensions of right hand side in @scenario assignment differ from left hand side.")
                     end
                     ξ
                 end
