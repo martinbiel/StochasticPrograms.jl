@@ -583,7 +583,7 @@ function subproblem(scenarioproblems::ScenarioProblems, scenario_index::Integer)
 end
 function subproblem(scenarioproblems::DistributedScenarioProblems, scenario_index::Integer)
     return get_from_scenarioproblem(scenarioproblems, scenario_index) do sp, i
-        return fetch(sp).scenarios[i]
+        return fetch(sp).problems[i]
     end
 end
 function subproblems(scenarioproblems::ScenarioProblems)
