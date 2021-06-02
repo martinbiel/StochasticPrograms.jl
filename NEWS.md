@@ -1,6 +1,14 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.6.2 (Jun 02, 2021)
+-----------------------------
+
+Bugfixes. Internal renaming for better clarity:
+ - `VerticalStructure` becomes `StageDecompositionStructure`
+ - `HorizontalStructure` becomes `ScenarioDecompositionStructure`
+and `StageDecomposition` and `ScenarioDecomposition` are the official API structs passed through the `instantiation` keyword. The old API structs `Vertical` and `Horizontal` are kept to avoid breaking.
+
 Version 0.6.1 (May 28, 2021)
 -----------------------------
 
