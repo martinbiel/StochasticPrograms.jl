@@ -116,18 +116,18 @@ function num_known_decisions(model::JuMP.Model, stage::Integer = 2)
     return num_known_decisions(decisions, stage - 1)
 end
 
-function get_stage_objective(model::JuMP.Model, stage::Integer)
+function get_stage_objective(model::JuMP.Model, stage::Integer, ::Val{N}) where N
     stage > 1 && error("The objective at stage $stage is scenario dependent, consider `get_stage_objective(model, stage, scenario_index)`.")
-    decisions = get_decisions(model)::Decisions
+    decisions = get_decisions(model)::Decisions{N}
     if decisions.is_node
         return (objective_sense(model), objective_function(model))
     end
     (sense, obj) = get_stage_objective(decisions, stage, 1)
     return (sense, jump_function(model, obj))
 end
-function get_stage_objective(model::JuMP.Model, stage::Integer, scenario_index::Integer)
+function get_stage_objective(model::JuMP.Model, stage::Integer, scenario_index::Integer, ::Val{N}) where N
     stage == 1 && error("The first-stage objective is not scenario dependent, consider `get_stage_objective(model, stage)`.")
-    decisions = get_decisions(model)::Decisions
+    decisions = get_decisions(model)::Decisions{N}
     if decisions.is_node
         return (objective_sense(model), objective_function(model))
     end

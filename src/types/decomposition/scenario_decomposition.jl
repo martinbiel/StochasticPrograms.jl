@@ -60,25 +60,25 @@ end
 function MOI.get(structure::ScenarioDecompositionStructure, attr::MOI.AbstractConstraintAttribute, ci::MOI.ConstraintIndex)
     error("The scenario-decomposition structure is completely decomposed into subproblems. All model attributes are scenario dependent.")
 end
-function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentModelAttribute)
+function MOI.get(structure::ScenarioDecompositionStructure{N}, attr::ScenarioDependentModelAttribute) where N
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     if attr.attr isa MOI.ObjectiveFunction
         return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
             subprob = fetch(sp).problems[i]
-            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            (sense, obj) = get_stage_objective(subprob, stage, 1, Val{N}())
             return obj
         end
     elseif attr.attr isa MOI.ObjectiveFunctionType
         return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
             subprob = fetch(sp).problems[i]
-            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            (sense, obj) = get_stage_objective(subprob, stage, 1, Val{N}())
             return typeof(moi_function(obj))
         end
     elseif attr.attr isa MOI.ObjectiveSense
         return get_from_scenarioproblem(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage) do sp, i, stage
             subprob = fetch(sp).problems[i]
-            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            (sense, obj) = get_stage_objective(subprob, stage, 1, Val{N}())
             return sense
         end
     else
@@ -110,9 +110,9 @@ function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::Union{MOI.A
         set_in_scenarioproblems!(scenarioproblems(structure), value) do sp, new_obj
             for (i,subprob) in enumerate(subproblems(fetch(sp)))
                 # Get first-stage objective+sense
-                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1, Val{2}())
                 # Get second_stage objective+sense
-                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                (sense, obj) = get_stage_objective(subprob, 2, 1, Val{2}())
                 # Update first-stage objective
                 set_stage_objective!(subprob, 1, new_sense, moi_function(new_obj))
                 # Update sub objective
@@ -129,13 +129,13 @@ function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::Union{MOI.A
         set_in_scenarioproblems!(scenarioproblems(structure), value) do sp, new_sense
             for (i,subprob) in enumerate(subproblems(fetch(sp)))
                 # Get first-stage objective+sense
-                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1, Val{2}())
                 if first_stage_sense == new_sense
                     # Nothing to do
                     return nothing
                 end
                 # Get second_stage objective+sense
-                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                (sense, obj) = get_stage_objective(subprob, 2, 1, Val{2}())
                 # Update first-stage objective
                 set_stage_objective!(subprob, 1, new_sense, moi_function(first_stage_obj))
                 # Update sub objective
@@ -160,9 +160,9 @@ function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDep
         set_in_scenarioproblem!(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage, value) do sp, i, stage, value
             subprob = fetch(sp).problems[i]
             # Get first-stage objective+sense
-            (sense, obj) = get_stage_objective(subprob, 1)
+            (sense, obj) = get_stage_objective(subprob, 1, Val{2}())
             # Update subobjective
-            (sub_sense, prev_obj) = get_stage_objective(subprob, stage, 1)
+            (sub_sense, prev_obj) = get_stage_objective(subprob, stage, 1, Val{2}())
             set_stage_objective!(subprob, stage, 1, sub_sense, value)
             new_obj = jump_function(structure.model, value)
             # Update main objective
@@ -178,13 +178,13 @@ function MOI.set(structure::ScenarioDecompositionStructure{2}, attr::ScenarioDep
         set_in_scenarioproblem!(scenarioproblems(structure, attr.stage), attr.scenario_index, attr.stage, value) do sp, i, stage, value
             subprob = fetch(sp).problems[i]
             # Get current objective+sense
-            (sense, obj) = get_stage_objective(subprob, stage, 1)
+            (sense, obj) = get_stage_objective(subprob, stage, 1, Val{2}())
             if sense == value
                 # Nothing to do
                 return nothing
             end
             # Get first-stage objective+sense
-            (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+            (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1, Val{2}())
             # Update node sense
             set_stage_objective!(subprob, stage, 1, value, moi_function(obj))
             # Update sub objective
@@ -433,16 +433,16 @@ function JuMP.unfix(structure::ScenarioDecompositionStructure{N}, index::MOI.Var
     return nothing
 end
 
-function JuMP.set_objective_sense(structure::ScenarioDecompositionStructure, stage::Integer, sense::MOI.OptimizationSense)
+function JuMP.set_objective_sense(structure::ScenarioDecompositionStructure{N}, stage::Integer, sense::MOI.OptimizationSense) where N
     if stage == 1
         MOI.set(structure, MOI.ObjectiveSense(), sense)
     else
         set_in_scenarioproblems!(scenarioproblems(structure), sense) do sp, new_sense
             for (i,subprob) in enumerate(subproblems(fetch(sp)))
                 # Get first-stage objective+sense
-                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1)
+                (first_stage_sense, first_stage_obj) = get_stage_objective(subprob, 1, Val{N}())
                 # Get current objective+sense
-                (sense, obj) = get_stage_objective(subprob, 2, 1)
+                (sense, obj) = get_stage_objective(subprob, 2, 1, Val{N}())
                 if sense == new_sense
                     # Nothing to do
                     return nothing

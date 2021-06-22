@@ -1,3 +1,4 @@
+
 # Deterministic equivalent generation #
 # =================================== #
 function generate!(stochasticprogram::StochasticProgram{N}, structure::DeterministicEquivalent{N}) where N
@@ -40,11 +41,11 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
             stage_key = Symbol(:stage_, stage)
             generator(stochasticprogram, stage_key)(dep_model, stage_parameters(stochasticprogram, stage), scenario)
             # Update objective and cache the subobjective function for scenario i
-            (sub_sense, sub_obj) = get_stage_objective(dep_model, 2, i)
+            (sub_sense, sub_obj) = get_stage_objective(dep_model, 2, i, Val{N}())
             if obj_sense == sub_sense
-                dep_obj += probability(scenario) * sub_obj
+                JuMP.add_to_expression!(dep_obj, probability(scenario), sub_obj)
             else
-                dep_obj -= probability(scenario) * sub_obj
+                JuMP.add_to_expression!(dep_obj, -probability(scenario), sub_obj)
             end
             # Bookkeeping for objects added in scenario i
             for (objkey,obj) in filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
