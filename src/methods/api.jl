@@ -731,7 +731,7 @@ Return the subproblem at `scenario_index` of the `stochasticprogram` at `stage`.
 """
 function subproblem(stochasticprogram::StochasticProgram{N}, stage::Integer, scenario_index::Integer) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage == 1 || error("The first-stage does not have subproblems.")
+    stage == 1 && error("The first-stage does not have subproblems.")
     return subproblem(structure(stochasticprogram), stage, scenario_index)
 end
 """
@@ -749,7 +749,7 @@ Return an array of all subproblems of the `stochasticprogram` at `stage`. Defaul
 """
 function subproblems(stochasticprogram::StochasticProgram{N}, stage::Integer = 2) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
-    stage == 1 || error("The first-stage does not have subproblems.")
+    stage == 1 && error("The first-stage does not have subproblems.")
     return subproblems(structure(stochasticprogram), stage)
 end
 """
