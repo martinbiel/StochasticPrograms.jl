@@ -58,13 +58,13 @@ function MOI.get(structure::DeterministicEquivalent{N}, attr::ScenarioDependentM
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     if attr.attr isa MOI.ObjectiveFunction
-        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index, Val{N}())[2]
+        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2]
     elseif attr.attr isa MOI.ObjectiveFunctionType
-        return typeof(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index, Val{N}())[2])
+        return typeof(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2])
     elseif attr.attr isa MOI.ObjectiveSense
-        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index, Val{N}())[1]
+        return get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[1]
     elseif attr.attr isa MOI.ObjectiveValue || attr.attr isa MOI.DualObjectiveValue
-        return MOIU.eval_variables(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index, Val{N}())[2]) do idx
+        return MOIU.eval_variables(get_stage_objective(structure.decisions, attr.stage, attr.scenario_index)[2]) do idx
             return MOI.get(backend(structure.model), MOI.VariablePrimal(), idx)
         end
     else
@@ -123,7 +123,7 @@ function MOI.set(structure::DeterministicEquivalent{N}, attr::MOI.AbstractModelA
         MOI.set(backend(structure.model), attr, dep_obj)
     elseif attr isa MOI.ObjectiveSense
         # Get full objective+sense
-        prev_sense, dep_obj = get_stage_objective(structure.decisions, 1, 1, Val{N}())
+        prev_sense, dep_obj = get_stage_objective(structure.decisions, 1, 1)
         # Update first-stage objective
         set_stage_objective!(structure.decisions, 1, 1, value, dep_obj)
         # Update main objective (if necessary)

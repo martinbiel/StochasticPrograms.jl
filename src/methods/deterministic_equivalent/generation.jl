@@ -28,6 +28,8 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
         end
         # Cache current objective and sense
         dep_obj = objective_function(dep_model)
+        # Convert DecisionRef to DecisionAffExpr
+        dep_obj = 1*dep_obj
         obj_sense = objective_sense(dep_model)
         obj_sense = obj_sense == MOI.FEASIBILITY_SENSE ? MOI.MIN_SENSE : obj_sense
         # Null objective temporarily in case subproblem objectives are zero
