@@ -427,7 +427,7 @@ x̄ = expected_value_decision(sp)
 ```
 The expected result of taking the expected value decision is known as the **expected result of the expected value decision**:
 ```math
-\mathrm{EEV} = c^T \bar{x} + \expect[\xi]{Q(\bar{x},\xi(\omega))}.
+\mathrm{EEV} = c^T \bar{x} + \operatorname{\mathbb{E}}_{\xi}{Q(\bar{x},\xi(\omega))}.
 ```
 The difference between the value of the recourse problem and the expected result of the expected value decision is known as the **value of the stochastic solution**:
 ```math
