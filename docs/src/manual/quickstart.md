@@ -201,6 +201,14 @@ Likewise, we can solve the problem with progressive-hedging. Consider:
 ```julia
 sp_progressivehedging = instantiate(simple_model, [ξ₁, ξ₂], optimizer = ProgressiveHedging.Optimizer)
 ```
+```julia
+Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Scenario-decomposition
+Solver name: Progressive-hedging with fixed penalty
+```
 Now, the induced structure is the scenario-decomposition that decomposes the stochastic program completely into subproblems over the scenarios. Consider the printout:
 ```julia
 print(sp_progressivehedging)
@@ -421,7 +429,7 @@ If the expectation in the original model is instead taken inside the second-stag
     & \quad x \geq 0.
   \end{aligned}
 ```
-The solution to the expected-value-problem is known as the **expected value decision**, and is denote by ``\bar{x}``. We can compute it through
+The solution to the expected-value-problem is known as the **expected value decision**, and is denoted by ``\bar{x}``. We can compute it through
 ```@example simple
 x̄ = expected_value_decision(sp)
 ```
