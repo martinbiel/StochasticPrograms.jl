@@ -185,10 +185,10 @@ and verify that we get the same results:
 ```julia
 objective_value(sp_lshaped)
 ```
-and
 ```julia
 -855.8333333333339
 ```
+and
 ```julia
 optimal_decision(sp_lshaped)
 ```
