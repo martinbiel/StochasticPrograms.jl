@@ -122,19 +122,21 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                         arrayname = add_subscript(objkey, i)
                     end
                     # Handle each individual constraint/expression in array
-                    for con in obj
-                        # Update constraint/expression name to reflect stage and scenario
-                        if name(con) == ""
-                            # Do not need update unnamed constraints
-                            continue
+                    if obj isa AbstractArray{<:ConstraintRef}
+                        for con in obj
+                            # Update constraint name to reflect stage and scenario
+                            if name(con) == ""
+                                # Do not need update unnamed constraints
+                                continue
+                            end
+                            splitname = split(name(con), "[")
+                            conname = if N > 2
+                                conname = add_subscript(splitname[1], stage)
+                            else
+                                conname = splitname[1]
+                            end
+                            set_name(con, @sprintf("%s[%s", add_subscript(conname,i), splitname[2]))
                         end
-                        splitname = split(name(con), "[")
-                        conname = if N > 2
-                            conname = add_subscript(splitname[1], stage)
-                        else
-                            conname = splitname[1]
-                        end
-                        set_name(con, @sprintf("%s[%s", add_subscript(conname,i), splitname[2]))
                     end
                     # Return new key
                     newkey = Symbol(arrayname)
