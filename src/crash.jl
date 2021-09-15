@@ -70,7 +70,7 @@ end
 function (::None)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
     # Get instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
-    sp = instantiate(stochasticmodel, sampler, 0; optimizer = optimizer)
+    sp = instantiate(stochasticmodel, sampler, 1; optimizer = optimizer)
     return rand(num_decisions(sp))
 end
 
@@ -210,7 +210,7 @@ end
 function (crash::Custom)(stochasticmodel::StochasticModel, sampler::AbstractSampler)
     # Get instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
-    sp = instantiate(stochasticmodel, sampler, 0; optimizer = optimizer)
+    sp = instantiate(stochasticmodel, sampler, 1; optimizer = optimizer)
     return crash.x₀[1:num_decisions(sp)]
 end
 
