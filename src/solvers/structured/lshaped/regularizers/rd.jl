@@ -151,8 +151,10 @@ function take_step!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
     t = timestamp(lshaped)
     σ̃ = incumbent_trustregion(lshaped, t, rd)
     Q̃ = incumbent_objective(lshaped, t, rd)
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     need_update = false
-    if abs(θ-Q) <= τ*(1+abs(θ)) || Q <= Q̃ + τ || rd.data.major_iterations == 0
+    if abs(θ-Q) <= τ*(1+abs(θ)) || coeff*Q <= coeff*Q̃ + τ || rd.data.major_iterations == 0
         need_update = true
         x = current_decision(lshaped)
         for i in eachindex(rd.ξ)
@@ -164,9 +166,9 @@ function take_step!(lshaped::AbstractLShaped, rd::RegularizedDecomposition)
     else
         rd.data.minor_iterations += 1
     end
-    rd.data.σ = if Q + τ <= (1-γ)*Q̃ + γ*θ
+    rd.data.σ = if coeff*Q + τ <= coeff*(1-γ)*Q̃ + coeff*γ*θ
         max(σ, min(σ̅, 2*σ))
-    elseif Q - τ >= γ*Q̃ + (1-γ)*θ
+    elseif coeff*Q - τ >= coeff*γ*Q̃ + coeff*(1-γ)*θ
         min(σ, max(σ̲, 0.5*σ))
     else
         σ

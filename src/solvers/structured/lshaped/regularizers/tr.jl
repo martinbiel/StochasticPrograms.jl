@@ -82,6 +82,10 @@ end
 
 function initialize_regularization!(lshaped::AbstractLShaped, tr::TrustRegion{T}) where T <: AbstractFloat
     n = length(tr.ξ) + 1
+    # Sense-correct initial objective
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    tr.data.Q̃ *= coeff
     # Add projection targets
     add_projection_targets!(tr, lshaped.master)
     # Add trust region
@@ -168,7 +172,9 @@ function take_step!(lshaped::AbstractLShaped, tr::TrustRegion)
     need_update = false
     t = timestamp(lshaped)
     Q̃t = incumbent_objective(lshaped, t, tr)
-    if Q + τ <= Q̃ && (tr.data.major_iterations == 1 || Q <= Q̃t - γ*abs(Q̃t-θ))
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if coeff*Q + τ <= coeff*Q̃ && (tr.data.major_iterations == 1 || coeff*Q <= coeff*Q̃t - γ*abs(Q̃t-θ))
         need_update = true
         enlarge_trustregion!(lshaped, tr)
         tr.data.cΔ = 0
@@ -230,7 +236,9 @@ function enlarge_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
     Δ̃ = incumbent_trustregion(lshaped, t, tr)
     ξ = incumbent_decision(lshaped, t, tr)
     Q̃ = incumbent_objective(lshaped, t, tr)
-    if Q̃ - Q >= 0.5*(Q̃ - θ) && abs(norm(ξ - lshaped.x, Inf) - Δ̃) <= τ
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if coeff*(Q̃ - Q) >= 0.5*coeff*(Q̃ - θ) && abs(norm(ξ - lshaped.x, Inf) - Δ̃) <= τ
         # Enlarge the trust-region radius
         Δ = StochasticPrograms.decision(tr.decisions, tr.data.Δ)
         Δ.value = max(Δ.value, min(Δ̅, 2 * Δ̃))

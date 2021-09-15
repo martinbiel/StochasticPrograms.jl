@@ -85,6 +85,10 @@ end
 function initialize_regularization!(lshaped::AbstractLShaped, lv::LevelSet)
     # Add projection targets
     add_projection_targets!(lv, lshaped.master)
+    # Sense-correct initial objective
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    lv.data.Q̃ *= coeff
     # Run penalty initialization to check support
     initialize_penaltyterm!(lv.penaltyterm,
                             lshaped.master,
@@ -150,7 +154,9 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
     @unpack Q = lshaped.data
     @unpack τ = lshaped.parameters
     @unpack Q̃ = lv.data
-    if Q <= Q̃ - τ
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if coeff*Q <= coeff*Q̃ - τ
         x = current_decision(lshaped)
         for i in eachindex(lv.ξ)
             lv.ξ[i].value = x[i]
@@ -205,9 +211,11 @@ function take_step!(lshaped::AbstractLShaped, lv::LevelSet)
                             all_decisions(lv.decisions),
                             lv.projection_targets)
     # Add level constraint
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
     lv.data.constraint =
-        MOI.add_constraint(lshaped.master, objective,
-                           MOI.LessThan(L))
+        MOI.add_constraint(lshaped.master, coeff*objective,
+                           MOI.LessThan(coeff*L))
     return nothing
 end
 

@@ -73,7 +73,9 @@ function iterate!(quasigradient::AbstractQuasiGradient, execution::AbstractQuasi
         log!(quasigradient; status = MOI.DUAL_INFEASIBLE)
         return MOI.DUAL_INFEASIBLE
     end
-    if Q <= quasigradient.data.Q
+    sense = MOI.get(quasigradient.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if coeff*Q <= coeff*quasigradient.data.Q
         quasigradient.data.Q = Q
         quasigradient.ξ .= quasigradient.x
     end
