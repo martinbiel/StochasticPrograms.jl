@@ -88,6 +88,10 @@ end
 function initialize_regularization!(lshaped::AbstractLShaped, rd::RegularizedDecomposition{T}) where T <: AbstractFloat
     # Add projection targets
     add_projection_targets!(rd, lshaped.master)
+    # Sense-correct initial objective
+    sense = MOI.get(lshaped.master, MOI.ObjectiveSense())
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    rd.data.Q̃ *= coeff
     # Prepare penalty constant
     rd.data.σ = rd.parameters.σ
     push!(rd.σ_history,rd.data.σ)

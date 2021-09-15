@@ -49,8 +49,6 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
         end
         # Cache current objective and sense
         dep_obj = objective_function(dep_model)
-        # Convert to DecisionAffExpr
-        dep_obj = convert(DecisionAffExpr{Float64}, 1*dep_obj)
         obj_sense = objective_sense(dep_model)
         obj_sense = obj_sense == MOI.FEASIBILITY_SENSE ? MOI.MIN_SENSE : obj_sense
         # Null objective temporarily in case subproblem objectives are zero
@@ -66,9 +64,9 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
             # Update objective and cache the subobjective function for scenario i
             (sub_sense, sub_obj) = get_stage_objective(dep_model, 2, i, Val{N}())
             if obj_sense == sub_sense
-                JuMP.add_to_expression!(dep_obj, probability(scenario), sub_obj)
+                dep_obj += probability(scenario) * sub_obj
             else
-                JuMP.add_to_expression!(dep_obj, -probability(scenario), sub_obj)
+                dep_obj -= probability(scenario) * sub_obj
             end
             # Bookkeeping for objects added in scenario i
             for (objkey,obj) in filter(kv->kv.first ∉ visited_objs, object_dictionary(dep_model))
