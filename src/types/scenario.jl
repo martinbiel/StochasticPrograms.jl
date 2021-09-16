@@ -148,7 +148,7 @@ struct Scenario{T} <: AbstractScenario
 end
 
 function Base.zero(::Type{Scenario{NT}}) where NT <: NamedTuple
-    return Scenario(NamedTuple{Tuple(NT.names)}(zero.(NT.types)); probability = 1.0)
+    return Scenario(NamedTuple{Tuple(fieldnames(NT))}(zero.(NT.types)); probability = 1.0)
 end
 function Base.zero(::Type{Scenario{D}}) where {T, N, D <: Array{T,N}}
     return Scenario(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end); probability = 1.0)
