@@ -38,16 +38,17 @@ struct SubProblem{T <: AbstractFloat, F <: AbstractFeasibilityAlgorithm, I <: Ab
         T = typeof(π)
         # Get optimizer backend
         optimizer = backend(model)
-        # Instantiate feasibility algorithm
-        feasibility_algorithm = worker(feasibility_strategy, optimizer)
-        F = typeof(feasibility_algorithm)
-        # Instantiate integer algorithm
-        integer_algorithm = worker(integer_strategy, T)
-        I = typeof(integer_algorithm)
         # Collect all constraints with known decision occurances
         constraints, terms =
             collect_linking_constraints(model,
                                         T)
+        # Instantiate feasibility algorithm
+        feasibility_algorithm = worker(feasibility_strategy, constraints, optimizer)
+        F = typeof(feasibility_algorithm)
+        # Instantiate integer algorithm
+        integer_algorithm = worker(integer_strategy, T)
+        I = typeof(integer_algorithm)
+
         subproblem =  new{T,F,I}(id,
                                  π,
                                  model,
@@ -141,7 +142,7 @@ function solve_subproblem(subproblem::SubProblem, x::AbstractVector)
     if status ∈ AcceptableTermination
         return OptimalityCut(subproblem, x)
     elseif status == MOI.INFEASIBLE
-        return Infeasible(subproblem)
+        return Infeasible(subproblem, x)
     elseif status == MOI.DUAL_INFEASIBLE
         return Unbounded(subproblem)
     else
@@ -208,7 +209,7 @@ function FeasibilityCut(subproblem::SubProblem{T}, x::AbstractVector) where T <:
     return FeasibilityCut(G, g, subproblem.id)
 end
 
-function Infeasible(subproblem::SubProblem)
+function Infeasible(subproblem::SubProblem{T}, x) where T
     # Get sense
     sense = MOI.get(subproblem.optimizer, MOI.ObjectiveSense())
     correction = (sense == MOI.MIN_SENSE || sense == MOI.FEASIBILITY_SENSE) ? 1.0 : -1.0

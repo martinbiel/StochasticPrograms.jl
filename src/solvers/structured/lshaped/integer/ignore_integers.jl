@@ -26,19 +26,23 @@
 Empty functor object for running an L-shaped algorithm without dealing with integer variables.
 
 """
-struct NoIntegerAlgorithm <: AbstractIntegerAlgorithm end
+struct NoIntegerAlgorithm <: AbstractIntegerAlgorithm
+    skip_check::Bool
+end
 
-function initialize_integer_algorithm!(::NoIntegerAlgorithm, first_stage::JuMP.Model)
+function initialize_integer_algorithm!(integer::NoIntegerAlgorithm, first_stage::JuMP.Model)
     # Sanity check
-    if any(is_binary, all_decision_variables(first_stage, 1)) ||
+    if !integer.skip_check &&
+       any(is_binary, all_decision_variables(first_stage, 1)) ||
        any(is_integer, all_decision_variables(first_stage, 1))
         @warn "First-stage has binary/integer decisions and no `IntegerStrategy` has been set. Procedure will fail if second-stage has binary/integer variables. Otherwise, the master_optimizer must be integer-capable."
     end
     return nothing
 end
 
-function initialize_integer_algorithm!(::NoIntegerAlgorithm, subproblem::SubProblem)
-    if any(is_binary, all_decision_variables(subproblem.model, StochasticPrograms.stage(subproblem.model))) ||
+function initialize_integer_algorithm!(integer::NoIntegerAlgorithm, subproblem::SubProblem)
+    if !integer.skip_check &&
+       any(is_binary, all_decision_variables(subproblem.model, StochasticPrograms.stage(subproblem.model))) ||
        any(is_integer, all_decision_variables(subproblem.model, StochasticPrograms.stage(subproblem.model))) ||
        any(is_binary, all_auxiliary_variables(subproblem.model)) ||
        any(is_integer, all_auxiliary_variables(subproblem.model))
@@ -104,14 +108,20 @@ end
 Factory object for [`NoIntegerAlgorithm`](@ref). Passed by default to `integer_strategy` in `LShaped.Optimizer`.
 
 """
-struct IgnoreIntegers <: AbstractIntegerStrategy end
+struct IgnoreIntegers <: AbstractIntegerStrategy
+    skip_check::Bool
 
-function master(::IgnoreIntegers, ::Type{T}) where T <: AbstractFloat
-    return NoIntegerAlgorithm()
+    IgnoreIntegers(skip_check::Bool) = new(skip_check)
 end
 
-function worker(::IgnoreIntegers, ::Type{T}) where T <: AbstractFloat
-    return NoIntegerAlgorithm()
+IgnoreIntegers(; skip_check = false) = IgnoreIntegers(skip_check)
+
+function master(ignore::IgnoreIntegers, ::Type{T}) where T <: AbstractFloat
+    return NoIntegerAlgorithm(ignore.skip_check)
+end
+
+function worker(ignore::IgnoreIntegers, ::Type{T}) where T <: AbstractFloat
+    return NoIntegerAlgorithm(ignore.skip_check)
 end
 function worker_type(::IgnoreIntegers)
     return NoIntegerAlgorithm

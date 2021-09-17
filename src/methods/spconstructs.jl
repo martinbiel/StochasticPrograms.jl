@@ -208,7 +208,7 @@ If an optimizer has not been set yet (see [`set_optimizer`](@ref)), a `NoOptimiz
 
 See also: [`EVPI`](@ref), [`EWS`](@ref)
 """
-function VRP(stochasticprogram::StochasticProgram)
+function VRP(stochasticprogram::StochasticProgram; crash::AbstractCrash = Crash.None())
     # Throw NoOptimizer error if no recognized optimizer has been provided
     check_provided_optimizer(stochasticprogram.optimizer)
     # Check if cached solution is available
@@ -218,7 +218,7 @@ function VRP(stochasticprogram::StochasticProgram)
         return MOI.get(cache[:solution], MOI.ObjectiveValue())
     end
     # Solve DEP
-    optimize!(stochasticprogram)
+    optimize!(stochasticprogram; crash = crash)
     # Return optimal value
     return objective_value(stochasticprogram)
 end
@@ -254,8 +254,19 @@ function EVPI(stochasticprogram::StochasticProgram{2})
     vrp = VRP(stochasticprogram)
     # Solve all possible WS models and calculate EWS
     ews = EWS(stochasticprogram)
-    # Return EVPI = EWS - VRP
-    return abs(ews-vrp)
+    # Sense correction
+    sense = objective_sense(stochasticprogram)
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if sense == MOI.MIN_SENSE && ews > vrp
+        @warn "Inaccuracy in optimal solution. EWS > VRP when minimizing."
+        return 0.0
+    end
+    if sense == MOI.MAX_SENSE && ews < vrp
+        @warn "Inaccuracy in optimal solution. EWS < VRP when maximizing."
+        return 0.0
+    end
+    # Return EVPI
+    return coeff*(vrp - ews)
 end
 """
     EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
@@ -299,12 +310,28 @@ function EVPI(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
         return ConfidenceInterval(-tolerance, tolerance, confidence)
     end
     # Switch on sign
-    if lower(ews) >= upper(vrp)
-        # Return confidence interval around EVPI
-        return ConfidenceInterval(lower(ews) - upper(vrp), upper(ews) - lower(vrp), confidence)
-    else
-        # Return confidence interval around EVPI
-        return ConfidenceInterval(lower(vrp) - upper(ews), upper(vrp) - lower(ews), confidence)
+    sp = instantiate(stochasticmodel, sampler, 1)
+    sense = objective_sense(sp)
+    if sense == MOI.MIN_SENSE
+        if lower(vrp) >= upper(ews)
+            # Return confidence interval around EVPI
+            return ConfidenceInterval(lower(vrp) - upper(ews), upper(vrp) - lower(ews), confidence)
+        else
+            @warn "EVPI is not statistically significant to the chosen confidence level and tolerance. EWS > VRP when minimizing."
+            # Return confidence interval as tolerance around zero
+            tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+            return ConfidenceInterval(-tolerance, tolerance, confidence)
+        end
+    elseif sense == MOI.MAX_SENSE
+        if lower(ews) >= upper(vrp)
+            # Return confidence interval around EVPI
+            return ConfidenceInterval(lower(ews) - upper(vrp), upper(ews) - lower(vrp), confidence)
+        else
+            @warn "EVPI is not statistically significant to the chosen confidence level and tolerance. EWS < VRP when maximizing."
+            # Return confidence interval as tolerance around zero
+            tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+            return ConfidenceInterval(-tolerance, tolerance, confidence)
+        end
     end
 end
 """
@@ -431,8 +458,19 @@ function VSS(stochasticprogram::StochasticProgram{2})
     eev = EEV(stochasticprogram)
     # Calculate VRP
     vrp = VRP(stochasticprogram)
-    # Return VSS = VRP-EEV
-    return abs(vrp-eev)
+    # Sense correction
+    sense = objective_sense(stochasticprogram)
+    coeff = sense == MOI.MIN_SENSE ? 1.0 : -1.0
+    if sense == MOI.MIN_SENSE && eev < vrp
+        @warn "Inaccuracy in optimal solution. EEV < VRP when minimizing."
+        return 0.0
+    end
+    if sense == MOI.MAX_SENSE && eev > vrp
+        @warn "Inaccuracy in optimal solution. EEV > VRP when maximizing."
+        return 0.0
+    end
+    # Return VSS
+    return coeff*(eev - vrp)
 end
 """
     VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
@@ -476,12 +514,28 @@ function VSS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler; conf
         return ConfidenceInterval(-tolerance, tolerance, confidence)
     end
     # Switch on sign
-    if lower(vrp) >= upper(eev)
-        # Return confidence interval around VSS
-        return ConfidenceInterval(lower(vrp) - upper(eev), upper(vrp) - lower(eev), confidence)
-    else
-        # Return confidence interval around VSS
-        return ConfidenceInterval(lower(eev) - upper(vrp), upper(eev) - lower(vrp), confidence)
+    sp = instantiate(stochasticmodel, sampler, 1)
+    sense = objective_sense(sp)
+    if sense == MOI.MIN_SENSE
+        if lower(eev) >= upper(vrp)
+            # Return confidence interval around VSS
+            return ConfidenceInterval(lower(eev) - upper(vrp), upper(eev) - lower(vrp), confidence)
+        else
+            @warn "VSS is not statistically significant to the chosen confidence level and tolerance. EEV < VRP when minimizing."
+            # Return confidence interval as tolerance around zero
+            tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+            return ConfidenceInterval(-tolerance, tolerance, confidence)
+        end
+    elseif sense == MOI.MAX_SENSE
+        if lower(eev) <= upper(vrp)
+            # Return confidence interval around VSS
+            return ConfidenceInterval(lower(vrp) - upper(eev), upper(vrp) - lower(eev), confidence)
+        else
+            @warn "VSS is not statistically significant to the chosen confidence level and tolerance. EEV > VRP when maximizing."
+            # Return confidence interval as tolerance around zero
+            tolerance = MOI.get(stochasticmodel, RelativeTolerance())
+            return ConfidenceInterval(-tolerance, tolerance, confidence)
+        end
     end
 end
 # ========================== #

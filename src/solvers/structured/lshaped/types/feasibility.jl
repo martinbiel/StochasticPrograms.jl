@@ -59,7 +59,15 @@ Worker functor object for using feasibility cuts in an L-shaped algorithm. Creat
 """
 mutable struct FeasibilityCutsWorker <: AbstractFeasibilityAlgorithm
     objective::MOI.AbstractScalarFunction
+    linking_constraints::Vector{MOI.ConstraintIndex}
     feasibility_variables::Vector{MOI.VariableIndex}
+    prepared::Bool
+
+    function FeasibilityCutsWorker(objective::MOI.AbstractScalarFunction,
+                                   linking_constraints::Vector{MOI.ConstraintIndex},
+                                   feasibility_variables::Vector{MOI.VariableIndex})
+        return new(objective, linking_constraints, feasibility_variables, false)
+    end
 end
 
 handle_feasibility(::FeasibilityCutsWorker) = true
@@ -71,37 +79,73 @@ function prepare!(model::MOI.ModelLike, worker::FeasibilityCutsWorker)
     MOI.set(model, MOI.ObjectiveFunction{G}(), zero(MOI.ScalarAffineFunction{Float64}))
     i = 1
     # Create auxiliary feasibility variables
-    for (F, S) in MOI.get(model, MOI.ListOfConstraints())
-        i = add_auxiliary_variables!(model, worker, F, S, i)
+    for ci in worker.linking_constraints
+        i = add_auxiliary_variables!(model, worker, ci, i)
     end
+    worker.prepared = true
     return nothing
 end
 function prepared(worker::FeasibilityCutsWorker)
-    return length(worker.feasibility_variables) > 0
+    return worker.prepared
 end
 
 function add_auxiliary_variables!(model::MOI.ModelLike,
                                   worker::FeasibilityCutsWorker,
-                                  F::Type{<:MOI.AbstractFunction},
-                                  S::Type{<:MOI.AbstractSet},
-                                  idx::Integer)
+                                  ci::CI{F,S},
+                                  idx::Integer) where {F <: MOI.AbstractFunction, S <: MOI.AbstractSet}
     # Nothing to do for most most constraints
     return idx
 end
 
 function add_auxiliary_variables!(model::MOI.ModelLike,
                                   worker::FeasibilityCutsWorker,
-                                  F::Type{<:AffineDecisionFunction},
-                                  S::Type{<:MOI.AbstractScalarSet},
-                                  idx::Integer)
+                                  ci::CI{F,S},
+                                  idx::Integer) where {F <: AffineDecisionFunction, S <: MOI.AbstractScalarSet}
     G = MOI.ScalarAffineFunction{Float64}
     obj_sense = MOI.get(model, MOI.ObjectiveSense())
-    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
+    # Positive feasibility variable
+    pos_aux_var = MOI.add_variable(model)
+    name = add_subscript(:v⁺, idx)
+    MOI.set(model, MOI.VariableName(), pos_aux_var, name)
+    worker.feasibility_variables[idx] = pos_aux_var
+    # Nonnegativity constraint
+    MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+                       MOI.GreaterThan{Float64}(0.0))
+    # Add to objective
+    MOI.modify(model, MOI.ObjectiveFunction{G}(),
+               MOI.ScalarCoefficientChange(pos_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
+    # Add to constraint
+    MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+    # Negative feasibility variable
+    neg_aux_var = MOI.add_variable(model)
+    name = add_subscript(:v⁻, idx)
+    MOI.set(model, MOI.VariableName(), neg_aux_var, name)
+    worker.feasibility_variables[idx] = neg_aux_var
+    # Nonnegativity constraint
+    MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+                       MOI.GreaterThan{Float64}(0.0))
+    # Add to objective
+    MOI.modify(model, MOI.ObjectiveFunction{G}(),
+               MOI.ScalarCoefficientChange(neg_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
+    # Add to constraint
+    MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
+    # Return updated identification index
+    return idx + 1
+end
+
+function add_auxiliary_variables!(model::MOI.ModelLike,
+                                  worker::FeasibilityCutsWorker,
+                                  ci::CI{F,S},
+                                  idx::Integer) where {F <: VectorAffineDecisionFunction, S <: MOI.AbstractVectorSet}
+    G = MOI.ScalarAffineFunction{Float64}
+    obj_sense = MOI.get(model, MOI.ObjectiveSense())
+    n = MOI.dimension(MOI.get(model, MOI.ConstraintSet(), ci))
+    for (i, id) in enumerate(idx:(idx + n - 1))
         # Positive feasibility variable
         pos_aux_var = MOI.add_variable(model)
-        name = add_subscript(:v⁺, idx)
+        name = add_subscript(:v⁺, id)
         MOI.set(model, MOI.VariableName(), pos_aux_var, name)
-        push!(worker.feasibility_variables, pos_aux_var)
+        worker.feasibility_variables[id] = pos_aux_var
         # Nonnegativity constraint
         MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
                            MOI.GreaterThan{Float64}(0.0))
@@ -109,12 +153,14 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
         MOI.modify(model, MOI.ObjectiveFunction{G}(),
                    MOI.ScalarCoefficientChange(pos_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
         # Add to constraint
-        MOI.modify(model, ci, MOI.ScalarCoefficientChange(pos_aux_var, 1.0))
+        MOI.modify(model, ci, MOI.MultirowChange(pos_aux_var, [(i, 1.0)]))
+    end
+    for (i, id) in enumerate(idx:(idx + n - 1))
         # Negative feasibility variable
         neg_aux_var = MOI.add_variable(model)
-        name = add_subscript(:v⁻, idx)
+        name = add_subscript(:v⁻, id)
         MOI.set(model, MOI.VariableName(), neg_aux_var, name)
-        push!(worker.feasibility_variables, neg_aux_var)
+        worker.feasibility_variables[id] = neg_aux_var
         # Nonnegativity constraint
         MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
                            MOI.GreaterThan{Float64}(0.0))
@@ -122,67 +168,22 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
         MOI.modify(model, MOI.ObjectiveFunction{G}(),
                    MOI.ScalarCoefficientChange(neg_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
         # Add to constraint
-        MOI.modify(model, ci, MOI.ScalarCoefficientChange(neg_aux_var, -1.0))
-        # Update identification index
-        idx += 1
+        MOI.modify(model, ci, MOI.MultirowChange(neg_aux_var, [(i, -1.0)]))
     end
-    return idx + 1
-end
-
-function add_auxiliary_variables!(model::MOI.ModelLike,
-                                  worker::FeasibilityCutsWorker,
-                                  F::Type{<:VectorAffineDecisionFunction},
-                                  S::Type{<:MOI.AbstractVectorSet},
-                                  idx::Integer)
-    G = MOI.ScalarAffineFunction{Float64}
-    obj_sense = MOI.get(model, MOI.ObjectiveSense())
-    for ci in MOI.get(model, MOI.ListOfConstraintIndices{F, S}())
-        n = MOI.dimension(MOI.get(model, MOI.ConstraintSet(), ci))
-        for (i, id) in enumerate(idx:(idx + n - 1))
-            # Positive feasibility variable
-            pos_aux_var = MOI.add_variable(model)
-            name = add_subscript(:v⁺, id)
-            MOI.set(model, MOI.VariableName(), pos_aux_var, name)
-            push!(worker.feasibility_variables, pos_aux_var)
-            # Nonnegativity constraint
-            MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
-                               MOI.GreaterThan{Float64}(0.0))
-            # Add to objective
-            MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                       MOI.ScalarCoefficientChange(pos_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
-            # Add to constraint
-            MOI.modify(model, ci, MOI.MultirowChange(pos_aux_var, [(i, 1.0)]))
-        end
-        for (i, id) in enumerate(idx:(idx + n - 1))
-            # Negative feasibility variable
-            neg_aux_var = MOI.add_variable(model)
-            name = add_subscript(:v⁻, id)
-            MOI.set(model, MOI.VariableName(), neg_aux_var, name)
-            push!(worker.feasibility_variables, neg_aux_var)
-            # Nonnegativity constraint
-            MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
-                               MOI.GreaterThan{Float64}(0.0))
-            # Add to objective
-            MOI.modify(model, MOI.ObjectiveFunction{G}(),
-                       MOI.ScalarCoefficientChange(neg_aux_var, obj_sense == MOI.MAX_SENSE ? -1.0 : 1.0))
-            # Add to constraint
-            MOI.modify(model, ci, MOI.MultirowChange(neg_aux_var, [(i, -1.0)]))
-        end
-        # Update identification index
-        idx += n
-    end
-    return idx + 1
+    # Return updated identification index
+    return idx + n + 1
 end
 
 function restore!(model::MOI.ModelLike, worker::FeasibilityCutsWorker)
     # Delete any feasibility variables
-    if !isempty(worker.feasibility_variables)
+    if prepared(worker)
         MOI.delete(model, worker.feasibility_variables)
     end
-    empty!(worker.feasibility_variables)
     # Restore objective
     F = typeof(worker.objective)
     MOI.set(model, MOI.ObjectiveFunction{F}(), worker.objective)
+    # Switch status flag
+    worker.prepared = false
     return nothing
 end
 
@@ -200,7 +201,7 @@ function master(::IgnoreFeasibility, ::Type{T}) where T <: AbstractFloat
     return NoFeasibilityAlgorithm()
 end
 
-function worker(::IgnoreFeasibility, ::MOI.ModelLike)
+function worker(::IgnoreFeasibility, ::Vector{MOI.ConstraintIndex}, ::MOI.ModelLike)
     return NoFeasibilityAlgorithm()
 end
 function worker_type(::IgnoreFeasibility)
@@ -219,11 +220,14 @@ function master(::FeasibilityCuts, ::Type{T}) where T <: AbstractFloat
     return FeasibilityCutsMaster(T)
 end
 
-function worker(::FeasibilityCuts, model::MOI.ModelLike)
+function worker(::FeasibilityCuts, linking_constraints::Vector{MOI.ConstraintIndex}, model::MOI.ModelLike)
     # Cache objective
     func_type = MOI.get(model, MOI.ObjectiveFunctionType())
     obj = MOI.get(model, MOI.ObjectiveFunction{func_type}())
-    return FeasibilityCutsWorker(obj, Vector{MOI.VariableIndex}())
+    num_constraints = mapreduce(+, linking_constraints) do ci
+        return MOI.dimension(MOI.get(model, MOI.ConstraintSet(), ci))
+    end
+    return FeasibilityCutsWorker(obj, linking_constraints, Vector{MOI.VariableIndex}(undef, num_constraints))
 end
 function worker_type(::FeasibilityCuts)
     return FeasibilityCutsWorker
