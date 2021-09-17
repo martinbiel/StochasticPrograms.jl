@@ -22,14 +22,17 @@
 
 mutable struct Optimizer <: AbstractSampledOptimizer
     instance_optimizer
+    instance_crash::AbstractCrash
     optimizer_params::Dict{MOI.AbstractOptimizerAttribute, Any}
     parameters::SAAParameters{Float64}
     status::MOI.TerminationStatusCode
     algorithm::Union{SampleAverageApproximation, Nothing}
 
     function Optimizer(; optimizer = nothing,
+                       crash::AbstractCrash = Crash.None(),
                        kw...)
         return new(optimizer,
+                   crash,
                    Dict{MOI.AbstractOptimizerAttribute, Any}(),
                    SAAParameters{Float64}(; kw...),
                    MOI.OPTIMIZE_NOT_CALLED,
@@ -191,6 +194,15 @@ end
 
 function MOI.set(optimizer::Optimizer, ::InstanceOptimizer, optimizer_constructor)
     optimizer.instance_optimizer = optimizer_constructor
+    return nothing
+end
+
+function MOI.get(optimizer::Optimizer, ::InstanceCrash)
+    return optimizer.instance_crash
+end
+
+function MOI.set(optimizer::Optimizer, ::InstanceCrash, crash::AbstractCrash)
+    optimizer.instance_crash = crash
     return nothing
 end
 

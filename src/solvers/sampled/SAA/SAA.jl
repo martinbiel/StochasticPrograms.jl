@@ -28,7 +28,7 @@ using StochasticPrograms
 using ProgressMeter
 using Parameters
 
-import StochasticPrograms: load_model!, optimizer_name, optimal_instance
+import StochasticPrograms: AbstractCrash, load_model!, optimizer_name, optimal_instance
 
 const MOI = MathOptInterface
 const MOIU = MOI.Utilities

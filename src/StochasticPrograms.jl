@@ -82,6 +82,7 @@ export
     SubProblemOptimizerAttribute,
     RawSubProblemOptimizerParameter,
     InstanceOptimizer,
+    InstanceCrash,
     InstanceOptimizerAttribute,
     RawInstanceOptimizerParameter,
     NumSamples,

@@ -167,6 +167,8 @@ function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     check_provided_optimizer(stochasticmodel.optimizer)
     # Get the instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get instance crash
+    crash = MOI.get(stochasticmodel, InstanceCrash())
     # Get parameters
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
@@ -183,7 +185,7 @@ function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     log && ProgressMeter.update!(progress, 0, keep = false, offset = offset)
     for i = 1:M
         let sampled_model = instantiate(stochasticmodel, sampler, N; optimizer = optimizer, kw...)
-            Qs[i] = VRP(sampled_model)
+            Qs[i] = VRP(sampled_model; crash = crash)
             # Clear memory from temporary model
             clear!(sampled_model)
         end
