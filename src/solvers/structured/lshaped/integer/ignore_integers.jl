@@ -79,6 +79,8 @@ function solve_subproblem(subproblem::SubProblem,
     model = subproblem.optimizer
     if !prepared(feasibility_algorithm)
         prepare!(model, feasibility_algorithm)
+    else
+        activate!(model, feasibility_algorithm)
     end
     # Optimize auxiliary problem
     MOI.optimize!(model)
@@ -98,7 +100,7 @@ function solve_subproblem(subproblem::SubProblem,
         return FeasibilityCut(subproblem, x)
     end
     # Restore subproblem and solve as usual
-    restore_subproblem!(subproblem)
+    deactivate!(model, feasibility_algorithm)
     return solve_subproblem(subproblem, x)
 end
 

@@ -190,6 +190,8 @@ function solve_subproblem(subproblem::SubProblem,
     model = subproblem.optimizer
     if !prepared(feasibility_algorithm)
         prepare!(model, feasibility_algorithm)
+    else
+        activate!(model, feasibility_algorithm)
     end
     # Relax integrality
     unrelax = relax_decision_integrality(subproblem.model)
@@ -217,7 +219,7 @@ function solve_subproblem(subproblem::SubProblem,
     # Unrelax integrality restrictions again
     unrelax()
     # Restore subproblem and solve as usual
-    restore_subproblem!(subproblem)
+    deactivate!(model, feasibility_algorithm)
     return solve_subproblem(subproblem, metadata, NoFeasibilityAlgorithm(), worker, x)
 end
 
