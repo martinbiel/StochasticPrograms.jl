@@ -51,7 +51,13 @@ function initialize_integer_algorithm!(integer::NoIntegerAlgorithm, subproblem::
     return nothing
 end
 
-function handle_integrality!(::AbstractLShaped, ::NoIntegerAlgorithm)
+function handle_integrality!(lshaped::AbstractLShaped, ::NoIntegerAlgorithm)
+    # Ensure any binary/integer decisions are rounded
+    for (i,dvar) in enumerate(all_decision_variables(lshaped.structure.first_stage, 1))
+        if is_binary(dvar) || is_integer(dvar)
+            lshaped.x[i] = round(lshaped.x[i])
+        end
+    end
     return nothing
 end
 

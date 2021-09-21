@@ -58,6 +58,10 @@ function handle_integrality!(lshaped::AbstractLShaped, ::ConvexificationMaster)
     if gap(lshaped) <= τ
         set_metadata!(lshaped.execution.metadata, :converged, true)
     end
+    # Ensure all binary decisions are rounded
+    for (i,dvar) in enumerate(all_decision_variables(lshaped.structure.first_stage, 1))
+        lshaped.x[i] = round(lshaped.x[i])
+    end
     return nothing
 end
 """

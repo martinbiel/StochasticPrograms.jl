@@ -58,6 +58,10 @@ function handle_integrality!(lshaped::AbstractLShaped, master::CombinatorialCuts
         # Only update lower bound if all master variables have been added
         return nothing
     end
+    # Ensure all binary decisions are rounded
+    for (i,dvar) in enumerate(all_decision_variables(lshaped.structure.first_stage, 1))
+        lshaped.x[i] = round(lshaped.x[i])
+    end
     if master.parameters.lower_bound <= -1e10 ||
         (master.parameters.update_L_every != 0 &&
          rem(lshaped.data.iterations, master.parameters.update_L_every) == 0)
