@@ -150,6 +150,8 @@ function EWS(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
         z = quantile(Normal(0,1), confidence)
         L = 𝔼WS - z * σ / sqrt(N)
         U = 𝔼WS + z * σ / sqrt(N)
+        # Clear memory from temporary model
+        clear!(eval_model)
         return ConfidenceInterval(L, U, confidence)
     end
 end
@@ -433,8 +435,13 @@ function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     confidence = MOI.get(stochasticmodel, Confidence())
     N = MOI.get(stochasticmodel, NumSamples())
     # Generate expected value decision
-    sp = instantiate(stochasticmodel, sampler, N, optimizer = optimizer)
-    x̄ = expected_value_decision(sp)
+    x̄ = let sampled_model = instantiate(stochasticmodel, sampler, N, optimizer = optimizer)
+        x̄ = expected_value_decision(sp)
+        # Clear memory from temporary model
+        clear!(sampled_model)
+        # Return EVP decision
+        x̂
+    end
     # Evaluate expected value decision
     M = MOI.get(stochasticmodel, NumEvalSamples())
     MOI.set(stochasticmodel, NumEvalSamples(), MOI.get(stochasticmodel, NumEEVSamples()))

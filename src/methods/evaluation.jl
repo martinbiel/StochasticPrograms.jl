@@ -212,6 +212,8 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     check_provided_optimizer(stochasticmodel.optimizer)
     # Get the instance optimizer
     optimizer = MOI.get(stochasticmodel, InstanceOptimizer())
+    # Get instance crash
+    crash = MOI.get(stochasticmodel, InstanceCrash())
     # Get parameters
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
@@ -223,7 +225,7 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
                                 optimizer = optimizer,
                                 kw...)
     # Optimize
-    optimize!(sampled_model)
+    optimize!(sampled_model; crash = crash)
     x̂ = optimal_decision(sampled_model)
     return upper_confidence_interval(stochasticmodel, x̂, sampler; kw...)
 end
