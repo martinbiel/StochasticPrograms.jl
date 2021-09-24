@@ -147,6 +147,15 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                     end
                     # Return new key
                     newkey = Symbol(exprname)
+                elseif isa(obj, _Constant)
+                    # Update obj name to reflect stage and scenario
+                    constantname = if N > 2
+                        constantname = add_subscript(add_subscript(objkey, stage), i)
+                    else
+                        constantname = add_subscript(objkey, i)
+                    end
+                    # Return new key
+                    newkey = Symbol(constantname)
                 else
                     continue
                 end
