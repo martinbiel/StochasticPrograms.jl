@@ -112,7 +112,8 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                     newkey = Symbol(conname)
                 elseif isa(obj, AbstractArray{<:ConstraintRef}) ||
                        isa(obj, AbstractArray{<:GenericAffExpr}) ||
-                       isa(obj, AbstractArray{<:DecisionAffExpr})
+                       isa(obj, AbstractArray{<:DecisionAffExpr}) ||
+                       isa(obj, AbstractArray{<:_Constant})
                     # Update obj name to reflect stage and scenario
                     arrayname = if N > 2
                         arrayname = add_subscript(add_subscript(objkey, stage), i)
