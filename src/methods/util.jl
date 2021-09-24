@@ -116,7 +116,7 @@ function get_problem(stochasticprogram::StochasticProgram, key::Symbol)
     return stochasticprogram.problemcache[key]
 end
 
-typename(dtype::UnionAll) = dtype.body.name.name
+typename(dtype::UnionAll) = dtype.body.body.name.name
 typename(dtype::DataType) = dtype.name.name
 
 function _function_type(ci::CI{F,S}) where {F,S}
