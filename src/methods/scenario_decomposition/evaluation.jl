@@ -34,12 +34,11 @@ end
 function _eval_subproblems(structure::ScenarioDecompositionStructure{2,1,Tuple{SP}},
                            decision::AbstractVector) where SP <: ScenarioProblems
     # Update decisions
-    take_decisions!(structure.decisions[1], decision)
-    map(subprob -> update_decisions!(subprob), subproblems(structure))
+    map(subprob -> take_decisions!(subprob, all_decision_variables(subprob, 1), decision), subproblems(structure))
     # Cache result
     result = outcome_mean(subproblems(structure), probability.(scenarios(structure)))
     # Revert back to untaken decisions
-    untake_decisions!(structure)
+    map(subprob -> untake_decisions!(subprob, all_decision_variables(subprob, 1)), subproblems(structure))
     # Return evaluation result
     return result
 end
@@ -56,10 +55,15 @@ function _eval_subproblems(structure::ScenarioDecompositionStructure{2,1,Tuple{S
                 decision) do sp, d, x
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0
-                    take_decisions!(fetch(d), x)
-                    map(subprob -> update_decisions!(subprob), subproblems(scenarioproblems))
-                    return outcome_mean(subproblems(scenarioproblems),
-                                        probability.(scenarios(scenarioproblems)))
+                    # Update decisions
+                    map(subprob -> take_decisions!(subprob, all_decision_variables(subprob, 1), x), subproblems(scenarioproblems))
+                    # Cache result
+                    result = outcome_mean(subproblems(scenarioproblems),
+                                          probability.(scenarios(scenarioproblems)))
+                    # Revert back to untaken decisions
+                    map(subprob -> untake_decisions!(subprob, all_decision_variables(subprob, 1)), subproblems(scenarioproblems))
+                    # Return evaluation result
+                    return result
                 end
         end
     end
@@ -69,9 +73,13 @@ end
 function _stat_eval_subproblems(structure::ScenarioDecompositionStructure{2,1,Tuple{SP}},
                                 decision::AbstractVector) where SP <: ScenarioProblems
     # Update decisions
-    take_decisions!(structure.decisions[1], decision)
-    map(subprob -> update_decisions!(subprob), subproblems(structure))
-    return welford(subproblems(structure), probability.(scenarios(structure)))
+    map(subprob -> take_decisions!(subprob, all_decision_variables(subprob, 1), x), subproblems(structure))
+    # Cache result
+    result = welford(subproblems(structure), probability.(scenarios(structure)))
+    # Revert back to untaken decisions
+    map(subprob -> untake_decisions!(subprob, all_decision_variables(subprob, 1)), subproblems(structure))
+    # Return evaluation result
+    return result
 end
 function _stat_eval_subproblems(structure::ScenarioDecompositionStructure{2,1,Tuple{SP}},
                                 decision::AbstractVector) where SP <: DistributedScenarioProblems
@@ -86,10 +94,14 @@ function _stat_eval_subproblems(structure::ScenarioDecompositionStructure{2,1,Tu
                 x) do sp, d, x
                     scenarioproblems = fetch(sp)
                     num_scenarios(scenarioproblems) == 0 && return 0.0, 0.0, 0.0, 0
-                    take_decisions!(fetch(d), x)
-                    map(subprob -> update_decisions!(subprob), subproblems(scenarioproblems))
-                    return welford(subproblems(scenarioproblems),
-                                   probability.(scenarios(scenarioproblems)))
+                    # Update decisions
+                    map(subprob -> take_decisions!(subprob, all_decision_variables(subprob, 1), x), subproblems(scenarioproblems))
+                    # Cache result
+                    result = welford(subproblems(scenarioproblems), probability.(scenarios(scenarioproblems)))
+                    # Revert back to untaken decisions
+                    map(subprob -> untake_decisions!(subprob, all_decision_variables(subprob, 1)), subproblems(scenarioproblems))
+                    # Return evaluation result
+                    return result
                 end
         end
     end
