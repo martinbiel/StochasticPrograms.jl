@@ -60,9 +60,6 @@ Is always defined for scenarios created through @scenario. Other user defined sc
 function set_probability!(scenario::AbstractScenario, π::AbstractFloat)
     scenario.probability.π = π
 end
-function Base.zero(::Type{S}) where S <: AbstractScenario
-    error("zero not implemented for scenario type: ", S)
-end
 function Base.show(io::IO, scenario::S) where S <: AbstractScenario
     print(io, "$(S.name.name) with probability $(probability(scenario))")
     scenariotext(io, scenario)
@@ -93,11 +90,16 @@ struct ExpectedScenario{S <: AbstractScenario} <: AbstractScenario
         return new{typeof(scenario)}(scenario)
     end
 end
+function ExpectedScenario(expected::ExpectedScenario)
+    return expected
+end
 function Base.show(io::IO, scenario::ExpectedScenario{S}) where S <: AbstractScenario
     print(io, "Expected scenario of type $(S.name.name)")
     scenariotext(io, scenario.scenario)
     return io
 end
+
+struct EmptyScenario{S <: AbstractScenario} <: AbstractScenario end
 """
     expected(scenarios::Vector{<:AbstractScenario})
 
@@ -110,8 +112,14 @@ Otherwise, user-defined scenario types must implement this method for full funct
 See also [`ExpectedScenario`](@ref)
 """
 function expected(scenarios::Vector{S}) where S <: AbstractScenario
-    isempty(scenarios) && return ExpectedScenario(zero(S))
-    return reduce(expected, scenarios; init = ExpectedScenario(zero(S)))
+    isempty(scenarios) && return ExpectedScenario(EmptyScenario{S}())
+    return reduce(expected, scenarios; init = ExpectedScenario(EmptyScenario{S}()))
+end
+function expected(ξ₁::AbstractScenario, ξ₂::ExpectedScenario{<:EmptyScenario})
+    return ExpectedScenario(ξ₁)
+end
+function expected(ξ₁::ExpectedScenario{<:EmptyScenario}, ξ₂::AbstractScenario)
+    return ExpectedScenario(ξ₂)
 end
 function expected(ξ₁::ExpectedScenario{S}, ξ₂::S) where S <: AbstractScenario
     set_probability!(ξ₁.scenario, 1.0)
@@ -147,19 +155,6 @@ struct Scenario{T} <: AbstractScenario
     end
 end
 
-function Base.zero(::Type{Scenario{NT}}) where NT <: NamedTuple
-    return Scenario(NamedTuple{Tuple(fieldnames(NT))}(zero.(NT.types)); probability = 1.0)
-end
-function Base.zero(::Type{Scenario{D}}) where {T, N, D <: Array{T,N}}
-    return Scenario(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end); probability = 1.0)
-end
-function Base.zero(::Type{Scenario{D}}) where {T, N, Ax <: NTuple, D <: DenseAxisArray{T,N,Ax}}
-    axs = ntuple(Val{N}()) do i Ax.types[i]() end
-    return Scenario(DenseAxisArray(Array{T,N}(undef, ntuple(Val{N}()) do i 0 end), axs...); probability = 1.0)
-end
-function Base.zero(::Type{Scenario{D}}) where {T, N, K, D <: SparseAxisArray{T,N,K}}
-    return Scenario(Dict{K,T}(); probability = 1.0)
-end
 function scenariotext(io::IO, scenario::Scenario{NT}) where NT <: NamedTuple
     for (k,v) in pairs(scenario.data)
         print(io, "\n  $k: $v")

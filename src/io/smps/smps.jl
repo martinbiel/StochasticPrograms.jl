@@ -30,7 +30,7 @@ using Distributed
 
 # External libraries
 using StochasticPrograms
-using StochasticPrograms: canonical, AdditiveZeroArray
+using StochasticPrograms: canonical
 using Compat
 using Distributions
 using Distributions: AliasTable

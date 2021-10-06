@@ -54,29 +54,15 @@ struct SMPSScenario{T <: AbstractFloat, A <: AbstractArray{T,1}, M <: AbstractAr
     end
 end
 
-function Base.zero(::Type{SMPSScenario{T}}) where T <: AbstractFloat
-    return SMPSScenario(Probability(1.0),
-                        AdditiveZeroArray{T,1}(),
-                        AdditiveZeroArray{T,2}(),
-                        AdditiveZeroArray{T,2}(),
-                        AdditiveZeroArray{T,1}(),
-                        AdditiveZeroArray{T,2}(),
-                        AdditiveZeroArray{T,1}(),
-                        AdditiveZeroArray{T,1}())
-end
-
-function StochasticPrograms.expected(scenarios::Vector{<:SMPSScenario{T}}) where T <: AbstractFloat
-    isempty(scenarios) && return zero(SMPSScenario{T})
-    expected = reduce(scenarios) do ξ₁, ξ₂
-        SMPSScenario(Probability(1.0),
-                     probability(ξ₁) * ξ₁.Δq + probability(ξ₂) * ξ₂.Δq,
-                     probability(ξ₁) * ξ₁.ΔT + probability(ξ₂) * ξ₂.ΔT,
-                     probability(ξ₁) * ξ₁.ΔW + probability(ξ₂) * ξ₂.ΔW,
-                     probability(ξ₁) * ξ₁.Δh + probability(ξ₂) * ξ₂.Δh,
-                     probability(ξ₁) * ξ₁.ΔC + probability(ξ₂) * ξ₂.ΔC,
-                     probability(ξ₁) * ξ₁.Δd₁ + probability(ξ₂) * ξ₂.Δd₁,
-                     probability(ξ₁) * ξ₁.Δd₂ + probability(ξ₂) * ξ₂.Δd₂)
-    end
+function StochasticPrograms.expected(ξ₁::SMPSScenario{T}, ξ₂::SMPSScenario{T}) where T <: AbstractFloat
+    expected = SMPSScenario(Probability(1.0),
+                            probability(ξ₁) * ξ₁.Δq + probability(ξ₂) * ξ₂.Δq,
+                            probability(ξ₁) * ξ₁.ΔT + probability(ξ₂) * ξ₂.ΔT,
+                            probability(ξ₁) * ξ₁.ΔW + probability(ξ₂) * ξ₂.ΔW,
+                            probability(ξ₁) * ξ₁.Δh + probability(ξ₂) * ξ₂.Δh,
+                            probability(ξ₁) * ξ₁.ΔC + probability(ξ₂) * ξ₂.ΔC,
+                            probability(ξ₁) * ξ₁.Δd₁ + probability(ξ₂) * ξ₂.Δd₁,
+                            probability(ξ₁) * ξ₁.Δd₂ + probability(ξ₂) * ξ₂.Δd₂)
     return StochasticPrograms.ExpectedScenario(expected)
 end
 

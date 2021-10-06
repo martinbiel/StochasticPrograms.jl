@@ -588,8 +588,8 @@ end
 function expected(scenarioproblems::ScenarioProblems)
     return expected(scenarioproblems.scenarios)
 end
-function expected(scenarioproblems::DistributedScenarioProblems{S}) where S <: AbstractScenario
-    partial_expectations = Vector{ExpectedScenario{S}}(undef, nworkers())
+function expected(scenarioproblems::DistributedScenarioProblems{S})::ExpectedScenario{S} where S <: AbstractScenario
+    partial_expectations = Vector{ExpectedScenario}(undef, nworkers())
     return get_from_scenarioproblems(scenarioproblems, expected, partial_expectations) do sp
         return expected(fetch(sp))
     end
