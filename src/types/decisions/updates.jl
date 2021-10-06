@@ -120,3 +120,8 @@ function update_decision_state!(dref::DecisionRef, state::DecisionState)
     end
     return nothing
 end
+
+function update_decision_states!(drefs::Vector{DecisionRef}, state::DecisionState)
+    map(dref -> update_decision_state!(dref, state), drefs)
+    return nothing
+end
