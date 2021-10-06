@@ -93,6 +93,7 @@ end
 function ExpectedScenario(expected::ExpectedScenario)
     return expected
 end
+probability(expected::ExpectedScenario)::Float64 = probability(expected.scenario)
 function Base.show(io::IO, scenario::ExpectedScenario{S}) where S <: AbstractScenario
     print(io, "Expected scenario of type $(S.name.name)")
     scenariotext(io, scenario.scenario)
@@ -122,16 +123,12 @@ function expected(ξ₁::ExpectedScenario{<:EmptyScenario}, ξ₂::AbstractScena
     return ExpectedScenario(ξ₂)
 end
 function expected(ξ₁::ExpectedScenario{S}, ξ₂::S) where S <: AbstractScenario
-    set_probability!(ξ₁.scenario, 1.0)
     return expected(ξ₁.scenario, ξ₂)
 end
 function expected(ξ₁::S, ξ₂::ExpectedScenario{S}) where S <: AbstractScenario
-    set_probability!(ξ₂.scenario, 1.0)
     return expected(ξ₁, ξ₂.scenario)
 end
 function expected(ξ₁::ExpectedScenario{S}, ξ₂::ExpectedScenario{S}) where S <: AbstractScenario
-    set_probability!(ξ₁.scenario, 1.0)
-    set_probability!(ξ₂.scenario, 1.0)
     return expected(ξ₁.scenario, ξ₂.scenario)
 end
 

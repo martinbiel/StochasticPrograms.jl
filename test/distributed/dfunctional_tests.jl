@@ -106,5 +106,22 @@
             @test isapprox(EV(sp_copy), EV(sp), rtol = tol)
             @test isapprox(EEV(sp_copy), EEV(sp), rtol = tol)
         end
+        @testset "SMPS" begin
+            simple_smps = read("io/smps/simple.smps", StochasticProgram, optimizer = LShaped.Optimizer)
+            set_optimizer_attribute(simple_smps, MasterOptimizer(), () -> GLPK.Optimizer())
+            set_optimizer_attribute(simple_smps, SubProblemOptimizer(), () -> GLPK.Optimizer())
+            optimize!(simple_smps)
+            @test termination_status(simple_smps) == MOI.OPTIMAL
+            @test isapprox(optimal_decision(simple_smps), simple_res.x̄, rtol = tol)
+            for i in 1:num_scenarios(simple_smps)
+                @test isapprox(optimal_recourse_decision(simple_smps, i), simple_res.ȳ[i], rtol = tol)
+            end
+            @test isapprox(objective_value(simple_smps), simple_res.VRP, rtol = tol)
+            @test isapprox(EWS(simple_smps), simple_res.EWS, rtol = tol)
+            @test isapprox(EVPI(simple_smps), simple_res.EVPI, rtol = tol)
+            @test isapprox(VSS(simple_smps), simple_res.VSS, rtol = tol)
+            @test isapprox(EV(simple_smps), simple_res.EV, rtol = tol)
+            @test isapprox(EEV(simple_smps), simple_res.EEV, rtol = tol)
+        end
     end
 end
