@@ -27,15 +27,31 @@ Conveniece type that adheres to the [`AbstractScenario`](@ref) abstraction. Obta
 
 See also: [`SMPSSampler`](@ref)
 """
-struct SMPSScenario{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractScenario
+struct SMPSScenario{T <: AbstractFloat, A <: AbstractArray{T,1}, M <: AbstractArray{T,2}} <: AbstractScenario
     probability::Probability
-    Δq::Vector{T}
+    Δq::A
     ΔT::M
     ΔW::M
-    Δh::Vector{T}
+    Δh::A
     ΔC::M
-    Δd₁::Vector{T}
-    Δd₂::Vector{T}
+    Δd₁::A
+    Δd₂::A
+
+    function SMPSScenario(π::Probability, Δq::A, ΔT::M, ΔW::M, Δh::A, ΔC::M, Δd₁::A, Δd₂::A) where {T <: AbstractFloat, A <: AbstractArray{T,1}, M <: AbstractArray{T,2}}
+        return new{T,A,M}(π, Δq, ΔT, ΔW, Δh, ΔC, Δd₁, Δd₂)
+    end
+
+    function SMPSScenario(π::Probability, Δq::AbstractVector, ΔT::AbstractMatrix, ΔW::AbstractMatrix, Δh::AbstractVector, ΔC::AbstractMatrix, Δd₁::AbstractVector, Δd₂::AbstractVector)
+        T = promote_type(eltype(Δq), eltype(ΔT), eltype(ΔW), eltype(Δh), eltype(ΔC), eltype(Δd₁), eltype(Δd₂), Float32)
+        return new{T,Vector{T},Matrix{T}}(π,
+                                          convert(Vector{T}, Δq),
+                                          convert(Matrix{T}, ΔT),
+                                          convert(Matrix{T}, ΔW),
+                                          convert(Vector{T}, Δh),
+                                          convert(Matrix{T}, ΔC),
+                                          convert(Vector{T}, Δd₁),
+                                          convert(Vector{T}, Δd₂))
+    end
 end
 
 function Base.zero(::Type{SMPSScenario{T}}) where T <: AbstractFloat

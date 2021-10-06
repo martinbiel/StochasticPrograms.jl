@@ -51,7 +51,7 @@ Sampler object for SMPS scenarios. Obtained by reading from a model defined in S
 
 See also: [`SMPSScenario`](@ref)
 """
-struct SMPSSampler{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractSampler{SMPSScenario{T,M}}
+struct SMPSSampler{T <: AbstractFloat, M <: AbstractMatrix} <: AbstractSampler{SMPSScenario{T,Vector{T},M}}
     template::LPData{T,M}
     technology::UnitRange{Int}
     recourse::UnitRange{Int}
