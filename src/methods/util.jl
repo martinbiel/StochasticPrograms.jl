@@ -119,6 +119,21 @@ end
 typename(dtype::UnionAll) = dtype.body.body.name.name
 typename(dtype::DataType) = dtype.name.name
 
+function run_manual_gc()
+    @everywhere GC.gc()
+    @everywhere ccall(:malloc_trim, Cvoid, (Cint,), 0)
+    @everywhere sleep(1)
+    @everywhere GC.gc()
+    @everywhere ccall(:malloc_trim, Cvoid, (Cint,), 0)
+    @everywhere sleep(1)
+    @everywhere GC.gc()
+    @everywhere ccall(:malloc_trim, Cvoid, (Cint,), 0)
+    @everywhere sleep(1)
+    @everywhere GC.gc()
+    @everywhere ccall(:malloc_trim, Cvoid, (Cint,), 0)
+    @everywhere sleep(10)
+end
+
 function _function_type(ci::CI{F,S}) where {F,S}
     return F
 end

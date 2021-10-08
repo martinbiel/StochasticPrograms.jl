@@ -178,6 +178,7 @@ function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
     offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
     indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
+    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     progress = Progress(M, 0.0, "$(repeat(" ", indent))Lower CI    ")
@@ -188,6 +189,9 @@ function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
             Qs[i] = VRP(sampled_model; crash = crash)
             # Clear memory from temporary model
             clear!(sampled_model)
+        end
+        if nworkers() > 1 && manual_gc
+            run_manual_gc()
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset)
     end
@@ -253,6 +257,7 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision
     keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
     offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
     indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
+    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
     # Generate upper bound
     Q = Vector{Float64}(undef, T)
     progress = Progress(T, 0.0, "$(repeat(" ", indent))Upper CI    ")
@@ -269,6 +274,9 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision
             Q[i] = evaluate_decision(eval_model, decision)
             # Clear memory from temporary model
             clear!(eval_model)
+        end
+        if nworkers() > 1 && manual_gc
+            run_manual_gc()
         end
         log && ProgressMeter.update!(progress, i, keep = keep, offset = offset - 1)
     end

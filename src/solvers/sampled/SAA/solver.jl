@@ -42,6 +42,7 @@ end
     keep::Bool = false
     offset::Int = 5
     indent::Int = 4
+    manual_gc::Bool = false
 end
 
 """
