@@ -222,15 +222,20 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
     num_samples = MOI.get(stochasticmodel, NumSamples())
+    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
     # decision generation
-    sampled_model = instantiate(stochasticmodel,
-                                sampler,
-                                num_samples;
-                                optimizer = optimizer,
-                                kw...)
-    # Optimize
-    optimize!(sampled_model; crash = crash)
-    x̂ = optimal_decision(sampled_model)
+    x̂ = let sampled_model = instantiate(stochasticmodel,
+                                        sampler,
+                                        num_samples;
+                                        optimizer = optimizer,
+                                        kw...)
+        # Optimize
+        optimize!(sampled_model; crash = crash)
+        x̂ = optimal_decision(sampled_model)
+    end
+    if nworkers() > 1 && manual_gc
+        run_manual_gc()
+    end
     return upper_confidence_interval(stochasticmodel, x̂, sampler; kw...)
 end
 """
