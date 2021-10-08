@@ -232,6 +232,8 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
         # Optimize
         optimize!(sampled_model; crash = crash)
         x̂ = optimal_decision(sampled_model)
+        # Clear memory from temporary model
+        clear!(sampled_model)
     end
     if nworkers() > 1 && manual_gc
         run_manual_gc()
