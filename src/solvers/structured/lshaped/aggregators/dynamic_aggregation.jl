@@ -72,7 +72,7 @@ function aggregate_cut!(lshaped::AbstractLShaped, aggregation::DynamicAggregatio
     return false
 end
 
-function aggregate_cut!(cutqueue::CutQueue, aggregation::DynamicAggregation, ::MetaData, t::Integer, cut::HyperPlane, x::AbstractArray)
+function aggregate_cut!(cutqueue::CutQueue, aggregation::DynamicAggregation, ::MetaDataChannel, t::Integer, cut::HyperPlane, x::AbstractArray)
     put!(cutqueue, (t, cut))
     return nothing
 end
