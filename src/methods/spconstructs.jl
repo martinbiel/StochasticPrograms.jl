@@ -436,7 +436,7 @@ function EEV(stochasticmodel::StochasticModel{2}, sampler::AbstractSampler)
     N = MOI.get(stochasticmodel, NumSamples())
     # Generate expected value decision
     x̄ = let sampled_model = instantiate(stochasticmodel, sampler, N, optimizer = optimizer)
-        x̄ = expected_value_decision(sp)
+        x̄ = expected_value_decision(sampled_model)
         # Clear memory from temporary model
         clear!(sampled_model)
         # Return EVP decision
