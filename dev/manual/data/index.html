@@ -51,7 +51,7 @@ Subject to
  x + y₁ ≤ 2.0
  x + y₂ ≤ 2.0
 Solver name: GLPK
-VRP = 2.0</code></pre><p>Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to <a href="../../library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, Vector{&lt;:AbstractScenario}}"><code>instantiate</code></a>:</p><pre><code class="language-julia hljs">sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5, optimizer = GLPK.Optimizer)
+VRP = 2.0</code></pre><p>Now, we can investigate the impact of the stage parameters by changing them slightly and reinstantiate the problem. This is achieved by supplying the new parameter values as keyword arguments to <a href="../../library/public/#StochasticPrograms.instantiate-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, Vector{var&quot;#s77&quot;} where var&quot;#s77&quot;&lt;:AbstractScenario}"><code>instantiate</code></a>:</p><pre><code class="language-julia hljs">sp = instantiate(sm, [ξ₁,ξ₂], l₁ = -2., u₁ = 2., U = 2., l₂ = -0.5, u₂ = 0.5, optimizer = GLPK.Optimizer)
 
 println(sp)
 
@@ -74,12 +74,12 @@ VRP = 2.25</code></pre><h2 id="Scenario-data"><a class="docs-heading-anchor" hre
   d₁: 500.0
   d₂: 100.0</code></pre><p>Below, an equivalent formulation is given that instead defines a random vector.</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:4]</code></pre><p>paired with</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:4] = [24.0, 28.0, 500.0, 100.0] probability = 0.4</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.4 and underlying data:
 
-[24.0, 28.0, 500.0, 100.0]</code></pre><p>Multidimensional random data is also supported. A simple example is given below.</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:2, j in 1:3]</code></pre><p>paired with</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:2, j in 1:3] = rand(2, 3) probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.9972049492823014 and underlying data:
+[24.0, 28.0, 500.0, 100.0]</code></pre><p>Multidimensional random data is also supported. A simple example is given below.</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:2, j in 1:3]</code></pre><p>paired with</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:2, j in 1:3] = rand(2, 3) probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.8254035668939852 and underlying data:
 
-[0.31874238872083116 0.3514649663593079 0.7652770686829733; 0.38470952540556647 0.9635984150611009 0.8861888287956178]</code></pre><p>The assignment syntax is used to directly create the random matrix. The dimensions of the RHS must match the index declaration, which in turn must match the <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> declaration. It is also possible to construct more complex examples using JuMP&#39;s container syntax. For example,</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:3, k in [:a, :b, :c]]</code></pre><p>and</p><pre><code class="language-julia hljs">data = Dict((1, :a) =&gt; 1.0, (2, :a) =&gt; 2.0, (3, :a) =&gt; 3.0,
+[0.9998551794202823 0.012621040634131164 0.6801321645212897; 0.14593909653671022 0.00913574161036168 0.09654506489996617]</code></pre><p>The assignment syntax is used to directly create the random matrix. The dimensions of the RHS must match the index declaration, which in turn must match the <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> declaration. It is also possible to construct more complex examples using JuMP&#39;s container syntax. For example,</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:3, k in [:a, :b, :c]]</code></pre><p>and</p><pre><code class="language-julia hljs">data = Dict((1, :a) =&gt; 1.0, (2, :a) =&gt; 2.0, (3, :a) =&gt; 3.0,
             (1, :b) =&gt; 4.0, (2, :b) =&gt; 5.0, (3, :b) =&gt; 6.0,
             (1, :c) =&gt; 7.0, (2, :c) =&gt; 8.0, (3, :c) =&gt; 9.0)
-ξ₁ = @scenario ξ[i in 1:3, k in [:a, :b, :c]] data[i,k] probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.8175371462801374 and underlying data:
+ξ₁ = @scenario ξ[i in 1:3, k in [:a, :b, :c]] data[i,k] probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.0929507313766691 and underlying data:
 
 2-dimensional DenseAxisArray{Float64,2,...} with index sets:
     Dimension 1, Base.OneTo(3)
@@ -89,7 +89,7 @@ And data, a 3×3 Matrix{Float64}:
  2.0  5.0  8.0
  3.0  6.0  9.0</code></pre><p>or the shorthand:</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:3, k in [:a, :b, :c]] = [1. 2. 3.;
                                                  4. 5. 6.;
-                                                 7. 8. 9] probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.942681528835317 and underlying data:
+                                                 7. 8. 9] probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.5226999656496945 and underlying data:
 
 2-dimensional DenseAxisArray{Float64,2,...} with index sets:
     Dimension 1, Base.OneTo(3)
@@ -97,7 +97,7 @@ And data, a 3×3 Matrix{Float64}:
 And data, a 3×3 Matrix{Float64}:
  1.0  2.0  3.0
  4.0  5.0  6.0
- 7.0  8.0  9.0</code></pre><p>Triangular and conditional indexing work as well:</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:3, j in 1:3; i &lt;= j]</code></pre><p>and</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:3, j in 1:3; i &lt;= j] i+j probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.9649401192051282 and underlying data:
+ 7.0  8.0  9.0</code></pre><p>Triangular and conditional indexing work as well:</p><pre><code class="language-julia hljs">@uncertain ξ[i in 1:3, j in 1:3; i &lt;= j]</code></pre><p>and</p><pre><code class="language-julia hljs">ξ₁ = @scenario ξ[i in 1:3, j in 1:3; i &lt;= j] i+j probability = rand()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.4795991147223939 and underlying data:
 
   [1, 1]  =  2
   [1, 2]  =  3
@@ -223,11 +223,11 @@ sampler = Sampler() do
     return Scenario(q₁ = 24.0 + randn(), q₂ = 28.0 + randn(), d₁ = 500.0 + randn(), d₂ = 100 + randn(), probability = rand())
 end
 
-sampler()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.9149290036628314
-  q₁: 23.929416861046104
-  q₂: 28.531476753783195
-  d₁: 499.1931476739933
-  d₂: 102.4569913339833</code></pre><p>Samplers can also be conveniently created using <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a>. We can define a simple scenario type and a simple sampler as follows:</p><pre><code class="language-julia hljs">using StochasticPrograms
+sampler()</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.4886128300795012
+  q₁: 24.297287984535462
+  q₂: 28.382395967790607
+  d₁: 499.4023655232718
+  d₂: 99.98955475536262</code></pre><p>Samplers can also be conveniently created using <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a>. We can define a simple scenario type and a simple sampler as follows:</p><pre><code class="language-julia hljs">using StochasticPrograms
 
 @define_scenario ExampleScenario = begin
     w::Float64
@@ -247,9 +247,9 @@ end</code></pre><p>This creates a new <a href="../../library/public/#StochasticP
 ξ = sampler()
 
 println(ξ)
-println(&quot;ξ: $(ξ.w)&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ExampleScenario with probability 0.7701803478856664
-  w: 0.5351288372577702
-ξ: 0.5351288372577702</code></pre><p>Now, lets create a stochastic model using the <code>ExampleScenario</code> type:</p><pre><code class="language-julia hljs">sm = @stochastic_model begin
+println(&quot;ξ: $(ξ.w)&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">ExampleScenario with probability 0.951916339835734
+  w: 0.6222226769966677
+ξ: 0.6222226769966677</code></pre><p>Now, lets create a stochastic model using the <code>ExampleScenario</code> type:</p><pre><code class="language-julia hljs">sm = @stochastic_model begin
     @stage 1 begin
         @decision(model, x &gt;= 0)
         @objective(model, Min, x)
@@ -279,11 +279,11 @@ Min x + 0.2 y₅ + 0.2 y₄ + 0.2 y₃ + 0.2 y₂ + 0.2 y₁
 Subject to
  x ∈ Decisions
  x ≥ 0.0
- x + y₁ = -1.652041583838595
- x + y₂ = -0.6582676917128082
- x + y₃ = 2.364485406800317
- x + y₄ = -0.005116361108615195
- x + y₅ = 1.0640888692377932
+ x + y₁ = -4.534172697601061
+ x + y₂ = 0.8628430528458241
+ x + y₃ = 1.9265432100763813
+ x + y₄ = -1.0446735148430168
+ x + y₅ = -0.10090245986733057
 Solver name: No optimizer attached.</code></pre><p>Sampled stochastic programs are solved as usual:</p><pre><code class="language-julia hljs">using GLPK
 
 set_optimizer(sp, GLPK.Optimizer)
@@ -292,4 +292,4 @@ optimize!(sp)
 
 println(&quot;optimal decision: $(optimal_decision(sp))&quot;)
 println(&quot;optimal value: $(objective_value(sp))&quot;)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">optimal decision: [0.0]
-optimal value: 0.22262972787561844</code></pre><p>Again, if the functionality offered by <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> is not adequate, consider <a href="#Custom-scenarios">Custom scenarios</a>.</p><h2 id="Custom-scenarios"><a class="docs-heading-anchor" href="#Custom-scenarios">Custom scenarios</a><a id="Custom-scenarios-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-scenarios" title="Permalink"></a></h2><p>More complex scenario designs are probably not implementable using <a href="../../library/public/#StochasticPrograms.@define_scenario"><code>@define_scenario</code></a>. However, it is still possible to create a custom scenario type as long as:</p><ul><li>The type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>, which should return an additive zero element if given an empty array</li></ul><p>The restriction on <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>See the <a href="../examples/#Continuous-scenario-distribution">Continuous scenario distribution</a> for an example of custom scenario/sampler implementations.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quickstart/">« Quick start</a><a class="docs-footer-nextpage" href="../model/">Stochastic models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Monday 13 December 2021 11:01">Monday 13 December 2021</span>. Using Julia version 1.7.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+optimal value: -0.5780724818778408</code></pre><p>Again, if the functionality offered by <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> is not adequate, consider <a href="#Custom-scenarios">Custom scenarios</a>.</p><h2 id="Custom-scenarios"><a class="docs-heading-anchor" href="#Custom-scenarios">Custom scenarios</a><a id="Custom-scenarios-1"></a><a class="docs-heading-anchor-permalink" href="#Custom-scenarios" title="Permalink"></a></h2><p>More complex scenario designs are probably not implementable using <a href="../../library/public/#StochasticPrograms.@define_scenario"><code>@define_scenario</code></a>. However, it is still possible to create a custom scenario type as long as:</p><ul><li>The type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractScenario"><code>AbstractScenario</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.probability-Tuple{AbstractScenario}"><code>probability</code></a></li><li>The type implements <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a>, which should return an additive zero element if given an empty array</li></ul><p>The restriction on <a href="../../library/public/#StochasticPrograms.expected-Union{Tuple{Vector{S}}, Tuple{S}} where S&lt;:AbstractScenario"><code>expected</code></a> is there to support taking expectations in a distributed environment. We are also free to define custom sampler objects, as long as:</p><ul><li>The sampler type is a subtype of <a href="../../library/public/#StochasticPrograms.AbstractSampler"><code>AbstractSampler</code></a></li><li>The sampler type implements a functor call that performs the sampling</li></ul><p>See the <a href="../examples/#Continuous-scenario-distribution">Continuous scenario distribution</a> for an example of custom scenario/sampler implementations.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../quickstart/">« Quick start</a><a class="docs-footer-nextpage" href="../model/">Stochastic models »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.10 on <span class="colophon-date" title="Monday 13 December 2021 11:52">Monday 13 December 2021</span>. Using Julia version 1.6.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
