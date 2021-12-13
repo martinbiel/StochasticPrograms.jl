@@ -1,6 +1,13 @@
 StochasticPrograms release notes
 ==================
 
+Version 0.6.3 (Dec 13, 2021)
+-----------------------------
+
+Bugfixes.
+
+- Added `InstanceCrash` attribute to specify crash method to use in sample-based schemes.
+
 Version 0.6.2 (Jun 02, 2021)
 -----------------------------
 
