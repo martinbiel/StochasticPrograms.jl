@@ -732,7 +732,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_less_than_(dual(sp_cref), objective_sense(sp))
+    return JuMP._shadow_price_less_than(dual(sp_cref), objective_sense(sp))
 end
 """
     shadow_price(sp_cref::SPConstraintRef, scenario_index::Integer)
@@ -748,7 +748,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_less_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
+    return JuMP._shadow_price_less_than(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.GreaterThan}
@@ -758,7 +758,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_greater_than_(dual(sp_cref), objective_sense(sp))
+    return JuMP._shadow_price_greater_than(dual(sp_cref), objective_sense(sp))
 end
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.GreaterThan}
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `shadow_price(sp_cref)`.")
@@ -767,7 +767,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_greater_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
+    return JuMP._shadow_price_greater_than(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.EqualTo}
@@ -780,9 +780,9 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
     sense = objective_sense(sp)
     dual_val = dual(sp_cref)
     if dual_val > 0
-        return JuMP.shadow_price_greater_than_(dual_val, sense)
+        return JuMP._shadow_price_greater_than(dual_val, sense)
     else
-        return JuMP.shadow_price_less_than_(dual_val, sense)
+        return JuMP._shadow_price_less_than(dual_val, sense)
     end
 end
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.EqualTo}
@@ -795,9 +795,9 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
     sense = objective_sense(sp, scenario_index)
     dual_val = dual(sp_cref, scenario_index)
     if dual_val > 0
-        return JuMP.shadow_price_greater_than_(dual_val, sense)
+        return JuMP._shadow_price_greater_than(dual_val, sense)
     else
-        return JuMP.shadow_price_less_than_(dual_val, sense)
+        return JuMP._shadow_price_less_than(dual_val, sense)
     end
 end
 """

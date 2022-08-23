@@ -195,6 +195,7 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
     @test  2.0 == @inferred JuMP.reduced_cost(x)
     @test  0.0 == @inferred JuMP.reduced_cost(y, 1)
     @test -1.0 == @inferred JuMP.dual(c, 1)
+    @test -1.0 == @inferred JuMP.shadow_price(c, 1)
     @test  2.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(x))
     @test  0.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(y), 1)
 end
