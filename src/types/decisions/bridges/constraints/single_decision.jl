@@ -23,7 +23,7 @@
 # SingleDecision #
 # ========================== #
 mutable struct SingleDecisionConstraintBridge{T, S <: MOI.AbstractScalarSet} <: MOIB.Constraint.AbstractBridge
-    constraint::CI{MOI.SingleVariable, S}
+    constraint::CI{MOI.VariableIndex, S}
     decision::SingleDecision
 end
 
@@ -33,7 +33,7 @@ function MOIB.Constraint.bridge_constraint(::Type{SingleDecisionConstraintBridge
                                            set::S) where {T, S <: MOI.AbstractScalarSet}
     # Perform the bridge mapping manually
     g = MOIB.bridged_variable_function(model, f.decision)
-    mapped_variable = MOI.SingleVariable(only(g.terms).variable_index)
+    mapped_variable = MOI.VariableIndex(only(g.terms).variable.value)
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
                                     mapped_variable,
@@ -48,10 +48,10 @@ function MOI.supports_constraint(::Type{<:SingleDecisionConstraintBridge{T}},
     return true
 end
 function MOIB.added_constrained_variable_types(::Type{<:SingleDecisionConstraintBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:SingleDecisionConstraintBridge{T,S}}) where {T,S}
-    return [(MOI.SingleVariable, S), (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T})]
+    return [(MOI.VariableIndex, S), (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T})]
 end
 function MOIB.Constraint.concrete_bridge_type(::Type{<:SingleDecisionConstraintBridge{T}},
                               ::Type{SingleDecision},
@@ -59,8 +59,8 @@ function MOIB.Constraint.concrete_bridge_type(::Type{<:SingleDecisionConstraintB
     return SingleDecisionConstraintBridge{T,S}
 end
 
-MOI.get(b::SingleDecisionConstraintBridge{T,S}, ::MOI.NumberOfConstraints{MOI.SingleVariable, S}) where {T,S} = 1
-MOI.get(b::SingleDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.SingleVariable, S}) where {T,S} = [b.constraint]
+MOI.get(b::SingleDecisionConstraintBridge{T,S}, ::MOI.NumberOfConstraints{MOI.VariableIndex, S}) where {T,S} = 1
+MOI.get(b::SingleDecisionConstraintBridge{T}, ::MOI.ListOfConstraintIndices{MOI.VariableIndex, S}) where {T,S} = [b.constraint]
 
 function MOI.get(model::MOI.ModelLike, attr::MOI.AbstractConstraintAttribute,
                  bridge::SingleDecisionConstraintBridge)

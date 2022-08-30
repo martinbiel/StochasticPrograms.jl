@@ -165,7 +165,7 @@ function scenariotext(io::IO, scenario::Scenario)
 end
 
 Scenarios{S <: AbstractScenario} = Vector{S}
-ScenarioTypes{N} = NTuple{N, Union{DataType, UnionAll}}
+ScenarioTypes{N} = NTuple{N, Union{Type, UnionAll}}
 
 function expected(ξ₁::Scenario{NT}, ξ₂::Scenario{NT}) where NT <: NamedTuple
     keys(ξ₁.data) == keys(ξ₂.data) || error("Inconsistent scenarios. $(keys(ξ₁)) and $(keys(ξ₂)) do not match.")

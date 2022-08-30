@@ -174,11 +174,11 @@ function lower_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     α = 1 - confidence
     N = MOI.get(stochasticmodel, NumSamples())
     M = MOI.get(stochasticmodel, NumLowerTrials())
-    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
-    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
-    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
-    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
-    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
+    log = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("log"))
+    keep = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("keep"))
+    offset = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("offset"))
+    indent = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("indent"))
+    manual_gc = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("manual_gc"))
     # Lower bound
     Qs = Vector{Float64}(undef, M)
     progress = Progress(M, 0.0, "$(repeat(" ", indent))Lower CI    ")
@@ -222,7 +222,7 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, sampler:
     confidence = MOI.get(stochasticmodel, Confidence())
     α = 1 - confidence
     num_samples = MOI.get(stochasticmodel, NumSamples())
-    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
+    manual_gc = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("manual_gc"))
     # decision generation
     x̂ = let sampled_model = instantiate(stochasticmodel,
                                         sampler,
@@ -261,11 +261,11 @@ function upper_confidence_interval(stochasticmodel::StochasticModel{2}, decision
     N = MOI.get(stochasticmodel, NumEvalSamples())
     N = max(N, MOI.get(stochasticmodel, NumSamples()))
     T = MOI.get(stochasticmodel, NumUpperTrials())
-    log = MOI.get(stochasticmodel, MOI.RawParameter("log"))
-    keep = MOI.get(stochasticmodel, MOI.RawParameter("keep"))
-    offset = MOI.get(stochasticmodel, MOI.RawParameter("offset"))
-    indent = MOI.get(stochasticmodel, MOI.RawParameter("indent"))
-    manual_gc = MOI.get(stochasticmodel, MOI.RawParameter("manual_gc"))
+    log = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("log"))
+    keep = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("keep"))
+    offset = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("offset"))
+    indent = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("indent"))
+    manual_gc = MOI.get(stochasticmodel, MOI.RawOptimizerAttribute("manual_gc"))
     # Generate upper bound
     Q = Vector{Float64}(undef, T)
     progress = Progress(T, 0.0, "$(repeat(" ", indent))Upper CI    ")

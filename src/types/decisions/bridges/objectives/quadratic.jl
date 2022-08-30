@@ -34,8 +34,8 @@ function MOIB.Objective.bridge_objective(::Type{QuadraticDecisionObjectiveBridge
     # Set the bridged objective
     MOI.set(model, MOI.ObjectiveFunction{F}(),
             MOI.ScalarQuadraticFunction(
-                f.variable_part.affine_terms,
                 f.variable_part.quadratic_terms,
+                f.variable_part.affine_terms,
                 zero(T)))
     # Save decision function to allow modifications
     return QuadraticDecisionObjectiveBridge{T}(f)
@@ -45,9 +45,9 @@ function MOIB.Objective.supports_objective_function(
     ::Type{<:QuadraticDecisionObjectiveBridge}, ::Type{<:QuadraticDecisionFunction})
     return true
 end
-MOIB.added_constrained_variable_types(::Type{<:QuadraticDecisionObjectiveBridge}) = Tuple{DataType}[]
+MOIB.added_constrained_variable_types(::Type{<:QuadraticDecisionObjectiveBridge}) = Tuple{Type}[]
 function MOIB.added_constraint_types(::Type{<:QuadraticDecisionObjectiveBridge})
-    return Tuple{DataType, DataType}[]
+    return Tuple{Type, Type}[]
 end
 function MOIB.Objective.concrete_bridge_type(::Type{<:QuadraticDecisionObjectiveBridge{T}},
                                              ::Type{QuadraticDecisionFunction{T}}) where T

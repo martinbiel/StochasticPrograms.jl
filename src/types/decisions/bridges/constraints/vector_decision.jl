@@ -36,7 +36,7 @@ function MOIB.Constraint.bridge_constraint(::Type{VectorDecisionConstraintBridge
         bridged = MOIB.bridged_function(
             model,
             AffineDecisionFunction{T}(SingleDecision(decision)))
-        bridged.decision_part.terms[1].variable_index
+        bridged.decision_part.terms[1].variable
     end
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
@@ -52,7 +52,7 @@ function MOI.supports_constraint(::Type{<:VectorDecisionConstraintBridge{T}},
     return true
 end
 function MOIB.added_constrained_variable_types(::Type{<:VectorDecisionConstraintBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:VectorDecisionConstraintBridge{T,S}}) where {T,S}
     return [(MOI.VectorOfVariables, S), (MOI.ScalarAffineFunction{T}, MOI.EqualTo{T})]

@@ -445,7 +445,7 @@ function JuMP.value(dvar_expr::Union{GenericAffExpr{T,DecisionVariable}, Generic
         end
         return value(dvar, stage_to_scenario[stage(dvar)]; result = result)
     end
-    return value(dvar_expr, var_value)
+    return value(var_value, dvar_expr)
 end
 """
     reduced_cost(dvar::DecisionVariable)::Float64

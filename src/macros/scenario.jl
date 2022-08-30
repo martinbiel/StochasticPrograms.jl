@@ -58,7 +58,7 @@ macro scenario(args...)
             return :(Scenario(; $(esc.(kw_args)...), probability = $(esc(probability))))
         else
             if @capture(kw_args[1], idx_ = val_)
-                idxvars, indices = Containers._build_ref_sets(error, idx)
+                idxvars, indices = Containers.build_ref_sets(error, idx)
                 values = @q begin
                     if $indices isa VectorizedProductIterator && all(idx -> idx isa Base.OneTo, $indices.prod.iterators)
                         $(esc(val))[$(esc.(idxvars)...)]

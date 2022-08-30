@@ -206,18 +206,18 @@ function test_eval_variables(x, fx, y, fy, z, fz, w, fw)
     @test MOIU.eval_variables(vi -> vals[vi], f) ≈ [6, 11]
     f = QuadraticDecisionFunction(
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm.(1.0, [z, w]),
             MOI.ScalarQuadraticTerm.(1.0, [z, w], [z, w]),
+            MOI.ScalarAffineTerm.(1.0, [z, w]),
             -12.0,
         ),
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm.(1.0, [x, y]),
             MOI.ScalarQuadraticTerm.(1.0, [x, x, y], [x, y, y]),
+            MOI.ScalarAffineTerm.(1.0, [x, y]),
             0.0,
         ),
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm{Float64}[],
             MOI.ScalarQuadraticTerm.(1.0, [z, w], [x, y]),
+            MOI.ScalarAffineTerm{Float64}[],
             0.0,
         ),
     )
@@ -306,18 +306,18 @@ end
 function test_map_indices(x, fx, y, fy, z, fz, w, fw)
     f = QuadraticDecisionFunction(
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm.(1.0, [z, w]),
             MOI.ScalarQuadraticTerm.(1.0, [z, w], [z, w]),
+            MOI.ScalarAffineTerm.(1.0, [z, w]),
             -12.0,
         ),
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm.(1.0, [x, y]),
             MOI.ScalarQuadraticTerm.(1.0, [x, x, y], [x, y, y]),
+            MOI.ScalarAffineTerm.(1.0, [x, y]),
             0.0,
         ),
         MOI.ScalarQuadraticFunction(
-            MOI.ScalarAffineTerm{Float64}[],
             MOI.ScalarQuadraticTerm.(1.0, [z, w], [x, y]),
+            MOI.ScalarAffineTerm{Float64}[],
             0.0,
         ),
     )
@@ -473,14 +473,14 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test MOIU.promote_operation(
                 +,
                 Float64,
-                MOI.SingleVariable,
+                MOI.VariableIndex,
                 SingleDecision,
             ) == AffineDecisionFunction{Float64}
             @test MOIU.promote_operation(
                 +,
                 Float64,
                 SingleDecision,
-                MOI.SingleVariable,
+                MOI.VariableIndex,
             ) == AffineDecisionFunction{Float64}
             @test MOIU.promote_operation(
                 +,
@@ -574,18 +574,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test convert(typeof(f), f) === f
             quad_f = QuadraticDecisionFunction(
                 MOI.ScalarQuadraticFunction(
-                    f.variable_part.terms,
                     MOI.ScalarQuadraticTerm{Float64}[],
+                    f.variable_part.terms,
                     f.variable_part.constant,
                 ),
                 MOI.ScalarQuadraticFunction(
-                    f.decision_part.terms,
                     MOI.ScalarQuadraticTerm{Float64}[],
+                    f.decision_part.terms,
                     0.0,
                 ),
                 MOI.ScalarQuadraticFunction(
-                    MOI.ScalarAffineTerm{Float64}[],
                     MOI.ScalarQuadraticTerm{Float64}[],
+                    MOI.ScalarAffineTerm{Float64}[],
                     0.0,
                 ),
             )
@@ -692,7 +692,7 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
                         MOI.ScalarAffineTerm.([3, 4], [x, y]),
                         5,
                     ),
-                ) - SingleDecision(x) - MOI.SingleVariable(w)
+                ) - SingleDecision(x) - MOI.VariableIndex(w.value)
         end
         @testset "modification" begin
             f = MOIU.modify_function(f, MOI.ScalarConstantChange(6))
@@ -772,14 +772,14 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test MOIU.promote_operation(
                 *,
                 Int,
-                MOI.SingleVariable,
+                MOI.VariableIndex,
                 SingleDecision,
             ) == QuadraticDecisionFunction{Int}
             @test MOIU.promote_operation(
                 *,
                 Int,
                 SingleDecision,
-                MOI.SingleVariable,
+                MOI.VariableIndex,
             ) == QuadraticDecisionFunction{Int}
             @test MOIU.promote_operation(
                 *,
@@ -796,14 +796,14 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test MOIU.promote_operation(
                 *,
                 Float64,
-                MOI.SingleVariable,
+                MOI.VariableIndex,
                 AffineDecisionFunction{Float64},
             ) == QuadraticDecisionFunction{Float64}
             @test MOIU.promote_operation(
                 *,
                 Int,
                 AffineDecisionFunction{Int},
-                MOI.SingleVariable,
+                MOI.VariableIndex,
             ) == QuadraticDecisionFunction{Int}
             @test MOIU.promote_operation(
                 *,
@@ -962,7 +962,7 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
                     aff,
                     (1.0fx) * fz,
                     (1.0fw) * fz,
-                ) ≈ q + (1.0fx) * fy
+                ) ≈ q - (1.0fx) * fy
             end
             f = 7 + 3fx + 2fx * fx + 2fy * fy + 3fx * fy + 3fx * fz + 2fz * fz
             @test f ≈ 7 + (fx + 2fy) * (1fx + fy) + 3fx + (fx + 2fz) * (1fx + fz)
@@ -976,34 +976,34 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test f ≈ begin
                 QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4], [z], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         4,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(3, x)],
                         MOI.ScalarQuadraticTerm.([4], [x], [x]),
+                        [MOI.ScalarAffineTerm(3, x)],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm{Int}[],
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) + QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm{Int}[],
+                        MOI.ScalarAffineTerm{Int}[],
                         3,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4, 3], [y, x], [y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 )
@@ -1011,34 +1011,34 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test f ≈ begin
                 QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4], [z], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         10,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(3, x)],
                         MOI.ScalarQuadraticTerm.([2], [x], [x]),
+                        [MOI.ScalarAffineTerm(3, x)],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm{Int}[],
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) - QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm{Int}[],
+                        MOI.ScalarAffineTerm{Int}[],
                         3,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([-2, -4, -3], [x, y, x], [x, y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([-3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 )
@@ -1055,18 +1055,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
                     ),
                 ) + QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(2, z)],
                         MOI.ScalarQuadraticTerm.([4], [z], [z]),
+                        [MOI.ScalarAffineTerm(2, z)],
                         2,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4, 4, 3], [x, y, x], [x, y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) - MOI.ScalarAffineFunction(
@@ -1086,18 +1086,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
                     ),
                 ) - QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(2, z)],
                         MOI.ScalarQuadraticTerm.([-4], [z], [z]),
+                        [MOI.ScalarAffineTerm(2, z)],
                         -2,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([-4, -4, -3], [x, y, x], [x, y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) + MOI.ScalarAffineFunction(
@@ -1108,18 +1108,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test f ≈ begin
                 QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4], [z], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         2,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4, 4, 3], [x, y, x], [x, y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) + AffineDecisionFunction(
@@ -1136,18 +1136,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test f ≈ begin
                 QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(2, z)],
                         MOI.ScalarQuadraticTerm.([4], [z], [z]),
+                        [MOI.ScalarAffineTerm(2, z)],
                         9,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([4, 4, 3], [x, y, x], [x, y, y]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Int}[],
                         MOI.ScalarQuadraticTerm.([3], [x], [z]),
+                        MOI.ScalarAffineTerm{Int}[],
                         0,
                     ),
                 ) - AffineDecisionFunction(
@@ -1164,18 +1164,18 @@ function test_scalar_operations(x, fx, y, fy, z, fz, w, fw)
             @test f ≈ begin
                 2.0 * QuadraticDecisionFunction(
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(2., z)],
                         MOI.ScalarQuadraticTerm.([4.], [z], [z]),
+                        MOI.ScalarAffineTerm{Float64}[],
                         7.0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        [MOI.ScalarAffineTerm(3., x)],
                         MOI.ScalarQuadraticTerm.([4., 4., 3.], [x, y, x], [x, y, y]),
+                        [MOI.ScalarAffineTerm(3., x)],
                         0.0,
                     ),
                     MOI.ScalarQuadraticFunction(
-                        MOI.ScalarAffineTerm{Float64}[],
                         MOI.ScalarQuadraticTerm.([3.], [x], [z]),
+                        MOI.ScalarAffineTerm{Float64}[],
                         0.0,
                     ),
                 ) / 2.0
@@ -1393,7 +1393,7 @@ function test_vector_operations(x, fx, y, fy, z, fz, w, fw)
                         MOI.VectorAffineTerm.([1, 2], MOI.ScalarAffineTerm.([3, 4], [x, y])),
                         zeros(Int, 2),
                     ),
-                ) - MOIU.operate(vcat, Int, 1SingleDecision(x) + MOI.SingleVariable(w), 0)
+                ) - MOIU.operate(vcat, Int, 1SingleDecision(x) + MOI.VariableIndex(w.value), 0)
             )
         end
         @testset "modification" begin
@@ -1420,9 +1420,9 @@ function runtests()
     y = MOI.VariableIndex(2)
     fy = SingleDecision(y)
     z = MOI.VariableIndex(3)
-    fz = MOI.SingleVariable(z)
+    fz = MOI.VariableIndex(z.value)
     w = MOI.VariableIndex(4)
-    fw = MOI.SingleVariable(w)
+    fw = MOI.VariableIndex(w.value)
 
     @testset "DecisionFunctions" begin
         for name in names(@__MODULE__; all = true)

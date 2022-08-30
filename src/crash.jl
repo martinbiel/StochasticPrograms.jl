@@ -169,7 +169,7 @@ function (crash::PreSolve)(stochasticprogram::StochasticProgram)
     end
     check_loadable(optimizer, structure_)
     # Better printing
-    MOI.set(optimizer, MOI.RawParameter("keep"), false)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("keep"), false)
     # Load structure
     load_structure!(optimizer, structure_, x₀)
     # Run presolve

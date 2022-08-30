@@ -66,30 +66,30 @@ is_decision_type(::Type{MultipleDecisionSet}) = false
 function JuMP.in_set_string(print_mode, set::SingleDecisionSet)
     decision_str(set) = set.is_recourse ? "RecourseDecisions" : "Decisions"
     if state(set.decision) == Taken
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))(value = $(set.decision.value))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))(value = $(set.decision.value))")
     end
     if state(set.decision) == Known
-        return string(JuMP._math_symbol(print_mode, :in), " Known(value = $(set.decision.value))")
+        return string(_math_symbol(print_mode, :in), " Known(value = $(set.decision.value))")
     end
     if set.constraint isa NoSpecifiedConstraint
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))")
     else
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
     end
 end
 
 function JuMP.in_set_string(print_mode, set::MultipleDecisionSet)
     decision_str(set) = set.is_recourse ? "RecourseDecisions" : "Decisions"
     if all(d -> state(d) == Taken, set.decisions)
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))(values = $([d.value for d in set.decisions]))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))(values = $([d.value for d in set.decisions]))")
     end
     if all(d -> state(d) == Known, set.decisions)
-        return string(JuMP._math_symbol(print_mode, :in), " Known(values = $([d.value for d in set.decisions]))")
+        return string(_math_symbol(print_mode, :in), " Known(values = $([d.value for d in set.decisions]))")
     end
     if set.constraint isa NoSpecifiedConstraint
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))")
     else
-        return string(JuMP._math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
+        return string(_math_symbol(print_mode, :in), " $(decision_str(set))($(JuMP.in_set_string(print_mode, set.constraint)))")
     end
 end
 

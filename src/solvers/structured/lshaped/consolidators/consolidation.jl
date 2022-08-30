@@ -25,7 +25,7 @@ abstract type AbstractConsolidator end
 """
     RawConsolidationParameter
 
-An optimizer attribute used for raw parameters of the consolidator. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the consolidator. Defers to `RawOptimizerAttribute`.
 """
 struct RawConsolidationParameter <: ConsolidationParameter
     name::Any

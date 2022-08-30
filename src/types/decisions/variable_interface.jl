@@ -359,7 +359,7 @@ function JuMP.delete(model::JuMP.Model, dref::DecisionRef)
         end
     end
     # Remove SingleDecisionSet constraint
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index(dref).value)
     MOI.delete(backend(model), ci)
     # Delete the variable corresponding to the decision
     MOI.delete(backend(model), index(dref))
@@ -397,7 +397,7 @@ function JuMP.delete(model::JuMP.Model, drefs::Vector{DecisionRef})
     end
     # Remove any SingleDecisionSet constraints
     for dref in drefs
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index(dref).value)
         if MOI.is_valid(backend(model), ci)
             MOI.delete(backend(model), ci)
         end

@@ -49,7 +49,7 @@ function MOI.supports_constraint(::Type{<:AffineDecisionConstraintBridge{T}},
     return true
 end
 function MOIB.added_constrained_variable_types(::Type{<:AffineDecisionConstraintBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:AffineDecisionConstraintBridge{T, S}}) where {T, S}
     return [(MOI.ScalarAffineFunction{T}, S)]

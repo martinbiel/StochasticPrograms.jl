@@ -48,7 +48,7 @@ struct MasterOptimizerAttribute <: AbstractStructuredOptimizerAttribute end
 """
     RawMasterOptimizerParameter
 
-An optimizer attribute used for raw parameters of the master optimizer. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the master optimizer. Defers to `RawOptimizerAttribute`.
 """
 struct RawMasterOptimizerParameter <: AbstractStructuredOptimizerAttribute
     name::Any
@@ -66,7 +66,7 @@ end
 
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, param::RawMasterOptimizerParameter, value)
     MOI.set(stochasticprogram, param, value)
-    set_master_optimizer_attribute!(structure(stochasticprogram), MOI.RawParameter(param.name), value)
+    set_master_optimizer_attribute!(structure(stochasticprogram), MOI.RawOptimizerAttribute(param.name), value)
 end
 """
     get_masteroptimizer_attribute(stochasticprogram::StochasticProgram, name::String)
@@ -139,7 +139,7 @@ struct SubProblemOptimizerAttribute <: AbstractStructuredOptimizerAttribute end
 """
     RawSubProblemOptimizerParameter
 
-An optimizer attribute used for raw parameters of the subproblem optimizer. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the subproblem optimizer. Defers to `RawOptimizerAttribute`.
 """
 struct RawSubProblemOptimizerParameter <: AbstractStructuredOptimizerAttribute
     name::Any
@@ -157,7 +157,7 @@ end
 
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, param::RawSubProblemOptimizerParameter, value)
     MOI.set(stochasticprogram, param, value)
-    set_subproblem_optimizer_attribute!(structure(stochasticprogram), MOI.RawParameter(param.name), value)
+    set_subproblem_optimizer_attribute!(structure(stochasticprogram), MOI.RawOptimizerAttribute(param.name), value)
 end
 """
     get_suboptimizer_attribute(stochasticprogram::StochasticProgram, name::String)
@@ -297,7 +297,7 @@ struct InstanceOptimizerAttribute end
 """
     RawInstanceOptimizerParameter
 
-An optimizer attribute used for raw parameters of the instance optimizer. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the instance optimizer. Defers to `RawOptimizerAttribute`.
 """
 struct RawInstanceOptimizerParameter <: AbstractSampledOptimizerAttribute
     name::Any

@@ -114,7 +114,7 @@ function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentCons
     con_ref = ConstraintRef(structure.model, mapped_ci)
     return MOI.get(structure.model, attr.attr, con_ref)
 end
-function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: MOI.SingleVariable, S}
+function MOI.get(structure::DeterministicEquivalent, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: MOI.VariableIndex, S}
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), attr.scenario_index)
@@ -246,7 +246,7 @@ function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentCons
     return nothing
 end
 function MOI.set(structure::DeterministicEquivalent, attr::ScenarioDependentConstraintAttribute,
-                 ci::CI{F,S}, value) where {F <: MOI.SingleVariable, S}
+                 ci::CI{F,S}, value) where {F <: MOI.VariableIndex, S}
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), attr.scenario_index)
@@ -778,7 +778,7 @@ end
 # ========================== #
 function mapped_index(structure::DeterministicEquivalent{2}, index::MOI.VariableIndex, scenario_index::Integer)
     # The initial number of first-stage decisions is always given by
-    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
+    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.VariableIndex,SingleDecisionSet{Float64}}())
     # Calculate offset from first-stage auxilliary variables (first-stage decisions are included in second-stage proxy, so deduct them)
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfVariables()) - num_first_stage_decisions
     # Calculate offset from extra counts of first-stage decisions from second-stage proxy

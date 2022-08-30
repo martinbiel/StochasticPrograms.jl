@@ -421,7 +421,7 @@ function cutting_plane(worker::ParametricGomoryWorker,
                 i += 1
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
                 for term in f.terms
-                    idx = term.variable_index.value - nx
+                    idx = term.variable.value - nx
                     if idx == fractional_index
                         # yⱼ
                         push!(Hᵢ, i)
@@ -487,7 +487,7 @@ function cutting_plane(worker::ParametricGomoryWorker,
                 i += 1
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
                 for term in f.variable_part.terms
-                    idx = term.variable_index.value - nx
+                    idx = term.variable.value - nx
                     if idx == fractional_index
                         # yⱼ
                         push!(Hᵢ, i)
@@ -508,7 +508,7 @@ function cutting_plane(worker::ParametricGomoryWorker,
                     end
                 end
                 for term in f.decision_part.terms
-                    idx = term.variable_index.value - nx
+                    idx = term.variable.value - nx
                     if idx == fractional_index
                         # yⱼ
                         push!(Hᵢ, i)
@@ -529,7 +529,7 @@ function cutting_plane(worker::ParametricGomoryWorker,
                     end
                 end
                 for term in f.known_part.terms
-                    idx = term.variable_index.value
+                    idx = term.variable.value
                     # yⱼ
                     push!(Fᵢ, i)
                     push!(Fᵥ, term.coefficient)

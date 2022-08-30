@@ -27,8 +27,8 @@ struct AffineDecisionFunction{T} <: MOI.AbstractScalarFunction
     decision_part::MOI.ScalarAffineFunction{T}
 end
 
-function AffineDecisionFunction{T}(f::MOI.SingleVariable) where T
-    AffineDecisionFunction(MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(one(T), f.variable)], zero(T)),
+function AffineDecisionFunction{T}(f::MOI.VariableIndex) where T
+    AffineDecisionFunction(MOI.ScalarAffineFunction([MOI.ScalarAffineTerm(one(T), f)], zero(T)),
                            convert(MOI.ScalarAffineFunction{T}, zero(T)))
 end
 
@@ -59,7 +59,7 @@ function Base.convert(::Type{AffineDecisionFunction{T}}, α::T) where T
 end
 
 function Base.convert(::Type{AffineDecisionFunction{T}},
-                      f::MOI.SingleVariable) where T
+                      f::MOI.VariableIndex) where T
     return AffineDecisionFunction(convert(MOI.ScalarAffineFunction{T}, f),
                                   convert(MOI.ScalarAffineFunction{T}, zero(T)))
 end
@@ -85,18 +85,18 @@ function Base.convert(::Type{AffineDecisionFunction{T}},
                                   convert(MOI.ScalarAffineFunction{T}, f.decision_part))
 end
 
-function Base.convert(::Type{MOI.SingleVariable}, f::AffineDecisionFunction)
+function Base.convert(::Type{MOI.VariableIndex}, f::AffineDecisionFunction)
     if !iszero(f.variable_part.constant) || !isone(length(f.variable_part.terms)) || !isone(f.variable_part.terms[1].coefficient)
-        throw(InexactError(:convert, MOI.SingleVariable, f))
+        throw(InexactError(:convert, MOI.VariableIndex, f))
     end
-    return MOI.SingleVariable(f.variable_part.terms[1].variable_index)
+    return MOI.VariableIndex(f.variable_part.terms[1].variable.value)
 end
 
 function Base.convert(::Type{SingleDecision}, f::AffineDecisionFunction)
     if !iszero(f.decision_part.constant) || !isone(length(f.decision_part.terms)) || !isone(f.decision_part.terms[1].coefficient)
         throw(InexactError(:convert, SingleDecision, f))
     end
-    return SingleDecision(f.decision_part.terms[1].variable_index)
+    return SingleDecision(f.decision_part.terms[1].variable)
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}}, α::T) where T
@@ -105,9 +105,9 @@ function Base.convert(::Type{VectorAffineDecisionFunction{T}}, α::T) where T
 end
 
 function Base.convert(::Type{VectorAffineDecisionFunction{T}},
-                      f::MOI.SingleVariable) where T
+                      f::MOI.VariableIndex) where T
     return VectorAffineDecisionFunction(
-        MOI.VectorAffineFunction{T}([MOI.VectorAffineTerm{T}(1, MOI.ScalarAffineTerm(one(T), f.variable))], [zero(T)]),
+        MOI.VectorAffineFunction{T}([MOI.VectorAffineTerm{T}(1, MOI.ScalarAffineTerm(one(T), f))], [zero(T)]),
         MOI.VectorAffineFunction{T}(MOI.VectorAffineTerm{T}[], [zero(T)]))
 end
 
@@ -256,7 +256,7 @@ end
 function _DecisionAffExpr(m::Model, f::MOI.ScalarAffineFunction)
     aff = _DAE()
     for t in f.terms
-        JuMP.add_to_expression!(aff, t.coefficient, DecisionRef(m, t.variable_index))
+        JuMP.add_to_expression!(aff, t.coefficient, DecisionRef(m, t.variable))
     end
     # There should be not any constants in the decision terms
     return aff
@@ -287,9 +287,9 @@ end
 # MOI Function interface #
 # ========================== #
 MOI.constant(f::AffineDecisionFunction) = MOI.constant(f.variable_part)
-MOI.constant(f::AffineDecisionFunction, T::DataType) = MOI.constant(f)
+MOI.constant(f::AffineDecisionFunction, T::Type) = MOI.constant(f)
 MOI.constant(f::VectorAffineDecisionFunction) = MOI.constant(f.variable_part)
-MOI.constant(f::VectorAffineDecisionFunction, T::DataType) = MOI.constant(f)
+MOI.constant(f::VectorAffineDecisionFunction, T::Type) = MOI.constant(f)
 
 function MOIU.eval_variables(varval::Function, f::AffineDecisionFunction)
     var_value = MOIU.eval_variables(varval, f.variable_part)
@@ -362,13 +362,13 @@ function MOIU.substitute_variables(variable_map::Function, f::AffineDecisionFunc
                                convert(MOI.ScalarAffineFunction{T}, zero(T)))
     # Substitute variables
     for term in f.variable_part.terms
-        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.variable)
         new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate!(+, T, g, new_term)::AffineDecisionFunction{T}
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.variable)
         new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate!(+, T, g, new_term)::AffineDecisionFunction{T}
     end
@@ -381,13 +381,13 @@ function MOIU.substitute_variables(variable_map::Function, f::VectorAffineDecisi
                                      MOI.VectorAffineFunction(MOI.VectorAffineTerm{T}[], zeros(T, n)))
     # Substitute variables
     for term in f.variable_part.terms
-        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable)
         new_term = MOIU.operate(*, T, term.scalar_term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::typeof(g)
     end
     # Substitute decisions
     for term in f.decision_part.terms
-        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.scalar_term.variable)
         new_term = MOIU.operate(*, T, term.scalar_term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate_output_index!(+, T, term.output_index, g, new_term)::VectorAffineDecisionFunction{T}
     end
@@ -459,7 +459,7 @@ function MOIU.convert_approx(::Type{SingleDecision},
         any(j -> abs(f.variable_part.terms[j].coefficient) > tol, eachindex(f.variable_part.terms))
         throw(InexactError(:convert_approx, SingleDecision, func))
     end
-    return SingleDecision(f.decision_part.terms[i].variable_index)
+    return SingleDecision(f.decision_part.terms[i].variable)
 end
 
 function MOIU.convert_approx(::Type{VectorOfDecisions},
@@ -474,7 +474,7 @@ end
 function modify_coefficient!(terms::Vector{MOI.ScalarAffineTerm{T}},
                              index::MOI.VariableIndex,
                              new_coefficient::Number) where T
-    i = something(findfirst(t -> t.variable_index == index,
+    i = something(findfirst(t -> t.variable == index,
                             terms), 0)
     if iszero(i)
         # The variable was not already included in the terms
@@ -501,7 +501,7 @@ function modify_coefficients!(terms::Vector{MOI.VectorAffineTerm{T}},
                               new_coefficients::AbstractVector) where T
     rowmap = Dict(c[1]=>i for (i,c) in enumerate(new_coefficients))
     del = Int[]
-    for i in findall(t -> t.variable_index == index, terms)
+    for i in findall(t -> t.variable == index, terms)
         row = terms[i].output_index
         j = Base.get(rowmap, row, 0)
         if !iszero(j)
@@ -525,9 +525,9 @@ end
 
 function add_term!(terms::Vector{MOI.ScalarAffineTerm{T}},
                    term::MOI.ScalarAffineTerm{T}) where T
-    index = term.variable_index
+    index = term.variable
     coefficient = term.coefficient
-    i = something(findfirst(t -> t.variable_index == index,
+    i = something(findfirst(t -> t.variable == index,
                             terms), 0)
     if iszero(i)
         if !iszero(coefficient)
@@ -548,9 +548,9 @@ end
 
 function remove_term!(terms::Vector{MOI.ScalarAffineTerm{T}},
                       term::MOI.ScalarAffineTerm{T}) where T
-    index = term.variable_index
+    index = term.variable
     coefficient = term.coefficient
-    i = something(findfirst(t -> t.variable_index == index,
+    i = something(findfirst(t -> t.variable == index,
                             terms), 0)
     if iszero(i) && !iszero(coefficient)
         # The variable was not already included in the terms

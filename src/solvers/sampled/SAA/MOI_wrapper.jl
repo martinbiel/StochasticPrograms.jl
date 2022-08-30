@@ -47,10 +47,10 @@ function load_model!(optimizer::Optimizer,
     instance_optimizer = MOI.get(optimizer, InstanceOptimizer())
     # Default log settings
     try
-        MOI.set(instance_optimizer, MOI.RawParameter("log"), optimizer.parameters.log)
-        MOI.set(instance_optimizer, MOI.RawParameter("keep"), optimizer.parameters.keep)
-        MOI.set(instance_optimizer, MOI.RawParameter("offset"), optimizer.parameters.offset + 1)
-        MOI.set(instance_optimizer, MOI.RawParameter("indent"), 2 * optimizer.parameters.indent)
+        MOI.set(instance_optimizer, MOI.RawOptimizerAttribute("log"), optimizer.parameters.log)
+        MOI.set(instance_optimizer, MOI.RawOptimizerAttribute("keep"), optimizer.parameters.keep)
+        MOI.set(instance_optimizer, MOI.RawOptimizerAttribute("offset"), optimizer.parameters.offset + 1)
+        MOI.set(instance_optimizer, MOI.RawOptimizerAttribute("indent"), 2 * optimizer.parameters.indent)
     catch
     end
     # Create new SAA algorithm
@@ -84,16 +84,16 @@ end
 # MOI #
 # ========================== #
 function MOI.get(optimizer::Optimizer, ::MOI.Silent)
-    return !MOI.get(optimizer, MOI.RawParameter("log"))
+    return !MOI.get(optimizer, MOI.RawOptimizerAttribute("log"))
 end
 
 function MOI.set(optimizer::Optimizer, attr::MOI.Silent, flag::Bool)
-    MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("log"), !flag)
     optimizer.optimizer_params[attr] = flag
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
     name = Symbol(param.name)
     if !(name in fieldnames(SAAParameters))
         error("Unrecognized parameter name: $(name).")
@@ -101,7 +101,7 @@ function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
     return getfield(optimizer.parameters, name)
 end
 
-function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     name = Symbol(param.name)
     if !(name in fieldnames(SAAParameters))
         error("Unrecognized parameter name: $(name).")
@@ -111,20 +111,20 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
 end
 
 function MOI.get(optimizer::Optimizer, ::RelativeTolerance)
-    return MOI.get(optimizer, MOI.RawParameter("tolerance"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("tolerance"))
 end
 
 function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
-    MOI.set(optimizer, MOI.RawParameter("tolerance"), limit)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("tolerance"), limit)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::Confidence)
-    return MOI.get(optimizer, MOI.RawParameter("confidence"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("confidence"))
 end
 
 function MOI.set(optimizer::Optimizer, ::Confidence, confidence::Real)
-    MOI.set(optimizer, MOI.RawParameter("confidence"), confidence)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("confidence"), confidence)
     return nothing
 end
 
@@ -132,56 +132,56 @@ function MOI.get(optimizer::Optimizer, ::NumSamples)
     if optimizer.algorithm != nothing
         return optimizer.algorithm.data.sample_size
     end
-    return MOI.get(optimizer, MOI.RawParameter("num_samples"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_samples"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumSamples, num_samples::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_samples"), num_samples)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_samples"), num_samples)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::NumEvalSamples)
-    return MOI.get(optimizer, MOI.RawParameter("num_eval_samples"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_eval_samples"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumEvalSamples, num_eval_samples::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_eval_samples"), num_eval_samples)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_eval_samples"), num_eval_samples)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::NumEWSSamples)
-    return MOI.get(optimizer, MOI.RawParameter("num_ews_samples"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_ews_samples"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumEWSSamples, num_ews_samples::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_ews_samples"), num_ews_samples)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_ews_samples"), num_ews_samples)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::NumEEVSamples)
-    return MOI.get(optimizer, MOI.RawParameter("num_eev_samples"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_eev_samples"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumEEVSamples, num_eev_samples::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_eev_samples"), num_eev_samples)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_eev_samples"), num_eev_samples)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::NumLowerTrials)
-    return MOI.get(optimizer, MOI.RawParameter("num_lower_trials"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_lower_trials"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumLowerTrials, num_lower_trials::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_lower_trials"), num_lower_trials)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_lower_trials"), num_lower_trials)
     return nothing
 end
 
 function MOI.get(optimizer::Optimizer, ::NumUpperTrials)
-    return MOI.get(optimizer, MOI.RawParameter("num_upper_trials"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("num_upper_trials"))
 end
 
 function MOI.set(optimizer::Optimizer, ::NumUpperTrials, num_upper_trials::Integer)
-    MOI.set(optimizer, MOI.RawParameter("num_upper_trials"), num_upper_trials)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("num_upper_trials"), num_upper_trials)
     return nothing
 end
 
@@ -219,7 +219,7 @@ function MOI.set(optimizer::Optimizer, ::InstanceOptimizerAttribute, attr::MOI.A
 end
 
 function MOI.get(optimizer::Optimizer, param::RawInstanceOptimizerParameter)
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     if !haskey(optimizer.optimizer_params, moi_param)
         error("Instance optimizer attribute $(param.name) has not been set.")
     end
@@ -231,7 +231,7 @@ function MOI.set(optimizer::Optimizer, param::RawInstanceOptimizerParameter, val
     if !MOI.supports(MOI.get(optimizer, InstanceOptimizer())(), param)
         return nothing
     end
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     optimizer.optimizer_params[moi_param] = value
     return nothing
 end
@@ -259,5 +259,5 @@ function MOI.is_empty(optimizer::Optimizer)
 end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
-MOI.supports(::Optimizer, ::MOI.RawParameter) = true
+MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::AbstractSampledOptimizerAttribute) = true

@@ -41,7 +41,7 @@ process_cut!(lshaped::AbstractLShaped, cut::AbstractHyperPlane) = process_cut!(l
 """
     RawRegularizationParameter
 
-An optimizer attribute used for raw parameters of the regularizer. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the regularizer. Defers to `RawOptimizerAttribute`.
 """
 struct RawRegularizationParameter <: RegularizationParameter
     name::Any

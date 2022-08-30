@@ -59,7 +59,7 @@ function initialize_penaltyterm!(penalty::Quadratic,
     end
     # Add ℓ₂-norm auxiliary variable
     penalty.t = MOI.add_variable(model)
-    t = MOI.SingleVariable(penalty.t)
+    t = MOI.VariableIndex(penalty.t.value)
     # Prepare variable vectors
     x = VectorOfDecisions(x)
     ξ = VectorOfDecisions(ξ)
@@ -96,7 +96,7 @@ function update_penaltyterm!(penalty::Quadratic,
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
     for vi in ξ
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(model,
                    ci,
                    KnownValuesChange())
@@ -123,7 +123,7 @@ function enable_penalty!(penalty::Quadratic,
                          ξ::Vector{MOI.VariableIndex})
     update_penaltyterm!(penalty, model, α, x, ξ)
     T = typeof(α)
-    t = MOI.SingleVariable(penalty.t)
+    t = MOI.VariableIndex(penalty.t.value)
     # Prepare variable vectors
     x = VectorOfDecisions(x)
     ξ = VectorOfDecisions(ξ)
@@ -220,7 +220,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     for i in eachindex(x)
         penalty.auxiliary_variables[i] = MOI.add_variable(model)
         var = penalty.auxiliary_variables[i]
-        MOI.add_constraint(model, MOI.SingleVariable(var), MOI.GreaterThan(0.0))
+        MOI.add_constraint(model, MOI.VariableIndex(var.value), MOI.GreaterThan(0.0))
         name = add_subscript("‖x - ξ‖₂²", i)
         MOI.set(model, MOI.VariableName(), var, name)
     end
@@ -232,7 +232,7 @@ function initialize_penaltyterm!(penalty::Linearized,
     end .- (penalty.spacing - 1)
     k = 1
     for i in eachindex(x)
-        tᵢ = MOI.SingleVariable(penalty.auxiliary_variables[i])
+        tᵢ = MOI.VariableIndex(penalty.auxiliary_variables[i].value)
         xᵢ = SingleDecision(x[i])
         ξᵢ = SingleDecision(ξ[i])
         for (j,r) in enumerate(breakpoints)
@@ -280,7 +280,7 @@ function update_penaltyterm!(penalty::Linearized,
     end
     # Update projection targets
     for vi in ξ
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(model,
                    ci,
                    KnownValuesChange())
@@ -344,7 +344,7 @@ function initialize_penaltyterm!(penalty::InfNorm,
     MOI.set(model, MOI.VariableName(), penalty.t, "||x - ξ||_∞")
     x = VectorOfDecisions(x)
     ξ = VectorOfDecisions(ξ)
-    t = MOI.SingleVariable(penalty.t)
+    t = MOI.VariableIndex(penalty.t.value)
     # Add ∞-norm constraint
     f = MOIU.operate(vcat, T, t, x) -
         MOIU.operate(vcat, T, zero(α), ξ)
@@ -375,7 +375,7 @@ function update_penaltyterm!(penalty::InfNorm,
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
     for vi in ξ
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(model,
                    ci,
                    KnownValuesChange())
@@ -432,7 +432,7 @@ function initialize_penaltyterm!(penalty::ManhattanNorm,
     MOI.set(model, MOI.VariableName(), penalty.t, "‖x - ξ‖₁")
     x = VectorOfDecisions(x)
     ξ = VectorOfDecisions(ξ)
-    t = MOI.SingleVariable(penalty.t)
+    t = MOI.VariableIndex(penalty.t)
     # Add ∞-norm constraint
     f = MOIU.operate(vcat, T, t, x) -
         MOIU.operate(vcat, T, zero(α), ξ)
@@ -463,7 +463,7 @@ function update_penaltyterm!(penalty::ManhattanNorm,
                MOI.ScalarCoefficientChange(penalty.t, correction * α))
     # Update projection targets
     for vi in ξ
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(model,
                    ci,
                    KnownValuesChange())

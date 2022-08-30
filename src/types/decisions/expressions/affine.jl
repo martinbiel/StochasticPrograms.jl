@@ -20,6 +20,54 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+_sign_string(coef) = coef < zero(coef) ? " - " : " + "
+
+function _math_symbol(::MIME"text/plain", name::Symbol)
+    if name == :leq
+        return Sys.iswindows() ? "<=" : "≤"
+    elseif name == :geq
+        return Sys.iswindows() ? ">=" : "≥"
+    elseif name == :eq
+        return Sys.iswindows() ? "==" : "="
+    elseif name == :times
+        return "*"
+    elseif name == :sq
+        return "²"
+    elseif name == :ind_open
+        return "["
+    elseif name == :ind_close
+        return "]"
+    elseif name == :for_all
+        return Sys.iswindows() ? "for all" : "∀"
+    elseif name == :in
+        return Sys.iswindows() ? "in" : "∈"
+    elseif name == :open_set
+        return "{"
+    elseif name == :dots
+        return Sys.iswindows() ? ".." : "…"
+    elseif name == :close_set
+        return "}"
+    elseif name == :union
+        return Sys.iswindows() ? "or" : "∪"
+    elseif name == :infty
+        return Sys.iswindows() ? "Inf" : "∞"
+    elseif name == :open_rng
+        return "["
+    elseif name == :close_rng
+        return "]"
+    elseif name == :integer
+        return "integer"
+    elseif name == :succeq0
+        return " is semidefinite"
+    elseif name == :Vert
+        return Sys.iswindows() ? "||" : "‖"
+    elseif name == :sub2
+        return Sys.iswindows() ? "_2" : "₂"
+    else
+        error("Internal error: Unrecognized symbol $name.")
+    end
+end
+
 const _Constant = JuMP._Constant
 const _VariableAffExpr{C} = GenericAffExpr{C, VariableRef}
 const _DecisionAffExpr{C} = GenericAffExpr{C, DecisionRef}
@@ -198,7 +246,7 @@ function JuMP.function_string(mode, aff::DecisionAffExpr, show_constant=true)
     # Constant
     if !JuMP._is_zero_for_printing(aff.variables.constant) && show_constant
         ret = string(ret,
-                     JuMP._sign_string(aff.variables.constant),
+                     _sign_string(aff.variables.constant),
                      JuMP._string_round(abs(aff.variables.constant)))
     end
     return ret

@@ -121,7 +121,7 @@ function get_problem(stochasticprogram::StochasticProgram, key::Symbol)
 end
 
 typename(dtype::UnionAll) = dtype.body.body.name.name
-typename(dtype::DataType) = dtype.name.name
+typename(dtype::Type) = dtype.name.name
 
 function run_manual_gc()
     @everywhere GC.gc()
@@ -260,7 +260,7 @@ end
 function decision_constraints_at_stage(stochasticprogram::StochasticProgram{N}, s::Integer) where N
     1 <= s <= N || error("Stage $s not in range 1 to $N.")
     proxy_ = proxy(stochasticprogram, s)
-    return mapreduce(vcat, MOI.get(proxy_, MOI.ListOfConstraints())) do (F, S)
+    return mapreduce(vcat, MOI.get(proxy_, MOI.ListOfConstraintTypesPresent())) do (F, S)
         if F <: SingleDecision
             return map(MOI.get(proxy_, MOI.ListOfConstraintIndices{F,S}())) do ci
                 # Change to correct index
@@ -293,7 +293,7 @@ function attach_mocks!(structure::ScenarioDecompositionStructure)
 end
 
 function decision_index(model::MOI.ModelLike, index::MOI.VariableIndex)
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index.value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index.value)
     if MOI.is_valid(model, ci)
         return MOI.get(model, DecisionIndex(), ci)
     end

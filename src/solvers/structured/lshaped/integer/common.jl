@@ -117,7 +117,7 @@ function SecondStageLP(subproblem::SubProblem{T_}; standard_form = false) where 
                 continue
             elseif F <: VariableRef || F <: DecisionRef
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
-                if f isa MOI.SingleVariable
+                if f isa MOI.VariableIndex
                     idx = f.variable.value - nx
                 elseif f isa SingleDecision
                     idx = f.decision.value - nx
@@ -148,7 +148,7 @@ function SecondStageLP(subproblem::SubProblem{T_}; standard_form = false) where 
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
                 for term in f.terms
                     push!(Wᵢ, i)
-                    push!(Wⱼ, term.variable_index.value - nx)
+                    push!(Wⱼ, term.variable.value - nx)
                     push!(Wᵥ, term.coefficient)
                 end
                 set = MOI.get(model, MOI.ConstraintSet(), cref)
@@ -187,7 +187,7 @@ function SecondStageLP(subproblem::SubProblem{T_}; standard_form = false) where 
                     i += 1
                     for term in fⱼ.terms
                         push!(Wᵢ, i)
-                        push!(Wⱼ, term.variable_index.value - nx)
+                        push!(Wⱼ, term.variable.value - nx)
                         push!(Wᵥ, term.coefficient)
                     end
                     if set isa MOI.Nonpositives
@@ -353,7 +353,7 @@ function optimal_basis(subproblem::SubProblem)
             elseif F <: VariableRef || F <: DecisionRef
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
                 set = MOI.get(model, MOI.ConstraintSet(), cref)
-                if f isa MOI.SingleVariable
+                if f isa MOI.VariableIndex
                     idx = f.variable.value - nx
                 elseif f isa SingleDecision
                     idx = f.decision.value - nx

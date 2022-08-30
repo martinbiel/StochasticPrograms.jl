@@ -366,7 +366,7 @@ If available, returns the solve time reported by the solver of
 the `stochasticprogram`.
 """
 function JuMP.solve_time(stochasticprogram::StochasticProgram)
-    return MOI.get(stochasticprogram, MOI.SolveTime())
+    return MOI.get(stochasticprogram, MOI.SolveTimeSec())
 end
 """
     solve_time(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)
@@ -375,7 +375,7 @@ If available, returns the solve time reported by the solver of
 the node at stage `stage` and scenario `scenario_index`.
 """
 function JuMP.solve_time(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)
-    attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.SolveTime())
+    attr = ScenarioDependentModelAttribute(stage, scenario_index, MOI.SolveTimeSec())
     return MOI.get(stochasticprogram, attr)
 end
 """
@@ -889,7 +889,7 @@ Return the value associated with the solver-specific attribute named `name` in `
 See also: [`set_optimizer_attribute`](@ref), [`set_optimizer_attributes`](@ref).
 """
 function JuMP.get_optimizer_attribute(stochasticprogram::StochasticProgram, name::String)
-    return get_optimizer_attribute(stochasticprogram, MOI.RawParameter(name))
+    return get_optimizer_attribute(stochasticprogram, MOI.RawOptimizerAttribute(name))
 end
 """
     get_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute)
@@ -965,7 +965,7 @@ Sets solver-specific attribute identified by `name` to `value` in the `stochasti
 See also: [`get_optimizer_attribute`](@ref)
 """
 function JuMP.set_optimizer_attribute(stochasticprogram::StochasticProgram, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticprogram, MOI.RawParameter(String(name)), value)
+    return set_optimizer_attribute(stochasticprogram, MOI.RawOptimizerAttribute(String(name)), value)
 end
 """
     set_optimizer_attribute(stochasticprogram::StochasticProgram, attr::MOI.AbstractOptimizerAttribute, value)
@@ -1020,7 +1020,7 @@ function JuMP.node_count(stochasticprogram::StochasticProgram)
     return MOI.get(stochasticprogram, MOI.NodeCount())
 end
 function JuMP.set_optimizer_attribute(stochasticmodel::StochasticModel, name::Union{Symbol, String}, value)
-    return set_optimizer_attribute(stochasticmodel, MOI.RawParameter(String(name)), value)
+    return set_optimizer_attribute(stochasticmodel, MOI.RawOptimizerAttribute(String(name)), value)
 end
 function JuMP.set_optimizer_attribute(stochasticmodel::StochasticModel, attr::MOI.AbstractOptimizerAttribute, value)
     return MOI.set(stochasticmodel, attr, value)

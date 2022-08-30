@@ -255,10 +255,10 @@ function test_delete_constraints(Structure)
     @test_throws Exception JuMP.delete(second_sp, sp_cref)
     # Scenario-dependent
     sp_cref = sp[2,:con2]
-    @test_throws ErrorException JuMP.is_valid(sp, sp_cref)
+    @test_throws UndefVarError JuMP.is_valid(sp, sp_cref)
     @test JuMP.is_valid(sp, sp_cref, 1)
     @test JuMP.is_valid(sp, sp_cref, 2)
-    @test_throws ErrorException JuMP.delete(sp, sp_cref)
+    @test_throws UndefVarError JuMP.delete(sp, sp_cref)
     JuMP.delete(sp, sp_cref, 1)
     @test !JuMP.is_valid(sp, sp_cref, 1)
     @test JuMP.is_valid(sp, sp_cref, 2)
@@ -287,10 +287,10 @@ function test_delete_constraints(Structure)
     @test JuMP.is_valid(sp, cons[2])
     # Scenario-dependent
     cons = all_constraints(sp, 2, DecisionAffExpr{Float64}, MOI.LessThan{Float64})
-    @test_throws ErrorException all(JuMP.is_valid.(sp, cons))
+    @test_throws UndefVarError all(JuMP.is_valid.(sp, cons))
     @test all(JuMP.is_valid.(sp, cons, 1))
     @test all(JuMP.is_valid.(sp, cons, 2))
-    @test_throws ErrorException JuMP.delete(sp, cons[[1, 3]])
+    @test_throws UndefVarError JuMP.delete(sp, cons[[1, 3]])
     JuMP.delete(sp, cons[[1, 3]], 1)
     @test all((!JuMP.is_valid).(sp, cons[[1, 3]], 1))
     @test JuMP.is_valid(sp, cons[2], 1)
@@ -465,10 +465,10 @@ function test_change_decision_coefficient(Structure)
     x = sp[1,:x]
     y = sp[2,:y]
     sp_cref = sp[2,:con2]
-    @test_throws ErrorException JuMP.normalized_coefficient(sp_cref, y) == 2.0
+    @test_throws UndefVarError JuMP.normalized_coefficient(sp_cref, y) == 2.0
     @test JuMP.normalized_coefficient(sp_cref, y, 1) == 1.0
     @test JuMP.normalized_coefficient(sp_cref, y, 2) == 2.0
-    @test_throws ErrorException JuMP.set_normalized_coefficient(sp_cref, y, 1.0)
+    @test_throws UndefVarError JuMP.set_normalized_coefficient(sp_cref, y, 1.0)
     JuMP.set_normalized_coefficient(sp_cref, y, 1, 2.0)
     JuMP.set_normalized_coefficient(sp_cref, y, 2, 1.0)
     @test JuMP.normalized_coefficient(sp_cref, y, 1) == 2.0
@@ -478,10 +478,10 @@ function test_change_decision_coefficient(Structure)
     @test JuMP.normalized_coefficient(sp_cref, y, 1) == 3.0
     @test JuMP.normalized_coefficient(sp_cref, y, 2) == 3.0
     quad_con = sp[2,:quadcon2]
-    @test_throws ErrorException JuMP.normalized_coefficient(quad_con, y) == 0.0
+    @test_throws UndefVarError JuMP.normalized_coefficient(quad_con, y) == 0.0
     @test JuMP.normalized_coefficient(quad_con, y, 1) == 0.0
     @test JuMP.normalized_coefficient(quad_con, y, 2) == 0.0
-    @test_throws ErrorException JuMP.set_normalized_coefficient(quad_con, y, 2)
+    @test_throws UndefVarError JuMP.set_normalized_coefficient(quad_con, y, 2)
     JuMP.set_normalized_coefficient(quad_con, y, 1, 2)
     JuMP.set_normalized_coefficient(quad_con, y, 2, 2)
     @test JuMP.normalized_coefficient(quad_con, y, 1) == 2.0
@@ -520,10 +520,10 @@ function test_change_decision_rhs(Structure)
     @test JuMP.normalized_rhs(sp_cref) == 3.0
     # Scenario-dependent
     sp_cref = sp[2,:con2]
-    @test_throws ErrorException JuMP.normalized_rhs(sp_cref)
+    @test_throws UndefVarError JuMP.normalized_rhs(sp_cref)
     @test JuMP.normalized_rhs(sp_cref, 1) == 1.0
     @test JuMP.normalized_rhs(sp_cref, 2) == 2.0
-    @test_throws ErrorException JuMP.set_normalized_rhs(sp_cref, 2.0)
+    @test_throws UndefVarError JuMP.set_normalized_rhs(sp_cref, 2.0)
     JuMP.set_normalized_rhs(sp_cref, 1, 2.0)
     JuMP.set_normalized_rhs(sp_cref, 2, 1.0)
     @test JuMP.normalized_rhs(sp_cref, 1) == 2.0

@@ -129,6 +129,7 @@ function generate!(stochasticprogram::StochasticProgram{N}, structure::Determini
                                 continue
                             end
                             splitname = split(name(con), "[")
+                            length(splitname) >= 2 || continue
                             conname = if N > 2
                                 conname = add_subscript(splitname[1], stage)
                             else

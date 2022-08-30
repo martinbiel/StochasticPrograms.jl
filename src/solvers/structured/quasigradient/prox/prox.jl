@@ -30,7 +30,7 @@ prox!(quasigradient::AbstractQuasiGradient, x::AbstractVector, ∇f::AbstractVec
 """
     RawProxParameter
 
-An optimizer attribute used for raw parameters of the proximal step. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the proximal step. Defers to `RawOptimizerAttribute`.
 """
 struct RawProxParameter <: ProxParameter
     name::Any

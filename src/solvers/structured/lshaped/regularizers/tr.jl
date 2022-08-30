@@ -214,13 +214,13 @@ function update_trustregion!(lshaped::AbstractLShaped, tr::TrustRegion)
     @unpack Δ = tr.data
     # Update projection targets
     for vi in tr.projection_targets
-        ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(vi.value)
+        ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(vi.value)
         MOI.modify(lshaped.master,
                    ci,
                    KnownValuesChange())
     end
     # Update trust-region
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(Δ.value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(Δ.value)
     MOI.modify(lshaped.master,
                ci,
                KnownValuesChange())

@@ -35,9 +35,9 @@ function MOIB.Objective.supports_objective_function(
     ::Type{<:FunctionizeDecisionObjectiveBridge}, ::Type{SingleDecision})
     return true
 end
-MOIB.added_constrained_variable_types(::Type{<:FunctionizeDecisionObjectiveBridge}) = Tuple{DataType}[]
+MOIB.added_constrained_variable_types(::Type{<:FunctionizeDecisionObjectiveBridge}) = Tuple{Type}[]
 function MOIB.added_constraint_types(::Type{<:FunctionizeDecisionObjectiveBridge})
-    return Tuple{DataType, DataType}[]
+    return Tuple{Type, Type}[]
 end
 function MOIB.set_objective_function_type(::Type{FunctionizeDecisionObjectiveBridge{T}}) where T
     return AffineDecisionFunction{T}

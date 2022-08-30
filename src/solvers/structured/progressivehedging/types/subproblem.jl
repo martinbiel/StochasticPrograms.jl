@@ -145,7 +145,7 @@ function reformulate_subproblem!(subproblem::SubProblem, ξ::AbstractVector, r::
     # Update dual penalty
     for (i,vi) in enumerate(all_decisions(subproblem.decisions))
         j = if typeof(f) <: AffineDecisionFunction
-            j = something(findfirst(t -> t.variable_index == vi,
+            j = something(findfirst(t -> t.variable == vi,
                                     f.decision_part.terms), 0)
         else
             j = 0

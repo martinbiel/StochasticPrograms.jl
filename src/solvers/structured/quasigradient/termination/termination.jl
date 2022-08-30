@@ -28,7 +28,7 @@ terminate(quasigradient::AbstractQuasiGradient, k::Integer, f::Float64, x::Abstr
 """
     RawTerminationParameter
 
-An optimizer attribute used for raw parameters of the termination criterion. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the termination criterion. Defers to `RawOptimizerAttribute`.
 """
 struct RawTerminationParameter <: TerminationParameter
     name::Any

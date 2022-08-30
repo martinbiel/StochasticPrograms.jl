@@ -49,7 +49,7 @@ end
 
 function Base.convert(::Type{MOI.ScalarAffineFunction{T}},
                       f::SingleDecision) where T
-    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(f.decision))
+    return MOI.ScalarAffineFunction{T}(MOI.VariableIndex(f.decision.value))
 end
 
 # JuMP overrides #
@@ -90,7 +90,7 @@ is_decision_type(::Type{VectorOfDecisions}) = true
 
 # MOI Function interface #
 # ========================== #
-MOI.constant(f::SingleDecision, T::DataType) = zero(T)
+MOI.constant(f::SingleDecision, T::Type) = zero(T)
 
 function MOIU.eval_variables(varval::Function, f::SingleDecision)
     return varval(f.decision)

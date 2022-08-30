@@ -62,10 +62,10 @@ function MOIB.Variable.supports_constrained_variable(
 end
 
 function MOIB.added_constrained_variable_types(::Type{<:DecisionBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:DecisionBridge})
-    return Tuple{DataType, DataType}[]
+    return Tuple{Type, Type}[]
 end
 
 # Attributes, Bridge acting as a model
@@ -156,12 +156,12 @@ end
 
 function MOIB.bridged_function(bridge::DecisionBridge{T}) where T
     # Return mapped variable
-    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variable))
+    return MOI.ScalarAffineFunction{T}(MOI.VariableIndex(bridge.variable.value))
 end
 
 function MOIB.Variable.unbridged_map(bridge::DecisionBridge, vi::MOI.VariableIndex)
     return (bridge.variable => SingleDecision(vi),)
-    return (bridge.variable => MOI.SingleVariable(vi),)
+    return (bridge.variable => MOI.VariableIndex(vi.value),)
 end
 
 # Multiple decisions #
@@ -203,10 +203,10 @@ function MOIB.Variable.supports_constrained_variable(
 end
 
 function MOIB.added_constrained_variable_types(::Type{<:DecisionsBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:DecisionsBridge})
-    return Tuple{DataType, DataType}[]
+    return Tuple{Type, Type}[]
 end
 
 # Attributes, Bridge acting as a model
@@ -228,7 +228,7 @@ function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge{T}) where T
     MOI.delete(model, bridge.variables)
 end
 
-function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge{T}, i::MOIB.Variable.IndexInVector) where T
+function MOI.delete(model::MOI.ModelLike, bridge::DecisionsBridge{T}, i::MOIB.IndexInVector) where T
     if bridge.fixing_constraints[i].value != 0
         # Remove the fixing constraint
         MOI.delete(model, bridge.fixing_constraints[i])
@@ -254,7 +254,7 @@ end
 
 function MOI.get(model::MOI.ModelLike,
                  attr::Union{MOI.VariablePrimal, MOI.VariablePrimalStart},
-                 bridge::DecisionsBridge, i::MOIB.Variable.IndexInVector)
+                 bridge::DecisionsBridge, i::MOIB.IndexInVector)
     decision = bridge.decisions[i.value]
     if decision.state == Taken
         return decision.value
@@ -264,12 +264,12 @@ function MOI.get(model::MOI.ModelLike,
 end
 
 function MOI.get(model::MOI.ModelLike, ::DecisionIndex,
-                 bridge::DecisionBridge{T}, i::MOIB.Variable.IndexInVector) where T
+                 bridge::DecisionBridge{T}, i::MOIB.IndexInVector) where T
     return bridge.variables[i]
 end
 
 function MOI.set(model::MOI.ModelLike, attr::MOI.VariablePrimalStart,
-                 bridge::DecisionsBridge{T}, val, i::MOIB.Variable.IndexInVector) where T
+                 bridge::DecisionsBridge{T}, val, i::MOIB.IndexInVector) where T
     MOI.set(model, attr, bridge.variables[i.value], val)
 end
 
@@ -312,12 +312,12 @@ function MOI.modify(model::MOI.ModelLike, bridge::DecisionsBridge{T}, ::KnownVal
     return nothing
 end
 
-function MOIB.bridged_function(bridge::DecisionsBridge{T}, i::MOIB.Variable.IndexInVector) where T
+function MOIB.bridged_function(bridge::DecisionsBridge{T}, i::MOIB.IndexInVector) where T
     # Return mapped variable
-    return MOI.ScalarAffineFunction{T}(MOI.SingleVariable(bridge.variables[i.value]))
+    return MOI.ScalarAffineFunction{T}(MOI.VariableIndex(bridge.variables[i.value].value))
 end
-function MOIB.Variable.unbridged_map(bridge::DecisionsBridge, vi::MOI.VariableIndex, i::MOIB.Variable.IndexInVector)
-    return (bridge.variables[i.value] => MOI.SingleVariable(vi),)
+function MOIB.Variable.unbridged_map(bridge::DecisionsBridge, vi::MOI.VariableIndex, i::MOIB.IndexInVector)
+    return (bridge.variables[i.value] => MOI.VariableIndex(vi.value),)
 end
 
 # Modifications #
@@ -339,7 +339,7 @@ function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionCoefficientChange)
     f = MOIB.bridged_variable_function(b, change.decision)
     # Continue modification with mapped variable
-    MOI.modify(b, obj, MOI.ScalarCoefficientChange(only(f.terms).variable_index, change.new_coefficient))
+    MOI.modify(b, obj, MOI.ScalarCoefficientChange(only(f.terms).variable, change.new_coefficient))
     return nothing
 end
 
@@ -347,6 +347,6 @@ function MOIB.modify_bridged_change(b::MOIB.AbstractBridgeOptimizer, obj,
                                     change::DecisionMultirowChange)
     f = MOIB.bridged_variable_function(b, change.decision)
     # Continue modification with mapped variable
-    MOI.modify(b, obj, MOI.MultirowChange(only(f.terms).variable_index, change.new_coefficients))
+    MOI.modify(b, obj, MOI.MultirowChange(only(f.terms).variable, change.new_coefficients))
     return nothing
 end

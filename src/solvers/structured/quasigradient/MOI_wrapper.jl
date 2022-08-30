@@ -188,17 +188,17 @@ end
 # MOI #
 # ========================== #
 function MOI.get(optimizer::Optimizer, ::MOI.Silent)
-    return !MOI.get(optimizer, MOI.RawParameter("log"))
+    return !MOI.get(optimizer, MOI.RawOptimizerAttribute("log"))
 end
 
 function MOI.set(optimizer::Optimizer, attr::MOI.Silent, flag::Bool)
-    MOI.set(optimizer, MOI.RawParameter("log"), !flag)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("log"), !flag)
     optimizer.master_params[attr] = flag
     optimizer.sub_params[attr] = flag
     return nothing
 end
 
-function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
+function MOI.get(optimizer::Optimizer, param::MOI.RawOptimizerAttribute)
     name = Symbol(param.name)
     if !(name in fieldnames(QuasiGradientParameters))
         error("Unrecognized parameter name: $(name).")
@@ -206,7 +206,7 @@ function MOI.get(optimizer::Optimizer, param::MOI.RawParameter)
     return getfield(optimizer.parameters, name)
 end
 
-function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
+function MOI.set(optimizer::Optimizer, param::MOI.RawOptimizerAttribute, value)
     name = Symbol(param.name)
     if !(name in fieldnames(QuasiGradientParameters))
         error("Unrecognized parameter name: $(name).")
@@ -216,22 +216,22 @@ function MOI.set(optimizer::Optimizer, param::MOI.RawParameter, value)
 end
 
 function MOI.get(optimizer::Optimizer, ::MOI.TimeLimitSec)
-    limit = MOI.get(optimizer, MOI.RawParameter("time_limit"))
+    limit = MOI.get(optimizer, MOI.RawOptimizerAttribute("time_limit"))
     return isinf(limit) ? nothing : limit
 end
 
 function MOI.set(optimizer::Optimizer, ::MOI.TimeLimitSec, limit::Union{Real, Nothing})
     limit = limit === nothing ? Inf : limit
-    MOI.set(optimizer, MOI.RawParameter("time_limit"), limit)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("time_limit"), limit)
     return
 end
 
 function MOI.get(optimizer::Optimizer, ::RelativeTolerance)
-    return MOI.get(optimizer, MOI.RawParameter("τ"))
+    return MOI.get(optimizer, MOI.RawOptimizerAttribute("τ"))
 end
 
 function MOI.set(optimizer::Optimizer, ::RelativeTolerance, limit::Real)
-    MOI.set(optimizer, MOI.RawParameter("τ"), limit)
+    MOI.set(optimizer, MOI.RawOptimizerAttribute("τ"), limit)
     return nothing
 end
 
@@ -260,7 +260,7 @@ function MOI.set(optimizer::Optimizer, ::MasterOptimizerAttribute, attr::MOI.Abs
 end
 
 function MOI.get(optimizer::Optimizer, param::RawMasterOptimizerParameter)
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     if !haskey(optimizer.master_params, moi_param)
         error("Master optimizer attribute $(param.name) has not been set.")
     end
@@ -268,7 +268,7 @@ function MOI.get(optimizer::Optimizer, param::RawMasterOptimizerParameter)
 end
 
 function MOI.set(optimizer::Optimizer, param::RawMasterOptimizerParameter, value)
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     optimizer.master_params[moi_param] = value
     return nothing
 end
@@ -298,7 +298,7 @@ function MOI.set(optimizer::Optimizer, ::SubProblemOptimizerAttribute, attr::MOI
 end
 
 function MOI.get(optimizer::Optimizer, param::RawSubProblemOptimizerParameter)
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     if !haskey(optimizer.sub_params, moi_param)
         error("Subproblem optimizer attribute $(param.name) has not been set.")
     end
@@ -306,7 +306,7 @@ function MOI.get(optimizer::Optimizer, param::RawSubProblemOptimizerParameter)
 end
 
 function MOI.set(optimizer::Optimizer, param::RawSubProblemOptimizerParameter, value)
-    moi_param = MOI.RawParameter(param.name)
+    moi_param = MOI.RawOptimizerAttribute(param.name)
     optimizer.sub_params[moi_param] = value
     return nothing
 end
@@ -433,7 +433,7 @@ function MOI.get(optimizer::Optimizer, ::MOI.ObjectiveValue)
     return objective_value(optimizer.quasigradient)
 end
 
-function MOI.get(optimizer::Optimizer, ::MOI.SolveTime)
+function MOI.get(optimizer::Optimizer, ::MOI.SolveTimeSec)
     return optimizer.solve_time
 end
 
@@ -531,7 +531,7 @@ end
 
 MOI.supports(::Optimizer, ::MOI.Silent) = true
 MOI.supports(::Optimizer, ::MOI.TimeLimitSec) = true
-MOI.supports(::Optimizer, ::MOI.RawParameter) = true
+MOI.supports(::Optimizer, ::MOI.RawOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::AbstractStructuredOptimizerAttribute) = true
 MOI.supports(::Optimizer, ::RawInstanceOptimizerParameter) = true
 MOI.supports(::Optimizer, ::AbstractQuasiGradientAttribute) = true

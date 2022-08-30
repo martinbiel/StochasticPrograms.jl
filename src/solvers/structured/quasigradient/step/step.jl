@@ -28,7 +28,7 @@ step(quasigradient::AbstractQuasiGradient, k::Integer, f::Float64, x::AbstractVe
 """
     RawStepParameter
 
-An optimizer attribute used for raw parameters of the step. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the step. Defers to `RawOptimizerAttribute`.
 """
 struct RawStepParameter <: StepParameter
     name::Any
