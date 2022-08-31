@@ -917,7 +917,7 @@ end
 # Printing #
 # ========================== #
 function Base.show(io::IO, sp_cref::SPConstraintRef)
-    print(io, constraint_string(REPLMode, sp_cref))
+    print(io, constraint_string(MIME("text/plain"), sp_cref))
 end
 function Base.show(io::IO, ::MIME"text/latex", sp_cref::SPConstraintRef)
     print(io, constraint_string(IJuliaMode, sp_cref))

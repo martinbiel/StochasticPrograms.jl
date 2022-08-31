@@ -90,7 +90,8 @@ macro scenario(args...)
     @assert length(args) == 2
     @assert isempty(kw_args)
     idx, values = args
-    code = Containers.parse_container(error, idx, esc(values), requested_container)
+    index_vars, indices = Containers.build_ref_sets(error, idx)
+    code = Containers.container_code(index_vars, indices, esc(values), requested_container)
     return :(Scenario($code; probability = $(esc(probability))))
 end
 function _extract_kw_args(args)

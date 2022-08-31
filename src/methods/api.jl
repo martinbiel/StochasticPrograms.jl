@@ -844,7 +844,7 @@ function optimizer_name(stochasticprogram::StochasticProgram)
     return optimizer_name(optimizer(stochasticprogram))
 end
 function optimizer_name(optimizer::MOI.AbstractOptimizer)
-    if JuMP.moi_mode(optimizer) != DIRECT && MOIU.state(optimizer) == MOIU.NO_OPTIMIZER
+    if JuMP._moi_mode(optimizer) != DIRECT && MOIU.state(optimizer) == MOIU.NO_OPTIMIZER
         return "No optimizer attached."
     end
     return JuMP._try_get_solver_name(optimizer)
