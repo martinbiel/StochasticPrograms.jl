@@ -30,10 +30,11 @@ If you use StochasticPrograms, please cite the following [preprint](https://arxi
 
 ```
 @article{spjl,
-  title     = {Efficient Stochastic Programming in {J}ulia},
-  author    = {Martin Biel and Mikael Johansson},
-  journal   = {arXiv preprint arXiv:1909.10451},
-  year      = {2019}
+  title={Efficient stochastic programming in Julia},
+  author={Biel, Martin and Johansson, Mikael},
+  journal={INFORMS Journal on Computing},
+  year={2022},
+  publisher={INFORMS}
 }
 ```
 

@@ -21,7 +21,7 @@ The framework will prove useful to researchers, educators and industrial users a
 
 ## Project Status
 
-The package is tested against Julia `1.6`, `1.7` and `nightly` branches on Linux, macOS, and Windows. See [NEWS](https://github.com/martinbiel/StochasticPrograms.jl/blob/master/NEWS.md) for release notes.
+The package is tested against Julia `1.6`, `1.8` and `nightly` branches on Linux, macOS, and Windows. See [NEWS](https://github.com/martinbiel/StochasticPrograms.jl/blob/master/NEWS.md) for release notes.
 
 An older version for Julia `0.6` is available on the `compat-0.6` branch, but backwards compatibility can not be promised.
 
@@ -30,10 +30,11 @@ An older version for Julia `0.6` is available on the `compat-0.6` branch, but ba
 If you use StochasticPrograms, please cite the following [preprint](https://arxiv.org/abs/1909.10451):
 
 ```
-@Article{spjl,
-  title     = {Efficient Stochastic Programming in {J}ulia},
-  author    = {Martin Biel and Mikael Johansson},
-  journal   = {arXiv preprint arXiv:1909.10451},
-  year      = {2019}
+@article{spjl,
+  title={Efficient stochastic programming in Julia},
+  author={Biel, Martin and Johansson, Mikael},
+  journal={INFORMS Journal on Computing},
+  year={2022},
+  publisher={INFORMS}
 }
 ```
