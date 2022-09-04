@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quick start · StochasticPrograms.jl</title><script data-outdated-warner src="../../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="../.."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../../assets/documenter.js"></script><script src="../../siteinfo.js"></script><script src="../../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../../">StochasticPrograms.jl</a></span></div><form class="docs-search" action="../../search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li><a class="tocitem" href="../../">Home</a></li><li><span class="tocitem">Manual</span><ul><li class="is-active"><a class="tocitem" href>Quick start</a><ul class="internal"><li><a class="tocitem" href="#Installation"><span>Installation</span></a></li><li><a class="tocitem" href="#Stochastic-programs"><span>Stochastic programs</span></a></li><li><a class="tocitem" href="#A-simple-stochastic-program"><span>A simple stochastic program</span></a></li><li><a class="tocitem" href="#Stochastic-model-definition"><span>Stochastic model definition</span></a></li><li><a class="tocitem" href="#Finite-sample-space"><span>Finite sample space</span></a></li><li><a class="tocitem" href="#Infinite-sample-space"><span>Infinite sample space</span></a></li></ul></li><li><a class="tocitem" href="../data/">Stochastic data</a></li><li><a class="tocitem" href="../model/">Stochastic models</a></li><li><a class="tocitem" href="../decisions/">Decision API</a></li><li><a class="tocitem" href="../distributed/">Distributed stochastic programs</a></li><li><a class="tocitem" href="../structuredsolvers/">Structured solvers</a></li><li><a class="tocitem" href="../examples/">Examples</a></li></ul></li><li><span class="tocitem">Library</span><ul><li><a class="tocitem" href="../../library/public/">Public interface</a></li><li><a class="tocitem" href="../../library/solverinterface/">Solver interface</a></li><li><a class="tocitem" href="../../library/crash/">Crash</a></li><li><a class="tocitem" href="../../library/lshaped/">L-shaped solvers</a></li><li><a class="tocitem" href="../../library/progressivehedging/">Progressive-hedging solvers</a></li><li><a class="tocitem" href="../../library/quasigradient/">Quasi-gradient solvers</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Manual</a></li><li class="is-active"><a href>Quick start</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Quick start</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/martinbiel/StochasticPrograms.jl/blob/master/docs/src/manual/quickstart.md" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="Quick-start"><a class="docs-heading-anchor" href="#Quick-start">Quick start</a><a id="Quick-start-1"></a><a class="docs-heading-anchor-permalink" href="#Quick-start" title="Permalink"></a></h1><h2 id="Installation"><a class="docs-heading-anchor" href="#Installation">Installation</a><a id="Installation-1"></a><a class="docs-heading-anchor-permalink" href="#Installation" title="Permalink"></a></h2><p>StochasticPrograms is installed as follows:</p><pre><code class="language-julia hljs">pkg&gt; add StochasticPrograms</code></pre><p>Afterwards, the functionality can be made available in a module or REPL through:</p><pre><code class="language-julia hljs">using StochasticPrograms</code></pre><h2 id="Stochastic-programs"><a class="docs-heading-anchor" href="#Stochastic-programs">Stochastic programs</a><a id="Stochastic-programs-1"></a><a class="docs-heading-anchor-permalink" href="#Stochastic-programs" title="Permalink"></a></h2><p>Consider some probability space <span>$(\Omega,\mathcal{F},\pi)$</span> where <span>$\Omega$</span> is a sample space, <span>$\mathcal{F}$</span> is a <span>$\sigma$</span>-algebra over <span>$\Omega$</span> and <span>$\pi: \mathcal{F} \to [0,1]$</span> is a probability measure. Let <span>$\xi(\omega): \Omega \to \mathbb{R}^{N}$</span> be some random variable on <span>$\Omega$</span> with finite second moments. A two-stage linear stochastic program has the following mathematical representation:</p><p class="math-container">\[\begin{aligned}
+ \operatorname*{minimize}_{x \in \mathbb{R}^n} &amp; \quad c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right] \\
+ \text{s.t.} &amp; \quad Ax = b \\
+ &amp; \quad x \geq 0
+\end{aligned}\]</p><p>where</p><p class="math-container">\[\begin{aligned}
+    Q(x,\xi(\omega)) = \min_{y \in \mathbb{R}^m} &amp; \quad q_{\omega}^T y \\
+    \text{s.t.} &amp; \quad T_{\omega}x + Wy = h_{\omega} \\
+    &amp; \quad y \geq 0
+  \end{aligned}\]</p><p>If the sample space <span>$\Omega$</span> is finite, stochastic program has a closed form that can be represented on a computer. Such functionality is provided by StochasticPrograms. If the sample space <span>$\Omega$</span> is infinite, sampling techniques can be used to represent the stochastic program using finite instances generated using  <a href="../../library/public/#StochasticPrograms.sample"><code>sample</code></a>.</p><h2 id="A-simple-stochastic-program"><a class="docs-heading-anchor" href="#A-simple-stochastic-program">A simple stochastic program</a><a id="A-simple-stochastic-program-1"></a><a class="docs-heading-anchor-permalink" href="#A-simple-stochastic-program" title="Permalink"></a></h2><p>To showcase the use of StochasticPrograms we will walk through a simple example. Consider the following stochastic program: (taken from <a href="https://link.springer.com/book/10.1007%2F978-1-4614-0237-4">Introduction to Stochastic Programming</a>).</p><p class="math-container">\[\begin{aligned}
+ \operatorname*{minimize}_{x_1, x_2 \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 + \operatorname{\mathbb{E}}_{\omega} \left[Q(x_1,x_2,\xi(\omega))\right] \\
+ \text{s.t.} &amp; \quad x_1+x_2 \leq 120 \\
+ &amp; \quad x_1 \geq 40 \\
+ &amp; \quad x_2 \geq 20
+\end{aligned}\]</p><p>where</p><p class="math-container">\[\begin{aligned}
+ Q(x_1,x_2,\xi(\omega)) = \min_{y_1,y_2 \in \mathbb{R}} &amp; \quad q_1(\omega)y_1 + q_2(\omega)y_2 \\
+ \text{s.t.} &amp; \quad 6y_1+10y_2 \leq 60x_1 \\
+ &amp; \quad 8y_1 + 5y_2 \leq 80x_2 \\
+ &amp; \quad 0 \leq y_1 \leq d_1(\omega) \\
+ &amp; \quad 0 \leq y_2 \leq d_2(\omega)
+\end{aligned}\]</p><p>and the stochastic variable</p><p class="math-container">\[  \xi(\omega) = \begin{pmatrix}
+     q_1(\omega) &amp; q_2(\omega) &amp; d_1(\omega) &amp; d_2(\omega)
+  \end{pmatrix}^T\]</p><p>parameterizes the second-stage model. In the following, we consider how to model, analyze, and solve this stochastic program using StochasticPrograms. In many examples, a <code>MathOptInterface</code> solver is required. Hence, we load the GLPK solver:</p><pre><code class="language-julia hljs">using GLPK</code></pre><p>We also load Ipopt to solve quadratic problems:</p><pre><code class="language-julia hljs">using Ipopt</code></pre><h2 id="Stochastic-model-definition"><a class="docs-heading-anchor" href="#Stochastic-model-definition">Stochastic model definition</a><a id="Stochastic-model-definition-1"></a><a class="docs-heading-anchor-permalink" href="#Stochastic-model-definition" title="Permalink"></a></h2><p>First, we define a stochastic model that describes the introduced stochastic program above.</p><pre><code class="language-julia hljs">@stochastic_model simple_model begin
+    @stage 1 begin
+        @decision(simple_model, x₁ &gt;= 40)
+        @decision(simple_model, x₂ &gt;= 20)
+        @objective(simple_model, Min, 100*x₁ + 150*x₂)
+        @constraint(simple_model, x₁ + x₂ &lt;= 120)
+    end
+    @stage 2 begin
+        @uncertain q₁ q₂ d₁ d₂
+        @recourse(simple_model, 0 &lt;= y₁ &lt;= d₁)
+        @recourse(simple_model, 0 &lt;= y₂ &lt;= d₂)
+        @objective(simple_model, Max, q₁*y₁ + q₂*y₂)
+        @constraint(simple_model, 6*y₁ + 10*y₂ &lt;= 60*x₁)
+        @constraint(simple_model, 8*y₁ + 5*y₂ &lt;= 80*x₂)
+    end
+end</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Two-Stage Stochastic Model
+
+minimize f₀(x) + 𝔼[f(x,ξ)]
+  x∈𝒳
+
+where
+
+f(x,ξ) = min  f(y; x, ξ)
+              y ∈ 𝒴 (x, ξ)
+</code></pre><p>The optimization models in the first and second stage are defined using JuMP syntax inside <a href="../../library/public/#StochasticPrograms.@stage"><code>@stage</code></a> blocks. Every first-stage variable is annotated with <a href="../../library/public/#StochasticPrograms.@decision"><code>@decision</code></a>. This allows us to use the variable in the second stage. The <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> annotation specifies that the variables <code>q₁</code>, <code>q₂</code>, <code>d₁</code> and <code>d₂</code> are uncertain. Instances of the uncertain variables will later be injected to create instances of the second stage model. We will consider two stochastic models of the uncertainty and showcase the main functionality of the framework for each.</p><h2 id="Finite-sample-space"><a class="docs-heading-anchor" href="#Finite-sample-space">Finite sample space</a><a id="Finite-sample-space-1"></a><a class="docs-heading-anchor-permalink" href="#Finite-sample-space" title="Permalink"></a></h2><p>First, let <span>$\xi$</span> be a discrete distribution, taking on the value</p><p class="math-container">\[  \xi_1 = \begin{pmatrix}
+    24 &amp; 28 &amp; 500 &amp; 100
+  \end{pmatrix}^T\]</p><p>with probability <span>$0.4$</span> and</p><p class="math-container">\[  \xi_1 = \begin{pmatrix}
+    28 &amp; 32 &amp; 300 &amp; 300
+  \end{pmatrix}^T\]</p><p>with probability <span>$0.6$</span>.</p><h3 id="Instantiation"><a class="docs-heading-anchor" href="#Instantiation">Instantiation</a><a id="Instantiation-1"></a><a class="docs-heading-anchor-permalink" href="#Instantiation" title="Permalink"></a></h3><p>First, we create the two instances <span>$\xi_1$</span> and <span>$\xi_2$</span> of the random variable. For simple models this is conveniently achieved through the <a href="../../library/public/#StochasticPrograms.Scenario"><code>Scenario</code></a> type. <span>$\xi_1$</span> and <span>$\xi_2$</span> can be created as follows:</p><pre><code class="language-julia hljs">ξ₁ = @scenario q₁ = 24.0 q₂ = 28.0 d₁ = 500.0 d₂ = 100.0 probability = 0.4</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.4
+  q₁: 24.0
+  q₂: 28.0
+  d₁: 500.0
+  d₂: 100.0</code></pre><p>and</p><pre><code class="language-julia hljs">ξ₂ = @scenario q₁ = 28.0 q₂ = 32.0 d₁ = 300.0 d₂ = 300.0 probability = 0.6</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario with probability 0.6
+  q₁: 28.0
+  q₂: 32.0
+  d₁: 300.0
+  d₂: 300.0</code></pre><p>where the variable names should match those given in the <a href="../../library/public/#StochasticPrograms.@uncertain"><code>@uncertain</code></a> annotation. We are now ready to instantiate the stochastic program introduced above.</p><pre><code class="language-julia hljs">sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Deterministic equivalent
+Solver name: GLPK</code></pre><p>By default, the stochastic program is instantiated with a deterministic equivalent structure. It is straightforward to work out the extended form because the example problem is small:</p><p class="math-container">\[\begin{aligned}
+ \operatorname*{minimize}_{x_1, x_2, y_{11}, y_{21}, y_{12}, y_{22} \in \mathbb{R}} &amp; \quad 100x_1 + 150x_2 - 9.6y_{11} - 11.2y_{21} - 16.8y_{12} - 19.2y_{22}  \\
+ \text{s.t.} &amp; \quad x_1 + x_2 \leq 120 \\
+ &amp; \quad 6 y_{11} + 10 y_{21} \leq 60 x_1 \\
+ &amp; \quad 8 y_{11} + 5 y_{21} \leq 80 x_2 \\
+ &amp; \quad 6 y_{12} + 10 y_{22} \leq 60 x_1 \\
+ &amp; \quad 8 y_{12} + 5 y_{22} \leq 80 x_2 \\
+ &amp; \quad x_1 \geq 40 \\
+ &amp; \quad x_2 \geq 20 \\
+ &amp; \quad 0 \leq y_{11} \leq 500 \\
+ &amp; \quad 0 \leq y_{21} \leq 100 \\
+ &amp; \quad 0 \leq y_{12} \leq 300 \\
+ &amp; \quad 0 \leq y_{22} \leq 300
+\end{aligned}\]</p><p>We can print the stochastic program and confirm that it indeed models the example recourse problem given above:</p><pre><code class="language-julia hljs">print(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Deterministic equivalent problem
+Min 100 x₁ + 150 x₂ - 9.600000000000001 y₁₁ - 11.200000000000001 y₂₁ - 16.8 y₁₂ - 19.2 y₂₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ y₁₁ ∈ RecourseDecisions
+ y₂₁ ∈ RecourseDecisions
+ y₁₂ ∈ RecourseDecisions
+ y₂₂ ∈ RecourseDecisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ y₁₁ ≥ 0.0
+ y₂₁ ≥ 0.0
+ y₁₂ ≥ 0.0
+ y₂₂ ≥ 0.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁₁ + 10 y₂₁ ≤ 0.0
+ -80 x₂ + 8 y₁₁ + 5 y₂₁ ≤ 0.0
+ -60 x₁ + 6 y₁₂ + 10 y₂₂ ≤ 0.0
+ -80 x₂ + 8 y₁₂ + 5 y₂₂ ≤ 0.0
+ y₁₁ ≤ 500.0
+ y₂₁ ≤ 100.0
+ y₁₂ ≤ 300.0
+ y₂₂ ≤ 300.0
+Solver name: GLPK</code></pre><h3 id="Optimization"><a class="docs-heading-anchor" href="#Optimization">Optimization</a><a id="Optimization-1"></a><a class="docs-heading-anchor-permalink" href="#Optimization" title="Permalink"></a></h3><p>The most common operation is to solve the instantiated stochastic program for an optimal first-stage decision. We instantiated the problem with the <code>GLPK</code> optimizer, so we can solve the problem directly:</p><pre><code class="language-julia hljs">optimize!(sp)</code></pre><p>We can then query the resulting optimal value:</p><pre><code class="language-julia hljs">objective_value(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-855.8333333333321</code></pre><p>and the optimal first-stage decision:</p><pre><code class="language-julia hljs">optimal_decision(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 46.66666666666667
+ 36.25</code></pre><p>Alternatively, we can solve the problem with a structure-exploiting solver. The framework provides both <code>LShaped</code> and <code>ProgressiveHedging</code> solvers. We first re-instantiate the problem using an L-shaped optimizer:</p><pre><code class="language-julia hljs">sp_lshaped = instantiate(simple_model, [ξ₁, ξ₂], optimizer = LShaped.Optimizer)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Stage-decomposition
+Solver name: L-shaped with disaggregate cuts</code></pre><p>It should be noted that the memory representation of the stochastic program is now different. Because we instantiated the model with an L-shaped optimizer it generated the program according to a stage-decomposition structure:</p><pre><code class="language-julia hljs">print(sp_lshaped)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">First-stage
+==============
+Min 100 x₁ + 150 x₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+
+Second-stage
+==============
+Subproblem 1 (p = 0.40):
+Max 24 y₁ + 28 y₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Subproblem 2 (p = 0.60):
+Max 28 y₁ + 32 y₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 300.0
+ y₂ ≤ 300.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Solver name: L-shaped with disaggregate cuts</code></pre><p>To solve the problem with L-shaped, we must first specify internal optimizers that can solve emerging subproblems:</p><pre><code class="language-julia hljs">set_optimizer_attribute(sp_lshaped, MasterOptimizer(), GLPK.Optimizer)
+set_optimizer_attribute(sp_lshaped, SubProblemOptimizer(), GLPK.Optimizer)</code></pre><p>We can now run the optimization procedure:</p><pre><code class="language-julia hljs">optimize!(sp_lshaped)</code></pre><pre><code class="language-julia hljs">L-Shaped Gap  Time: 0:00:01 (6 iterations)
+  Objective:       -855.8333333333339
+  Gap:             0.0
+  Number of cuts:  7
+  Iterations:      6</code></pre><p>and verify that we get the same results:</p><pre><code class="language-julia hljs">objective_value(sp_lshaped)</code></pre><pre><code class="language-julia hljs">-855.8333333333339</code></pre><p>and</p><pre><code class="language-julia hljs">optimal_decision(sp_lshaped)</code></pre><pre><code class="language-julia hljs">2-element Array{Float64,1}:
+ 46.66666666666673
+ 36.25000000000003</code></pre><p>Likewise, we can solve the problem with progressive-hedging. Consider:</p><pre><code class="language-julia hljs">sp_progressivehedging = instantiate(simple_model, [ξ₁, ξ₂], optimizer = ProgressiveHedging.Optimizer)</code></pre><pre><code class="language-julia hljs">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 2 scenarios of type Scenario
+Structure: Scenario-decomposition
+Solver name: Progressive-hedging with fixed penalty</code></pre><p>Now, the induced structure is the scenario-decomposition that decomposes the stochastic program completely into subproblems over the scenarios. Consider the printout:</p><pre><code class="language-julia hljs">print(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">Scenario problems
+==============
+Subproblem 1 (p = 0.40):
+Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
+Subject to
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Subproblem 2 (p = 0.60):
+Min 100 x₁ + 150 x₂ - 28 y₁ - 32 y₂
+Subject to
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 300.0
+ y₂ ≤ 300.0
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+
+Solver name: Progressive-hedging with fixed penalty</code></pre><p>To solve the problem with progressive-hedging, we must also specify an internal optimizers that can solve the subproblems:</p><pre><code class="language-julia hljs">set_optimizer_attribute(sp_progressivehedging, SubProblemOptimizer(), Ipopt.Optimizer)
+set_suboptimizer_attribute(sp_progressivehedging, MOI.RawParameter(&quot;print_level&quot;), 0) # Silence Ipopt</code></pre><p>We can now run the optimization procedure:</p><pre><code class="language-julia hljs">optimize!(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">Progressive Hedging Time: 0:00:07 (303 iterations)
+  Objective:   -855.5842547490254
+  Primal gap:  7.2622997706326046e-6
+  Dual gap:    8.749063651111478e-6
+  Iterations:  302</code></pre><p>and verify that we get the same results:</p><pre><code class="language-julia hljs">objective_value(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">-855.5842547490254</code></pre><p>and</p><pre><code class="language-julia hljs">optimal_decision(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">2-element Array{Float64,1}:
+ 46.65459574079722
+ 36.24298005619633</code></pre><h3 id="Decision-evaluation"><a class="docs-heading-anchor" href="#Decision-evaluation">Decision evaluation</a><a id="Decision-evaluation-1"></a><a class="docs-heading-anchor-permalink" href="#Decision-evaluation" title="Permalink"></a></h3><p>Decision evaluation is an important concept in stochastic programming. The expected result of taking a given first-stage decision <span>$x$</span> is given by</p><p class="math-container">\[V(x) = c^T x + \operatorname{\mathbb{E}}_{\omega} \left[Q(x,\xi(\omega))\right]\]</p><p>If the sample space is finite, the above expressions has a closed form that is readily calculated. Consider the following first-stage decision:</p><pre><code class="language-julia hljs">x = [40., 20.]</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 40.0
+ 20.0</code></pre><p>The expected result of taking this decision in the simple finite model can be determined through:</p><pre><code class="language-julia hljs">evaluate_decision(sp, x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-470.39999999999964</code></pre><p>Internally, this fixes all occurances of the first-stage variables in the deterministic equivalent and solves the resulting problem. An equivalent approach is to fix the decisions manually:</p><pre><code class="language-julia hljs">another_sp = instantiate(simple_model, [ξ₁, ξ₂], optimizer = GLPK.Optimizer)
+fix.(all_decision_variables(another_sp, 1), x)
+optimize!(another_sp)
+objective_value(another_sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-470.39999999999964</code></pre><p>Decision evaluation is supported by the other storage structures as well:</p><pre><code class="language-julia hljs">evaluate_decision(sp_lshaped, x)</code></pre><pre><code class="language-julia hljs">-470.39999999999964</code></pre><p>and</p><pre><code class="language-julia hljs">evaluate_decision(sp_progressivehedging, x)</code></pre><pre><code class="language-julia hljs">-470.40000522896185</code></pre><p>In a stage-decomposition structure, the occurances of first-stage decisions in the second-stage subproblems are treated as known decisions with parameter values that can be set. We can explicitly create such a subproblem to clearly see this in action:</p><pre><code class="language-julia hljs">print(outcome_model(sp, x, ξ₁))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Min -24 y₁ - 28 y₂ + 100 x₁ + 150 x₂
+Subject to
+ x₁ ∈ Known(value = 40.0)
+ x₂ ∈ Known(value = 20.0)
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0</code></pre><p>Moreover, we can evaluate the result of the decision in a given scenario, i.e. solving a single outcome model, through:</p><pre><code class="language-julia hljs">evaluate_decision(sp, x, ξ₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">900.0</code></pre><h3 id="Solution-caching"><a class="docs-heading-anchor" href="#Solution-caching">Solution caching</a><a id="Solution-caching-1"></a><a class="docs-heading-anchor-permalink" href="#Solution-caching" title="Permalink"></a></h3><p>StochasticPrograms minimizes memory usage by reusing the same underlying structure when optimizing the model as when evaluating a decision. As a consequence, calls to for example <a href="../../library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractVector{T} where T, AbstractSampler}"><code>evaluate_decision</code></a> replaces any previosly found optimal solution. Hence,</p><pre><code class="language-julia hljs">objective_value(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-470.39999999999964</code></pre><p>and</p><pre><code class="language-julia hljs">optimal_decision(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 40.0
+ 20.0</code></pre><p>returns values consistent with above call to <a href="../../library/public/#StochasticPrograms.evaluate_decision-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractVector{T} where T, AbstractSampler}"><code>evaluate_decision</code></a>. Optionally, the solution obtained from calling <a href="../../library/solverinterface/#JuMP.optimize!"><code>optimize!</code></a> can be cached by setting a <code>cache</code> flag during the call:</p><pre><code class="language-julia hljs">optimize!(sp; cache = true)</code></pre><p>or by directly calling <a href="../../library/public/#StochasticPrograms.cache_solution!-Tuple{StochasticProgram}"><code>cache_solution!</code></a>:</p><pre><code class="language-julia hljs">cache_solution!(sp)</code></pre><p>after optimizing. Now, we again obtain</p><pre><code class="language-julia hljs">objective_value(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-855.8333333333321</code></pre><p>and</p><pre><code class="language-julia hljs">optimal_decision(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 46.66666666666667
+ 36.25</code></pre><p>However, if we now also re-run decision evaluation:</p><pre><code class="language-julia hljs">evaluate_decision(sp, x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-470.39999999999964</code></pre><p>the solution stays consistent with the optimization call:</p><pre><code class="language-julia hljs">objective_value(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-855.8333333333321</code></pre><p>and</p><pre><code class="language-julia hljs">optimal_decision(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 46.66666666666667
+ 36.25</code></pre><p>The caching procedure attempts to save as many MathOptInterface attributes as possible, so for example dual values of the constraints should stay consistent with the optimized model as well. For larger models, the caching procedure can be time consuming and is therefore not enabled by default. For the same reason, the subproblem solutions are only cached for models with fewer than 100 scenarios. The first-stage solution is always cached if caching is enabled.</p><h3 id="Stochastic-performance"><a class="docs-heading-anchor" href="#Stochastic-performance">Stochastic performance</a><a id="Stochastic-performance-1"></a><a class="docs-heading-anchor-permalink" href="#Stochastic-performance" title="Permalink"></a></h3><p>Apart from solving the stochastic program, we can compute two classical measures of stochastic performance. The first measures the value of knowing the random outcome before making the decision. This is achieved by taking the expectation in the original model outside the minimization, to obtain the wait-and-see problem:</p><p class="math-container">\[\mathrm{EWS} = \operatorname{\mathbb{E}}_{\omega}\left[
+  \begin{aligned}
+    \min_{x \in \mathbb{R}^n} &amp; \quad c^T x + Q(x,\xi(\omega)) \\
+    \text{s.t.} &amp; \quad Ax = b \\
+    &amp; \quad x \geq 0.
+  \end{aligned}\right]\]</p><p>Now, the first- and second-stage decisions are taken with knowledge about the uncertainty. If we assume that we know what the actual outcome will be, we would be interested in the optimal course of action in that scenario. This is the concept of wait-and-see models. For example if <span>$ξ₁$</span> is believed to be the actual outcome, we can define a wait-and-see model as follows:</p><pre><code class="language-julia hljs">ws = WS(sp, ξ₁)
+print(ws)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Min 100 x₁ + 150 x₂ - 24 y₁ - 28 y₂
+Subject to
+ x₁ ∈ Decisions
+ x₂ ∈ Decisions
+ y₁ ∈ RecourseDecisions
+ y₂ ∈ RecourseDecisions
+ x₁ ≥ 40.0
+ x₂ ≥ 20.0
+ y₁ ≥ 0.0
+ y₂ ≥ 0.0
+ x₁ + x₂ ≤ 120.0
+ -60 x₁ + 6 y₁ + 10 y₂ ≤ 0.0
+ -80 x₂ + 8 y₁ + 5 y₂ ≤ 0.0
+ y₁ ≤ 500.0
+ y₂ ≤ 100.0</code></pre><p>The optimal first-stage decision in this scenario can be determined through:</p><pre><code class="language-julia hljs">x₁ = wait_and_see_decision(sp, ξ₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 40.0
+ 29.583333333333336</code></pre><p>We can evaluate this decision:</p><pre><code class="language-julia hljs">evaluate_decision(sp, x₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-762.5000000000014</code></pre><p>The outcome is of course worse than taking the optimal decision. However, it would perform better if <span>$ξ₁$</span> is the actual outcome:</p><pre><code class="language-julia hljs">evaluate_decision(sp, x₁, ξ₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">37.49999999999909</code></pre><p>as compared to:</p><pre><code class="language-julia hljs">evaluate_decision(sp, optimal_decision(sp), ξ₁)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">104.16666666666788</code></pre><p>The difference between the expected wait-and-see value and the value of the recourse problem is known as the <strong>expected value of perfect information</strong>:</p><p class="math-container">\[\mathrm{EVPI} = \mathrm{EWS} - \mathrm{VRP}.\]</p><p>The EVPI measures the expected loss of not knowing the exact outcome beforehand. It quantifies the value of having access to an accurate forecast. We calculate it in the framework through:</p><pre><code class="language-julia hljs">EVPI(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">662.9166666666679</code></pre><p>EVPI is supported in the other structures as well:</p><pre><code class="language-julia hljs">EVPI(sp_lshaped)</code></pre><pre><code class="language-julia hljs">662.9166666666661</code></pre><p>and</p><pre><code class="language-julia hljs">EVPI(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">663.165763660815</code></pre><p>We can also compute EWS directly using <a href="../../library/public/#StochasticPrograms.EWS-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EWS</code></a>. Note, that the scenario-decomposition structure is ideal for solving wait-and-see type problems.</p><p>If the expectation in the original model is instead taken inside the second-stage objective function <span>$Q$</span>, we obtain the expected-value-problem:</p><p class="math-container">\[\begin{aligned}
+    \operatorname*{minimize}_{x \in \mathbb{R}^n} &amp; \quad c^T x + Q(x,\operatorname{\mathbb{E}}_{\omega}[\xi(\omega)]) \\
+    \text{s.t.} &amp; \quad Ax = b \\
+    &amp; \quad x \geq 0.
+  \end{aligned}\]</p><p>The solution to the expected-value-problem is known as the <strong>expected value decision</strong>, and is denoted by <span>$\bar{x}$</span>. We can compute it through</p><pre><code class="language-julia hljs">x̄ = expected_value_decision(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">2-element Vector{Float64}:
+ 71.45833333333334
+ 48.54166666666667</code></pre><p>The expected result of taking the expected value decision is known as the <strong>expected result of the expected value decision</strong>:</p><p class="math-container">\[\mathrm{EEV} = c^T \bar{x} + \operatorname{\mathbb{E}}_{\xi}{Q(\bar{x},\xi(\omega))}.\]</p><p>The difference between the value of the recourse problem and the expected result of the expected value decision is known as the <strong>value of the stochastic solution</strong>:</p><p class="math-container">\[\mathrm{VSS} = \mathrm{EEV} - \mathrm{VRP}.\]</p><p>The VSS measures the expected loss of ignoring the uncertainty in the problem. A large VSS indicates that the second stage is sensitive to the stochastic data. We calculate it using</p><pre><code class="language-julia hljs">VSS(sp)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">286.91666666666515</code></pre><p>VSS is supported in the other structures as well:</p><pre><code class="language-julia hljs">VSS(sp_lshaped)</code></pre><pre><code class="language-julia hljs">286.91666666666606</code></pre><p>and</p><pre><code class="language-julia hljs">VSS(sp_progressivehedging)</code></pre><pre><code class="language-julia hljs">286.6675823650668</code></pre><p>We can also compute EEV directly using <a href="../../library/public/#StochasticPrograms.EEV-Tuple{StochasticModel{2, P} where P&lt;:Tuple{StageParameters, StageParameters}, AbstractSampler}"><code>EEV</code></a>. Note, that the stage-decomposition structure is ideal for solving VSS type problems.</p><h2 id="Infinite-sample-space"><a class="docs-heading-anchor" href="#Infinite-sample-space">Infinite sample space</a><a id="Infinite-sample-space-1"></a><a class="docs-heading-anchor-permalink" href="#Infinite-sample-space" title="Permalink"></a></h2><p>In the above, the probability space consists of only two scenarios and the stochastic program can hence be represented in a closed form. If it instead holds that <span>$\xi$</span> follows say a normal distribution, then it is no longer possible to represent the full stochastic program since this would require infinite scenarios. We then revert to sampling-based techniques. For example, let <span>$\xi \sim \mathcal{N}(\mu, \Sigma)$</span> with</p><p class="math-container">\[\mu = \begin{pmatrix}
+ 24 \\
+ 32 \\
+ 400 \\
+ 200
+\end{pmatrix}, \quad \Sigma = \begin{pmatrix}
+ 2 &amp; 0.5 &amp; 0 &amp; 0 \\
+ 0.5 &amp; 1 &amp; 0 &amp; 0 \\
+ 0 &amp; 0 &amp; 50 &amp; 20 \\
+ 0 &amp; 0 &amp; 20 &amp; 30
+\end{pmatrix}\]</p><h3 id="Instantiation-2"><a class="docs-heading-anchor" href="#Instantiation-2">Instantiation</a><a class="docs-heading-anchor-permalink" href="#Instantiation-2" title="Permalink"></a></h3><p>To approximate the resulting stochastic program in StochasticPrograms, we first create a sampler object capable of generating scenarios from this distribution. This is most conveniently achieved using the <a href="../../library/public/#StochasticPrograms.@sampler"><code>@sampler</code></a> macro:</p><pre><code class="language-julia hljs">using Distributions
+
+@sampler SimpleSampler = begin
+    N::MvNormal
+
+    SimpleSampler(μ, Σ) = new(MvNormal(μ, Σ))
+
+    @sample Scenario begin
+        x = rand(sampler.N)
+        return Scenario(q₁ = x[1], q₂ = x[2], d₁ = x[3], d₂ = x[4])
+    end
+end
+
+μ = [24, 32, 400, 200]
+Σ = [2 0.5 0 0
+     0.5 1 0 0
+     0 0 50 20
+     0 0 20 30]
+
+sampler = SimpleSampler(μ, Σ)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Scenario sampler</code></pre><p>Now, we can use the same stochastic model created before and the created sampler object to generate a sampled approximation of the stochastic program. For now, we create a small sampled model of just 5 scenarios:</p><pre><code class="language-julia hljs">sampled_sp = instantiate(simple_model, sampler, 5, optimizer = GLPK.Optimizer)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Stochastic program with:
+ * 2 decision variables
+ * 2 recourse variables
+ * 5 scenarios of type Scenario
+Structure: Deterministic equivalent
+Solver name: GLPK</code></pre><p>An optimal solution to this sampled model approximates the optimal solution to the infinite model in the sense that the empirical average second-stage cost converges pointwise with probability one to the true optimal value as the number of sampled scenarios goes to infinity. Moreoever, we can apply a central limit theorem to calculate confidence intervals around the objective value, as well as around the EVPI and VSS. This is the basis for the technique known as sample average approximation. In the following, we show how we can achieve approximations of the finite sample space functionality. Note that most operations are now performed directly on the <code>simple_model</code> object together with a supplied sampler object.</p><h3 id="Optimization-2"><a class="docs-heading-anchor" href="#Optimization-2">Optimization</a><a class="docs-heading-anchor-permalink" href="#Optimization-2" title="Permalink"></a></h3><p>To approximately solve the stochastic program over normally distributed scenarios, we must first set a sample-based solver. The framework provides the <code>SAA</code> solver:</p><pre><code class="language-julia hljs">set_optimizer(simple_model, SAA.Optimizer)</code></pre><p>We must first set an instance optimizer that can solve emerging sampled instances:</p><pre><code class="language-julia hljs">set_optimizer_attribute(simple_model, InstanceOptimizer(), GLPK.Optimizer)</code></pre><p>Note, that we can use a structure-exploiting solver for the instance optimizer. We now set a desired confidence level and the number of samples:</p><pre><code class="language-julia hljs">set_optimizer_attribute(simple_model, Confidence(), 0.9)
+set_optimizer_attribute(simple_model, NumSamples(), 100)
+set_optimizer_attribute(simple_model, NumEvalSamples(), 300)</code></pre><p>We can now calculate a confidence interval around the optimal value through:</p><pre><code class="language-julia hljs">confidence_interval(simple_model, sampler)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Confidence interval (p = 90%): [-1088.41 − -1065.72]</code></pre><p>The optimization procedure provided by <code>SAA</code> iteratively calculates confidence intervals for growing sample sizes until a desired relative tolerance is reached:</p><pre><code class="language-julia hljs">set_optimizer_attribute(simple_model, RelativeTolerance(), 5e-2)</code></pre><p>We can now optimize the model:</p><pre><code class="language-julia hljs">optimize!(simple_model, sampler)</code></pre><pre><code class="language-julia hljs">SAA gap Time: 0:00:03 (4 iterations)
+  Confidence interval:  Confidence interval (p = 95%): [-1095.65 − -1072.36]
+  Relative error:       0.021487453807842415
+  Sample size:          64</code></pre><p>and query the result:</p><pre><code class="language-julia hljs">objective_value(simple_model);objective_value(simple_model);</code></pre><pre><code class="language-julia hljs">objective_value(simple_model) = Confidence interval (p = 95%): [-1095.65 − -1072.36]</code></pre><p>Note, that we can just replace the sampler object to use another model of the uncertainty.</p><h3 id="Decision-evaluation-2"><a class="docs-heading-anchor" href="#Decision-evaluation-2">Decision evaluation</a><a class="docs-heading-anchor-permalink" href="#Decision-evaluation-2" title="Permalink"></a></h3><p>If the sample space is infinite, or if the underlying random variable <span>$\xi$</span> is continuous, a first-stage decision also can only be evaluated in a stochastic sense. For example, note the result of evaluating the decision on the sampled model created above:</p><pre><code class="language-julia hljs">evaluate_decision(sampled_sp, x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-1045.6472509382693</code></pre><p>and compare it to the result of evaluating it on another sampled model of similar size:</p><pre><code class="language-julia hljs">another_sp = instantiate(simple_model, sampler, 5, optimizer = GLPK.Optimizer)
+evaluate_decision(another_sp, x)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">-1008.0143554432134</code></pre><p>which, if any, of these values should be a candidate for the true value of <span>$V(x)$</span>? A more precise result is obtained by evaluating the decision using a sampled-based approach:</p><pre><code class="language-julia hljs">evaluate_decision(simple_model, x, sampler)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Confidence interval (p = 90%): [-1101.83 − -1063.44]</code></pre><h3 id="Stochastic-performance-2"><a class="docs-heading-anchor" href="#Stochastic-performance-2">Stochastic performance</a><a class="docs-heading-anchor-permalink" href="#Stochastic-performance-2" title="Permalink"></a></h3><p>Using the same techniques as above, we can calculate confidence intervals around the EVPI and VSS:</p><pre><code class="language-julia hljs">EVPI(simple_model, sampler)</code></pre><pre><code class="language-julia hljs">Confidence interval (p = 99%): [32.96 − 144.51]</code></pre><p>and</p><pre><code class="language-julia hljs">VSS(simple_model, sampler)</code></pre><pre><code class="language-julia hljs">Warning: VSS is not statistically significant to the chosen confidence level and tolerance
+Confidence interval (p = 95%): [-0.05 − 0.05]</code></pre><p>Note, that the VSS is not statistically significant. This is not surprising for a normally distributed uncertainty model. The expected value decision is expected to perform well.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../data/">Stochastic data »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.23 on <span class="colophon-date" title="Sunday 4 September 2022 12:36">Sunday 4 September 2022</span>. Using Julia version 1.6.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
