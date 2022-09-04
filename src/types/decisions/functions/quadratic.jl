@@ -42,7 +42,7 @@ function Base.convert(::Type{QuadraticDecisionFunction{T}}, α::T) where T
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
 end
 function Base.convert(::Type{QuadraticDecisionFunction{T}},
-                      f::MOI.SingleVariable) where T
+                      f::MOI.VariableIndex) where T
     return QuadraticDecisionFunction{T}(
         convert(MOI.ScalarQuadraticFunction{T}, f),
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
@@ -53,8 +53,8 @@ function Base.convert(::Type{QuadraticDecisionFunction{T}},
     return QuadraticDecisionFunction{T}(
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)),
         MOI.ScalarQuadraticFunction{T}(
-            [MOI.ScalarAffineTerm(one(T), f.decision)],
             MOI.ScalarQuadraticTerm{T}[],
+            [MOI.ScalarAffineTerm(one(T), f.decision)],
             zero(T),
         ),
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
@@ -80,9 +80,9 @@ function Base.convert(::Type{QuadraticDecisionFunction{T}},
         convert(MOI.ScalarQuadraticFunction{T}, f.decision_part),
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
 end
-function Base.convert(::Type{MOI.SingleVariable},
+function Base.convert(::Type{MOI.VariableIndex},
                       f::QuadraticDecisionFunction{T}) where T
-    return convert(MOI.SingleVariable, convert(AffineDecisionFunction{T}, f))
+    return convert(MOI.VariableIndex, convert(AffineDecisionFunction{T}, f))
 end
 function Base.convert(::Type{SingleDecision},
                       f::QuadraticDecisionFunction{T}) where T
@@ -160,11 +160,11 @@ function QuadraticDecisionFunction(quad::DQE)
     # Return QuadraticDecisionFunction with QuadraticPart
     return QuadraticDecisionFunction(
         variable_part,
-        MOI.ScalarQuadraticFunction(decision_affine_terms,
-                                    decision_quad_terms,
+        MOI.ScalarQuadraticFunction(decision_quad_terms,
+                                    decision_affine_terms,
                                     0.0),
-        MOI.ScalarQuadraticFunction(MOI.ScalarAffineTerm{Float64}[],
-                                    cross_terms,
+        MOI.ScalarQuadraticFunction(cross_terms,
+                                    MOI.ScalarAffineTerm{Float64}[],
                                     0.0))
 end
 JuMP.moi_function(quad::DQE) = QuadraticDecisionFunction(quad)
@@ -179,8 +179,8 @@ QuadraticDecisionFunction(quad::_DQE) = QuadraticDecisionFunction(convert(DQE, q
 function _DecisionQuadExpr(m::Model, f::MOI.ScalarQuadraticFunction)
     quad = _DQE(_DecisionAffExpr(m, MOI.ScalarAffineFunction(f.affine_terms, 0.0)))
     for t in f.quadratic_terms
-        v1 = t.variable_index_1
-        v2 = t.variable_index_2
+        v1 = t.variable_1
+        v2 = t.variable_2
         coef = t.coefficient
         if v1 == v2
             coef /= 2
@@ -196,8 +196,8 @@ function DQE(model::Model, f::QuadraticDecisionFunction{T}) where T
     cross_terms = OrderedDict{DecisionCrossTerm, Float64}()
     for term in f.cross_terms.quadratic_terms
         cross_term = DecisionCrossTerm(
-            DecisionRef(model, term.variable_index_1),
-            VariableRef(model, term.variable_index_2))
+            DecisionRef(model, term.variable_1),
+            VariableRef(model, term.variable_2))
         JuMP._add_or_set!(cross_terms, cross_term, term.coefficient)
     end
     return DQE(QuadExpr(model,
@@ -219,7 +219,7 @@ end
 # ========================== #
 MOI.constant(f::QuadraticDecisionFunction) =
     MOI.constant(f.variable_part)
-MOI.constant(f::QuadraticDecisionFunction, T::DataType) = MOI.constant(f)
+MOI.constant(f::QuadraticDecisionFunction, T::Type) = MOI.constant(f)
 
 function MOIU.eval_variables(varval::Function, f::QuadraticDecisionFunction)
     var_value = MOIU.eval_variables(varval, f.variable_part)
@@ -241,16 +241,16 @@ function MOIU.substitute_variables(variable_map::Function, f::QuadraticDecisionF
         convert(MOI.ScalarQuadraticFunction{T}, zero(T)))
     # Substitute variables
     for term in f.variable_part.affine_terms
-        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.variable)
         new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     for term in f.variable_part.quadratic_terms
-        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
-        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_2)
         f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
         coeff = term.coefficient
-        if term.variable_index_1 == term.variable_index_2
+        if term.variable_1 == term.variable_2
             coeff /= 2
         end
         new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
@@ -258,16 +258,16 @@ function MOIU.substitute_variables(variable_map::Function, f::QuadraticDecisionF
     end
     # Substitute decisions
     for term in f.decision_part.affine_terms
-        func::AffineDecisionFunction{T} = variable_map(term.variable_index)
+        func::AffineDecisionFunction{T} = variable_map(term.variable)
         new_term = MOIU.operate(*, T, term.coefficient, func)::AffineDecisionFunction{T}
         MOIU.operate!(+, T, g, new_term)::QuadraticDecisionFunction{T}
     end
     for term in f.decision_part.quadratic_terms
-        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
-        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_2)
         f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
         coeff = term.coefficient
-        if term.variable_index_1 == term.variable_index_2
+        if term.variable_1 == term.variable_2
             coeff /= 2
         end
         new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
@@ -275,11 +275,11 @@ function MOIU.substitute_variables(variable_map::Function, f::QuadraticDecisionF
     end
     # Substitute decisions in cross terms
     for term in f.cross_terms.quadratic_terms
-        f1::AffineDecisionFunction{T} = variable_map(term.variable_index_1)
-        f2::AffineDecisionFunction{T} = variable_map(term.variable_index_2)
+        f1::AffineDecisionFunction{T} = variable_map(term.variable_1)
+        f2::AffineDecisionFunction{T} = variable_map(term.variable_2)
         f12 = MOIU.operate(*, T, f1, f2)::QuadraticDecisionFunction{T}
         coeff = term.coefficient
-        if term.variable_index_1 == term.variable_index_2
+        if term.variable_1 == term.variable_2
             coeff /= 2
         end
         new_term = MOIU.operate!(*, T, f12, coeff)::QuadraticDecisionFunction{T}
@@ -335,11 +335,11 @@ end
 
 function add_term!(terms::Vector{MOI.ScalarQuadraticTerm{T}},
                    term::MOI.ScalarQuadraticTerm{T}) where T
-    index_1 = term.variable_index_1
-    index_2 = term.variable_index_2
+    index_1 = term.variable_1
+    index_2 = term.variable_2
     coefficient = term.coefficient
-    i = something(findfirst(t -> t.variable_index_1 == index_1 &&
-                            t.variable_index_2 == index_2,
+    i = something(findfirst(t -> t.variable_1 == index_1 &&
+                            t.variable_2 == index_2,
                             terms), 0)
     if iszero(i)
         if !iszero(coefficient)
@@ -360,11 +360,11 @@ end
 
 function remove_term!(terms::Vector{MOI.ScalarQuadraticTerm{T}},
                       term::MOI.ScalarQuadraticTerm{T}) where T
-    index_1 = term.variable_index_1
-    index_2 = term.variable_index_2
+    index_1 = term.variable_1
+    index_2 = term.variable_2
     coefficient = term.coefficient
-    i = something(findfirst(t -> t.variable_index_1 == index_1 &&
-                            t.variable_index_2 == index_2,
+    i = something(findfirst(t -> t.variable_1 == index_1 &&
+                            t.variable_2 == index_2,
                             terms), 0)
     if iszero(i) && !iszero(coefficient)
         # The term was not already included in the terms

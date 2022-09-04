@@ -30,7 +30,7 @@ function JuMP.normalized_coefficient(
 end
 
 function JuMP.set_objective_coefficient(model::Model, dref::DecisionRef, coeff::Real)
-    if model.nlp_data !== nothing && _nlp_objective_function(model) !== nothing
+    if JuMP._nlp_objective_function(model) !== nothing
         error("A nonlinear objective is already set in the model")
     end
     obj_fct_type = objective_function_type(model)
@@ -87,7 +87,7 @@ end
 
 function update_known_decisions!(model::MOI.ModelLike)
     change = KnownValuesChange()
-    F = MOI.SingleVariable
+    F = MOI.VariableIndex
     S = SingleDecisionSet{Float64}
     for ci in MOI.get(model, MOI.ListOfConstraintIndices{F,S}())
         MOI.modify(model, ci, change)
@@ -102,7 +102,7 @@ end
 
 function update_decision_state!(dref::DecisionRef, state::DecisionState)
     model = backend(owner_model(dref))
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(dref).value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index(dref).value)
     if MOI.is_valid(model, ci)
         MOI.modify(model, ci, DecisionStateChange(1, state))
         return nothing

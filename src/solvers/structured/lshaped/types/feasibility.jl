@@ -112,7 +112,7 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
     MOI.set(model, MOI.VariableName(), pos_aux_var, name)
     push!(worker.feasibility_variables, pos_aux_var)
     # Nonnegativity constraint
-    MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+    MOI.add_constraint(model, MOI.VariableIndex(pos_aux_var.value),
                        MOI.GreaterThan{Float64}(0.0))
     # Add to objective
     MOI.modify(model, MOI.ObjectiveFunction{G}(),
@@ -125,7 +125,7 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
     MOI.set(model, MOI.VariableName(), neg_aux_var, name)
     push!(worker.feasibility_variables, neg_aux_var)
     # Nonnegativity constraint
-    MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+    MOI.add_constraint(model, MOI.VariableIndex(neg_aux_var.value),
                        MOI.GreaterThan{Float64}(0.0))
     # Add to objective
     MOI.modify(model, MOI.ObjectiveFunction{G}(),
@@ -150,7 +150,7 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
         MOI.set(model, MOI.VariableName(), pos_aux_var, name)
         push!(worker.feasibility_variables, pos_aux_var)
         # Nonnegativity constraint
-        MOI.add_constraint(model, MOI.SingleVariable(pos_aux_var),
+        MOI.add_constraint(model, MOI.VariableIndex(pos_aux_var.value),
                            MOI.GreaterThan{Float64}(0.0))
         # Add to objective
         MOI.modify(model, MOI.ObjectiveFunction{G}(),
@@ -165,7 +165,7 @@ function add_auxiliary_variables!(model::MOI.ModelLike,
         MOI.set(model, MOI.VariableName(), neg_aux_var, name)
         push!(worker.feasibility_variables, neg_aux_var)
         # Nonnegativity constraint
-        MOI.add_constraint(model, MOI.SingleVariable(neg_aux_var),
+        MOI.add_constraint(model, MOI.VariableIndex(neg_aux_var.value),
                            MOI.GreaterThan{Float64}(0.0))
         # Add to objective
         MOI.modify(model, MOI.ObjectiveFunction{G}(),

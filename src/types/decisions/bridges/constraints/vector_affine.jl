@@ -49,7 +49,7 @@ function MOI.supports_constraint(::Type{<:VectorAffineDecisionConstraintBridge{T
     return true
 end
 function MOIB.added_constrained_variable_types(::Type{<:VectorAffineDecisionConstraintBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{<:VectorAffineDecisionConstraintBridge{T, S}}) where {T, S}
     return [(MOI.VectorAffineFunction{T}, S)]

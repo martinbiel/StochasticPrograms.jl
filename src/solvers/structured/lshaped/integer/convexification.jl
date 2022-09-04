@@ -420,7 +420,7 @@ function cutting_plane(worker::ConvexificationWorker,
                 i += 1
                 f = MOI.get(model, MOI.ConstraintFunction(), cref)
                 for term in f.terms
-                    idx = term.variable_index.value - nx
+                    idx = term.variable.value - nx
                     if idx == fractional_index
                         # yⱼ
                         push!(Hᵢ, i)

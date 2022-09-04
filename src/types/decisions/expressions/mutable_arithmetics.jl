@@ -167,50 +167,50 @@ end
 # Mutable operate #
 # ========================== #
 # zero/one #
-function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, aff::DecisionAffExpr)
-    MA.mutable_operate!(op, aff.variables)
-    MA.mutable_operate!(op, aff.decisions)
+function MA.operate!(op::Union{typeof(zero), typeof(one)}, aff::DecisionAffExpr)
+    MA.operate!(op, aff.variables)
+    MA.operate!(op, aff.decisions)
     return aff
 end
-function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, quad::DecisionQuadExpr)
-    MA.mutable_operate!(op, quad.variables)
-    MA.mutable_operate!(op, quad.decisions)
+function MA.operate!(op::Union{typeof(zero), typeof(one)}, quad::DecisionQuadExpr)
+    MA.operate!(op, quad.variables)
+    MA.operate!(op, quad.decisions)
     empty!(quad.cross_terms)
     return quad
 end
 # * #
-function MA.mutable_operate!(::typeof(*), expr::_DecisionAffOrQuadExpr, α::_Constant)
+function MA.operate!(::typeof(*), expr::_DecisionAffOrQuadExpr, α::_Constant)
     if iszero(α)
-        return MA.mutable_operate!(zero, expr)
+        return MA.operate!(zero, expr)
     else
         return map_coefficients_inplace!(x -> MA.mul!(x, α), expr)
     end
 end
 # +/- #
-function MA.mutable_operate!(::typeof(+), expr::_DecisionAffOrQuadExpr, x)
+function MA.operate!(::typeof(+), expr::_DecisionAffOrQuadExpr, x)
     return JuMP.add_to_expression!(expr, x)
 end
-function MA.mutable_operate!(::typeof(-), expr::_DecisionAffOrQuadExpr, x)
+function MA.operate!(::typeof(-), expr::_DecisionAffOrQuadExpr, x)
     return JuMP.add_to_expression!(expr, -1.0, x)
 end
 # add/sub_mul #
-function MA.mutable_operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
+function MA.operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
     return JuMP.add_to_expression!(expr, x)
 end
-function MA.mutable_operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar, y::_Scalar)
+function MA.operate!(::typeof(MA.add_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar, y::_Scalar)
     return JuMP.add_to_expression!(expr, x, y)
 end
-function MA.mutable_operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
+function MA.operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar)
     return JuMP.add_to_expression!(expr, -1.0, x)
 end
-function MA.mutable_operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar, y::_Scalar)
+function MA.operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::_Scalar, y::_Scalar)
     return JuMP.add_to_expression!(expr, -x, y)
 end
-function MA.mutable_operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::Union{_Variable, _Decision}, y::_Constant)
+function MA.operate!(::typeof(MA.sub_mul), expr::_DecisionAffOrQuadExpr, x::Union{_Variable, _Decision}, y::_Constant)
     return JuMP.add_to_expression!(expr, x, -y)
 end
-function MA.mutable_operate!(op::MA.AddSubMul, expr::_DecisionAffOrQuadExpr, x, y)
-    return MA.mutable_operate!(op, expr, x * y)
+function MA.operate!(op::MA.AddSubMul, expr::_DecisionAffOrQuadExpr, x, y)
+    return MA.operate!(op, expr, x * y)
 end
 @generated function _add_sub_mul_reorder!(op::MA.AddSubMul, expr::_DecisionAffOrQuadExpr, args::Vararg{Any, N}) where N
     n = length(args)
@@ -219,9 +219,9 @@ end
     allscalar = all(t -> (t <: _Constant), args[setdiff(1:n, varidx)])
     idx = (allscalar && length(varidx) == 1) ? varidx[1] : n
     coef = Expr(:call, :*, [:(args[$i]) for i in setdiff(1:n, idx)]...)
-    return :(MA.mutable_operate!(op, expr, $coef, args[$idx]))
+    return :(MA.operate!(op, expr, $coef, args[$idx]))
 end
-function MA.mutable_operate!(op::MA.AddSubMul, expr::_DecisionAffOrQuadExpr, x, y, z, other_args::Vararg{Any, N}) where N
+function MA.operate!(op::MA.AddSubMul, expr::_DecisionAffOrQuadExpr, x, y, z, other_args::Vararg{Any, N}) where N
     return _add_sub_mul_reorder!(op, expr, x, y, z, other_args...)
 end
 function JuMP.add_to_expression!(expr::_DecisionAffOrQuadExpr, α::_Constant, β::_Constant)

@@ -52,7 +52,7 @@ function cache_model_attributes!(cache::SolutionCache, src::CachableModel)
                   MOI.DualObjectiveValue(),
                   MOI.ObjectiveBound(),
                   MOI.RelativeGap(),
-                  MOI.SolveTime(),
+                  MOI.SolveTimeSec(),
                   MOI.SimplexIterations(),
                   MOI.BarrierIterations(),
                   MOI.NodeCount(),
@@ -75,7 +75,7 @@ function cache_model_attributes!(cache::SolutionCache, src::CachableModel, stage
                   MOI.DualObjectiveValue(),
                   MOI.ObjectiveBound(),
                   MOI.RelativeGap(),
-                  MOI.SolveTime(),
+                  MOI.SolveTimeSec(),
                   MOI.SimplexIterations(),
                   MOI.BarrierIterations(),
                   MOI.NodeCount(),
@@ -135,7 +135,7 @@ function cache_constraint_attributes!(cache::SolutionCache, src::CachableModel, 
     return nothing
 end
 function cache_constraint_attributes!(cache::SolutionCache, src::CachableModel)
-    ctypes = filter(t -> is_decision_type(t[1]), MOI.get(src, MOI.ListOfConstraints()))
+    ctypes = filter(t -> is_decision_type(t[1]), MOI.get(src, MOI.ListOfConstraintTypesPresent()))
     constraints = mapreduce(vcat, ctypes) do (F, S)
         return MOI.get(src, MOI.ListOfConstraintIndices{F,S}())
     end

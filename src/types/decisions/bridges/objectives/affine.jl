@@ -41,9 +41,9 @@ function MOIB.Objective.supports_objective_function(
     ::Type{<:AffineDecisionObjectiveBridge}, ::Type{<:AffineDecisionFunction})
     return true
 end
-MOIB.added_constrained_variable_types(::Type{<:AffineDecisionObjectiveBridge}) = Tuple{DataType}[]
+MOIB.added_constrained_variable_types(::Type{<:AffineDecisionObjectiveBridge}) = Tuple{Type}[]
 function MOIB.added_constraint_types(::Type{<:AffineDecisionObjectiveBridge})
-    return Tuple{DataType, DataType}[]
+    return Tuple{Type, Type}[]
 end
 function MOIB.set_objective_function_type(::Type{AffineDecisionObjectiveBridge{T}}) where T
     return MOI.ScalarAffineFunction{T}

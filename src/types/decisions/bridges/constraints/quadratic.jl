@@ -37,8 +37,8 @@ function MOIB.Constraint.bridge_constraint(::Type{QuadraticDecisionConstraintBri
     # Add the bridged constraint
     constraint = MOI.add_constraint(model,
                                     MOI.ScalarQuadraticFunction(
-                                        f.variable_part.affine_terms,
                                         f.variable_part.quadratic_terms,
+                                        f.variable_part.affine_terms,
                                         zero(T)),
                                     MOIU.shift_constant(set, -f.variable_part.constant))
     # Save the constraint index, the decision function, and the set, to allow modifications
@@ -51,7 +51,7 @@ function MOI.supports_constraint(::Type{<:QuadraticDecisionConstraintBridge{T}},
     return true
 end
 function MOIB.added_constrained_variable_types(::Type{<:QuadraticDecisionConstraintBridge})
-    return Tuple{DataType}[]
+    return Tuple{Type}[]
 end
 function MOIB.added_constraint_types(::Type{QuadraticDecisionConstraintBridge{T, S}}) where {T, S}
     return [(MOI.ScalarQuadraticFunction{T}, S)]
@@ -98,8 +98,8 @@ function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintFunction,
     # Change the function of the bridged constraints
     MOI.set(model, MOI.ConstraintFunction(), bridge.constraint,
             MOI.ScalarQuadraticFunction(
-                f.variable_part.affine_terms,
                 f.variable_part.quadratic_terms,
+                f.variable_part.affine_terms,
                 zero(T)))
     # Shift constraint set
     MOI.set(model, MOI.ConstraintSet(), bridge.constraint,

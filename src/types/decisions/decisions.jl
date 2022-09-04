@@ -71,7 +71,7 @@ struct IgnoreDecisions end
 
 const DecisionMap = OrderedDict{MOI.VariableIndex, Decision{Float64}}
 const StageMap = Dict{MOI.VariableIndex, Int}
-const ConstraintMap = MOIU.DoubleDicts.MainIndexDoubleDict
+const ConstraintMap = MOIU.DoubleDicts.IndexDoubleDict
 
 struct Decisions{N}
     decisions::NTuple{N, DecisionMap}
@@ -329,7 +329,7 @@ function update_known_decisions!(decisions::Decisions{N}, stage::Integer, x::Abs
     update_known_decisions!(decisions[stage], x)
 end
 
-is_decision_type(::DataType) = false
+is_decision_type(::Type) = false
 
 include("variable_interface.jl")
 include("expressions/expressions.jl")

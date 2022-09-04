@@ -86,7 +86,7 @@ function MOI.add_constraint(b::MOIB.AbstractBridgeOptimizer,
                             f::SingleDecision,
                             s::MOI.AbstractSet)
     if MOIB.is_bridged(b, f.decision)
-        if MOI.is_valid(b, MOI.ConstraintIndex{MOI.SingleVariable, typeof(s)}(f.decision.value))
+        if MOI.is_valid(b, MOI.ConstraintIndex{MOI.VariableIndex, typeof(s)}(f.decision.value))
             # The other constraint could have been through a variable bridge.
             error("Cannot add two `SingleDecision`-in-`$(typeof(s))`",
                   " on the same decision $(f.decision).")

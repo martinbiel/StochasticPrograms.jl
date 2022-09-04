@@ -46,8 +46,8 @@ function MA.isequal_canonical(f::F, g::F) where F <: QuadraticDecisionFunction
         MA.isequal_canonical(f.cross_terms, g.cross_terms)
 end
 
-function MA.iszero!(f::TypedScalarDecisionLike)
-    return iszero!(MOI.constant(f)) && MOIU._is_constant(MOIU.canonicalize!(f))
+function MA.iszero!!(f::TypedScalarDecisionLike)
+    return iszero!!(MOI.constant(f)) && MOIU._is_constant(MOIU.canonicalize!(f))
 end
 
 function MA.scaling(f::TypedScalarDecisionLike)
@@ -80,56 +80,56 @@ function MA.promote_operation(op::PROMOTE_IMPLEMENTED_OP,
     MOIU.promote_operation(op, G, F, G)
 end
 
-function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, f::AffineDecisionFunction)
-    MA.mutable_operate!(op, f.variable_part)
-    MA.mutable_operate!(zero, f.decision_part)
+function MA.operate!(op::Union{typeof(zero), typeof(one)}, f::AffineDecisionFunction)
+    MA.operate!(op, f.variable_part)
+    MA.operate!(zero, f.decision_part)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(zero), typeof(one)}, f::QuadraticDecisionFunction{T}) where T
-    MA.mutable_operate!(op, f.variable_part)
-    MA.mutable_operate!(zero, f.decision_part)
-    MA.mutable_operate!(zero, f.cross_terms)
-    return f
-end
-
-function MA.mutable_operate!(::typeof(-), f::AffineDecisionFunction)
-    MA.mutable_operate!(op, f.variable_part)
-    MA.mutable_operate!(op, f.decision_part)
-    return f
-end
-function MA.mutable_operate!(::typeof(-), f::QuadraticDecisionFunction{T}) where T
-    MA.mutable_operate!(op, f.variable_part)
-    MA.mutable_operate!(op, f.decision_part)
-    MA.mutable_operate!(op, f.cross_terms)
+function MA.operate!(op::Union{typeof(zero), typeof(one)}, f::QuadraticDecisionFunction{T}) where T
+    MA.operate!(op, f.variable_part)
+    MA.operate!(zero, f.decision_part)
+    MA.operate!(zero, f.cross_terms)
     return f
 end
 
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(::typeof(-), f::AffineDecisionFunction)
+    MA.operate!(op, f.variable_part)
+    MA.operate!(op, f.decision_part)
+    return f
+end
+function MA.operate!(::typeof(-), f::QuadraticDecisionFunction{T}) where T
+    MA.operate!(op, f.variable_part)
+    MA.operate!(op, f.decision_part)
+    MA.operate!(op, f.cross_terms)
+    return f
+end
+
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::AffineDecisionFunction{T},
                              g::T) where T
-    MA.mutable_operate!(op, f.variable_part, g)
+    MA.operate!(op, f.variable_part, g)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::AffineDecisionFunction{T},
-                             g::MOI.SingleVariable) where T
+                             g::MOI.VariableIndex) where T
     _operate_terms!(op, f.variable_part, AffineDecisionFunction{T}(g).variable_part)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::AffineDecisionFunction{T},
                              g::SingleDecision) where T
     _operate_terms!(op, f.decision_part, AffineDecisionFunction{T}(g).decision_part)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::AffineDecisionFunction{T},
                              g::MOI.ScalarAffineFunction{T}) where T
     _operate_terms!(op, f.variable_part, g)
     f.variable_part.constant = op(f.variable_part.constant, g.constant)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::AffineDecisionFunction{T},
                              g::AffineDecisionFunction{T}) where T
     # Variable part
@@ -141,39 +141,39 @@ function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
     return f
 end
 
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::T) where T
-    MA.mutable_operate!(op, f.variable_part, g)
+    MA.operate!(op, f.variable_part, g)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
-                             g::MOI.SingleVariable) where T
+                             g::MOI.VariableIndex) where T
     _operate_terms!(op, f.variable_part, convert(MOI.ScalarAffineFunction{T}, g))
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::SingleDecision) where T
     _operate_terms!(op, f.decision_part, convert(AffineDecisionFunction{T}, g).decision_part)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::MOI.ScalarAffineFunction{T}) where T
     _operate_terms!(op, f.variable_part, g)
     f.variable_part.constant = op(f.variable_part.constant, g.constant)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::MOI.ScalarQuadraticFunction{T}) where T
     _operate_terms!(op, f.variable_part, g)
     f.variable_part.constant = op(f.variable_part.constant, g.constant)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::AffineDecisionFunction{T}) where T
     # Variable_Part
@@ -184,7 +184,7 @@ function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
     f.decision_part.constant = op(f.decision_part.constant, f.decision_part.constant)
     return f
 end
-function MA.mutable_operate!(op::Union{typeof(+), typeof(-)},
+function MA.operate!(op::Union{typeof(+), typeof(-)},
                              f::QuadraticDecisionFunction{T},
                              g::QuadraticDecisionFunction{T}) where T
     # Variable part

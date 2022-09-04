@@ -353,9 +353,9 @@ function _cross_terms_function_string(mode, terms)
             x = function_string(mode, first(vars))
             y = function_string(mode, last(vars))
 
-            term_str[2 * elm - 1] = JuMP._sign_string(coef)
+            term_str[2 * elm - 1] = _sign_string(coef)
             term_str[2 * elm] = "$pre$x"
-            term_str[2 * elm] *= string(JuMP._math_symbol(mode, :times), y)
+            term_str[2 * elm] *= string(_math_symbol(mode, :times), y)
             if elm == 1
                 # Correction for first term as there is no space
                 # between - and variable coefficient/name

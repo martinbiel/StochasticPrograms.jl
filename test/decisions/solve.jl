@@ -54,7 +54,7 @@ function ScenarioDecompositionOptimizer()
     return opt, sub, sub
 end
 
-function fill_solution!(::MOI.AbstractOptimizer, master_optimizer, subproblem_optimizer, x, y, c)
+function fill_solution!(sp, ::MOI.AbstractOptimizer, master_optimizer, subproblem_optimizer, x, y, c)
     MOI.set(master_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(master_optimizer, MOI.RawStatusString(), "solver specific string")
     MOI.set(master_optimizer, MOI.ObjectiveValue(), 4.0)
@@ -71,10 +71,11 @@ function fill_solution!(::MOI.AbstractOptimizer, master_optimizer, subproblem_op
     MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(c,1), -1.0)
     MOI.set(master_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(x)), 2.0)
     MOI.set(subproblem_optimizer, MOI.ConstraintDual(), JuMP.optimizer_index(JuMP.LowerBoundRef(y), 1), 0.0)
+    sp.structure.model.is_model_dirty = false
     return nothing
 end
 
-function fill_solution!(optimizer::LShaped.Optimizer, master_optimizer, subproblem_optimizer, x, y, c)
+function fill_solution!(sp, optimizer::LShaped.Optimizer, master_optimizer, subproblem_optimizer, x, y, c)
     MOI.set(master_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(master_optimizer, MOI.RawStatusString(), "solver specific string")
     MOI.set(master_optimizer, MOI.ObjectiveValue(), 4.0)
@@ -98,11 +99,12 @@ function fill_solution!(optimizer::LShaped.Optimizer, master_optimizer, subprobl
     optimizer.primal_status = MOI.FEASIBLE_POINT
     optimizer.dual_status = MOI.FEASIBLE_POINT
     optimizer.raw_status = "solver specific string"
+    sp.structure.first_stage.is_model_dirty = false
+    sp.structure.scenarioproblems[1].problems[1].is_model_dirty = false
     return nothing
 end
 
-function fill_solution!(optimizer::ProgressiveHedging.Optimizer, master_optimizer, subproblem_optimizer, x, y, c)
-    master_optimizer
+function fill_solution!(sp, optimizer::ProgressiveHedging.Optimizer, master_optimizer, subproblem_optimizer, x, y, c)
     MOI.set(master_optimizer, MOI.TerminationStatus(), MOI.OPTIMAL)
     MOI.set(master_optimizer, MOI.RawStatusString(), "solver specific string")
     MOI.set(master_optimizer, MOI.ObjectiveValue(), 4.0)
@@ -125,6 +127,7 @@ function fill_solution!(optimizer::ProgressiveHedging.Optimizer, master_optimize
     optimizer.primal_status = MOI.FEASIBLE_POINT
     optimizer.dual_status = MOI.FEASIBLE_POINT
     optimizer.raw_status = "solver specific string"
+    sp.structure.scenarioproblems[1].problems[1].is_model_dirty = false
     return nothing
 end
 
@@ -151,7 +154,7 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
     y = sp[2,:y]
     c = sp[2,:con]
 
-    fill_solution!(mockoptimizer, master_optimizer, subproblem_optimizer, x, y, c)
+    fill_solution!(sp, mockoptimizer, master_optimizer, subproblem_optimizer, x, y, c)
 
     @test JuMP.has_values(sp)
     @test MOI.OPTIMAL == @inferred JuMP.termination_status(sp)
@@ -195,6 +198,7 @@ function test_solve(Structure, mockoptimizer, master_optimizer, subproblem_optim
     @test  2.0 == @inferred JuMP.reduced_cost(x)
     @test  0.0 == @inferred JuMP.reduced_cost(y, 1)
     @test -1.0 == @inferred JuMP.dual(c, 1)
+    @test -1.0 == @inferred JuMP.shadow_price(c, 1)
     @test  2.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(x))
     @test  0.0 == @inferred JuMP.dual(JuMP.LowerBoundRef(y), 1)
 end

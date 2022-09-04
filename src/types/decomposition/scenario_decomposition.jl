@@ -119,7 +119,7 @@ function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDepend
     mapped_ci = mapped_index(structure, ci, attr.scenario_index)
     return MOI.get(scenarioproblems(structure, attr.stage), attr, mapped_ci)
 end
-function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: Union{MOI.SingleVariable, SingleDecision}, S}
+function MOI.get(structure::ScenarioDecompositionStructure, attr::ScenarioDependentConstraintAttribute, ci::CI{F,S}) where {F <: Union{MOI.VariableIndex, SingleDecision}, S}
     n = num_scenarios(structure, attr.stage)
     1 <= attr.scenario_index <= n || error("Scenario index $attr.scenario_index not in range 1 to $n.")
     mapped_vi = mapped_index(structure, MOI.VariableIndex(ci.value), attr.scenario_index)
@@ -509,7 +509,7 @@ function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, in
     return JuMP._moi_optimizer_index(scenarioproblems(structure), mapped_vi, scenario_index)
 end
 function JuMP._moi_optimizer_index(structure::ScenarioDecompositionStructure, ci::CI{F,S}, scenario_index::Integer) where {F <: SingleDecision, S}
-    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
+    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.VariableIndex,SingleDecisionSet{Float64}}())
     if ci.value <= num_first_stage_decisions
         return JuMP._moi_optimizer_index(scenarioproblems(structure), ci, scenario_index)
     else
@@ -635,7 +635,7 @@ function JuMP.jump_function(structure::ScenarioDecompositionStructure{N},
                             f::MOI.AbstractFunction) where N
     1 <= stage <= N || error("Stage $stage not in range 1 to $N.")
     # Remap to proxy indices
-    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
+    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.VariableIndex,SingleDecisionSet{Float64}}())
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfVariables()) - num_first_stage_decisions
     f = MOIU.map_indices(f) do vi
         if vi.value <= num_first_stage_decisions
@@ -700,7 +700,7 @@ end
 # ========================== #
 function mapped_index(structure::ScenarioDecompositionStructure{2}, index::MOI.VariableIndex, scenario_index::Integer)
     # The initial number of first-stage decisions is always given by
-    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.SingleVariable,SingleDecisionSet{Float64}}())
+    num_first_stage_decisions = MOI.get(structure.proxy[1], MOI.NumberOfConstraints{MOI.VariableIndex,SingleDecisionSet{Float64}}())
     # Calculate offset from first-stage auxilliary variables (first-stage decisions are included in second-stage proxy, so deduct them)
     first_stage_offset = MOI.get(structure.proxy[1], MOI.NumberOfVariables()) - num_first_stage_decisions
     return MOI.VariableIndex(index.value + first_stage_offset)

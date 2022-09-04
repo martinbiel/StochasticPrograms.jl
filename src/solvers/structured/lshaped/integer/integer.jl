@@ -30,7 +30,7 @@ initialize_integer_algorithm!(subproblem::SubProblem) = initialize_integer_algor
 """
     RawIntegerAlgorithmParameter
 
-An optimizer attribute used for raw parameters of the integer algorithm. Defers to `RawParameter`.
+An optimizer attribute used for raw parameters of the integer algorithm. Defers to `RawOptimizerAttribute`.
 """
 struct RawIntegerParameter <: IntegerParameter
     name::Any

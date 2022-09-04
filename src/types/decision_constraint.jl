@@ -379,12 +379,12 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) wh
     {F <: SingleDecision, S <: MOI.AbstractScalarSet}
     sp = owner_model(sp_cref)
     # Check if the constraint was added at creation
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(sp_cref).value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index(sp_cref).value)
     if MOI.is_valid(backend(proxy(sp, stage(sp_cref))), ci)
         s = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintSet(), ci)::SingleDecisionSet
         if s.constraint isa S
-            f = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintFunction(), ci)::MOI.SingleVariable
-            return ScalarConstraint(jump_function(structure(sp), stage(sp_cef), SingleDecision(f.variable)), s.constraint)
+            f = MOI.get(backend(proxy(sp, stage(sp_cref))), MOI.ConstraintFunction(), ci)::MOI.VariableIndex
+            return ScalarConstraint(jump_function(structure(sp), stage(sp_cef), SingleDecision(f.value)), s.constraint)
         end
     end
     # Try to get constraint as usual
@@ -437,12 +437,12 @@ function JuMP.constraint_object(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, sc
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `constraint_object(sp_cref)`.")
     sp = owner_model(sp_cref)
     # Check if the constraint was added at creation
-    ci = CI{MOI.SingleVariable,SingleDecisionSet{Float64}}(index(sp_cref).value)
+    ci = CI{MOI.VariableIndex,SingleDecisionSet{Float64}}(index(sp_cref).value)
     if MOI.is_valid(backend(proxy(sp, stage(sp_cref))), ci)
         s_attr = ScenarioDependentConstraintAttribute(stage(sp_cref), scenario_index, MOI.ConstraintSet())
         s = MOI.get(structure(sp), s_attr, ci)::SingleDecisionSet
         if s.constraint isa S
-            return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), scenario_index, SingleDecision(f.variable)), s.constraint)
+            return ScalarConstraint(jump_function(structure(sp), stage(sp_cref), scenario_index, SingleDecision(f.value)), s.constraint)
         end
     end
     # Try to get constraint as usual
@@ -732,7 +732,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_less_than_(dual(sp_cref), objective_sense(sp))
+    return JuMP._shadow_price_less_than(dual(sp_cref), objective_sense(sp))
 end
 """
     shadow_price(sp_cref::SPConstraintRef, scenario_index::Integer)
@@ -748,7 +748,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_less_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
+    return JuMP._shadow_price_less_than(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.GreaterThan}
@@ -758,7 +758,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_greater_than_(dual(sp_cref), objective_sense(sp))
+    return JuMP._shadow_price_greater_than(dual(sp_cref), objective_sense(sp))
 end
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.GreaterThan}
     stage(sp_cref) == 1 && error("$sp_cref is not scenario dependent, consider `shadow_price(sp_cref)`.")
@@ -767,7 +767,7 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
         error("The shadow price is not available because no dual result is " *
               "available.")
     end
-    return JuMP.shadow_price_greater_than_(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
+    return JuMP._shadow_price_greater_than(dual(sp_cref, scenario_index), objective_sense(sp, scenario_index))
 end
 
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {F, S <: MOI.EqualTo}
@@ -780,9 +780,9 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}) where {
     sense = objective_sense(sp)
     dual_val = dual(sp_cref)
     if dual_val > 0
-        return JuMP.shadow_price_greater_than_(dual_val, sense)
+        return JuMP._shadow_price_greater_than(dual_val, sense)
     else
-        return JuMP.shadow_price_less_than_(dual_val, sense)
+        return JuMP._shadow_price_less_than(dual_val, sense)
     end
 end
 function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenario_index::Integer) where {F, S <: MOI.EqualTo}
@@ -795,9 +795,9 @@ function JuMP.shadow_price(sp_cref::SPConstraintRef{JuMP._MOICON{F, S}}, scenari
     sense = objective_sense(sp, scenario_index)
     dual_val = dual(sp_cref, scenario_index)
     if dual_val > 0
-        return JuMP.shadow_price_greater_than_(dual_val, sense)
+        return JuMP._shadow_price_greater_than(dual_val, sense)
     else
-        return JuMP.shadow_price_less_than_(dual_val, sense)
+        return JuMP._shadow_price_less_than(dual_val, sense)
     end
 end
 """
@@ -819,7 +819,7 @@ function JuMP.num_constraints(stochasticprogram::StochasticProgram{N},
     result = MOI.get(m, MOI.NumberOfConstraints{f_type, set_type}())
     # Add any constraints specified at creation
     if f_type <: SingleDecision
-        for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.SingleVariable, SingleDecisionSet{Float64}}())
+        for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.VariableIndex, SingleDecisionSet{Float64}}())
             set = MOI.get(backend(m), MOI.ConstraintSet(), ci)
             if set.constraint isa set_type
                 result += 1
@@ -868,7 +868,7 @@ function JuMP.all_constraints(stochasticprogram::StochasticProgram{N},
     end
     # Add any constraints specified at creation
     if f_type <: SingleDecision
-        for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.SingleVariable, SingleDecisionSet{Float64}}())
+        for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.VariableIndex, SingleDecisionSet{Float64}}())
             set = MOI.get(backend(m), MOI.ConstraintSet(), ci)
             if set.constraint isa set_type
                 inner_ci = CI{f_type, set_type}(ci.value)
@@ -888,18 +888,18 @@ function JuMP.all_constraints(stochasticprogram::StochasticProgram{N},
     return result
 end
 """
-    list_of_constraint_types(stochasticprogram::Stochasticprogram, stage::Integer)::Vector{Tuple{DataType, DataType}}
+    list_of_constraint_types(stochasticprogram::Stochasticprogram, stage::Integer)::Vector{Tuple{Type, Type}}
 
 Return a list of tuples of the form `(F, S)` where `F` is a JuMP function type and `S` is an MOI set type such that `all_constraints(stochasticprogram, stage, F, S)` returns a nonempty list.
 """
-function JuMP.list_of_constraint_types(stochasticprogram::StochasticProgram, stage::Integer)::Vector{Tuple{DataType, DataType}}
+function JuMP.list_of_constraint_types(stochasticprogram::StochasticProgram, stage::Integer)::Vector{Tuple{Type, Type}}
     m = proxy(stochasticprogram, stage)
-    decision_constraints = Tuple{DataType, DataType}[
+    decision_constraints = Tuple{Type, Type}[
         (jump_function_type(m, F), S)
-        for (F, S) in filter(t -> is_decision_type(t[1]), MOI.get(m, MOI.ListOfConstraints()))
+        for (F, S) in filter(t -> is_decision_type(t[1]), MOI.get(m, MOI.ListOfConstraintTypesPresent()))
     ]
     # Add any constraints specified at creation
-    for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.SingleVariable, SingleDecisionSet{Float64}}())
+    for ci in MOI.get(m, MOI.ListOfConstraintIndices{MOI.VariableIndex, SingleDecisionSet{Float64}}())
         set = MOI.get(backend(m), MOI.ConstraintSet(), ci)
         if !(set.constraint isa NoSpecifiedConstraint)
             push!(decision_constraints, (DecisionVariable, typeof(set.constraint)))
@@ -917,7 +917,7 @@ end
 # Printing #
 # ========================== #
 function Base.show(io::IO, sp_cref::SPConstraintRef)
-    print(io, constraint_string(REPLMode, sp_cref))
+    print(io, constraint_string(MIME("text/plain"), sp_cref))
 end
 function Base.show(io::IO, ::MIME"text/latex", sp_cref::SPConstraintRef)
     print(io, constraint_string(IJuliaMode, sp_cref))

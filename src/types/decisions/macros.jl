@@ -232,7 +232,7 @@ function JuMP.add_constraint(model::Model,
     decisions = get_decisions(model)::Decisions
     check_belongs_to_model(constraint, model)
     ci = CI{SingleDecision, S}(moi_function(constraint).decision.value)
-    inner = moi_add_constraint(backend(model), moi_function(constraint), moi_set(constraint))
+    inner = JuMP._moi_add_constraint(backend(model), moi_function(constraint), moi_set(constraint))
     map_constraint!(decisions, ci, inner)
     con_ref = ConstraintRef(model, inner, shape(constraint))
     if !isempty(name)

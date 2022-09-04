@@ -59,7 +59,7 @@ function prepare_master!(lshaped::AbstractLShaped)
         # Cache the objective function
         F = MOI.get(lshaped.master, MOI.ObjectiveFunctionType())
         lshaped.data.master_objective = MOI.get(lshaped.master, MOI.ObjectiveFunction{F}())
-        if F <: MOI.SingleVariable ||  F <: SingleDecision
+        if F <: MOI.VariableIndex ||  F <: SingleDecision
             # Set objective to AffineDecisionFunction during procedure
             F = AffineDecisionFunction{Float64}
             MOI.set(lshaped.master, MOI.ObjectiveFunction{F}(), convert(F, lshaped.data.master_objective))

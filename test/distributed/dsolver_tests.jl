@@ -23,7 +23,7 @@
 subsolver = GLPK.Optimizer
 qpsolver = () -> begin
     opt = Ipopt.Optimizer()
-    MOI.set(opt, MOI.RawParameter("print_level"), 0)
+    MOI.set(opt, MOI.RawOptimizerAttribute("print_level"), 0)
     return opt
 end
 
