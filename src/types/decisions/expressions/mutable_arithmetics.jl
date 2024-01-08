@@ -125,7 +125,7 @@ function MA.promote_operation(::typeof(*), ::Type{<:_Decision}, ::Type{<:_Decisi
     return DQE
 end
 # _Variable/_Decision--(_Variable/_Decision)AffExpr
-function MA.promote_operation(::typeof(*), ::Type{<:_Variable}, ::Type{GenericAffExpr{C, _Decision}}) where {C, D <: _Decision}
+function MA.promote_operation(::typeof(*), ::Type{<:_Variable}, ::Type{GenericAffExpr{C, _Decision}}) where {C}
     return DecisionQuadExpr{C}
 end
 function MA.promote_operation(::typeof(*), ::Type{GenericAffExpr{C, D}}, ::Type{<:_Variable}) where {C, D <: _Decision}

@@ -24,10 +24,9 @@
 
 using StochasticPrograms
 using Test
-using MathOptInterface
-const MOI = MathOptInterface
+import MathOptInterface as MOI
 const MOIU = MOI.Utilities
-const MA = MOI.MutableArithmetics
+import MutableArithmetics as MA
 
 function test_vectorization(x, fx, y, fy, z, fz, w, fw)
     g = VectorAffineDecisionFunction(

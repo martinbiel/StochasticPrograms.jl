@@ -657,7 +657,7 @@ end
 
 Return the scenario at `scenario_index` of the two-stage `stochasticprogram`
 """
-function scenario(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer) where N
+function scenario(stochasticprogram::TwoStageStochasticProgram, scenario_index::Integer)
     return scenario(structure(stochasticprogram), 2, scenario_index)
 end
 """

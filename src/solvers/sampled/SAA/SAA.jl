@@ -23,14 +23,13 @@
 @reexport module SAA
 
 using JuMP
-using MathOptInterface
+import MathOptInterface as MOI
 using StochasticPrograms
 using ProgressMeter
 using Parameters
 
 import StochasticPrograms: AbstractCrash, load_model!, optimizer_name, optimal_instance
 
-const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 
 include("solver.jl")

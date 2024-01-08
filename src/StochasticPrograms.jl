@@ -33,7 +33,7 @@ using Printf
 using JuMP
 using Compat
 using OrderedCollections
-using MathOptInterface
+import MathOptInterface as MOI
 import Distributions: mean, std, quantile, ProbabilityWeights, TDist, Normal
 using MacroTools
 using MacroTools: @q, postwalk, prewalk
@@ -47,15 +47,13 @@ const DenseAxisArray = JuMP.Containers.DenseAxisArray
 const SparseAxisArray = JuMP.Containers.SparseAxisArray
 const VectorizedProductIterator = JuMP.Containers.VectorizedProductIterator
 
-const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const MOIB = MOI.Bridges
 const VI = MOI.VariableIndex
 const CI = MOI.ConstraintIndex
 const AcceptableTermination = [MOI.OPTIMAL, MOI.LOCALLY_SOLVED, MOI.ALMOST_OPTIMAL, MOI.ALMOST_LOCALLY_SOLVED]
 
-import MutableArithmetics
-const MA = MutableArithmetics
+import MutableArithmetics as MA
 
 export
     StochasticModel,

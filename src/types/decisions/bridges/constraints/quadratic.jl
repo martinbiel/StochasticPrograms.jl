@@ -92,7 +92,7 @@ end
 
 function MOI.set(model::MOI.ModelLike, ::MOI.ConstraintFunction,
                  bridge::QuadraticDecisionConstraintBridge{T,S},
-                 f::QuadraticDecisionFunction{T}) where {T,S,F}
+                 f::QuadraticDecisionFunction{T}) where {T,S}
     # Update bridge functions and function constant
     bridge.decision_function = f
     # Change the function of the bridged constraints

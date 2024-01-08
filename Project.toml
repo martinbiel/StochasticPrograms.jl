@@ -22,25 +22,33 @@ Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 
 [compat]
-Clustering = "0.14"
+Clustering = "0.14, 0.15"
 Compat = "2.2, 3"
-Distributions = "0.25.0"
+Distributed = "<0.0.1, 1.6"
+Distributions = "0.25"
+GLPK = "1"
+Ipopt = "~1.0, ~1.1, ~1.2"
 JuMP = "= 1.2.1"
+LinearAlgebra = "<0.0.1, 1.6"
+Logging = "<0.0.1, 1.6"
 MacroTools = "0.5.3"
-MathOptInterface = "= 1.3.0"
-MutableArithmetics = "= 1.0.4"
-OrderedCollections = "1.2.0"
+MathOptInterface = "~1.3"
+MutableArithmetics = "1.0.4"
+OrderedCollections = "1.2"
 Parameters = "0.12"
-ProgressMeter = "1.4.1"
-Reexport = "1.0.0"
-julia = "1"
+Printf = "<0.0.1, 1.6"
+ProgressMeter = "~1.4.1"
+Random = "<0.0.1, 1.6"
+Reexport = "1"
+SparseArrays = "<0.0.1, 1.6"
+Test = "<0.0.1, 1.6"
+julia = "1.6"
 
 [extras]
-Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 GLPK = "60bf3e95-4087-53dc-ae20-288a0d20c6a6"
 Ipopt = "b6b21f68-93f8-5de0-b562-5493be1d77c9"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Logging", "GLPK", "Ipopt", "Distributions"]
+test = ["GLPK", "Ipopt", "Logging", "Test"]

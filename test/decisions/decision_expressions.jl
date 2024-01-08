@@ -24,10 +24,8 @@
 
 using StochasticPrograms
 using Test
-using MathOptInterface
-const MOI = MathOptInterface
-const MOIU = MOI.Utilities
-const MA = MOI.MutableArithmetics
+import MathOptInterface as MOI
+import MutableArithmetics as MA
 
 function DecisionModel()
     m = Model()

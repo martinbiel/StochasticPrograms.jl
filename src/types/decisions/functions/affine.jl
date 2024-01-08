@@ -347,14 +347,14 @@ function Base.getindex(it::MOIU.ScalarFunctionIterator{VectorAffineDecisionFunct
             push!(decision_terms, MOI.VectorAffineTerm(i, it.f.decision_part.terms[j].scalar_term))
         end
     end
-    return VectorAffineDecisionFunction(MOIU.VAF(variable_terms, it.f.variable_part.constants[output_indices]),
-                                        MOIU.VAF(decision_terms, it.f.decision_part.constants[output_indices]))
+    return VectorAffineDecisionFunction(MOI.VectorAffineFunction(variable_terms, it.f.variable_part.constants[output_indices]),
+                                        MOI.VectorAffineFunction(decision_terms, it.f.decision_part.constants[output_indices]))
 end
 
 
 function MOIU.zero_with_output_dimension(::Type{VectorAffineDecisionFunction{T}}, n::Integer) where T
-    return MOI.VectorAffineDecisionFunction{T}(MOIU.zero_with_output_dimension(MOI.VAF{T}, n),
-                                               MOIU.zero_with_output_dimension(MOI.VAF{T}, n))
+    return MOI.VectorAffineDecisionFunction{T}(MOIU.zero_with_output_dimension(MOI.VectorAffineFunction{T}, n),
+                                               MOIU.zero_with_output_dimension(MOI.VectorAffineFunction{T}, n))
 end
 
 function MOIU.substitute_variables(variable_map::Function, f::AffineDecisionFunction{T}) where T

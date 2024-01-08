@@ -188,7 +188,7 @@ function JuMP.dual_objective_value(stochasticprogram::TwoStageStochasticProgram,
     return dual_objective_value(stochasticprogram, 2, scenario_index; result = result)
 end
 """
-    objective_sense(stochasticprogram::StochasticProgram)::MathOptInterface.OptimizationSense
+    objective_sense(stochasticprogram::StochasticProgram)::MOI.OptimizationSense
 
 Return the objective sense of the `stochasticprogram`.
 """
@@ -196,7 +196,7 @@ function JuMP.objective_sense(stochasticprogram::StochasticProgram)
     return MOI.get(stochasticprogram, MOI.ObjectiveSense())::MOI.OptimizationSense
 end
 """
-    objective_sense(stochasticprogram::StochasticProgram, stage::Integer)::MathOptInterface.OptimizationSense
+    objective_sense(stochasticprogram::StochasticProgram, stage::Integer)::MOI.OptimizationSense
 
 Return the objective sense of the `stochasticprogram` stage `stage`.
 """
@@ -205,7 +205,7 @@ function JuMP.objective_sense(stochasticprogram::StochasticProgram{N}, stage::In
     return objective_sense(proxy(stochasticprogram, stage))
 end
 """
-    objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)::MathOptInterface.OptimizationSense
+    objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer)::MOI.OptimizationSense
 
 Return the objective sense in the node at stage `stage` and scenario `scenario_index`.
 """
@@ -215,7 +215,7 @@ function JuMP.objective_sense(stochasticprogram::StochasticProgram, stage::Integ
     return MOI.get(stochasticprogram, attr)::MOI.OptimizationSense
 end
 """
-    set_objective_sense(stochasticprogram::StochasticProgram, sense::MathOptInterface.OptimizationSense)
+    set_objective_sense(stochasticprogram::StochasticProgram, sense::MOI.OptimizationSense)
 
 Sets the objective sense of the `stochasticprogram` to `sense`.
 """
@@ -231,7 +231,7 @@ function JuMP.set_objective_sense(stochasticprogram::StochasticProgram, sense::M
     return nothing
 end
 """
-    set_objective_sense(stochasticprogram::StochasticProgram, stage::Integer, sense::MathOptInterface.OptimizationSense)
+    set_objective_sense(stochasticprogram::StochasticProgram, stage::Integer, sense::MOI.OptimizationSense)
 
 Sets the objective sense of the `stochasticprogram` at stage `stage` to `sense`.
 """
@@ -248,7 +248,7 @@ function JuMP.set_objective_sense(stochasticprogram::StochasticProgram{N}, stage
     return nothing
 end
 """
-    set_objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer, sense::MathOptInterface.OptimizationSense)
+    set_objective_sense(stochasticprogram::StochasticProgram, stage::Integer, scenario_index::Integer, sense::MOI.OptimizationSense)
 
 Sets the objective sense of the stochasticprogram node at stage `stage`
 and scenario `scenario_index` to the given `sense`.

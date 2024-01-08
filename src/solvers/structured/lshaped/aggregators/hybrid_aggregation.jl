@@ -96,7 +96,7 @@ function flush!(lshaped::AbstractLShaped, aggregation::HybridAggregation)
     return added
 end
 
-function flush!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaDataChannel, t::Integer, x::AbstractArray) where T <: AbstractFloat
+function flush!(cutqueue::CutQueue, aggregation::HybridAggregation, metadata::MetaDataChannel, t::Integer, x::AbstractArray)
     flush!(cutqueue, active(aggregation), metadata, t, x)
     if shift(fetch(metadata, t, :gap), aggregation.τ)
         activate_final!(aggregation)
