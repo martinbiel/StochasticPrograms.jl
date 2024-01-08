@@ -31,7 +31,7 @@ using Printf
 # External libraries
 using Parameters
 using JuMP
-using MathOptInterface
+import MathOptInterface as MOI
 using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, ScenarioDecompositionStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems
@@ -45,7 +45,6 @@ using ProgressMeter
 import Base: show, put!, wait, isready, take!, fetch
 import StochasticPrograms: supports_structure, num_iterations, default_structure, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems
 
-const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 
 export

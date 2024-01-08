@@ -31,7 +31,7 @@ using Printf
 # External libraries
 using Parameters
 using JuMP
-using MathOptInterface
+import MathOptInterface as MOI
 using StochasticPrograms
 using StochasticPrograms: AcceptableTermination
 using StochasticPrograms: UnspecifiedInstantiation, StageDecompositionStructure, AbstractScenarioProblems, ScenarioProblems, DistributedScenarioProblems, DecisionChannel
@@ -47,7 +47,6 @@ using Clustering
 import Base: show, put!, wait, isready, take!, fetch, zero, +, length, size
 import StochasticPrograms: supports_structure, num_iterations, default_structure, check_loadable, load_structure!, restore_structure!, optimize!, optimizer_name, master_optimizer, subproblem_optimizer, num_subproblems, remove_penalty_variables!, remove_penalty_constraints!, relax_decision_integrality
 
-const MOI = MathOptInterface
 const MOIU = MOI.Utilities
 const CI = MOI.ConstraintIndex
 const CutConstraint = CI{AffineDecisionFunction{Float64}, MOI.GreaterThan{Float64}}

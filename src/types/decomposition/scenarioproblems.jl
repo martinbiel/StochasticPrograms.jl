@@ -391,7 +391,7 @@ function scenario_decision_dispatch(decision_function::Function,
                                     scenarioproblems::ScenarioProblems,
                                     index::MOI.VariableIndex,
                                     scenario_index::Integer,
-                                    args...) where N
+                                    args...)
     dref = DecisionRef(subproblem(scenarioproblems, scenario_index), index)
     return decision_function(dref, args...)
 end
@@ -399,7 +399,7 @@ function scenario_decision_dispatch(decision_function::Function,
                                     scenarioproblems::DistributedScenarioProblems,
                                     index::MOI.VariableIndex,
                                     scenario_index::Integer,
-                                    args...) where N
+                                    args...)
     return get_from_scenarioproblem(scenarioproblems, scenario_index, decision_function, index, args...) do sp, i, decision_function, index, args...
         subprob = fetch(sp).problems[i]
         dref = DecisionRef(subprob, index)
@@ -410,7 +410,7 @@ function scenario_decision_dispatch!(decision_function!::Function,
                                      scenarioproblems::ScenarioProblems,
                                      index::MOI.VariableIndex,
                                      scenario_index::Integer,
-                                     args...) where N
+                                     args...)
     dref = DecisionRef(subproblem(scenarioproblems, scenario_index), index)
     decision_function!(dref, args...)
     return nothing
@@ -419,7 +419,7 @@ function scenario_decision_dispatch!(decision_function!::Function,
                                      scenarioproblems::DistributedScenarioProblems,
                                      index::MOI.VariableIndex,
                                      scenario_index::Integer,
-                                     args...) where N
+                                     args...)
     set_in_scenarioproblem!(scenarioproblems, scenario_index, decision_function!, index, args...) do sp, i, decision_function!, index, args...
         subprob = fetch(sp).problems[i]
         dref = DecisionRef(subprob, index)
@@ -558,11 +558,11 @@ end
 
 # Getters #
 # ========================== #
-function decision(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer) where N
+function decision(scenarioproblems::ScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
     subprob = subproblem(scenarioproblems, scenario_index)
     return decision(DecisionRef(subprob, index))
 end
-function decision(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer) where N
+function decision(scenarioproblems::DistributedScenarioProblems, index::MOI.VariableIndex, scenario_index::Integer)
     return get_from_scenarioproblem(scenarioproblems, scenario_index, index) do sp, i, index
         subprob = fetch(sp).problems[i]
         return decision(DecisionRef(subprob, index))

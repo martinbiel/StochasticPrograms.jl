@@ -51,9 +51,7 @@ module Crash
 
 using StochasticPrograms
 using StochasticPrograms: AbstractCrash, StochasticProgramOptimizer
-using MathOptInterface
-
-const MOI = MathOptInterface
+import MathOptInterface as MOI
 
 """
     None

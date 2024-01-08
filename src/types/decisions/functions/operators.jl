@@ -858,8 +858,8 @@ function MOIU.operate(::typeof(vcat), ::Type{T},
     out_dim = max(variable_out_dim, decision_out_dim)
     append!(variable_constants, zeros(T, out_dim - length(variable_constants)))
     append!(decision_constants, zeros(T, out_dim - length(decision_constants)))
-    return VectorAffineDecisionFunction{T}(MOIU.VAF(variable_terms, variable_constants),
-                                           MOIU.VAF(decision_terms, decision_constants))
+    return VectorAffineDecisionFunction{T}(MOI.VectorAffineFunction(variable_terms, variable_constants),
+                                           MOI.VectorAffineFunction(decision_terms, decision_constants))
 end
 
 # First or second argument must be decision like to avoid type piracy
